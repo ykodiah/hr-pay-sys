@@ -71,7 +71,9 @@ const employeePayroll = [
     grossPay: 9700,
     paye: 1455,
     ssnit: 873,
-    netPay: 7372,
+    providentFund: 485, // 5% of gross pay
+    providentFundEmployer: 485, // 5% employer contribution
+    netPay: 6887, // Updated to reflect provident fund deduction
     status: "Processed",
   },
   {
@@ -84,7 +86,9 @@ const employeePayroll = [
     grossPay: 8000,
     paye: 1200,
     ssnit: 720,
-    netPay: 6080,
+    providentFund: 400, // 5% of gross pay
+    providentFundEmployer: 400, // 5% employer contribution
+    netPay: 5680, // Updated to reflect provident fund deduction
     status: "Processed",
   },
   {
@@ -97,7 +101,9 @@ const employeePayroll = [
     grossPay: 6200,
     paye: 930,
     ssnit: 558,
-    netPay: 4712,
+    providentFund: 310, // 5% of gross pay
+    providentFundEmployer: 310, // 5% employer contribution
+    netPay: 4402, // Updated to reflect provident fund deduction
     status: "Processing",
   },
 ]
@@ -330,6 +336,10 @@ export default function PayrollPage() {
                   <div>
                     <p className="font-medium text-blue-600">-GHS {employee.ssnit.toLocaleString()}</p>
                     <p className="text-gray-500">SSNIT</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-purple-600">-GHS {employee.providentFund.toLocaleString()}</p>
+                    <p className="text-gray-500">Tier 3</p>
                   </div>
                   <div>
                     <p className="font-medium text-emerald-600">GHS {employee.netPay.toLocaleString()}</p>

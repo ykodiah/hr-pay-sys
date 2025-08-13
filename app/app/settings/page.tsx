@@ -24,6 +24,7 @@ import {
   Key,
   FileText,
 } from "lucide-react"
+import ProvidentFundSettings from "@/components/provident-fund-settings"
 
 export default function SettingsPage() {
   return (
@@ -201,6 +202,11 @@ export default function SettingsPage() {
               <Label htmlFor="auto-ssnit">Auto-calculate SSNIT</Label>
               <Switch id="auto-ssnit" defaultChecked />
             </div>
+            {/* Added provident fund auto-calculation toggle */}
+            <div className="flex items-center justify-between">
+              <Label htmlFor="auto-provident">Auto-calculate Provident Fund (Tier 3)</Label>
+              <Switch id="auto-provident" defaultChecked />
+            </div>
           </CardContent>
         </Card>
 
@@ -249,6 +255,9 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Provident Fund Configuration */}
+      <ProvidentFundSettings />
 
       {/* Security & Notifications */}
       <div className="grid lg:grid-cols-2 gap-6">
