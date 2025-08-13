@@ -32,6 +32,14 @@ export default function ProvidentFundSettings() {
     setConfig((prev) => ({ ...prev, [key]: value }))
   }
 
+  const handleNumberChange = (key: keyof ProvidentFundConfig, value: string, isFloat = false) => {
+    const parsedValue = isFloat ? Number.parseFloat(value) : Number.parseInt(value)
+    // Only update if the value is a valid number, otherwise keep the current value
+    if (!isNaN(parsedValue) && parsedValue >= 0) {
+      handleConfigChange(key, parsedValue)
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -113,8 +121,8 @@ export default function ProvidentFundSettings() {
                     min="0"
                     max="20"
                     step="0.5"
-                    value={config.employeePercentage}
-                    onChange={(e) => handleConfigChange("employeePercentage", Number.parseFloat(e.target.value))}
+                    value={config.employeePercentage.toString()}
+                    onChange={(e) => handleNumberChange("employeePercentage", e.target.value, true)}
                   />
                   <p className="text-xs text-gray-500">Percentage of gross salary</p>
                 </div>
@@ -129,8 +137,8 @@ export default function ProvidentFundSettings() {
                     min="0"
                     max="20"
                     step="0.5"
-                    value={config.employerPercentage}
-                    onChange={(e) => handleConfigChange("employerPercentage", Number.parseFloat(e.target.value))}
+                    value={config.employerPercentage.toString()}
+                    onChange={(e) => handleNumberChange("employerPercentage", e.target.value, true)}
                   />
                   <p className="text-xs text-gray-500">Percentage of gross salary</p>
                 </div>
@@ -145,8 +153,8 @@ export default function ProvidentFundSettings() {
                   id="max-contribution"
                   type="number"
                   min="0"
-                  value={config.maxContribution}
-                  onChange={(e) => handleConfigChange("maxContribution", Number.parseInt(e.target.value))}
+                  value={config.maxContribution.toString()}
+                  onChange={(e) => handleNumberChange("maxContribution", e.target.value)}
                 />
                 <p className="text-xs text-gray-500">Cap on total monthly contribution</p>
               </div>
@@ -157,8 +165,8 @@ export default function ProvidentFundSettings() {
                   id="min-salary"
                   type="number"
                   min="0"
-                  value={config.minSalaryThreshold}
-                  onChange={(e) => handleConfigChange("minSalaryThreshold", Number.parseInt(e.target.value))}
+                  value={config.minSalaryThreshold.toString()}
+                  onChange={(e) => handleNumberChange("minSalaryThreshold", e.target.value)}
                 />
                 <p className="text-xs text-gray-500">Minimum salary to qualify for contributions</p>
               </div>
