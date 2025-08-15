@@ -113,7 +113,7 @@ export default function ReportsPage() {
     {
       id: "employee-payslips",
       name: "Employee Payslips",
-      description: "Individual payslips for all employees",
+      description: "Individual payslips for all employees with bank details",
       category: "payroll",
       frequency: "Monthly",
       lastGenerated: "2025-01-10",
@@ -121,9 +121,9 @@ export default function ReportsPage() {
       downloadCount: 120,
     },
     {
-      id: "ssnit-report",
-      name: "SSNIT Contribution Report",
-      description: "Employee and employer SSNIT contributions",
+      id: "ssnit-tier1-report",
+      name: "SSNIT Tier 1 Report",
+      description: "SSNIT Tier 1 contributions with employee SSNIT numbers",
       category: "compliance",
       frequency: "Monthly",
       lastGenerated: "2025-01-08",
@@ -131,9 +131,19 @@ export default function ReportsPage() {
       downloadCount: 32,
     },
     {
+      id: "ssnit-tier2-report",
+      name: "SSNIT Tier 2 Report",
+      description: "SSNIT Tier 2 contributions with employee SSNIT numbers",
+      category: "compliance",
+      frequency: "Monthly",
+      lastGenerated: "2025-01-08",
+      isScheduled: true,
+      downloadCount: 28,
+    },
+    {
       id: "paye-report",
       name: "PAYE Tax Report",
-      description: "Pay As You Earn tax deductions summary",
+      description: "Pay As You Earn tax deductions with Ghana card numbers",
       category: "compliance",
       frequency: "Monthly",
       lastGenerated: "2025-01-08",
@@ -143,7 +153,7 @@ export default function ReportsPage() {
     {
       id: "tier3-report",
       name: "Tier 3 Provident Fund Report",
-      description: "Provident fund contributions and balances",
+      description: "Provident fund contributions and balances with employee details",
       category: "compliance",
       frequency: "Monthly",
       lastGenerated: "2025-01-08",
@@ -201,9 +211,19 @@ export default function ReportsPage() {
       downloadCount: 19,
     },
     {
+      id: "grouped-payroll-summary",
+      name: "Grouped Payroll Summary",
+      description: "Payroll summary grouped by departments and locations",
+      category: "analytics",
+      frequency: "Monthly",
+      lastGenerated: "2025-01-10",
+      isScheduled: false,
+      downloadCount: 25,
+    },
+    {
       id: "allowances-schedule",
       name: "Allowances Schedule",
-      description: "Detailed breakdown of all employee allowances",
+      description: "Detailed breakdown of taxable and non-taxable allowances",
       category: "payroll",
       frequency: "Monthly",
       lastGenerated: "2025-01-10",
@@ -222,6 +242,28 @@ export default function ReportsPage() {
   })
 
   const handleDownloadReport = (reportId: string, reportName: string, format: "pdf" | "excel" = "pdf") => {
+    let reportContent = ""
+
+    switch (reportId) {
+      case "ssnit-tier1-report":
+        reportContent = generateSSNITTier1Report()
+        break
+      case "ssnit-tier2-report":
+        reportContent = generateSSNITTier2Report()
+        break
+      case "paye-report":
+        reportContent = generatePAYEReport()
+        break
+      case "tier3-report":
+        reportContent = generateTier3Report()
+        break
+      case "allowances-schedule":
+        reportContent = generateAllowancesSchedule()
+        break
+      default:
+        reportContent = `Generated ${reportName} report`
+    }
+
     const link = document.createElement("a")
     link.href = "#"
     link.download = `${reportName.replace(/\s+/g, "_")}.${format}`
@@ -273,6 +315,173 @@ export default function ReportsPage() {
     { name: "HR", value: 54000, employees: 12 },
     { name: "Operations", value: 168000, employees: 82 },
   ]
+
+  const generateSSNITTier1Report = () => {
+    return `
+SSNIT TIER 1 CONTRIBUTION REPORT
+Period: January 2025
+Generated: ${new Date().toLocaleDateString()}
+
+Employee Name          | Employee ID | SSNIT Number      | Basic Salary | Employee (5.5%) | Employer (13%) | Total
+--------------------- | ----------- | ----------------- | ------------ | --------------- | -------------- | -------
+KWAME ASANTE          | EMP001      | GHA-001689781-4   | 8,500.00     | 467.50          | 1,105.00       | 1,572.50
+AMA OSEI              | EMP002      | GHA-002345678-9   | 7,200.00     | 396.00          | 936.00         | 1,332.00
+KOFI MENSAH           | EMP003      | GHA-003456789-0   | 5,800.00     | 319.00          | 754.00         | 1,073.00
+AKOSUA BOATENG        | EMP004      | GHA-004567890-1   | 6,500.00     | 357.50          | 845.00         | 1,202.50
+YAW ADJEI             | EMP005      | GHA-005678901-2   | 4,200.00     | 231.00          | 546.00         | 777.00
+
+TOTALS                |             |                   | 32,200.00    | 1,771.00        | 4,186.00       | 5,957.00
+
+Company: MIKADDO HOLDINGS LIMITED
+Prepared by: AkwaabaHRPay - Welcome to Growth
+    `
+  }
+
+  const generateSSNITTier2Report = () => {
+    return `
+SSNIT TIER 2 CONTRIBUTION REPORT
+Period: January 2025
+Generated: ${new Date().toLocaleDateString()}
+
+Employee Name          | Employee ID | SSNIT Number      | Basic Salary | Tier 2 Fund Name        | Contribution
+--------------------- | ----------- | ----------------- | ------------ | ----------------------- | ------------
+KWAME ASANTE          | EMP001      | GHA-001689781-4   | 8,500.00     | Enterprise Trustees     | 425.00
+AMA OSEI              | EMP002      | GHA-002345678-9   | 7,200.00     | GLICO Pensions          | 360.00
+KOFI MENSAH           | EMP003      | GHA-003456789-0   | 5,800.00     | Metropolitan Pensions   | 290.00
+AKOSUA BOATENG        | EMP004      | GHA-004567890-1   | 6,500.00     | Enterprise Trustees     | 325.00
+YAW ADJEI             | EMP005      | GHA-005678901-2   | 4,200.00     | GLICO Pensions          | 210.00
+
+TOTAL TIER 2 CONTRIBUTIONS                                                                      | 1,610.00
+
+Company: MIKADDO HOLDINGS LIMITED
+Prepared by: AkwaabaHRPay - Welcome to Growth
+    `
+  }
+
+  const generatePAYEReport = () => {
+    return `
+PAYE TAX REPORT
+Period: January 2025
+Generated: ${new Date().toLocaleDateString()}
+
+Employee Name          | Employee ID | Ghana Card Number | Taxable Income | PAYE Tax   | Tax Band
+--------------------- | ----------- | ----------------- | -------------- | ---------- | ---------
+KWAME ASANTE          | EMP001      | GHA-123456789-0   | 7,607.50       | 1,248.98   | 25%
+AMA OSEI              | EMP002      | GHA-234567890-1   | 6,444.00       | 998.75     | 17.5%
+KOFI MENSAH           | EMP003      | GHA-345678901-2   | 5,191.00       | 748.25     | 17.5%
+AKOSUA BOATENG        | EMP004      | GHA-456789012-3   | 5,817.50       | 873.50     | 17.5%
+YAW ADJEI             | EMP005      | GHA-567890123-4   | 3,759.00       | 498.75     | 10%
+
+TOTAL PAYE TAX COLLECTED                                                   | 4,368.23
+
+Tax Rates Applied:
+- 0% on first GHS 365
+- 5% on next GHS 365 (GHS 365 - GHS 730)
+- 10% on next GHS 365 (GHS 730 - GHS 1,095)
+- 17.5% on next GHS 365 (GHS 1,095 - GHS 1,460)
+- 25% on next GHS 2,190 (GHS 1,460 - GHS 3,650)
+- 30% on amounts above GHS 3,650
+
+Company: MIKADDO HOLDINGS LIMITED
+Prepared by: AkwaabaHRPay - Welcome to Growth
+    `
+  }
+
+  const generateTier3Report = () => {
+    return `
+TIER 3 PROVIDENT FUND REPORT
+Period: January 2025
+Generated: ${new Date().toLocaleDateString()}
+
+Employee Name          | Employee ID | Basic Salary | Employee Rate | Employee Contrib | Employer Rate | Employer Contrib | Total
+--------------------- | ----------- | ------------ | ------------- | --------------- | ------------- | --------------- | -------
+KWAME ASANTE          | EMP001      | 8,500.00     | 5.0%          | 425.00          | 5.0%          | 425.00          | 850.00
+AMA OSEI              | EMP002      | 7,200.00     | 5.0%          | 360.00          | 5.0%          | 360.00          | 720.00
+KOFI MENSAH           | EMP003      | 5,800.00     | 3.0%          | 174.00          | 3.0%          | 174.00          | 348.00
+AKOSUA BOATENG        | EMP004      | 6,500.00     | 5.0%          | 325.00          | 5.0%          | 325.00          | 650.00
+YAW ADJEI             | EMP005      | 4,200.00     | 5.0%          | 210.00          | 5.0%          | 210.00          | 420.00
+
+TOTALS                |             | 32,200.00    |               | 1,494.00        |               | 1,494.00        | 2,988.00
+
+Note: Contribution rates are configurable per employee based on their preference and company policy.
+Maximum contribution rate is 20% of basic salary as per Ghana pension regulations.
+
+Company: MIKADDO HOLDINGS LIMITED
+Prepared by: AkwaabaHRPay - Welcome to Growth
+    `
+  }
+
+  const generateAllowancesSchedule = () => {
+    return `
+ALLOWANCES SCHEDULE
+Period: January 2025
+Generated: ${new Date().toLocaleDateString()}
+
+TAXABLE ALLOWANCES:
+Employee Name          | Employee ID | Transport | Housing  | Medical | Other | Total Taxable
+--------------------- | ----------- | --------- | -------- | ------- | ----- | -------------
+KWAME ASANTE          | EMP001      | 500.00    | 600.00   | 100.00  | 0.00  | 1,200.00
+AMA OSEI              | EMP002      | 400.00    | 350.00   | 50.00   | 0.00  | 800.00
+KOFI MENSAH           | EMP003      | 300.00    | 100.00   | 0.00    | 0.00  | 400.00
+AKOSUA BOATENG        | EMP004      | 350.00    | 200.00   | 75.00   | 0.00  | 625.00
+YAW ADJEI             | EMP005      | 250.00    | 150.00   | 0.00    | 0.00  | 400.00
+
+TOTAL TAXABLE ALLOWANCES                                                    | 3,425.00
+
+NON-TAXABLE ALLOWANCES:
+Employee Name          | Employee ID | Uniform  | Training | Tools   | Other | Total Non-Taxable
+--------------------- | ----------- | -------- | -------- | ------- | ----- | -----------------
+KWAME ASANTE          | EMP001      | 0.00     | 200.00   | 100.00  | 0.00  | 300.00
+AMA OSEI              | EMP002      | 0.00     | 150.00   | 0.00    | 0.00  | 150.00
+KOFI MENSAH           | EMP003      | 50.00    | 100.00   | 0.00    | 0.00  | 150.00
+AKOSUA BOATENG        | EMP004      | 0.00     | 100.00   | 50.00   | 0.00  | 150.00
+YAW ADJEI             | EMP005      | 25.00    | 75.00    | 0.00    | 0.00  | 100.00
+
+TOTAL NON-TAXABLE ALLOWANCES                                                | 850.00
+
+GRAND TOTAL ALLOWANCES                                                      | 4,275.00
+
+Note: Taxable allowances are included in PAYE calculations. Non-taxable allowances are exempt from income tax.
+
+Company: MIKADDO HOLDINGS LIMITED
+Prepared by: AkwaabaHRPay - Welcome to Growth
+    `
+  }
+
+  const availableColumns = {
+    payroll: [
+      "employee_name",
+      "employee_id",
+      "ssnit_number",
+      "ghana_card_number",
+      "bank_name",
+      "account_number",
+      "department",
+      "base_salary",
+      "overtime",
+      "allowances_taxable",
+      "allowances_non_taxable",
+      "deductions",
+      "net_pay",
+      "paye",
+      "ssnit_employee",
+      "ssnit_employer",
+      "tier3_employee",
+      "tier3_employer",
+    ],
+    hr: [
+      "employee_name",
+      "employee_id",
+      "ssnit_number",
+      "ghana_card_number",
+      "department",
+      "position",
+      "hire_date",
+      "leave_balance",
+      "performance_rating",
+    ],
+    analytics: ["department", "headcount", "avg_salary", "turnover_rate", "productivity_score"],
+  }
 
   return (
     <div className="space-y-6">
@@ -701,16 +910,35 @@ function CustomReportBuilder({ onClose }: { onClose: () => void }) {
   const availableColumns = {
     payroll: [
       "employee_name",
+      "employee_id",
+      "ssnit_number",
+      "ghana_card_number",
+      "bank_name",
+      "account_number",
       "department",
       "base_salary",
       "overtime",
-      "allowances",
+      "allowances_taxable",
+      "allowances_non_taxable",
       "deductions",
       "net_pay",
       "paye",
-      "ssnit",
+      "ssnit_employee",
+      "ssnit_employer",
+      "tier3_employee",
+      "tier3_employer",
     ],
-    hr: ["employee_name", "department", "position", "hire_date", "leave_balance", "performance_rating"],
+    hr: [
+      "employee_name",
+      "employee_id",
+      "ssnit_number",
+      "ghana_card_number",
+      "department",
+      "position",
+      "hire_date",
+      "leave_balance",
+      "performance_rating",
+    ],
     analytics: ["department", "headcount", "avg_salary", "turnover_rate", "productivity_score"],
   }
 

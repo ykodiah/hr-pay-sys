@@ -30,8 +30,31 @@ import {
   Search,
 } from "lucide-react"
 
-const calculatePAYE = (grossPay: number) => {
-  // Ghana PAYE tax bands for 2025
+const calculateSSNIT = (basicSalary: number) => {
+  const maxSSNITSalary = 4500 // Maximum SSNIT salary ceiling
+  const ssnitSalary = Math.min(basicSalary, maxSSNITSalary)
+  return {
+    employee: Math.round(ssnitSalary * 0.055), // 5.5% on basic salary
+    employer: Math.round(ssnitSalary * 0.13), // 13% on basic salary
+    total: Math.round(ssnitSalary * 0.185),
+  }
+}
+
+const calculateTier3 = (basicSalary: number, contributionRate = 0.05) => {
+  return Math.round(basicSalary * contributionRate)
+}
+
+const calculatePAYE = (
+  basicSalary: number,
+  allowances: number,
+  ssnitEmployee: number,
+  tier3Employee: number,
+  tier3Employer: number,
+) => {
+  // Calculate taxable income: (basic + allowances) - SSNIT Employee - Tier3 (both employee and employer)
+  const taxableIncome = Math.max(0, basicSalary + allowances - ssnitEmployee - tier3Employee - tier3Employer)
+
+  // Ghana PAYE tax bands for 2025 (monthly)
   const taxBands = [
     { min: 0, max: 365, rate: 0 },
     { min: 365, max: 730, rate: 0.05 },
@@ -43,26 +66,12 @@ const calculatePAYE = (grossPay: number) => {
 
   let tax = 0
   for (const band of taxBands) {
-    if (grossPay > band.min) {
-      const taxableAmount = Math.min(grossPay, band.max) - band.min
+    if (taxableIncome > band.min) {
+      const taxableAmount = Math.min(taxableIncome, band.max) - band.min
       tax += taxableAmount * band.rate
     }
   }
   return Math.round(tax)
-}
-
-const calculateSSNIT = (grossPay: number) => {
-  const maxSSNITSalary = 4500 // Maximum SSNIT salary ceiling
-  const ssnitSalary = Math.min(grossPay, maxSSNITSalary)
-  return {
-    employee: Math.round(ssnitSalary * 0.055), // 5.5%
-    employer: Math.round(ssnitSalary * 0.135), // 13.5%
-    total: Math.round(ssnitSalary * 0.19),
-  }
-}
-
-const calculateTier3 = (grossPay: number, contributionRate = 0.05) => {
-  return Math.round(grossPay * contributionRate)
 }
 
 const initialPayrollPeriods = [
@@ -133,7 +142,7 @@ const initialEmployeePayroll = [
     grossPay: 9700,
     paye: 0,
     ssnit: { employee: 0, employer: 0 },
-    tier3: { employee: 0, employer: 0, rate: 0.05 },
+    tier3: { employee: 0, employer: 0, employeeRate: 0.05, employerRate: 0.05 },
     netPay: 0,
     status: "Pending",
     overtimeHours: 8,
@@ -162,7 +171,7 @@ const initialEmployeePayroll = [
     grossPay: 8000,
     paye: 0,
     ssnit: { employee: 0, employer: 0 },
-    tier3: { employee: 0, employer: 0, rate: 0.05 },
+    tier3: { employee: 0, employer: 0, employeeRate: 0.05, employerRate: 0.05 },
     netPay: 0,
     status: "Pending",
     overtimeHours: 4,
@@ -191,7 +200,7 @@ const initialEmployeePayroll = [
     grossPay: 6200,
     paye: 0,
     ssnit: { employee: 0, employer: 0 },
-    tier3: { employee: 0, employer: 0, rate: 0.03 },
+    tier3: { employee: 0, employer: 0, employeeRate: 0.03, employerRate: 0.03 },
     netPay: 0,
     status: "Pending",
     overtimeHours: 0,
@@ -214,11 +223,21 @@ export default function PayrollPage() {
   const currentPeriod = payrollPeriods.find((p) => p.period === selectedPeriod)
 
   const calculateEmployeePayroll = (employee: any) => {
-    const grossPay = employee.basicSalary + employee.allowances.total + employee.overtimeHours * employee.overtimeRate
-    const paye = calculatePAYE(grossPay)
-    const ssnit = calculateSSNIT(grossPay)
-    const tier3Employee = calculateTier3(grossPay, employee.tier3.rate)
-    const tier3Employer = calculateTier3(grossPay, employee.tier3.rate)
+    const basicSalary = employee.basicSalary
+    const allowancesTotal = employee.allowances.total
+    const overtimePay = employee.overtimeHours * employee.overtimeRate
+    const grossPay = basicSalary + allowancesTotal + overtimePay
+
+    // Calculate SSNIT on basic salary only
+    const ssnit = calculateSSNIT(basicSalary)
+
+    // Calculate Tier 3 on basic salary only
+    const tier3Employee = calculateTier3(basicSalary, employee.tier3.employeeRate || 0.05)
+    const tier3Employer = calculateTier3(basicSalary, employee.tier3.employerRate || 0.05)
+
+    // Calculate PAYE: (basic + allowances) - SSNIT Employee - Tier3 (employee + employer)
+    const paye = calculatePAYE(basicSalary, allowancesTotal, ssnit.employee, tier3Employee, tier3Employer)
+
     const totalDeductions = paye + ssnit.employee + tier3Employee + employee.deductions.total
     const netPay = grossPay - totalDeductions
 
@@ -783,11 +802,21 @@ function EditEmployeePayrollForm({
 
   const handleSave = () => {
     // Recalculate payroll with updated data
-    const grossPay = formData.basicSalary + formData.allowances.total + formData.overtimeHours * formData.overtimeRate
-    const paye = calculatePAYE(grossPay)
-    const ssnit = calculateSSNIT(grossPay)
-    const tier3Employee = calculateTier3(grossPay, formData.tier3.rate)
-    const tier3Employer = calculateTier3(grossPay, formData.tier3.rate)
+    const basicSalary = formData.basicSalary
+    const allowancesTotal = formData.allowances.total
+    const overtimePay = formData.overtimeHours * formData.overtimeRate
+    const grossPay = basicSalary + allowancesTotal + overtimePay
+
+    // Calculate SSNIT on basic salary only
+    const ssnit = calculateSSNIT(basicSalary)
+
+    // Calculate Tier 3 on basic salary only
+    const tier3Employee = calculateTier3(basicSalary, formData.tier3.employeeRate || 0.05)
+    const tier3Employer = calculateTier3(basicSalary, formData.tier3.employerRate || 0.05)
+
+    // Calculate PAYE: (basic + allowances) - SSNIT Employee - Tier3 (employee + employer)
+    const paye = calculatePAYE(basicSalary, allowancesTotal, ssnit.employee, tier3Employee, tier3Employer)
+
     const totalDeductions = paye + ssnit.employee + tier3Employee + formData.deductions.total
     const netPay = grossPay - totalDeductions
 
@@ -977,11 +1006,11 @@ function EditEmployeePayrollForm({
             type="number"
             step="0.01"
             max="0.20"
-            value={formData.tier3.rate * 100}
+            value={formData.tier3.employeeRate * 100}
             onChange={(e) =>
               setFormData({
                 ...formData,
-                tier3: { ...formData.tier3, rate: (Number.parseFloat(e.target.value) || 0) / 100 },
+                tier3: { ...formData.tier3, employeeRate: (Number.parseFloat(e.target.value) || 0) / 100 },
               })
             }
           />
@@ -1034,33 +1063,24 @@ function EditEmployeePayrollForm({
                     <span className="text-red-600">
                       GHS{" "}
                       {calculatePAYE(
-                        formData.basicSalary +
-                          formData.allowances.total +
-                          formData.overtimeHours * formData.overtimeRate,
+                        formData.basicSalary,
+                        formData.allowances.total,
+                        calculateSSNIT(formData.basicSalary).employee,
+                        calculateTier3(formData.basicSalary, formData.tier3.employeeRate || 0.05),
+                        calculateTier3(formData.basicSalary, formData.tier3.employerRate || 0.05),
                       ).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>SSNIT (Employee):</span>
                     <span className="text-blue-600">
-                      GHS{" "}
-                      {calculateSSNIT(
-                        formData.basicSalary +
-                          formData.allowances.total +
-                          formData.overtimeHours * formData.overtimeRate,
-                      ).employee.toLocaleString()}
+                      GHS {calculateSSNIT(formData.basicSalary).employee.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Tier 3 ({(formData.tier3.rate * 100).toFixed(1)}%):</span>
+                    <span>Tier 3 ({(formData.tier3.employeeRate * 100).toFixed(1)}%):</span>
                     <span className="text-purple-600">
-                      GHS{" "}
-                      {calculateTier3(
-                        formData.basicSalary +
-                          formData.allowances.total +
-                          formData.overtimeHours * formData.overtimeRate,
-                        formData.tier3.rate,
-                      ).toLocaleString()}
+                      GHS {calculateTier3(formData.basicSalary, formData.tier3.employeeRate || 0.05).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -1082,15 +1102,14 @@ function EditEmployeePayrollForm({
                   formData.allowances.total +
                   formData.overtimeHours * formData.overtimeRate -
                   calculatePAYE(
-                    formData.basicSalary + formData.allowances.total + formData.overtimeHours * formData.overtimeRate,
+                    formData.basicSalary,
+                    formData.allowances.total,
+                    calculateSSNIT(formData.basicSalary).employee,
+                    calculateTier3(formData.basicSalary, formData.tier3.employeeRate || 0.05),
+                    calculateTier3(formData.basicSalary, formData.tier3.employerRate || 0.05),
                   ) -
-                  calculateSSNIT(
-                    formData.basicSalary + formData.allowances.total + formData.overtimeHours * formData.overtimeRate,
-                  ).employee -
-                  calculateTier3(
-                    formData.basicSalary + formData.allowances.total + formData.overtimeHours * formData.overtimeRate,
-                    formData.tier3.rate,
-                  ) -
+                  calculateSSNIT(formData.basicSalary).employee -
+                  calculateTier3(formData.basicSalary, formData.tier3.employeeRate || 0.05) -
                   formData.deductions.total
                 ).toLocaleString()}
               </div>

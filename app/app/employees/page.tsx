@@ -49,8 +49,10 @@ const initialEmployees = [
     dateOfBirth: "1990-05-15",
     address: "East Legon, Accra",
     emergencyContact: "Akosua Asante - +233 20 111 2222",
-    bankAccount: "1234567890",
-    ssnit: "C123456789012",
+    bankName: "GT Bank",
+    bankAccount: "20610953414",
+    ssnit: "GHA-001689781-4",
+    ghanaCard: "GHA-123456789-0",
     leaveBalance: { annual: 15, sick: 10, casual: 5 },
     documents: ["Contract", "ID Copy", "CV"],
   },
@@ -70,8 +72,10 @@ const initialEmployees = [
     dateOfBirth: "1985-07-22",
     address: "Kumasi Central",
     emergencyContact: "Kofi Osei - +233 20 222 3333",
+    bankName: "Ecobank",
     bankAccount: "0987654321",
-    ssnit: "C987654321098",
+    ssnit: "GHA-002345678-9",
+    ghanaCard: "GHA-234567890-1",
     leaveBalance: { annual: 21, sick: 10, casual: 5 },
     documents: ["Contract", "ID Copy"],
   },
@@ -91,8 +95,10 @@ const initialEmployees = [
     dateOfBirth: "1992-03-12",
     address: "Takoradi Beach",
     emergencyContact: "Ama Mensah - +233 20 333 4444",
+    bankName: "Standard Chartered",
     bankAccount: "1122334455",
-    ssnit: "C112233445566",
+    ssnit: "GHA-003456789-0",
+    ghanaCard: "GHA-345678901-2",
     leaveBalance: { annual: 21, sick: 10, casual: 5 },
     documents: ["CV"],
   },
@@ -112,8 +118,10 @@ const initialEmployees = [
     dateOfBirth: "1988-11-11",
     address: "Accra Mall",
     emergencyContact: "Yaw Boateng - +233 20 444 5555",
+    bankName: "Fidelity Bank",
     bankAccount: "5566778899",
-    ssnit: "C556677889900",
+    ssnit: "GHA-004567890-1",
+    ghanaCard: "GHA-456789012-3",
     leaveBalance: { annual: 21, sick: 10, casual: 5 },
     documents: [],
   },
@@ -133,8 +141,10 @@ const initialEmployees = [
     dateOfBirth: "1995-06-06",
     address: "Tamale Town",
     emergencyContact: "Ama Adjei - +233 20 555 6666",
+    bankName: "Access Bank",
     bankAccount: "6677889900",
-    ssnit: "C667788990011",
+    ssnit: "GHA-005678901-2",
+    ghanaCard: "GHA-567890123-4",
     leaveBalance: { annual: 21, sick: 10, casual: 5 },
     documents: [],
   },
@@ -451,8 +461,10 @@ function AddEmployeeForm({
     dateOfBirth: employee?.dateOfBirth || "",
     address: employee?.address || "",
     emergencyContact: employee?.emergencyContact || "",
+    bankName: employee?.bankName || "",
     bankAccount: employee?.bankAccount || "",
     ssnit: employee?.ssnit || "",
+    ghanaCard: employee?.ghanaCard || "",
     status: employee?.status || "Active",
   })
 
@@ -469,6 +481,10 @@ function AddEmployeeForm({
     if (!formData.salary) newErrors.salary = "Salary is required"
     if (!formData.location) newErrors.location = "Location is required"
     if (!formData.startDate) newErrors.startDate = "Start date is required"
+    if (!formData.bankName) newErrors.bankName = "Bank Name is required"
+    if (!formData.bankAccount) newErrors.bankAccount = "Bank Account Number is required"
+    if (!formData.ssnit) newErrors.ssnit = "SSNIT Number is required"
+    if (!formData.ghanaCard) newErrors.ghanaCard = "Ghana Card Number is required"
 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -674,6 +690,29 @@ function AddEmployeeForm({
               {errors.salary && <p className="text-red-500 text-sm mt-1">{errors.salary}</p>}
             </div>
             <div>
+              <Label htmlFor="bankName">Bank Name</Label>
+              <Select value={formData.bankName} onValueChange={(value) => handleInputChange("bankName", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select bank" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GT Bank">GT Bank</SelectItem>
+                  <SelectItem value="Ecobank">Ecobank</SelectItem>
+                  <SelectItem value="Standard Chartered">Standard Chartered</SelectItem>
+                  <SelectItem value="Fidelity Bank">Fidelity Bank</SelectItem>
+                  <SelectItem value="Access Bank">Access Bank</SelectItem>
+                  <SelectItem value="Absa Bank">Absa Bank</SelectItem>
+                  <SelectItem value="Stanbic Bank">Stanbic Bank</SelectItem>
+                  <SelectItem value="UMB Bank">UMB Bank</SelectItem>
+                  <SelectItem value="CAL Bank">CAL Bank</SelectItem>
+                  <SelectItem value="GCB Bank">GCB Bank</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
               <Label htmlFor="bankAccount">Bank Account Number</Label>
               <Input
                 id="bankAccount"
@@ -682,15 +721,24 @@ function AddEmployeeForm({
                 placeholder="Account number"
               />
             </div>
+            <div>
+              <Label htmlFor="ssnit">SSNIT Number</Label>
+              <Input
+                id="ssnit"
+                value={formData.ssnit}
+                onChange={(e) => handleInputChange("ssnit", e.target.value)}
+                placeholder="GHA-123456789-0"
+              />
+            </div>
           </div>
 
           <div>
-            <Label htmlFor="ssnit">SSNIT Number</Label>
+            <Label htmlFor="ghanaCard">Ghana Card Number</Label>
             <Input
-              id="ssnit"
-              value={formData.ssnit}
-              onChange={(e) => handleInputChange("ssnit", e.target.value)}
-              placeholder="C123456789012"
+              id="ghanaCard"
+              value={formData.ghanaCard}
+              onChange={(e) => handleInputChange("ghanaCard", e.target.value)}
+              placeholder="GHA-123456789-0"
             />
           </div>
         </TabsContent>
@@ -802,6 +850,30 @@ function EmployeeProfile({ employee }: { employee: any }) {
               <div className="flex justify-between">
                 <span className="text-gray-600">Salary:</span>
                 <span className="font-semibold">GHS {employee.salary?.toLocaleString()}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Financial Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Bank Name:</span>
+                <span>{employee.bankName || "Not provided"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Account Number:</span>
+                <span>{employee.bankAccount || "Not provided"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">SSNIT Number:</span>
+                <span>{employee.ssnit || "Not provided"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Ghana Card Number:</span>
+                <span>{employee.ghanaCard || "Not provided"}</span>
               </div>
             </CardContent>
           </Card>

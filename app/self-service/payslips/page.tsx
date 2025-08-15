@@ -7,45 +7,73 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { FileText, Download, Eye, Calendar, DollarSign, Calculator, TrendingDown } from "lucide-react"
 
-// Mock payslip data
 const payslips = [
   {
     id: 1,
     period: "January 2025",
+    date: "31/1/2025",
+    printDate: "02/02/2025",
+    employeeName: "KWAME ASANTE",
+    jobTitle: "SENIOR SOFTWARE ENGINEER",
+    employeeId: "EMP001",
+    ssfNo: "GHA-001689781-4",
+    bankName: "GT BANK",
+    accountNumber: "20610953414",
     basicSalary: 8500,
-    allowances: 1200,
-    grossPay: 9700,
-    paye: 1455,
-    ssnit: 873,
-    otherDeductions: 0,
-    netPay: 7372,
+    allowances: {
+      transport: 500,
+      housing: 600,
+      medical: 100,
+      total: 1200,
+    },
+    grossSalary: 9700,
+    deductions: {
+      ssnitEmployee: 467.5, // 5.5% of basic salary
+      paye: 1248.98,
+      providentFundEmployee: 425.0, // 5% of basic salary
+      providentFundEmployer: 425.0, // 5% of basic salary
+      welfare: 20,
+      loans: 0,
+      other: 0,
+    },
+    ssnitEmployer: 1105.0, // 13% of basic salary
+    totalDeductions: 2161.48,
+    netPay: 7538.52,
     payDate: "2025-01-31",
     status: "Paid",
   },
   {
     id: 2,
     period: "December 2024",
+    date: "31/12/2024",
+    printDate: "02/01/2025",
+    employeeName: "KWAME ASANTE",
+    jobTitle: "SENIOR SOFTWARE ENGINEER",
+    employeeId: "EMP001",
+    ssfNo: "GHA-001689781-4",
+    bankName: "GT BANK",
+    accountNumber: "20610953414",
     basicSalary: 8500,
-    allowances: 1000,
-    grossPay: 9500,
-    paye: 1425,
-    ssnit: 855,
-    otherDeductions: 0,
-    netPay: 7220,
+    allowances: {
+      transport: 400,
+      housing: 500,
+      medical: 100,
+      total: 1000,
+    },
+    grossSalary: 9500,
+    deductions: {
+      ssnitEmployee: 467.5,
+      paye: 1198.75,
+      providentFundEmployee: 425.0,
+      providentFundEmployer: 425.0,
+      welfare: 20,
+      loans: 0,
+      other: 0,
+    },
+    ssnitEmployer: 1105.0,
+    totalDeductions: 2111.25,
+    netPay: 7388.75,
     payDate: "2024-12-31",
-    status: "Paid",
-  },
-  {
-    id: 3,
-    period: "November 2024",
-    basicSalary: 8500,
-    allowances: 800,
-    grossPay: 9300,
-    paye: 1395,
-    ssnit: 837,
-    otherDeductions: 0,
-    netPay: 7068,
-    payDate: "2024-11-30",
     status: "Paid",
   },
 ]
@@ -85,7 +113,7 @@ export default function PayslipsPage() {
               <DollarSign className="w-5 h-5 text-emerald-600" />
               <div>
                 <div className="text-2xl font-bold text-gray-900">
-                  GHS {filteredPayslips.reduce((sum, p) => sum + p.grossPay, 0).toLocaleString()}
+                  GHS {filteredPayslips.reduce((sum, p) => sum + p.grossSalary, 0).toLocaleString()}
                 </div>
                 <p className="text-sm text-gray-600">Total Gross Pay</p>
               </div>
@@ -98,7 +126,7 @@ export default function PayslipsPage() {
               <Calculator className="w-5 h-5 text-red-600" />
               <div>
                 <div className="text-2xl font-bold text-gray-900">
-                  GHS {filteredPayslips.reduce((sum, p) => sum + p.paye, 0).toLocaleString()}
+                  GHS {filteredPayslips.reduce((sum, p) => sum + p.deductions.paye, 0).toLocaleString()}
                 </div>
                 <p className="text-sm text-gray-600">Total PAYE</p>
               </div>
@@ -111,7 +139,7 @@ export default function PayslipsPage() {
               <TrendingDown className="w-5 h-5 text-blue-600" />
               <div>
                 <div className="text-2xl font-bold text-gray-900">
-                  GHS {filteredPayslips.reduce((sum, p) => sum + p.ssnit, 0).toLocaleString()}
+                  GHS {filteredPayslips.reduce((sum, p) => sum + p.deductions.ssnitEmployee, 0).toLocaleString()}
                 </div>
                 <p className="text-sm text-gray-600">Total SSNIT</p>
               </div>
@@ -157,15 +185,17 @@ export default function PayslipsPage() {
 
                 <div className="grid grid-cols-4 gap-6 text-center text-sm">
                   <div>
-                    <p className="font-medium text-gray-900">GHS {payslip.grossPay.toLocaleString()}</p>
+                    <p className="font-medium text-gray-900">GHS {payslip.grossSalary.toLocaleString()}</p>
                     <p className="text-gray-500">Gross Pay</p>
                   </div>
                   <div>
-                    <p className="font-medium text-red-600">-GHS {payslip.paye.toLocaleString()}</p>
+                    <p className="font-medium text-red-600">-GHS {payslip.deductions.paye.toLocaleString()}</p>
                     <p className="text-gray-500">PAYE</p>
                   </div>
                   <div>
-                    <p className="font-medium text-blue-600">-GHS {payslip.ssnit.toLocaleString()}</p>
+                    <p className="font-medium text-blue-600">
+                      -GHS {payslip.deductions.ssnitEmployee.toLocaleString()}
+                    </p>
                     <p className="text-gray-500">SSNIT</p>
                   </div>
                   <div>
@@ -188,7 +218,7 @@ export default function PayslipsPage() {
                         View
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
+                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle>Payslip - {payslip.period}</DialogTitle>
                       </DialogHeader>
@@ -223,76 +253,134 @@ export default function PayslipsPage() {
 
 function PayslipDetail({ payslip }: { payslip: any }) {
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="text-center border-b pb-4">
-        <h2 className="text-xl font-bold text-gray-900">AkwaabaHRPay</h2>
-        <p className="text-gray-600">Payslip for {payslip.period}</p>
+    <div className="bg-white p-8 font-mono text-sm" style={{ fontFamily: "monospace" }}>
+      {/* Company Header */}
+      <div className="text-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">MIKADDO HOLDINGS LIMITED</h1>
+        <h2 className="text-xl font-semibold text-gray-800">Payslip</h2>
       </div>
 
-      {/* Employee Info */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <p className="text-sm font-medium text-gray-500">Employee Name</p>
-          <p className="text-lg font-semibold text-gray-900">Kwame Asante</p>
-        </div>
-        <div>
-          <p className="text-sm font-medium text-gray-500">Employee ID</p>
-          <p className="text-lg font-semibold text-gray-900">EMP-001</p>
-        </div>
-        <div>
-          <p className="text-sm font-medium text-gray-500">Department</p>
-          <p className="text-lg font-semibold text-gray-900">Technology</p>
-        </div>
-        <div>
-          <p className="text-sm font-medium text-gray-500">Pay Date</p>
-          <p className="text-lg font-semibold text-gray-900">{new Date(payslip.payDate).toLocaleDateString()}</p>
-        </div>
-      </div>
-
-      {/* Earnings */}
-      <div>
-        <h3 className="font-semibold text-gray-900 mb-3">Earnings</h3>
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span className="text-gray-600">Basic Salary</span>
-            <span className="font-medium">GHS {payslip.basicSalary.toLocaleString()}</span>
+      {/* Header Information */}
+      <div className="grid grid-cols-2 gap-8 mb-6 text-sm">
+        <div className="space-y-1">
+          <div className="flex">
+            <span className="w-16">Date:</span>
+            <span className="font-semibold">{payslip.date}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Allowances</span>
-            <span className="font-medium">GHS {payslip.allowances.toLocaleString()}</span>
+          <div className="flex">
+            <span className="w-16">Period:</span>
+            <span className="font-semibold">{payslip.period}</span>
           </div>
-          <div className="flex justify-between border-t pt-2 font-semibold">
-            <span>Gross Pay</span>
-            <span>GHS {payslip.grossPay.toLocaleString()}</span>
+        </div>
+        <div className="space-y-1">
+          <div className="flex">
+            <span className="w-20">SSF No.</span>
+            <span className="font-semibold">{payslip.ssfNo}</span>
+          </div>
+          <div className="flex">
+            <span className="w-20">Bank:</span>
+            <span className="font-semibold">{payslip.bankName}</span>
           </div>
         </div>
       </div>
 
-      {/* Deductions */}
-      <div>
-        <h3 className="font-semibold text-gray-900 mb-3">Deductions</h3>
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span className="text-gray-600">PAYE Tax</span>
-            <span className="font-medium text-red-600">GHS {payslip.paye.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">SSNIT (Employee)</span>
-            <span className="font-medium text-blue-600">GHS {payslip.ssnit.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between border-t pt-2 font-semibold">
-            <span>Total Deductions</span>
-            <span className="text-red-600">GHS {(payslip.paye + payslip.ssnit).toLocaleString()}</span>
-          </div>
+      {/* Employee Information */}
+      <div className="mb-6 text-sm">
+        <div className="mb-2">
+          <span className="font-semibold">Employee Name: </span>
+          <span className="font-bold">{payslip.employeeName}</span>
+        </div>
+        <div className="mb-2">
+          <span className="font-semibold">Job Title: </span>
+          <span className="font-semibold">{payslip.jobTitle}</span>
+        </div>
+        <div>
+          <span className="font-semibold">Acc. Number: </span>
+          <span className="font-semibold">{payslip.accountNumber}</span>
+        </div>
+      </div>
+
+      {/* Main Payslip Table */}
+      <div className="border-2 border-gray-800 mb-6">
+        {/* Table Header */}
+        <div className="grid grid-cols-4 border-b-2 border-gray-800 bg-gray-100">
+          <div className="p-3 border-r border-gray-800 font-bold text-center">EARNINGS</div>
+          <div className="p-3 border-r border-gray-800 font-bold text-center">AMT(GH¢)</div>
+          <div className="p-3 border-r border-gray-800 font-bold text-center">DEDUCTIONS</div>
+          <div className="p-3 font-bold text-center">AMT(GH¢)</div>
+        </div>
+
+        {/* Basic Salary Row */}
+        <div className="grid grid-cols-4 border-b border-gray-400">
+          <div className="p-3 border-r border-gray-800 font-semibold">BASIC SALARY</div>
+          <div className="p-3 border-r border-gray-800 text-right font-semibold">{payslip.basicSalary.toFixed(2)}</div>
+          <div className="p-3 border-r border-gray-800 font-semibold">SSNIT EMPLOYEE(5.5%)</div>
+          <div className="p-3 text-right font-semibold">{payslip.deductions.ssnitEmployee.toFixed(2)}</div>
+        </div>
+
+        {/* Empty row for spacing */}
+        <div className="grid grid-cols-4 border-b border-gray-400">
+          <div className="p-3 border-r border-gray-800"></div>
+          <div className="p-3 border-r border-gray-800"></div>
+          <div className="p-3 border-r border-gray-800 font-semibold">INCOME TAX</div>
+          <div className="p-3 text-right font-semibold">{payslip.deductions.paye.toFixed(2)}</div>
+        </div>
+
+        {/* Empty row for spacing */}
+        <div className="grid grid-cols-4 border-b border-gray-400">
+          <div className="p-3 border-r border-gray-800"></div>
+          <div className="p-3 border-r border-gray-800"></div>
+          <div className="p-3 border-r border-gray-800 font-semibold">PROVIDENT FUND (5%)</div>
+          <div className="p-3 text-right font-semibold">{payslip.deductions.providentFundEmployee.toFixed(2)}</div>
+        </div>
+
+        {/* Welfare row */}
+        <div className="grid grid-cols-4 border-b border-gray-400">
+          <div className="p-3 border-r border-gray-800"></div>
+          <div className="p-3 border-r border-gray-800"></div>
+          <div className="p-3 border-r border-gray-800 font-semibold">WELFARE</div>
+          <div className="p-3 text-right font-semibold">{payslip.deductions.welfare.toFixed(2)}</div>
+        </div>
+
+        {/* SSNIT Employer row */}
+        <div className="grid grid-cols-4 border-b border-gray-400">
+          <div className="p-3 border-r border-gray-800"></div>
+          <div className="p-3 border-r border-gray-800"></div>
+          <div className="p-3 border-r border-gray-800 font-semibold">SSNIT - EMPLOYER (13%)</div>
+          <div className="p-3 text-right font-semibold">{payslip.ssnitEmployer.toFixed(2)}</div>
+        </div>
+
+        {/* Provident Fund Employer row */}
+        <div className="grid grid-cols-4 border-b-2 border-gray-800">
+          <div className="p-3 border-r border-gray-800"></div>
+          <div className="p-3 border-r border-gray-800"></div>
+          <div className="p-3 border-r border-gray-800 font-semibold">PROVIDENT FUND - EMPLOYER (5%)</div>
+          <div className="p-3 text-right font-semibold">{payslip.deductions.providentFundEmployer.toFixed(2)}</div>
+        </div>
+
+        {/* Totals Row */}
+        <div className="grid grid-cols-4 bg-gray-100">
+          <div className="p-3 border-r border-gray-800 font-bold">GROSS SALARY</div>
+          <div className="p-3 border-r border-gray-800 text-right font-bold">{payslip.grossSalary.toFixed(2)}</div>
+          <div className="p-3 border-r border-gray-800 font-bold">TOTAL DEDUCTIONS</div>
+          <div className="p-3 text-right font-bold">{payslip.totalDeductions.toFixed(2)}</div>
         </div>
       </div>
 
       {/* Net Pay */}
-      <div className="bg-emerald-50 p-4 rounded-lg">
-        <div className="flex justify-between items-center">
-          <span className="text-lg font-semibold text-gray-900">Net Pay</span>
-          <span className="text-2xl font-bold text-emerald-600">GHS {payslip.netPay.toLocaleString()}</span>
+      <div className="text-center mb-8">
+        <div className="inline-block border-2 border-gray-800 bg-gray-100 px-8 py-4">
+          <span className="font-bold text-lg">NET PAY: {payslip.netPay.toFixed(2)}</span>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex justify-between items-center text-xs text-gray-600 border-t pt-4">
+        <div>
+          <span className="font-semibold">akwaabahrpay - Welcome to Growth</span>
+        </div>
+        <div>
+          <span>Print date: {payslip.printDate}</span>
         </div>
       </div>
     </div>
