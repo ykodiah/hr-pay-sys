@@ -827,9 +827,253 @@ function ComplianceAnalytics({ data }: { data: any[] }) {
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {data.map((item, index) => (
-          <Card key={index} className={`border-l-4 ${
-            item.status === 'compliant' ? 'border-l-emerald-500' :
-            item.status === 'warning' ? 'border-l-yellow-500' : 'border-l-red-500'
-          }`}>
+          <Card
+            key={index}
+            className={`border-l-4 ${
+              item.status === "compliant"
+                ? "border-l-emerald-500"
+                : item.status === "warning"
+                  ? "border-l-yellow-500"
+                  : "border-l-red-500"
+            }`}
+          >
             <CardContent className="p-4">
-\
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">{item.name}</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {item.value}/{item.total}
+                  </p>
+                  <div className="flex items-center mt-1">
+                    <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                      <div
+                        className="h-2 rounded-full"
+                        style={{
+                          width: `${(item.value / item.total) * 100}%`,
+                          backgroundColor: item.color,
+                        }}
+                      ></div>
+                    </div>
+                    <span className="text-xs text-gray-600">{Math.round((item.value / item.total) * 100)}%</span>
+                  </div>
+                </div>
+                <Badge
+                  variant={
+                    item.status === "compliant" ? "default" : item.status === "warning" ? "secondary" : "destructive"
+                  }
+                >
+                  {item.status === "compliant"
+                    ? "Compliant"
+                    : item.status === "warning"
+                      ? "Warning"
+                      : "Action Required"}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Compliance Overview</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="value" fill="#10b981" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Compliance Action Items</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {data
+              .filter((item) => item.status !== "compliant")
+              .map((item, index) => (
+                <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <p className="font-medium">{item.name}</p>
+                    <p className="text-sm text-gray-600">{item.total - item.value} employees need attention</p>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    Take Action
+                  </Button>
+                </div>
+              ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function InsightsAnalytics({
+  payrollData,
+  departmentData,
+  performanceData,
+}: {
+  payrollData: any[]
+  departmentData: any[]
+  performanceData: any[]
+}) {
+  const insights = [
+    {
+      title: "Payroll Growth Trend",
+      description: "Monthly payroll has increased by 14.2% over the last 6 months, indicating business growth.",
+      type: "positive",
+      impact: "high",
+      recommendation: "Consider salary benchmarking to ensure competitive compensation.",
+    },
+    {
+      title: "High Turnover in Operations",
+      description: "Operations department shows 18.7% turnover rate, significantly above company average.",
+      type: "warning",
+      impact: "high",
+      recommendation: "Investigate working conditions and implement retention strategies.",
+    },
+    {
+      title: "Technology Department Performance",
+      description: "Tech team shows highest productivity (92%) and satisfaction (4.3/5) scores.",
+      type: "positive",
+      impact: "medium",
+      recommendation: "Use as best practice model for other departments.",
+    },
+    {
+      title: "Tier 3 Enrollment Gap",
+      description: "12 employees not enrolled in Tier 3 pension scheme, affecting compliance.",
+      type: "warning",
+      impact: "medium",
+      recommendation: "Conduct enrollment drive and provide education on pension benefits.",
+    },
+  ]
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>AI-Powered Insights</CardTitle>
+          <p className="text-sm text-gray-600">
+            Automated analysis of your HR and payroll data with actionable recommendations
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {insights.map((insight, index) => (
+              <div
+                key={index}
+                className={`p-4 border rounded-lg ${
+                  insight.type === "positive"
+                    ? "border-emerald-200 bg-emerald-50"
+                    : insight.type === "warning"
+                      ? "border-yellow-200 bg-yellow-50"
+                      : "border-red-200 bg-red-50"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <h4 className="font-medium">{insight.title}</h4>
+                      <Badge
+                        variant={
+                          insight.impact === "high"
+                            ? "destructive"
+                            : insight.impact === "medium"
+                              ? "secondary"
+                              : "default"
+                        }
+                      >
+                        {insight.impact} impact
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-700 mb-2">{insight.description}</p>
+                    <p className="text-sm font-medium text-gray-900">Recommendation: {insight.recommendation}</p>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    View Details
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Predictive Analytics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="p-3 border rounded-lg">
+                <h4 className="font-medium mb-1">Projected Payroll Growth</h4>
+                <p className="text-sm text-gray-600 mb-2">Based on current trends, expect 8-12% growth next quarter</p>
+                <Progress value={75} className="h-2" />
+              </div>
+              <div className="p-3 border rounded-lg">
+                <h4 className="font-medium mb-1">Turnover Risk</h4>
+                <p className="text-sm text-gray-600 mb-2">15 employees identified as high turnover risk</p>
+                <Progress value={60} className="h-2" />
+              </div>
+              <div className="p-3 border rounded-lg">
+                <h4 className="font-medium mb-1">Budget Utilization</h4>
+                <p className="text-sm text-gray-600 mb-2">On track to utilize 97.8% of annual HR budget</p>
+                <Progress value={98} className="h-2" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Benchmarking</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center p-3 border rounded-lg">
+                <div>
+                  <p className="font-medium">Industry Average Salary</p>
+                  <p className="text-sm text-gray-600">Technology Sector</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-emerald-600">+12%</p>
+                  <p className="text-xs text-gray-500">Above average</p>
+                </div>
+              </div>
+              <div className="flex justify-between items-center p-3 border rounded-lg">
+                <div>
+                  <p className="font-medium">Employee Satisfaction</p>
+                  <p className="text-sm text-gray-600">Ghana Market</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-emerald-600">+8%</p>
+                  <p className="text-xs text-gray-500">Above average</p>
+                </div>
+              </div>
+              <div className="flex justify-between items-center p-3 border rounded-lg">
+                <div>
+                  <p className="font-medium">Turnover Rate</p>
+                  <p className="text-sm text-gray-600">Similar Companies</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-red-600">+3%</p>
+                  <p className="text-xs text-gray-500">Above average</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
