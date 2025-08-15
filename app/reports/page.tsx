@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { toast } from "@/hooks/use-toast"
 import {
   Download,
@@ -29,6 +30,7 @@ import {
   FileSpreadsheet,
   FileIcon as FilePdf,
   Save,
+  ChevronDown,
 } from "lucide-react"
 import {
   ResponsiveContainer,
@@ -218,6 +220,18 @@ export default function ReportsPage() {
     const matchesFrequency = selectedFrequency === "all" || report.frequency.toLowerCase() === selectedFrequency
     return matchesSearch && matchesCategory && matchesFrequency
   })
+
+  const handleDownloadReport = (reportId: string, reportName: string, format: "pdf" | "excel" = "pdf") => {
+    const link = document.createElement("a")
+    link.href = "#"
+    link.download = `${reportName.replace(/\s+/g, "_")}.${format}`
+    link.click()
+
+    toast({
+      title: "Download Started",
+      description: `${reportName} is being downloaded in ${format.toUpperCase()} format.`,
+    })
+  }
 
   const handleBulkDownload = async (format: string) => {
     if (selectedReports.length === 0) {
@@ -436,10 +450,25 @@ export default function ReportsPage() {
                   )}
 
                   <div className="flex space-x-2">
-                    <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700">
-                      <Download className="w-4 h-4 mr-1" />
-                      Generate
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700">
+                          <Download className="w-4 h-4 mr-1" />
+                          Generate
+                          <ChevronDown className="w-3 h-3 ml-1" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuItem onClick={() => handleDownloadReport(report.id, report.name, "pdf")}>
+                          <FilePdf className="w-4 h-4 mr-2" />
+                          Download PDF (Default)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDownloadReport(report.id, report.name, "excel")}>
+                          <FileSpreadsheet className="w-4 h-4 mr-2" />
+                          Download Excel
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <Button size="sm" variant="outline" className="bg-transparent">
                       <Eye className="w-4 h-4 mr-1" />
                       Preview

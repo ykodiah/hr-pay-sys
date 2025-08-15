@@ -195,9 +195,21 @@ export default function PayslipsPage() {
                       {selectedPayslip && <PayslipDetail payslip={selectedPayslip} />}
                     </DialogContent>
                   </Dialog>
-                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                  <Button
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    onClick={() => {
+                      // Simulate PDF download
+                      const link = document.createElement("a")
+                      link.href = "#"
+                      link.download = `Payslip_${payslip.period.replace(" ", "_")}.pdf`
+                      link.click()
+                      // Show success message
+                      alert(`Payslip for ${payslip.period} downloaded successfully!`)
+                    }}
+                  >
                     <Download className="w-4 h-4 mr-2" />
-                    Download
+                    Download PDF
                   </Button>
                 </div>
               </div>

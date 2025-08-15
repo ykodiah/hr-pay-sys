@@ -1,3 +1,5 @@
+"use client"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -109,8 +111,22 @@ export default function SelfServiceDashboard() {
                   <p className="font-medium text-gray-900">January 2025</p>
                   <p className="text-sm text-gray-600">Net Pay: GHS 7,372</p>
                 </div>
-                <Button size="sm" variant="outline" className="bg-transparent">
-                  Download
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="bg-transparent"
+                  onClick={() => {
+                    // Simulate PDF download
+                    const link = document.createElement("a")
+                    link.href = "#"
+                    link.download = "Payslip_January_2025.pdf"
+                    link.click()
+                    // Show success message
+                    alert("Payslip downloaded successfully!")
+                  }}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Download PDF
                 </Button>
               </div>
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -118,8 +134,20 @@ export default function SelfServiceDashboard() {
                   <p className="font-medium text-gray-900">December 2024</p>
                   <p className="text-sm text-gray-600">Net Pay: GHS 7,285</p>
                 </div>
-                <Button size="sm" variant="outline" className="bg-transparent">
-                  Download
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="bg-transparent"
+                  onClick={() => {
+                    const link = document.createElement("a")
+                    link.href = "#"
+                    link.download = "Payslip_December_2024.pdf"
+                    link.click()
+                    alert("Payslip downloaded successfully!")
+                  }}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Download PDF
                 </Button>
               </div>
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -127,8 +155,20 @@ export default function SelfServiceDashboard() {
                   <p className="font-medium text-gray-900">November 2024</p>
                   <p className="text-sm text-gray-600">Net Pay: GHS 7,156</p>
                 </div>
-                <Button size="sm" variant="outline" className="bg-transparent">
-                  Download
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="bg-transparent"
+                  onClick={() => {
+                    const link = document.createElement("a")
+                    link.href = "#"
+                    link.download = "Payslip_November_2024.pdf"
+                    link.click()
+                    alert("Payslip downloaded successfully!")
+                  }}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Download PDF
                 </Button>
               </div>
             </div>
