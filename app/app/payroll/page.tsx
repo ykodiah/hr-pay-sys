@@ -54,15 +54,15 @@ const calculatePAYE = (
   // Calculate taxable income: (basic + allowances) - SSNIT Employee - Tier3 (both employee and employer)
   const taxableIncome = Math.max(0, basicSalary + allowances - ssnitEmployee - tier3Employee - tier3Employer)
 
-  // Ghana PAYE tax bands for 2024/2025 (monthly) - correct rates from GRA
+  // Ghana PAYE tax bands for 2024/2025 (monthly rates)
   const taxBands = [
-    { min: 0, max: 490, rate: 0 }, // First GHS 490: 0%
-    { min: 490, max: 600, rate: 0.05 }, // Next GHS 110: 5%
-    { min: 600, max: 730, rate: 0.1 }, // Next GHS 130: 10%
-    { min: 730, max: 3896.67, rate: 0.175 }, // Next GHS 3,166.67: 17.5%
-    { min: 3896.67, max: 19896.67, rate: 0.25 }, // Next GHS 16,000: 25%
-    { min: 19896.67, max: 50416.67, rate: 0.3 }, // Next GHS 30,520: 30%
-    { min: 50416.67, max: Number.POSITIVE_INFINITY, rate: 0.35 }, // Exceeding GHS 50,000: 35%
+    { min: 0, max: 490, rate: 0 }, // First GH₵ 490: 0%
+    { min: 490, max: 600, rate: 0.05 }, // Next GH₵ 110: 5%
+    { min: 600, max: 730, rate: 0.1 }, // Next GH₵ 130: 10%
+    { min: 730, max: 3896.67, rate: 0.175 }, // Next GH₵ 3,166.67: 17.5%
+    { min: 3896.67, max: 19896.67, rate: 0.25 }, // Next GH₵ 16,000: 25%
+    { min: 19896.67, max: 50416.67, rate: 0.3 }, // Next GH₵ 30,520: 30%
+    { min: 50416.67, max: Number.POSITIVE_INFINITY, rate: 0.35 }, // Exceeding GH₵ 50,000: 35%
   ]
 
   let tax = 0
@@ -74,20 +74,13 @@ const calculatePAYE = (
     const bandWidth = band.max - band.min
     const taxableInBand = Math.min(remainingIncome, bandWidth)
 
-    if (taxableIncome > band.min) {
+    if (taxableInBand > 0) {
       tax += taxableInBand * band.rate
       remainingIncome -= taxableInBand
     }
   }
 
   return Math.round(tax)
-}
-
-const calculateConditionalTier3 = (basicSalary: number, employeeRate: number, employerRate: number) => {
-  return {
-    employee: employeeRate > 0 ? Math.round(basicSalary * employeeRate) : 0,
-    employer: employerRate > 0 ? Math.round(basicSalary * employerRate) : 0,
-  }
 }
 
 const initialPayrollPeriods = [
@@ -153,6 +146,7 @@ const initialEmployeePayroll = [
       loans: 200,
       advances: 0,
       other: 0,
+      welfare: 0,
       total: 200,
     },
     grossPay: 9700,
@@ -182,6 +176,7 @@ const initialEmployeePayroll = [
       loans: 150,
       advances: 50,
       other: 0,
+      welfare: 0,
       total: 200,
     },
     grossPay: 8000,
@@ -211,6 +206,7 @@ const initialEmployeePayroll = [
       loans: 100,
       advances: 0,
       other: 25,
+      welfare: 0,
       total: 125,
     },
     grossPay: 6200,
@@ -247,28 +243,22 @@ export default function PayrollPage() {
     // Calculate SSNIT on basic salary only
     const ssnit = calculateSSNIT(basicSalary)
 
-    // Calculate Tier 3 with conditional rates
-    const tier3Rates = calculateConditionalTier3(
-      basicSalary,
-      employee.tier3.employeeRate || 0,
-      employee.tier3.employerRate || 0,
-    )
+    // Calculate Tier 3 on basic salary only - check if employer contributes
+    const tier3EmployeeRate = employee.tier3.employeeRate || 0
+    const tier3EmployerRate = employee.tier3.employerRate || 0
+    const tier3Employee = tier3EmployeeRate > 0 ? calculateTier3(basicSalary, tier3EmployeeRate) : 0
+    const tier3Employer = tier3EmployerRate > 0 ? calculateTier3(basicSalary, tier3EmployerRate) : 0
 
     // Calculate PAYE: (basic + allowances) - SSNIT Employee - Tier3 (employee + employer)
-    const paye = calculatePAYE(basicSalary, allowancesTotal, ssnit.employee, tier3Rates.employee, tier3Rates.employer)
+    const paye = calculatePAYE(basicSalary, allowancesTotal, ssnit.employee, tier3Employee, tier3Employer)
 
-    // Only include non-zero deductions
-    const applicableDeductions = {
-      paye: paye,
-      ssnitEmployee: ssnit.employee,
-      tier3Employee: tier3Rates.employee,
-      welfare: employee.deductions.welfare || 0,
-      loans: employee.deductions.loans || 0,
-      advances: employee.deductions.advances || 0,
-      other: employee.deductions.other || 0,
-    }
+    // Only include applicable deductions
+    let totalDeductions = paye + ssnit.employee
+    if (tier3Employee > 0) totalDeductions += tier3Employee
+    if (employee.deductions.welfare > 0) totalDeductions += employee.deductions.welfare
+    if (employee.deductions.loans > 0) totalDeductions += employee.deductions.loans
+    if (employee.deductions.other > 0) totalDeductions += employee.deductions.other
 
-    const totalDeductions = Object.values(applicableDeductions).reduce((sum, val) => sum + val, 0)
     const netPay = grossPay - totalDeductions
 
     return {
@@ -276,8 +266,13 @@ export default function PayrollPage() {
       grossPay,
       paye,
       ssnit: { employee: ssnit.employee, employer: ssnit.employer },
-      tier3: { ...employee.tier3, employee: tier3Rates.employee, employer: tier3Rates.employer },
-      deductions: { ...employee.deductions, ...applicableDeductions },
+      tier3: {
+        ...employee.tier3,
+        employee: tier3Employee,
+        employer: tier3Employer,
+        employeeRate: tier3EmployeeRate,
+        employerRate: tier3EmployerRate,
+      },
       netPay,
       status: "Calculated",
     }
@@ -841,17 +836,22 @@ function EditEmployeePayrollForm({
     // Calculate SSNIT on basic salary only
     const ssnit = calculateSSNIT(basicSalary)
 
-    // Calculate Tier 3 with conditional rates
-    const tier3Rates = calculateConditionalTier3(
-      basicSalary,
-      formData.tier3.employeeRate || 0,
-      formData.tier3.employerRate || 0,
-    )
+    // Calculate Tier 3 on basic salary only - check if employer contributes
+    const tier3EmployeeRate = formData.tier3.employeeRate || 0
+    const tier3EmployerRate = formData.tier3.employerRate || 0
+    const tier3Employee = tier3EmployeeRate > 0 ? calculateTier3(basicSalary, tier3EmployeeRate) : 0
+    const tier3Employer = tier3EmployerRate > 0 ? calculateTier3(basicSalary, tier3EmployerRate) : 0
 
     // Calculate PAYE: (basic + allowances) - SSNIT Employee - Tier3 (employee + employer)
-    const paye = calculatePAYE(basicSalary, allowancesTotal, ssnit.employee, tier3Rates.employee, tier3Rates.employer)
+    const paye = calculatePAYE(basicSalary, allowancesTotal, ssnit.employee, tier3Employee, tier3Employer)
 
-    const totalDeductions = paye + ssnit.employee + tier3Rates.employee + formData.deductions.total
+    // Only include applicable deductions
+    let totalDeductions = paye + ssnit.employee
+    if (tier3Employee > 0) totalDeductions += tier3Employee
+    if (formData.deductions.welfare > 0) totalDeductions += formData.deductions.welfare
+    if (formData.deductions.loans > 0) totalDeductions += formData.deductions.loans
+    if (formData.deductions.other > 0) totalDeductions += formData.deductions.other
+
     const netPay = grossPay - totalDeductions
 
     const updatedEmployee = {
@@ -859,7 +859,13 @@ function EditEmployeePayrollForm({
       grossPay,
       paye,
       ssnit: { employee: ssnit.employee, employer: ssnit.employer },
-      tier3: { ...formData.tier3, employee: tier3Rates.employee, employer: tier3Rates.employer },
+      tier3: {
+        ...formData.tier3,
+        employee: tier3Employee,
+        employer: tier3Employer,
+        employeeRate: tier3EmployeeRate,
+        employerRate: tier3EmployerRate,
+      },
       netPay,
       status: "Calculated",
     }
@@ -988,7 +994,8 @@ function EditEmployeePayrollForm({
                   deductions: {
                     ...formData.deductions,
                     loans,
-                    total: loans + formData.deductions.advances + formData.deductions.other,
+                    total:
+                      loans + formData.deductions.advances + formData.deductions.other + formData.deductions.welfare,
                   },
                 })
               }}
@@ -1007,7 +1014,8 @@ function EditEmployeePayrollForm({
                   deductions: {
                     ...formData.deductions,
                     advances,
-                    total: formData.deductions.loans + advances + formData.deductions.other,
+                    total:
+                      formData.deductions.loans + advances + formData.deductions.other + formData.deductions.welfare,
                   },
                 })
               }}
@@ -1027,7 +1035,26 @@ function EditEmployeePayrollForm({
                 deductions: {
                   ...formData.deductions,
                   other,
-                  total: formData.deductions.loans + formData.deductions.advances + other,
+                  total: formData.deductions.loans + formData.deductions.advances + other + formData.deductions.welfare,
+                },
+              })
+            }}
+          />
+        </div>
+        <div>
+          <Label htmlFor="welfare">Welfare Deductions</Label>
+          <Input
+            id="welfare"
+            type="number"
+            value={formData.deductions.welfare}
+            onChange={(e) => {
+              const welfare = Number.parseFloat(e.target.value) || 0
+              setFormData({
+                ...formData,
+                deductions: {
+                  ...formData.deductions,
+                  welfare,
+                  total: formData.deductions.loans + formData.deductions.advances + formData.deductions.other + welfare,
                 },
               })
             }}
@@ -1164,5 +1191,3 @@ function EditEmployeePayrollForm({
     </Tabs>
   )
 }
-
-</merged_code>

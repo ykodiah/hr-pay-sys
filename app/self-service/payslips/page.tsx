@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { toast } from "@/hooks/use-toast"
 import { FileText, Download, Eye, Calendar, DollarSign, Calculator, TrendingDown } from "lucide-react"
 
 const payslips = [
@@ -12,14 +13,14 @@ const payslips = [
     id: 1,
     period: "January 2025",
     date: "31/1/2025",
-    processedDate: "2025-01-31T14:30:00", // Added processed date/time
+    processedDate: "2025-01-31T14:30:00",
     employeeName: "KWAME ASANTE",
     jobTitle: "SENIOR SOFTWARE ENGINEER",
     employeeId: "EMP001",
-    ssnitNo: "GHA-001689781-4", // Changed from ssfNo to ssnitNo
+    ssnitNo: "GHA-001689781-4",
     bankName: "GT BANK",
     accountNumber: "20610953414",
-    companyName: "AKWAABA HOLDINGS LIMITED", // Dynamic company name
+    companyName: "AKWAABA HOLDINGS LIMITED",
     basicSalary: 8500,
     allowances: [
       { name: "Transport Allowance", amount: 500, taxable: true },
@@ -29,19 +30,19 @@ const payslips = [
     totalAllowances: 1200,
     grossSalary: 9700,
     deductions: {
-      ssnitEmployee: 467.5, // 5.5% of basic salary
+      ssnitEmployee: 467.5,
       paye: 1248.98,
-      providentFundEmployee: 425.0, // 5% of basic salary
+      providentFundEmployee: 425.0,
       welfare: 20,
-      loans: 200, // Added loan deduction for this employee
+      loans: 200,
       other: 0,
     },
     employerContributions: {
-      ssnitEmployer: 1105.0, // 13% of basic salary
-      providentFundEmployer: 425.0, // 5% of basic salary
+      ssnitEmployer: 1105.0,
+      providentFundEmployer: 425.0,
     },
-    totalDeductions: 2361.48, // Updated to include loans
-    netPay: 5338.52, // Updated net pay
+    totalDeductions: 2361.48,
+    netPay: 5338.52,
     payDate: "2025-01-31",
     status: "Paid",
   },
@@ -70,7 +71,7 @@ const payslips = [
       paye: 1198.75,
       providentFundEmployee: 425.0,
       welfare: 20,
-      loans: 0, // No loans for this period
+      loans: 0,
       other: 0,
     },
     employerContributions: {
@@ -92,27 +93,32 @@ export default function PayslipsPage() {
 
   const downloadPDF = (payslip: any) => {
     try {
-      // Create a new window with the payslip content
-      const printWindow = window.open("", "_blank")
-      if (printWindow) {
-        const payslipHTML = generatePayslipHTML(payslip)
-        printWindow.document.write(payslipHTML)
-        printWindow.document.close()
+      const payslipHTML = generatePayslipHTML(payslip)
 
-        // Wait for content to load then print
-        printWindow.onload = () => {
-          printWindow.print()
-          printWindow.close()
-        }
+      // Create blob and download link
+      const blob = new Blob([payslipHTML], { type: "text/html" })
+      const url = URL.createObjectURL(blob)
 
-        // Show success message
-        setTimeout(() => {
-          alert(`Payslip for ${payslip.period} is ready for download!`)
-        }, 500)
-      }
+      // Create temporary link and trigger download
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `Payslip_${payslip.period.replace(" ", "_")}_${payslip.employeeName.replace(" ", "_")}.html`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Payslip Downloaded",
+        description: `Payslip for ${payslip.period} has been downloaded successfully.`,
+      })
     } catch (error) {
       console.error("PDF generation error:", error)
-      alert("Error generating PDF. Please try again.")
+      toast({
+        title: "Download Error",
+        description: "Error generating payslip. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -137,8 +143,7 @@ export default function PayslipsPage() {
         </Select>
       </div>
 
-      {/* Year Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
@@ -155,12 +160,45 @@ export default function PayslipsPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
+              <Calculator className="w-5 h-5 text-blue-600" />
+              <div>
+                <div className="text-2xl font-bold text-gray-900">
+                  GHS {filteredPayslips.reduce((sum, p) => sum + p.totalAllowances, 0).toLocaleString()}
+                </div>
+                <p className="text-sm text-gray-600">Total Allowances</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <TrendingDown className="w-5 h-5 text-purple-600" />
+              <div>
+                <div className="text-2xl font-bold text-gray-900">
+                  GHS{" "}
+                  {filteredPayslips
+                    .reduce(
+                      (sum, p) =>
+                        sum + p.deductions.providentFundEmployee + p.employerContributions.providentFundEmployer,
+                      0,
+                    )
+                    .toLocaleString()}
+                </div>
+                <p className="text-sm text-gray-600">Total PF (Employee + Employer)</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
               <Calculator className="w-5 h-5 text-red-600" />
               <div>
                 <div className="text-2xl font-bold text-gray-900">
-                  GHS {filteredPayslips.reduce((sum, p) => sum + p.deductions.paye, 0).toLocaleString()}
+                  GHS {filteredPayslips.reduce((sum, p) => sum + p.totalDeductions, 0).toLocaleString()}
                 </div>
-                <p className="text-sm text-gray-600">Total PAYE</p>
+                <p className="text-sm text-gray-600">Total Deductions</p>
               </div>
             </div>
           </CardContent>
@@ -168,20 +206,7 @@ export default function PayslipsPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <TrendingDown className="w-5 h-5 text-blue-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">
-                  GHS {filteredPayslips.reduce((sum, p) => sum + p.deductions.ssnitEmployee, 0).toLocaleString()}
-                </div>
-                <p className="text-sm text-gray-600">Total SSNIT</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <FileText className="w-5 h-5 text-purple-600" />
+              <FileText className="w-5 h-5 text-emerald-600" />
               <div>
                 <div className="text-2xl font-bold text-gray-900">
                   GHS {filteredPayslips.reduce((sum, p) => sum + p.netPay, 0).toLocaleString()}
@@ -280,7 +305,7 @@ function PayslipDetail({ payslip }: { payslip: any }) {
     { name: "SSNIT EMPLOYEE(5.5%)", amount: payslip.deductions.ssnitEmployee },
     { name: "INCOME TAX", amount: payslip.deductions.paye },
     { name: "PROVIDENT FUND (5%)", amount: payslip.deductions.providentFundEmployee },
-    { name: "WELFARE", amount: payslip.deductions.welfare },
+    ...(payslip.deductions.welfare > 0 ? [{ name: "WELFARE", amount: payslip.deductions.welfare }] : []),
     ...(payslip.deductions.loans > 0 ? [{ name: "LOANS", amount: payslip.deductions.loans }] : []),
     ...(payslip.deductions.other > 0 ? [{ name: "OTHER DEDUCTIONS", amount: payslip.deductions.other }] : []),
   ].filter((deduction) => deduction.amount > 0)
@@ -315,7 +340,6 @@ function PayslipDetail({ payslip }: { payslip: any }) {
         </div>
       </div>
 
-      {/* Employee Information */}
       <div className="mb-6 text-sm">
         <div className="mb-2">
           <span className="font-semibold">Employee Name: </span>
@@ -339,7 +363,6 @@ function PayslipDetail({ payslip }: { payslip: any }) {
           <div className="p-3 font-bold text-center">AMT(GH¢)</div>
         </div>
 
-        {/* Basic Salary Row */}
         <div className="grid grid-cols-4 border-b border-gray-400">
           <div className="p-3 border-r border-gray-800 font-semibold">BASIC SALARY</div>
           <div className="p-3 border-r border-gray-800 text-right font-semibold">{payslip.basicSalary.toFixed(2)}</div>
@@ -369,7 +392,6 @@ function PayslipDetail({ payslip }: { payslip: any }) {
           </div>
         ))}
 
-        {/* Totals Row */}
         <div className="grid grid-cols-4 bg-gray-100 border-t-2 border-gray-800">
           <div className="p-3 border-r border-gray-800 font-bold">GROSS SALARY</div>
           <div className="p-3 border-r border-gray-800 text-right font-bold">{payslip.grossSalary.toFixed(2)}</div>
@@ -391,10 +413,14 @@ function PayslipDetail({ payslip }: { payslip: any }) {
             <span>SSNIT - EMPLOYER (13%):</span>
             <span className="font-semibold">GHS {payslip.employerContributions.ssnitEmployer.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between">
-            <span>PROVIDENT FUND - EMPLOYER (5%):</span>
-            <span className="font-semibold">GHS {payslip.employerContributions.providentFundEmployer.toFixed(2)}</span>
-          </div>
+          {payslip.employerContributions.providentFundEmployer > 0 && (
+            <div className="flex justify-between">
+              <span>PROVIDENT FUND - EMPLOYER (5%):</span>
+              <span className="font-semibold">
+                GHS {payslip.employerContributions.providentFundEmployer.toFixed(2)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -415,7 +441,7 @@ function generatePayslipHTML(payslip: any): string {
     { name: "SSNIT EMPLOYEE(5.5%)", amount: payslip.deductions.ssnitEmployee },
     { name: "INCOME TAX", amount: payslip.deductions.paye },
     { name: "PROVIDENT FUND (5%)", amount: payslip.deductions.providentFundEmployee },
-    { name: "WELFARE", amount: payslip.deductions.welfare },
+    ...(payslip.deductions.welfare > 0 ? [{ name: "WELFARE", amount: payslip.deductions.welfare }] : []),
     ...(payslip.deductions.loans > 0 ? [{ name: "LOANS", amount: payslip.deductions.loans }] : []),
     ...(payslip.deductions.other > 0 ? [{ name: "OTHER DEDUCTIONS", amount: payslip.deductions.other }] : []),
   ].filter((deduction) => deduction.amount > 0)
@@ -424,25 +450,81 @@ function generatePayslipHTML(payslip: any): string {
     <!DOCTYPE html>
     <html>
     <head>
+      <meta charset="UTF-8">
       <title>Payslip - ${payslip.period}</title>
       <style>
-        body { font-family: monospace; font-size: 12px; margin: 20px; }
+        @media print {
+          body { margin: 0; }
+          .no-print { display: none; }
+        }
+        body { 
+          font-family: 'Courier New', monospace; 
+          font-size: 12px; 
+          margin: 20px; 
+          line-height: 1.4;
+          color: #000;
+        }
         .header { text-align: center; margin-bottom: 20px; }
         .company-name { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
         .payslip-title { font-size: 16px; font-weight: bold; }
         .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
         .employee-info { margin-bottom: 20px; }
-        .payslip-table { border: 2px solid #000; border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-        .payslip-table th, .payslip-table td { border: 1px solid #000; padding: 8px; text-align: left; }
-        .payslip-table th { background-color: #f0f0f0; font-weight: bold; text-align: center; }
-        .amount { text-align: right; }
-        .net-pay { text-align: center; margin-bottom: 20px; }
-        .net-pay-box { display: inline-block; border: 2px solid #000; background-color: #f0f0f0; padding: 15px; }
+        .payslip-table { 
+          border: 2px solid #000; 
+          border-collapse: collapse; 
+          width: 100%; 
+          margin-bottom: 20px; 
+        }
+        .payslip-table th, .payslip-table td { 
+          border: 1px solid #000; 
+          padding: 8px; 
+          text-align: left; 
+          vertical-align: top;
+        }
+        .payslip-table th { 
+          background-color: #f0f0f0; 
+          font-weight: bold; 
+          text-align: center; 
+        }
+        .amount { text-align: right; font-weight: bold; }
+        .net-pay { text-align: center; margin: 20px 0; }
+        .net-pay-box { 
+          display: inline-block; 
+          border: 2px solid #000; 
+          background-color: #f0f0f0; 
+          padding: 15px; 
+          font-weight: bold;
+          font-size: 14px;
+        }
         .employer-contributions { margin-bottom: 20px; }
-        .footer { border-top: 1px solid #000; padding-top: 10px; display: flex; justify-content: space-between; font-size: 10px; }
+        .footer { 
+          border-top: 1px solid #000; 
+          padding-top: 10px; 
+          display: flex; 
+          justify-content: space-between; 
+          font-size: 10px; 
+          margin-top: 30px;
+        }
+        .print-button {
+          margin: 20px 0;
+          text-align: center;
+        }
+        .print-btn {
+          background-color: #059669;
+          color: white;
+          padding: 10px 20px;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+          font-size: 14px;
+        }
       </style>
     </head>
     <body>
+      <div class="print-button no-print">
+        <button class="print-btn" onclick="window.print()">Print Payslip</button>
+      </div>
+      
       <div class="header">
         <div class="company-name">${payslip.companyName}</div>
         <div class="payslip-title">Payslip</div>
@@ -467,24 +549,24 @@ function generatePayslipHTML(payslip: any): string {
       
       <table class="payslip-table">
         <tr>
-          <th>EARNINGS</th>
-          <th>AMT(GHS)</th>
-          <th>DEDUCTIONS</th>
-          <th>AMT(GHS)</th>
+          <th style="width: 25%;">EARNINGS</th>
+          <th style="width: 25%;">AMT(GHS)</th>
+          <th style="width: 25%;">DEDUCTIONS</th>
+          <th style="width: 25%;">AMT(GHS)</th>
         </tr>
         <tr>
-          <td>BASIC SALARY</td>
+          <td><strong>BASIC SALARY</strong></td>
           <td class="amount">${payslip.basicSalary.toFixed(2)}</td>
-          <td>${applicableDeductions[0]?.name || ""}</td>
+          <td><strong>${applicableDeductions[0]?.name || ""}</strong></td>
           <td class="amount">${applicableDeductions[0]?.amount.toFixed(2) || ""}</td>
         </tr>
         ${payslip.allowances
           .map(
             (allowance: any, index: number) => `
           <tr>
-            <td>${allowance.name.toUpperCase()}</td>
+            <td><strong>${allowance.name.toUpperCase()}</strong></td>
             <td class="amount">${allowance.amount.toFixed(2)}</td>
-            <td>${applicableDeductions[index + 1]?.name || ""}</td>
+            <td><strong>${applicableDeductions[index + 1]?.name || ""}</strong></td>
             <td class="amount">${applicableDeductions[index + 1]?.amount.toFixed(2) || ""}</td>
           </tr>
         `,
@@ -497,31 +579,35 @@ function generatePayslipHTML(payslip: any): string {
           <tr>
             <td></td>
             <td></td>
-            <td>${deduction.name}</td>
+            <td><strong>${deduction.name}</strong></td>
             <td class="amount">${deduction.amount.toFixed(2)}</td>
           </tr>
         `,
           )
           .join("")}
-        <tr style="background-color: #f0f0f0; font-weight: bold;">
-          <td>GROSS SALARY</td>
-          <td class="amount">${payslip.grossSalary.toFixed(2)}</td>
-          <td>TOTAL DEDUCTIONS</td>
-          <td class="amount">${payslip.totalDeductions.toFixed(2)}</td>
+        <tr style="background-color: #f0f0f0;">
+          <td><strong>GROSS SALARY</strong></td>
+          <td class="amount"><strong>${payslip.grossSalary.toFixed(2)}</strong></td>
+          <td><strong>TOTAL DEDUCTIONS</strong></td>
+          <td class="amount"><strong>${payslip.totalDeductions.toFixed(2)}</strong></td>
         </tr>
       </table>
       
       <div class="net-pay">
         <div class="net-pay-box">
-          <strong>NET PAY: GHS ${payslip.netPay.toFixed(2)}</strong>
+          NET PAY: GHS ${payslip.netPay.toFixed(2)}
         </div>
       </div>
       
       <div class="employer-contributions">
         <div><strong>Employer Contributions:</strong></div>
-        <div style="padding-left: 20px;">
+        <div style="padding-left: 20px; margin-top: 10px;">
           <div>SSNIT - EMPLOYER (13%): <strong>GHS ${payslip.employerContributions.ssnitEmployer.toFixed(2)}</strong></div>
-          <div>PROVIDENT FUND - EMPLOYER (5%): <strong>GHS ${payslip.employerContributions.providentFundEmployer.toFixed(2)}</strong></div>
+          ${
+            payslip.employerContributions.providentFundEmployer > 0
+              ? `<div>PROVIDENT FUND - EMPLOYER (5%): <strong>GHS ${payslip.employerContributions.providentFundEmployer.toFixed(2)}</strong></div>`
+              : ""
+          }
         </div>
       </div>
       
@@ -529,6 +615,15 @@ function generatePayslipHTML(payslip: any): string {
         <div><strong>akwaabahrpay - Welcome to Growth</strong></div>
         <div>Print date: ${new Date(payslip.processedDate).toLocaleString()}</div>
       </div>
+      
+      <script>
+        // Auto-print when opened in new window
+        window.onload = function() {
+          setTimeout(function() {
+            window.print();
+          }, 500);
+        }
+      </script>
     </body>
     </html>
   `
