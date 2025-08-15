@@ -13,18 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "@/hooks/use-toast"
 import {
   Search,
   Filter,
@@ -38,12 +27,9 @@ import {
   Calendar,
   Briefcase,
   User,
-  Building,
-  CreditCard,
   FileText,
   Download,
   Upload,
-  Eye,
 } from "lucide-react"
 
 const initialEmployees = [
@@ -61,22 +47,12 @@ const initialEmployees = [
     avatar: "/placeholder.svg?height=40&width=40",
     employeeId: "EMP001",
     dateOfBirth: "1990-05-15",
-    address: "123 Liberation Road, Accra",
+    address: "East Legon, Accra",
     emergencyContact: "Akosua Asante - +233 20 111 2222",
     bankAccount: "1234567890",
-    bankName: "GCB Bank",
     ssnit: "C123456789012",
-    tier2Provider: "GLICO Pensions",
-    tier3Contribution: 5, // percentage
-    allowances: {
-      transport: 500,
-      housing: 1200,
-      medical: 300,
-    },
-    taxableAllowances: 800,
-    nonTaxableAllowances: 1200,
-    leaveBalance: 21,
-    notes: "Excellent performer, due for promotion review",
+    leaveBalance: { annual: 15, sick: 10, casual: 5 },
+    documents: ["Contract", "ID Copy", "CV"],
   },
   {
     id: 2,
@@ -92,22 +68,12 @@ const initialEmployees = [
     avatar: "/placeholder.svg?height=40&width=40",
     employeeId: "EMP002",
     dateOfBirth: "1985-07-22",
-    address: "456 Unity Avenue, Kumasi",
+    address: "Kumasi Central",
     emergencyContact: "Kofi Osei - +233 20 222 3333",
     bankAccount: "0987654321",
-    bankName: "Ecobank Ghana",
-    ssnit: "C234567890123",
-    tier2Provider: "Enterprise Trustees",
-    tier3Contribution: 5,
-    allowances: {
-      transport: 400,
-      housing: 1000,
-      medical: 250,
-    },
-    taxableAllowances: 750,
-    nonTaxableAllowances: 1100,
-    leaveBalance: 25,
-    notes: "Highly experienced in HR management",
+    ssnit: "C987654321098",
+    leaveBalance: { annual: 21, sick: 10, casual: 5 },
+    documents: ["Contract", "ID Copy"],
   },
   {
     id: 3,
@@ -122,23 +88,13 @@ const initialEmployees = [
     status: "Active",
     avatar: "/placeholder.svg?height=40&width=40",
     employeeId: "EMP003",
-    dateOfBirth: "1992-03-18",
-    address: "789 Freedom Street, Takoradi",
+    dateOfBirth: "1992-03-12",
+    address: "Takoradi Beach",
     emergencyContact: "Ama Mensah - +233 20 333 4444",
     bankAccount: "1122334455",
-    bankName: "Standard Chartered",
-    ssnit: "C345678901234",
-    tier2Provider: "Petra Trust",
-    tier3Contribution: 5,
-    allowances: {
-      transport: 300,
-      housing: 900,
-      medical: 200,
-    },
-    taxableAllowances: 600,
-    nonTaxableAllowances: 1000,
-    leaveBalance: 20,
-    notes: "Strong digital marketing skills",
+    ssnit: "C112233445566",
+    leaveBalance: { annual: 21, sick: 10, casual: 5 },
+    documents: ["CV"],
   },
   {
     id: 4,
@@ -153,23 +109,13 @@ const initialEmployees = [
     status: "On Leave",
     avatar: "/placeholder.svg?height=40&width=40",
     employeeId: "EMP004",
-    dateOfBirth: "1988-11-05",
-    address: "101 Independence Lane, Accra",
+    dateOfBirth: "1988-11-11",
+    address: "Accra Mall",
     emergencyContact: "Yaw Boateng - +233 20 444 5555",
     bankAccount: "5566778899",
-    bankName: "Absa Bank Ghana",
-    ssnit: "C456789012345",
-    tier2Provider: "Dalex Finance",
-    tier3Contribution: 5,
-    allowances: {
-      transport: 450,
-      housing: 1100,
-      medical: 275,
-    },
-    taxableAllowances: 700,
-    nonTaxableAllowances: 950,
-    leaveBalance: 18,
-    notes: "Skilled in financial analysis",
+    ssnit: "C556677889900",
+    leaveBalance: { annual: 21, sick: 10, casual: 5 },
+    documents: [],
   },
   {
     id: 5,
@@ -184,23 +130,13 @@ const initialEmployees = [
     status: "Active",
     avatar: "/placeholder.svg?height=40&width=40",
     employeeId: "EMP005",
-    dateOfBirth: "1995-06-12",
-    address: "222 Unity Road, Tamale",
-    emergencyContact: "Akosua Adjei - +233 20 555 6666",
-    bankAccount: "9988776655",
-    bankName: "Fidelity Bank",
-    ssnit: "C567890123456",
-    tier2Provider: "Metropolitan Pensions",
-    tier3Contribution: 5,
-    allowances: {
-      transport: 350,
-      housing: 850,
-      medical: 175,
-    },
-    taxableAllowances: 650,
-    nonTaxableAllowances: 900,
-    leaveBalance: 22,
-    notes: "Outstanding sales record",
+    dateOfBirth: "1995-06-06",
+    address: "Tamale Town",
+    emergencyContact: "Ama Adjei - +233 20 555 6666",
+    bankAccount: "6677889900",
+    ssnit: "C667788990011",
+    leaveBalance: { annual: 21, sick: 10, casual: 5 },
+    documents: [],
   },
 ]
 
@@ -211,13 +147,27 @@ export default function EmployeesPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+
+  const filteredEmployees = employees.filter((employee) => {
+    const matchesSearch =
+      employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employee.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employee.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesDepartment = selectedDepartment === "all" || employee.department === selectedDepartment
+    return matchesSearch && matchesDepartment
+  })
+
+  const departments = [...new Set(employees.map((emp) => emp.department))]
 
   const handleAddEmployee = (employeeData: any) => {
     const newEmployee = {
       ...employeeData,
-      id: Math.max(...employees.map((e) => e.id)) + 1,
-      employeeId: `EMP${String(Math.max(...employees.map((e) => Number.parseInt(e.employeeId.slice(3)))) + 1).padStart(3, "0")}`,
+      id: employees.length + 1,
+      employeeId: `EMP${String(employees.length + 1).padStart(3, "0")}`,
+      leaveBalance: { annual: 21, sick: 10, casual: 5 },
+      documents: [],
     }
     setEmployees([...employees, newEmployee])
     setIsAddDialogOpen(false)
@@ -233,7 +183,7 @@ export default function EmployeesPage() {
     setSelectedEmployee(null)
     toast({
       title: "Employee Updated",
-      description: `${employeeData.name}'s information has been updated.`,
+      description: "Employee information has been successfully updated.",
     })
   }
 
@@ -241,21 +191,10 @@ export default function EmployeesPage() {
     setEmployees(employees.filter((emp) => emp.id !== employeeId))
     toast({
       title: "Employee Removed",
-      description: "Employee has been removed from the system.",
+      description: "Employee has been successfully removed from the system.",
       variant: "destructive",
     })
   }
-
-  const filteredEmployees = employees.filter((employee) => {
-    const matchesSearch =
-      employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.position.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesDepartment = selectedDepartment === "all" || employee.department === selectedDepartment
-    return matchesSearch && matchesDepartment
-  })
-
-  const departments = [...new Set(employees.map((emp) => emp.department))]
 
   return (
     <div className="space-y-6">
@@ -265,14 +204,14 @@ export default function EmployeesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Employee Management</h1>
           <p className="text-gray-600">Manage your team members and their information</p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex gap-2">
+          <Button variant="outline">
+            <Upload className="w-4 h-4 mr-2" />
+            Import CSV
+          </Button>
           <Button variant="outline">
             <Download className="w-4 h-4 mr-2" />
             Export
-          </Button>
-          <Button variant="outline">
-            <Upload className="w-4 h-4 mr-2" />
-            Import
           </Button>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
@@ -285,7 +224,7 @@ export default function EmployeesPage() {
               <DialogHeader>
                 <DialogTitle>Add New Employee</DialogTitle>
               </DialogHeader>
-              <EmployeeForm onSubmit={handleAddEmployee} onClose={() => setIsAddDialogOpen(false)} />
+              <AddEmployeeForm onSubmit={handleAddEmployee} onClose={() => setIsAddDialogOpen(false)} />
             </DialogContent>
           </Dialog>
         </div>
@@ -298,7 +237,7 @@ export default function EmployeesPage() {
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <Input
-                placeholder="Search employees by name, email, or position..."
+                placeholder="Search by name, email, position, or employee ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -357,7 +296,7 @@ export default function EmployeesPage() {
       {/* Employee List */}
       <Card>
         <CardHeader>
-          <CardTitle>Employee Directory</CardTitle>
+          <CardTitle>Employee Directory ({filteredEmployees.length} employees)</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -377,7 +316,12 @@ export default function EmployeesPage() {
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <h3 className="font-semibold text-gray-900">{employee.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-900">{employee.name}</h3>
+                      <Badge variant="outline" className="text-xs">
+                        {employee.employeeId}
+                      </Badge>
+                    </div>
                     <p className="text-sm text-gray-600">{employee.position}</p>
                     <div className="flex items-center space-x-4 mt-1">
                       <div className="flex items-center text-xs text-gray-500">
@@ -418,11 +362,11 @@ export default function EmployeesPage() {
                       <DropdownMenuItem
                         onClick={() => {
                           setSelectedEmployee(employee)
-                          setIsViewDialogOpen(true)
+                          setIsProfileDialogOpen(true)
                         }}
                       >
-                        <Eye className="w-4 h-4 mr-2" />
-                        View Details
+                        <User className="w-4 h-4 mr-2" />
+                        View Profile
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {
@@ -435,38 +379,16 @@ export default function EmployeesPage() {
                       </DropdownMenuItem>
                       <DropdownMenuItem>
                         <Calendar className="w-4 h-4 mr-2" />
-                        View Leave History
+                        Leave History
                       </DropdownMenuItem>
                       <DropdownMenuItem>
                         <Briefcase className="w-4 h-4 mr-2" />
                         Payroll Details
                       </DropdownMenuItem>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600">
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Remove Employee
-                          </DropdownMenuItem>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This action cannot be undone. This will permanently remove {employee.name} from the
-                              system.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteEmployee(employee.id)}
-                              className="bg-red-600 hover:bg-red-700"
-                            >
-                              Remove Employee
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteEmployee(employee.id)}>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Remove Employee
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -476,22 +398,24 @@ export default function EmployeesPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+      {/* Employee Profile Dialog */}
+      <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Employee Details</DialogTitle>
+            <DialogTitle>Employee Profile</DialogTitle>
           </DialogHeader>
-          {selectedEmployee && <EmployeeDetails employee={selectedEmployee} />}
+          {selectedEmployee && <EmployeeProfile employee={selectedEmployee} />}
         </DialogContent>
       </Dialog>
 
+      {/* Edit Employee Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Employee</DialogTitle>
           </DialogHeader>
           {selectedEmployee && (
-            <EmployeeForm
+            <AddEmployeeForm
               employee={selectedEmployee}
               onSubmit={handleEditEmployee}
               onClose={() => {
@@ -506,50 +430,74 @@ export default function EmployeesPage() {
   )
 }
 
-function EmployeeForm({
+function AddEmployeeForm({
   employee,
   onSubmit,
   onClose,
-}: { employee?: any; onSubmit: (data: any) => void; onClose: () => void }) {
+}: {
+  employee?: any
+  onSubmit: (data: any) => void
+  onClose: () => void
+}) {
   const [formData, setFormData] = useState({
     name: employee?.name || "",
     email: employee?.email || "",
     phone: employee?.phone || "",
     position: employee?.position || "",
     department: employee?.department || "",
-    location: employee?.location || "",
     salary: employee?.salary || "",
+    location: employee?.location || "",
     startDate: employee?.startDate || "",
     dateOfBirth: employee?.dateOfBirth || "",
     address: employee?.address || "",
     emergencyContact: employee?.emergencyContact || "",
     bankAccount: employee?.bankAccount || "",
-    bankName: employee?.bankName || "",
     ssnit: employee?.ssnit || "",
-    tier2Provider: employee?.tier2Provider || "",
-    tier3Contribution: employee?.tier3Contribution || 5,
-    transportAllowance: employee?.allowances?.transport || 0,
-    housingAllowance: employee?.allowances?.housing || 0,
-    medicalAllowance: employee?.allowances?.medical || 0,
-    taxableAllowances: employee?.taxableAllowances || 0,
-    nonTaxableAllowances: employee?.nonTaxableAllowances || 0,
-    notes: employee?.notes || "",
+    status: employee?.status || "Active",
   })
+
+  const [errors, setErrors] = useState<any>({})
+
+  const validateForm = () => {
+    const newErrors: any = {}
+
+    if (!formData.name.trim()) newErrors.name = "Name is required"
+    if (!formData.email.trim()) newErrors.email = "Email is required"
+    if (!formData.phone.trim()) newErrors.phone = "Phone is required"
+    if (!formData.position.trim()) newErrors.position = "Position is required"
+    if (!formData.department) newErrors.department = "Department is required"
+    if (!formData.salary) newErrors.salary = "Salary is required"
+    if (!formData.location) newErrors.location = "Location is required"
+    if (!formData.startDate) newErrors.startDate = "Start date is required"
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (formData.email && !emailRegex.test(formData.email)) {
+      newErrors.email = "Invalid email format"
+    }
+
+    // Phone validation
+    const phoneRegex = /^\+233\s\d{2}\s\d{3}\s\d{4}$/
+    if (formData.phone && !phoneRegex.test(formData.phone)) {
+      newErrors.phone = "Phone must be in format: +233 XX XXX XXXX"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit({
-      ...formData,
-      allowances: {
-        transport: Number.parseFloat(formData.transportAllowance) || 0,
-        housing: Number.parseFloat(formData.housingAllowance) || 0,
-        medical: Number.parseFloat(formData.medicalAllowance) || 0,
-      },
-      salary: Number.parseFloat(formData.salary) || 0,
-      taxableAllowances: Number.parseFloat(formData.taxableAllowances) || 0,
-      nonTaxableAllowances: Number.parseFloat(formData.nonTaxableAllowances) || 0,
-      tier3Contribution: Number.parseFloat(formData.tier3Contribution) || 5,
-    })
+    if (validateForm()) {
+      onSubmit(formData)
+    }
+  }
+
+  const handleInputChange = (field: string, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+    if (errors[field]) {
+      setErrors((prev: any) => ({ ...prev, [field]: "" }))
+    }
   }
 
   return (
@@ -558,21 +506,48 @@ function EmployeeForm({
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="personal">Personal Info</TabsTrigger>
           <TabsTrigger value="employment">Employment</TabsTrigger>
-          <TabsTrigger value="payroll">Payroll & Benefits</TabsTrigger>
-          <TabsTrigger value="additional">Additional Info</TabsTrigger>
+          <TabsTrigger value="financial">Financial</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
         </TabsList>
 
         <TabsContent value="personal" className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="name">Full Name *</Label>
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => handleInputChange("name", e.target.value)}
                 placeholder="Enter full name"
-                required
+                className={errors.name ? "border-red-500" : ""}
               />
+              {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
+            </div>
+            <div>
+              <Label htmlFor="email">Email Address *</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleInputChange("email", e.target.value)}
+                placeholder="employee@company.com"
+                className={errors.email ? "border-red-500" : ""}
+              />
+              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="phone">Phone Number *</Label>
+              <Input
+                id="phone"
+                value={formData.phone}
+                onChange={(e) => handleInputChange("phone", e.target.value)}
+                placeholder="+233 XX XXX XXXX"
+                className={errors.phone ? "border-red-500" : ""}
+              />
+              {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
             </div>
             <div>
               <Label htmlFor="dateOfBirth">Date of Birth</Label>
@@ -580,31 +555,7 @@ function EmployeeForm({
                 id="dateOfBirth"
                 type="date"
                 value={formData.dateOfBirth}
-                onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="employee@company.com"
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+233 XX XXX XXXX"
-                required
+                onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
               />
             </div>
           </div>
@@ -614,7 +565,7 @@ function EmployeeForm({
             <Textarea
               id="address"
               value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              onChange={(e) => handleInputChange("address", e.target.value)}
               placeholder="Full address"
             />
           </div>
@@ -624,7 +575,7 @@ function EmployeeForm({
             <Input
               id="emergencyContact"
               value={formData.emergencyContact}
-              onChange={(e) => setFormData({ ...formData, emergencyContact: e.target.value })}
+              onChange={(e) => handleInputChange("emergencyContact", e.target.value)}
               placeholder="Name - Phone Number"
             />
           </div>
@@ -633,22 +584,20 @@ function EmployeeForm({
         <TabsContent value="employment" className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="position">Position</Label>
+              <Label htmlFor="position">Position *</Label>
               <Input
                 id="position"
                 value={formData.position}
-                onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                onChange={(e) => handleInputChange("position", e.target.value)}
                 placeholder="Job title"
-                required
+                className={errors.position ? "border-red-500" : ""}
               />
+              {errors.position && <p className="text-red-500 text-sm mt-1">{errors.position}</p>}
             </div>
             <div>
-              <Label htmlFor="department">Department</Label>
-              <Select
-                value={formData.department}
-                onValueChange={(value) => setFormData({ ...formData, department: value })}
-              >
-                <SelectTrigger>
+              <Label htmlFor="department">Department *</Label>
+              <Select value={formData.department} onValueChange={(value) => handleInputChange("department", value)}>
+                <SelectTrigger className={errors.department ? "border-red-500" : ""}>
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
@@ -660,17 +609,15 @@ function EmployeeForm({
                   <SelectItem value="Operations">Operations</SelectItem>
                 </SelectContent>
               </Select>
+              {errors.department && <p className="text-red-500 text-sm mt-1">{errors.department}</p>}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="location">Location</Label>
-              <Select
-                value={formData.location}
-                onValueChange={(value) => setFormData({ ...formData, location: value })}
-              >
-                <SelectTrigger>
+              <Label htmlFor="location">Location *</Label>
+              <Select value={formData.location} onValueChange={(value) => handleInputChange("location", value)}>
+                <SelectTrigger className={errors.location ? "border-red-500" : ""}>
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
@@ -681,182 +628,87 @@ function EmployeeForm({
                   <SelectItem value="Cape Coast">Cape Coast</SelectItem>
                 </SelectContent>
               </Select>
+              {errors.location && <p className="text-red-500 text-sm mt-1">{errors.location}</p>}
             </div>
             <div>
-              <Label htmlFor="startDate">Start Date</Label>
+              <Label htmlFor="startDate">Start Date *</Label>
               <Input
                 id="startDate"
                 type="date"
                 value={formData.startDate}
-                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                required
+                onChange={(e) => handleInputChange("startDate", e.target.value)}
+                className={errors.startDate ? "border-red-500" : ""}
               />
+              {errors.startDate && <p className="text-red-500 text-sm mt-1">{errors.startDate}</p>}
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="status">Employment Status</Label>
+            <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="On Leave">On Leave</SelectItem>
+                <SelectItem value="Suspended">Suspended</SelectItem>
+                <SelectItem value="Terminated">Terminated</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </TabsContent>
 
-        <TabsContent value="payroll" className="space-y-4">
+        <TabsContent value="financial" className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="salary">Monthly Salary (GHS)</Label>
+              <Label htmlFor="salary">Monthly Salary (GHS) *</Label>
               <Input
                 id="salary"
                 type="number"
                 value={formData.salary}
-                onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
+                onChange={(e) => handleInputChange("salary", Number.parseFloat(e.target.value))}
                 placeholder="5000"
-                required
+                className={errors.salary ? "border-red-500" : ""}
               />
-            </div>
-            <div>
-              <Label htmlFor="tier3Contribution">Tier 3 Contribution (%)</Label>
-              <Input
-                id="tier3Contribution"
-                type="number"
-                min="0"
-                max="16.5"
-                value={formData.tier3Contribution}
-                onChange={(e) => setFormData({ ...formData, tier3Contribution: e.target.value })}
-                placeholder="5"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h4 className="font-semibold">Allowances</h4>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="transportAllowance">Transport (GHS)</Label>
-                <Input
-                  id="transportAllowance"
-                  type="number"
-                  value={formData.transportAllowance}
-                  onChange={(e) => setFormData({ ...formData, transportAllowance: e.target.value })}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <Label htmlFor="housingAllowance">Housing (GHS)</Label>
-                <Input
-                  id="housingAllowance"
-                  type="number"
-                  value={formData.housingAllowance}
-                  onChange={(e) => setFormData({ ...formData, housingAllowance: e.target.value })}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <Label htmlFor="medicalAllowance">Medical (GHS)</Label>
-                <Input
-                  id="medicalAllowance"
-                  type="number"
-                  value={formData.medicalAllowance}
-                  onChange={(e) => setFormData({ ...formData, medicalAllowance: e.target.value })}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="taxableAllowances">Other Taxable Allowances (GHS)</Label>
-              <Input
-                id="taxableAllowances"
-                type="number"
-                value={formData.taxableAllowances}
-                onChange={(e) => setFormData({ ...formData, taxableAllowances: e.target.value })}
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <Label htmlFor="nonTaxableAllowances">Non-Taxable Allowances (GHS)</Label>
-              <Input
-                id="nonTaxableAllowances"
-                type="number"
-                value={formData.nonTaxableAllowances}
-                onChange={(e) => setFormData({ ...formData, nonTaxableAllowances: e.target.value })}
-                placeholder="0"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="bankName">Bank Name</Label>
-              <Select
-                value={formData.bankName}
-                onValueChange={(value) => setFormData({ ...formData, bankName: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select bank" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="GCB Bank">GCB Bank</SelectItem>
-                  <SelectItem value="Ecobank Ghana">Ecobank Ghana</SelectItem>
-                  <SelectItem value="Standard Chartered">Standard Chartered</SelectItem>
-                  <SelectItem value="Absa Bank Ghana">Absa Bank Ghana</SelectItem>
-                  <SelectItem value="Fidelity Bank">Fidelity Bank</SelectItem>
-                  <SelectItem value="Zenith Bank">Zenith Bank</SelectItem>
-                </SelectContent>
-              </Select>
+              {errors.salary && <p className="text-red-500 text-sm mt-1">{errors.salary}</p>}
             </div>
             <div>
               <Label htmlFor="bankAccount">Bank Account Number</Label>
               <Input
                 id="bankAccount"
                 value={formData.bankAccount}
-                onChange={(e) => setFormData({ ...formData, bankAccount: e.target.value })}
+                onChange={(e) => handleInputChange("bankAccount", e.target.value)}
                 placeholder="Account number"
               />
             </div>
           </div>
-        </TabsContent>
-
-        <TabsContent value="additional" className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="ssnit">SSNIT Number</Label>
-              <Input
-                id="ssnit"
-                value={formData.ssnit}
-                onChange={(e) => setFormData({ ...formData, ssnit: e.target.value })}
-                placeholder="C123456789012"
-              />
-            </div>
-            <div>
-              <Label htmlFor="tier2Provider">Tier 2 Provider</Label>
-              <Select
-                value={formData.tier2Provider}
-                onValueChange={(value) => setFormData({ ...formData, tier2Provider: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="GLICO Pensions">GLICO Pensions</SelectItem>
-                  <SelectItem value="Enterprise Trustees">Enterprise Trustees</SelectItem>
-                  <SelectItem value="Petra Trust">Petra Trust</SelectItem>
-                  <SelectItem value="Dalex Finance">Dalex Finance</SelectItem>
-                  <SelectItem value="Metropolitan Pensions">Metropolitan Pensions</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
 
           <div>
-            <Label htmlFor="notes">Additional Notes</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Any additional information..."
+            <Label htmlFor="ssnit">SSNIT Number</Label>
+            <Input
+              id="ssnit"
+              value={formData.ssnit}
+              onChange={(e) => handleInputChange("ssnit", e.target.value)}
+              placeholder="C123456789012"
             />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="documents" className="space-y-4">
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+            <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+            <p className="text-gray-600 mb-2">Upload employee documents</p>
+            <Button type="button" variant="outline">
+              <Upload className="w-4 h-4 mr-2" />
+              Choose Files
+            </Button>
+            <p className="text-xs text-gray-500 mt-2">Supported: PDF, DOC, DOCX, JPG, PNG (Max 5MB each)</p>
           </div>
         </TabsContent>
       </Tabs>
 
-      <div className="flex justify-end space-x-3 pt-4">
+      <div className="flex justify-end space-x-3 pt-4 border-t">
         <Button type="button" variant="outline" onClick={onClose}>
           Cancel
         </Button>
@@ -868,257 +720,179 @@ function EmployeeForm({
   )
 }
 
-function EmployeeDetails({ employee }: { employee: any }) {
+function EmployeeProfile({ employee }: { employee: any }) {
   return (
     <Tabs defaultValue="overview" className="w-full">
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className="grid w-full grid-cols-5">
         <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="employment">Employment</TabsTrigger>
         <TabsTrigger value="payroll">Payroll</TabsTrigger>
         <TabsTrigger value="leave">Leave</TabsTrigger>
         <TabsTrigger value="documents">Documents</TabsTrigger>
       </TabsList>
 
       <TabsContent value="overview" className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex items-center space-x-4">
+          <Avatar className="w-20 h-20">
+            <AvatarImage src={employee.avatar || "/placeholder.svg"} />
+            <AvatarFallback className="text-lg">
+              {employee.name
+                .split(" ")
+                .map((n: string) => n[0])
+                .join("")}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <h2 className="text-2xl font-bold">{employee.name}</h2>
+            <p className="text-gray-600">{employee.position}</p>
+            <Badge className="mt-1">{employee.employeeId}</Badge>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center">
-                <User className="w-5 h-5 mr-2" />
-                Personal Information
-              </CardTitle>
+              <CardTitle className="text-lg">Personal Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-600">Employee ID:</span>
-                <span className="font-medium">{employee.employeeId}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Full Name:</span>
-                <span className="font-medium">{employee.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Date of Birth:</span>
-                <span className="font-medium">{employee.dateOfBirth}</span>
-              </div>
-              <div className="flex justify-between">
                 <span className="text-gray-600">Email:</span>
-                <span className="font-medium">{employee.email}</span>
+                <span>{employee.email}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Phone:</span>
-                <span className="font-medium">{employee.phone}</span>
+                <span>{employee.phone}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Date of Birth:</span>
+                <span>{employee.dateOfBirth || "Not provided"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Address:</span>
-                <span className="font-medium text-right">{employee.address}</span>
+                <span className="text-right">{employee.address || "Not provided"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Emergency Contact:</span>
+                <span className="text-right">{employee.emergencyContact || "Not provided"}</span>
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center">
-                <Building className="w-5 h-5 mr-2" />
-                Employment Details
-              </CardTitle>
+              <CardTitle className="text-lg">Employment Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-600">Position:</span>
-                <span className="font-medium">{employee.position}</span>
-              </div>
-              <div className="flex justify-between">
                 <span className="text-gray-600">Department:</span>
-                <span className="font-medium">{employee.department}</span>
+                <span>{employee.department}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Location:</span>
-                <span className="font-medium">{employee.location}</span>
+                <span>{employee.location}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Start Date:</span>
-                <span className="font-medium">{employee.startDate}</span>
+                <span>{employee.startDate}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Status:</span>
                 <Badge variant={employee.status === "Active" ? "default" : "secondary"}>{employee.status}</Badge>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Leave Balance:</span>
-                <span className="font-medium">{employee.leaveBalance} days</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Emergency Contact & Banking</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <h4 className="font-semibold">Emergency Contact</h4>
-              <p className="text-gray-600">{employee.emergencyContact}</p>
-            </div>
-            <div className="space-y-3">
-              <h4 className="font-semibold">Banking Details</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Bank:</span>
-                  <span className="font-medium">{employee.bankName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Account:</span>
-                  <span className="font-medium">{employee.bankAccount}</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {employee.notes && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Additional Notes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-700">{employee.notes}</p>
-            </CardContent>
-          </Card>
-        )}
-      </TabsContent>
-
-      <TabsContent value="payroll" className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <CreditCard className="w-5 h-5 mr-2" />
-                Salary & Allowances
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Base Salary:</span>
-                <span className="font-medium">GHS {employee.salary?.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Transport Allowance:</span>
-                <span className="font-medium">GHS {employee.allowances?.transport?.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Housing Allowance:</span>
-                <span className="font-medium">GHS {employee.allowances?.housing?.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Medical Allowance:</span>
-                <span className="font-medium">GHS {employee.allowances?.medical?.toLocaleString()}</span>
-              </div>
-              <div className="border-t pt-2">
-                <div className="flex justify-between font-semibold">
-                  <span>Total Gross:</span>
-                  <span>
-                    GHS{" "}
-                    {(
-                      employee.salary +
-                      (employee.allowances?.transport || 0) +
-                      (employee.allowances?.housing || 0) +
-                      (employee.allowances?.medical || 0) +
-                      (employee.taxableAllowances || 0) +
-                      (employee.nonTaxableAllowances || 0)
-                    ).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Pension Contributions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">SSNIT Number:</span>
-                <span className="font-medium">{employee.ssnit}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Tier 2 Provider:</span>
-                <span className="font-medium">{employee.tier2Provider}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Tier 3 Contribution:</span>
-                <span className="font-medium">{employee.tier3Contribution}%</span>
+                <span className="text-gray-600">Salary:</span>
+                <span className="font-semibold">GHS {employee.salary?.toLocaleString()}</span>
               </div>
             </CardContent>
           </Card>
         </div>
       </TabsContent>
 
-      <TabsContent value="leave">
+      <TabsContent value="employment" className="space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle>Leave Information</CardTitle>
+            <CardTitle>Employment History</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-emerald-50 rounded-lg">
-                <div className="text-2xl font-bold text-emerald-600">{employee.leaveBalance}</div>
-                <div className="text-sm text-gray-600">Days Remaining</div>
-              </div>
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">5</div>
-                <div className="text-sm text-gray-600">Days Used</div>
-              </div>
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-bold text-gray-600">26</div>
-                <div className="text-sm text-gray-600">Total Allocation</div>
+            <div className="space-y-4">
+              <div className="border-l-2 border-emerald-500 pl-4">
+                <h4 className="font-semibold">{employee.position}</h4>
+                <p className="text-sm text-gray-600">{employee.department}</p>
+                <p className="text-xs text-gray-500">{employee.startDate} - Present</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </TabsContent>
 
-      <TabsContent value="documents">
+      <TabsContent value="payroll" className="space-y-4">
+        <div className="grid grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-emerald-600">GHS {employee.salary?.toLocaleString()}</div>
+              <p className="text-sm text-gray-600">Monthly Salary</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-blue-600">GHS {((employee.salary || 0) * 0.055).toFixed(0)}</div>
+              <p className="text-sm text-gray-600">SSNIT (5.5%)</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-purple-600">GHS {((employee.salary || 0) * 0.05).toFixed(0)}</div>
+              <p className="text-sm text-gray-600">Tier 3 (5%)</p>
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="leave" className="space-y-4">
+        <div className="grid grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-green-600">{employee.leaveBalance?.annual || 0}</div>
+              <p className="text-sm text-gray-600">Annual Leave</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-orange-600">{employee.leaveBalance?.sick || 0}</div>
+              <p className="text-sm text-gray-600">Sick Leave</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-blue-600">{employee.leaveBalance?.casual || 0}</div>
+              <p className="text-sm text-gray-600">Casual Leave</p>
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="documents" className="space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <FileText className="w-5 h-5 mr-2" />
-              Employee Documents
-            </CardTitle>
+            <CardTitle>Employee Documents</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center">
-                  <FileText className="w-4 h-4 mr-2 text-gray-500" />
-                  <span>Employment Contract</span>
-                </div>
-                <Button variant="outline" size="sm">
-                  <Download className="w-4 h-4 mr-1" />
-                  Download
-                </Button>
-              </div>
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center">
-                  <FileText className="w-4 h-4 mr-2 text-gray-500" />
-                  <span>ID Copy</span>
-                </div>
-                <Button variant="outline" size="sm">
-                  <Download className="w-4 h-4 mr-1" />
-                  Download
-                </Button>
-              </div>
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center">
-                  <FileText className="w-4 h-4 mr-2 text-gray-500" />
-                  <span>CV/Resume</span>
-                </div>
-                <Button variant="outline" size="sm">
-                  <Download className="w-4 h-4 mr-1" />
-                  Download
-                </Button>
-              </div>
+            <div className="space-y-2">
+              {employee.documents?.length > 0 ? (
+                employee.documents.map((doc: string, index: number) => (
+                  <div key={index} className="flex items-center justify-between p-2 border rounded">
+                    <div className="flex items-center">
+                      <FileText className="w-4 h-4 mr-2" />
+                      <span>{doc}</span>
+                    </div>
+                    <Button variant="ghost" size="sm">
+                      <Download className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 text-center py-4">No documents uploaded</p>
+              )}
             </div>
           </CardContent>
         </Card>
