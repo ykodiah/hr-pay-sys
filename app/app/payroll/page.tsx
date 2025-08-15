@@ -54,24 +54,40 @@ const calculatePAYE = (
   // Calculate taxable income: (basic + allowances) - SSNIT Employee - Tier3 (both employee and employer)
   const taxableIncome = Math.max(0, basicSalary + allowances - ssnitEmployee - tier3Employee - tier3Employer)
 
-  // Ghana PAYE tax bands for 2025 (monthly)
+  // Ghana PAYE tax bands for 2024/2025 (monthly) - correct rates from GRA
   const taxBands = [
-    { min: 0, max: 365, rate: 0 },
-    { min: 365, max: 730, rate: 0.05 },
-    { min: 730, max: 1095, rate: 0.1 },
-    { min: 1095, max: 1460, rate: 0.175 },
-    { min: 1460, max: 3650, rate: 0.25 },
-    { min: 3650, max: Number.POSITIVE_INFINITY, rate: 0.3 },
+    { min: 0, max: 490, rate: 0 }, // First GHS 490: 0%
+    { min: 490, max: 600, rate: 0.05 }, // Next GHS 110: 5%
+    { min: 600, max: 730, rate: 0.1 }, // Next GHS 130: 10%
+    { min: 730, max: 3896.67, rate: 0.175 }, // Next GHS 3,166.67: 17.5%
+    { min: 3896.67, max: 19896.67, rate: 0.25 }, // Next GHS 16,000: 25%
+    { min: 19896.67, max: 50416.67, rate: 0.3 }, // Next GHS 30,520: 30%
+    { min: 50416.67, max: Number.POSITIVE_INFINITY, rate: 0.35 }, // Exceeding GHS 50,000: 35%
   ]
 
   let tax = 0
+  let remainingIncome = taxableIncome
+
   for (const band of taxBands) {
+    if (remainingIncome <= 0) break
+
+    const bandWidth = band.max - band.min
+    const taxableInBand = Math.min(remainingIncome, bandWidth)
+
     if (taxableIncome > band.min) {
-      const taxableAmount = Math.min(taxableIncome, band.max) - band.min
-      tax += taxableAmount * band.rate
+      tax += taxableInBand * band.rate
+      remainingIncome -= taxableInBand
     }
   }
+
   return Math.round(tax)
+}
+
+const calculateConditionalTier3 = (basicSalary: number, employeeRate: number, employerRate: number) => {
+  return {
+    employee: employeeRate > 0 ? Math.round(basicSalary * employeeRate) : 0,
+    employer: employerRate > 0 ? Math.round(basicSalary * employerRate) : 0,
+  }
 }
 
 const initialPayrollPeriods = [
@@ -231,14 +247,28 @@ export default function PayrollPage() {
     // Calculate SSNIT on basic salary only
     const ssnit = calculateSSNIT(basicSalary)
 
-    // Calculate Tier 3 on basic salary only
-    const tier3Employee = calculateTier3(basicSalary, employee.tier3.employeeRate || 0.05)
-    const tier3Employer = calculateTier3(basicSalary, employee.tier3.employerRate || 0.05)
+    // Calculate Tier 3 with conditional rates
+    const tier3Rates = calculateConditionalTier3(
+      basicSalary,
+      employee.tier3.employeeRate || 0,
+      employee.tier3.employerRate || 0,
+    )
 
     // Calculate PAYE: (basic + allowances) - SSNIT Employee - Tier3 (employee + employer)
-    const paye = calculatePAYE(basicSalary, allowancesTotal, ssnit.employee, tier3Employee, tier3Employer)
+    const paye = calculatePAYE(basicSalary, allowancesTotal, ssnit.employee, tier3Rates.employee, tier3Rates.employer)
 
-    const totalDeductions = paye + ssnit.employee + tier3Employee + employee.deductions.total
+    // Only include non-zero deductions
+    const applicableDeductions = {
+      paye: paye,
+      ssnitEmployee: ssnit.employee,
+      tier3Employee: tier3Rates.employee,
+      welfare: employee.deductions.welfare || 0,
+      loans: employee.deductions.loans || 0,
+      advances: employee.deductions.advances || 0,
+      other: employee.deductions.other || 0,
+    }
+
+    const totalDeductions = Object.values(applicableDeductions).reduce((sum, val) => sum + val, 0)
     const netPay = grossPay - totalDeductions
 
     return {
@@ -246,7 +276,8 @@ export default function PayrollPage() {
       grossPay,
       paye,
       ssnit: { employee: ssnit.employee, employer: ssnit.employer },
-      tier3: { ...employee.tier3, employee: tier3Employee, employer: tier3Employer },
+      tier3: { ...employee.tier3, employee: tier3Rates.employee, employer: tier3Rates.employer },
+      deductions: { ...employee.deductions, ...applicableDeductions },
       netPay,
       status: "Calculated",
     }
@@ -810,14 +841,17 @@ function EditEmployeePayrollForm({
     // Calculate SSNIT on basic salary only
     const ssnit = calculateSSNIT(basicSalary)
 
-    // Calculate Tier 3 on basic salary only
-    const tier3Employee = calculateTier3(basicSalary, formData.tier3.employeeRate || 0.05)
-    const tier3Employer = calculateTier3(basicSalary, formData.tier3.employerRate || 0.05)
+    // Calculate Tier 3 with conditional rates
+    const tier3Rates = calculateConditionalTier3(
+      basicSalary,
+      formData.tier3.employeeRate || 0,
+      formData.tier3.employerRate || 0,
+    )
 
     // Calculate PAYE: (basic + allowances) - SSNIT Employee - Tier3 (employee + employer)
-    const paye = calculatePAYE(basicSalary, allowancesTotal, ssnit.employee, tier3Employee, tier3Employer)
+    const paye = calculatePAYE(basicSalary, allowancesTotal, ssnit.employee, tier3Rates.employee, tier3Rates.employer)
 
-    const totalDeductions = paye + ssnit.employee + tier3Employee + formData.deductions.total
+    const totalDeductions = paye + ssnit.employee + tier3Rates.employee + formData.deductions.total
     const netPay = grossPay - totalDeductions
 
     const updatedEmployee = {
@@ -825,7 +859,7 @@ function EditEmployeePayrollForm({
       grossPay,
       paye,
       ssnit: { employee: ssnit.employee, employer: ssnit.employer },
-      tier3: { ...formData.tier3, employee: tier3Employee, employer: tier3Employer },
+      tier3: { ...formData.tier3, employee: tier3Rates.employee, employer: tier3Rates.employer },
       netPay,
       status: "Calculated",
     }
@@ -1130,3 +1164,5 @@ function EditEmployeePayrollForm({
     </Tabs>
   )
 }
+
+</merged_code>
