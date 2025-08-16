@@ -35,6 +35,9 @@ import {
   Trash2,
   Plus,
   Edit,
+  Target,
+  TrendingUp,
+  DollarSign,
 } from "lucide-react"
 
 interface CompanySettings {
@@ -92,6 +95,49 @@ interface NotificationSettings {
   notificationEmail: string
   smsNotifications: boolean
   webhookUrl?: string
+}
+
+interface OrganizationSettings {
+  subsidiaries: Array<{
+    id: string
+    name: string
+    taxId: string
+    currency: string
+    address: string
+    isActive: boolean
+  }>
+  costCenters: Array<{
+    id: string
+    name: string
+    code: string
+    subsidiaryId: string
+    budget: number
+    isActive: boolean
+  }>
+  departments: Array<{
+    id: string
+    name: string
+    code: string
+    managerId?: string
+    costCenterId: string
+    isActive: boolean
+  }>
+  jobGrades: Array<{
+    id: string
+    name: string
+    level: number
+    minSalary: number
+    maxSalary: number
+    currency: string
+  }>
+}
+
+interface MultiCurrencySettings {
+  baseCurrency: string
+  supportedCurrencies: string[]
+  exchangeRates: Record<string, number>
+  autoUpdateRates: boolean
+  rateSource: string
 }
 
 export default function SettingsPage() {
@@ -153,6 +199,83 @@ export default function SettingsPage() {
     systemAlerts: true,
     notificationEmail: "admin@akwaabatech.com",
     smsNotifications: false,
+  })
+
+  const [organizationSettings, setOrganizationSettings] = useState<OrganizationSettings>({
+    subsidiaries: [
+      {
+        id: "1",
+        name: "Akwaaba Technologies Ltd",
+        taxId: "C0012345678",
+        currency: "GHS",
+        address: "123 Liberation Road, Labone, Accra, Ghana",
+        isActive: true,
+      },
+    ],
+    costCenters: [
+      {
+        id: "1",
+        name: "Information Technology",
+        code: "IT001",
+        subsidiaryId: "1",
+        budget: 500000,
+        isActive: true,
+      },
+      {
+        id: "2",
+        name: "Human Resources",
+        code: "HR001",
+        subsidiaryId: "1",
+        budget: 200000,
+        isActive: true,
+      },
+    ],
+    departments: [
+      {
+        id: "1",
+        name: "Software Development",
+        code: "DEV001",
+        costCenterId: "1",
+        isActive: true,
+      },
+      {
+        id: "2",
+        name: "HR Operations",
+        code: "HRO001",
+        costCenterId: "2",
+        isActive: true,
+      },
+    ],
+    jobGrades: [
+      {
+        id: "1",
+        name: "Junior Level",
+        level: 1,
+        minSalary: 2000,
+        maxSalary: 4000,
+        currency: "GHS",
+      },
+      {
+        id: "2",
+        name: "Senior Level",
+        level: 2,
+        minSalary: 4000,
+        maxSalary: 8000,
+        currency: "GHS",
+      },
+    ],
+  })
+
+  const [multiCurrencySettings, setMultiCurrencySettings] = useState<MultiCurrencySettings>({
+    baseCurrency: "GHS",
+    supportedCurrencies: ["GHS", "USD", "EUR"],
+    exchangeRates: {
+      USD: 12.5,
+      EUR: 13.75,
+      GHS: 1.0,
+    },
+    autoUpdateRates: true,
+    rateSource: "bank-of-ghana",
   })
 
   const handleSaveSettings = async () => {
@@ -224,6 +347,16 @@ export default function SettingsPage() {
     setHasUnsavedChanges(true)
   }
 
+  const updateOrganizationSettings = (field: keyof OrganizationSettings, value: any) => {
+    setOrganizationSettings((prev) => ({ ...prev, [field]: value }))
+    setHasUnsavedChanges(true)
+  }
+
+  const updateMultiCurrencySettings = (field: keyof MultiCurrencySettings, value: any) => {
+    setMultiCurrencySettings((prev) => ({ ...prev, [field]: value }))
+    setHasUnsavedChanges(true)
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -258,9 +391,11 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="organization">Organization</TabsTrigger>
+          <TabsTrigger value="currency">Multi-Currency</TabsTrigger>
           <TabsTrigger value="payroll">Payroll</TabsTrigger>
           <TabsTrigger value="hr">HR</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
@@ -412,6 +547,244 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="organization" className="space-y-6">
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Building2 className="w-5 h-5 text-emerald-600" />
+                  <span>Subsidiaries</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  {organizationSettings.subsidiaries.map((subsidiary) => (
+                    <div key={subsidiary.id} className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="font-medium">{subsidiary.name}</p>
+                          <p className="text-sm text-gray-500">
+                            {subsidiary.taxId} • {subsidiary.currency}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant={subsidiary.isActive ? "default" : "secondary"}>
+                            {subsidiary.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                          <Button variant="outline" size="sm">
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-600">{subsidiary.address}</p>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" className="w-full bg-transparent">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Subsidiary
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Target className="w-5 h-5 text-emerald-600" />
+                  <span>Cost Centers</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  {organizationSettings.costCenters.map((center) => (
+                    <div key={center.id} className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="font-medium">{center.name}</p>
+                          <p className="text-sm text-gray-500">{center.code}</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline">GHS {center.budget.toLocaleString()}</Badge>
+                          <Button variant="outline" size="sm">
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" className="w-full bg-transparent">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Cost Center
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="w-5 h-5 text-emerald-600" />
+                  <span>Departments</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  {organizationSettings.departments.map((dept) => (
+                    <div key={dept.id} className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="font-medium">{dept.name}</p>
+                          <p className="text-sm text-gray-500">{dept.code}</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant={dept.isActive ? "default" : "secondary"}>
+                            {dept.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                          <Button variant="outline" size="sm">
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" className="w-full bg-transparent">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Department
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <TrendingUp className="w-5 h-5 text-emerald-600" />
+                  <span>Job Grades</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  {organizationSettings.jobGrades.map((grade) => (
+                    <div key={grade.id} className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="font-medium">{grade.name}</p>
+                          <p className="text-sm text-gray-500">Level {grade.level}</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline">
+                            {grade.currency} {grade.minSalary.toLocaleString()} - {grade.maxSalary.toLocaleString()}
+                          </Badge>
+                          <Button variant="outline" size="sm">
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" className="w-full bg-transparent">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Job Grade
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="currency" className="space-y-6">
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <DollarSign className="w-5 h-5 text-emerald-600" />
+                  <span>Currency Configuration</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="base-currency">Base Currency</Label>
+                  <Select
+                    value={multiCurrencySettings.baseCurrency}
+                    onValueChange={(value) => updateMultiCurrencySettings("baseCurrency", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="GHS">Ghana Cedis (GHS)</SelectItem>
+                      <SelectItem value="USD">US Dollar (USD)</SelectItem>
+                      <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rate-source">Exchange Rate Source</Label>
+                  <Select
+                    value={multiCurrencySettings.rateSource}
+                    onValueChange={(value) => updateMultiCurrencySettings("rateSource", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bank-of-ghana">Bank of Ghana</SelectItem>
+                      <SelectItem value="xe-com">XE.com</SelectItem>
+                      <SelectItem value="manual">Manual Entry</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="auto-update">Auto-update Rates</Label>
+                    <p className="text-sm text-gray-500">Update exchange rates daily</p>
+                  </div>
+                  <Switch
+                    id="auto-update"
+                    checked={multiCurrencySettings.autoUpdateRates}
+                    onCheckedChange={(checked) => updateMultiCurrencySettings("autoUpdateRates", checked)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <RefreshCw className="w-5 h-5 text-emerald-600" />
+                  <span>Exchange Rates</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  {Object.entries(multiCurrencySettings.exchangeRates).map(([currency, rate]) => (
+                    <div key={currency} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+                          <DollarSign className="w-4 h-4 text-emerald-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{currency}</p>
+                          <p className="text-sm text-gray-500">
+                            1 {multiCurrencySettings.baseCurrency} = {rate} {currency}
+                          </p>
+                        </div>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        <Edit className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" className="w-full bg-transparent">
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Update All Rates
+                </Button>
               </CardContent>
             </Card>
           </div>
