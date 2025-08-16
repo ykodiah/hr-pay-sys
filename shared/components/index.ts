@@ -1,7 +1,0 @@
-export { Button, type ButtonProps } from "./Button"
-export { Card, CardHeader, CardTitle, CardContent, type CardProps } from "./Card"
-export { Input, type InputProps } from "./Input"
-export { Badge, type BadgeProps } from "./Badge"
-export { Avatar, type AvatarProps } from "./Avatar"
-export { LoadingSpinner, type LoadingSpinnerProps } from "./LoadingSpinner"
-export { colors, spacing, borderRadius, typography } from "../theme/colors"

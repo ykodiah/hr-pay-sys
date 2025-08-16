@@ -2,7 +2,6 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs"
 import { Ionicons } from "@expo/vector-icons"
 import { colors } from "../styles/colors"
-import { useFeatures } from "../../../shared/hooks/useFeatures"
 
 import DashboardScreen from "../screens/DashboardScreen"
 import PayslipsScreen from "../screens/PayslipsScreen"
@@ -13,8 +12,6 @@ import MoreScreen from "../screens/MoreScreen"
 const Tab = createBottomTabNavigator()
 
 export default function MainTabNavigator() {
-  const { isFeatureEnabled } = useFeatures("mobile")
-
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -72,36 +69,30 @@ export default function MainTabNavigator() {
           headerTitle: "AkwaabaHR Dashboard",
         }}
       />
-      {isFeatureEnabled("PAYROLL_PROCESSING") && (
-        <Tab.Screen
-          name="Payslips"
-          component={PayslipsScreen}
-          options={{
-            title: "Payslips",
-            headerTitle: "My Payslips",
-          }}
-        />
-      )}
-      {isFeatureEnabled("LEAVE_MANAGEMENT") && (
-        <Tab.Screen
-          name="Leave"
-          component={LeaveScreen}
-          options={{
-            title: "Leave",
-            headerTitle: "Leave Requests",
-          }}
-        />
-      )}
-      {isFeatureEnabled("PROFILE_MANAGEMENT") && (
-        <Tab.Screen
-          name="Profile"
-          component={ProfileScreen}
-          options={{
-            title: "Profile",
-            headerTitle: "My Profile",
-          }}
-        />
-      )}
+      <Tab.Screen
+        name="Payslips"
+        component={PayslipsScreen}
+        options={{
+          title: "Payslips",
+          headerTitle: "My Payslips",
+        }}
+      />
+      <Tab.Screen
+        name="Leave"
+        component={LeaveScreen}
+        options={{
+          title: "Leave",
+          headerTitle: "Leave Requests",
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          title: "Profile",
+          headerTitle: "My Profile",
+        }}
+      />
       <Tab.Screen
         name="More"
         component={MoreScreen}
