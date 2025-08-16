@@ -45,7 +45,7 @@ interface Course {
   title: string
   description: string
   category: "technical" | "leadership" | "compliance" | "soft-skills"
-  type: "online" | "classroom" | "virtual" | "blended"
+  type: "online" | "virtual" | "classroom" | "blended"
   level: "beginner" | "intermediate" | "advanced"
   duration: number // in hours
   instructor: string
@@ -854,7 +854,7 @@ export default function LearningPage() {
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium">Completion Rate</span>
-                      <span className="text-sm text-gray-600">{path.completionRate}%</span>
+                      <span className="font-medium">{path.completionRate}%</span>
                     </div>
                     <Progress value={path.completionRate} className="h-2" />
                   </div>
@@ -1217,4 +1217,16 @@ export default function LearningPage() {
                   </div>
                   <Progress value={87} className="h-2" />
 
-                  <div className\
+                  <div className="flex justify-between text-sm text-muted-foreground mt-2">
+                    <span>87% Complete</span>
+                    <span>13 of 15 courses</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}

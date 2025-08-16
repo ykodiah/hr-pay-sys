@@ -8,6 +8,9 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
 import {
   Line,
@@ -29,6 +32,7 @@ import {
   Scatter,
   RadialBarChart,
   RadialBar,
+  LineChart,
 } from "recharts"
 import {
   TrendingUp,
@@ -43,15 +47,106 @@ import {
   Target,
   Clock,
   TrendingDown,
+  Brain,
+  Calendar,
+  Settings,
+  Eye,
+  Plus,
+  Save,
+  Zap,
 } from "lucide-react"
 
 const payrollTrends = [
-  { period: "2024-08", gross: 420000, paye: 63000, ssnit: 37800, tier3: 21000, net: 298200, employees: 235 },
-  { period: "2024-09", gross: 435000, paye: 65250, ssnit: 39150, tier3: 21750, net: 308850, employees: 240 },
-  { period: "2024-10", gross: 448000, paye: 67200, ssnit: 40320, tier3: 22400, net: 318080, employees: 245 },
-  { period: "2024-11", gross: 462000, paye: 69300, ssnit: 41580, tier3: 23100, net: 328020, employees: 250 },
-  { period: "2024-12", gross: 478900, paye: 71835, ssnit: 43101, tier3: 23945, net: 340019, employees: 245 },
-  { period: "2025-01", gross: 485200, paye: 72780, ssnit: 43668, tier3: 24260, net: 344492, employees: 247 },
+  {
+    period: "2024-08",
+    gross: 420000,
+    paye: 63000,
+    ssnit: 37800,
+    tier3: 21000,
+    net: 298200,
+    employees: 235,
+    predicted: false,
+  },
+  {
+    period: "2024-09",
+    gross: 435000,
+    paye: 65250,
+    ssnit: 39150,
+    tier3: 21750,
+    net: 308850,
+    employees: 240,
+    predicted: false,
+  },
+  {
+    period: "2024-10",
+    gross: 448000,
+    paye: 67200,
+    ssnit: 40320,
+    tier3: 22400,
+    net: 318080,
+    employees: 245,
+    predicted: false,
+  },
+  {
+    period: "2024-11",
+    gross: 462000,
+    paye: 69300,
+    ssnit: 41580,
+    tier3: 23100,
+    net: 328020,
+    employees: 250,
+    predicted: false,
+  },
+  {
+    period: "2024-12",
+    gross: 478900,
+    paye: 71835,
+    ssnit: 43101,
+    tier3: 23945,
+    net: 340019,
+    employees: 245,
+    predicted: false,
+  },
+  {
+    period: "2025-01",
+    gross: 485200,
+    paye: 72780,
+    ssnit: 43668,
+    tier3: 24260,
+    net: 344492,
+    employees: 247,
+    predicted: false,
+  },
+  {
+    period: "2025-02",
+    gross: 492000,
+    paye: 73800,
+    ssnit: 44280,
+    tier3: 24600,
+    net: 349320,
+    employees: 250,
+    predicted: true,
+  },
+  {
+    period: "2025-03",
+    gross: 498500,
+    paye: 74775,
+    ssnit: 44910,
+    tier3: 24925,
+    net: 353890,
+    employees: 252,
+    predicted: true,
+  },
+  {
+    period: "2025-04",
+    gross: 505200,
+    paye: 75780,
+    ssnit: 45468,
+    tier3: 25260,
+    net: 358692,
+    employees: 255,
+    predicted: true,
+  },
 ]
 
 const departmentCosts = [
@@ -162,6 +257,75 @@ const complianceData = [
   { name: "Min Wage Review", value: 3, total: 247, color: "#f59e0b", status: "action_required" },
 ]
 
+const executiveMetrics = [
+  { metric: "Revenue per Employee", current: 125000, target: 130000, trend: "up", benchmark: 118000 },
+  { metric: "Employee Lifetime Value", current: 450000, target: 500000, trend: "up", benchmark: 420000 },
+  { metric: "Cost per Hire", current: 3200, target: 2800, trend: "down", benchmark: 3500 },
+  { metric: "Training ROI", current: 340, target: 400, trend: "up", benchmark: 280 },
+  { metric: "Engagement Score", current: 78, target: 85, trend: "up", benchmark: 72 },
+  { metric: "Productivity Index", current: 88.5, target: 92, trend: "up", benchmark: 85 },
+]
+
+const predictiveInsights = [
+  {
+    title: "Attrition Risk Alert",
+    description: "15 employees identified as high flight risk based on engagement patterns",
+    probability: 85,
+    impact: "High",
+    timeframe: "Next 3 months",
+    action: "Schedule retention interviews",
+    category: "workforce",
+  },
+  {
+    title: "Budget Variance Prediction",
+    description: "Q2 payroll costs projected to exceed budget by 8.5%",
+    probability: 72,
+    impact: "Medium",
+    timeframe: "Next quarter",
+    action: "Review hiring plans and salary adjustments",
+    category: "financial",
+  },
+  {
+    title: "Skills Gap Analysis",
+    description: "Critical shortage in data analytics skills projected for Q3",
+    probability: 90,
+    impact: "High",
+    timeframe: "6 months",
+    action: "Initiate training programs or external hiring",
+    category: "skills",
+  },
+]
+
+const customReports = [
+  {
+    id: "1",
+    name: "Executive Dashboard",
+    description: "High-level KPIs and trends for leadership team",
+    schedule: "Weekly",
+    recipients: ["CEO", "CFO", "CHRO"],
+    lastRun: "2025-01-20",
+    status: "active",
+  },
+  {
+    id: "2",
+    name: "Department Performance Report",
+    description: "Detailed analysis of departmental metrics and costs",
+    schedule: "Monthly",
+    recipients: ["Department Heads"],
+    lastRun: "2025-01-15",
+    status: "active",
+  },
+  {
+    id: "3",
+    name: "Compliance Audit Report",
+    description: "Comprehensive compliance status across all regulations",
+    schedule: "Quarterly",
+    recipients: ["Legal Team", "HR Manager"],
+    lastRun: "2025-01-01",
+    status: "active",
+  },
+]
+
 export default function AnalyticsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("last-6-months")
   const [selectedView, setSelectedView] = useState("overview")
@@ -170,19 +334,21 @@ export default function AnalyticsPage() {
   const [lastUpdated, setLastUpdated] = useState(new Date())
   const [activeTab, setActiveTab] = useState("overview")
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null)
-  const [isCustomRangeOpen, setIsCustomRangeOpen] = useState(false)
+  const [showReportBuilder, setShowReportBuilder] = useState(false)
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false)
 
   useEffect(() => {
     if (isRealTimeEnabled) {
       const interval = setInterval(() => {
         setLastUpdated(new Date())
-      }, 30000) // Update every 30 seconds
+        console.log("[v0] Real-time analytics data updated")
+      }, 30000)
       return () => clearInterval(interval)
     }
   }, [isRealTimeEnabled])
 
-  const currentMonth = payrollTrends[payrollTrends.length - 1]
-  const previousMonth = payrollTrends[payrollTrends.length - 2]
+  const currentMonth = payrollTrends.filter((p) => !p.predicted)[payrollTrends.filter((p) => !p.predicted).length - 1]
+  const previousMonth = payrollTrends.filter((p) => !p.predicted)[payrollTrends.filter((p) => !p.predicted).length - 2]
   const grossChange = ((currentMonth.gross - previousMonth.gross) / previousMonth.gross) * 100
   const netChange = ((currentMonth.net - previousMonth.net) / previousMonth.net) * 100
   const employeeChange = currentMonth.employees - previousMonth.employees
@@ -206,14 +372,22 @@ export default function AnalyticsPage() {
     })
   }
 
+  const handleCreateReport = () => {
+    toast({
+      title: "Report Created",
+      description: "Your custom report has been saved and scheduled successfully.",
+    })
+    setShowReportBuilder(false)
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Enhanced Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">HR & Payroll Analytics</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Advanced HR Analytics</h1>
           <div className="flex items-center space-x-2 mt-1">
-            <p className="text-gray-600">Comprehensive insights into your workforce and payroll data</p>
+            <p className="text-gray-600">AI-powered insights and predictive analytics</p>
             <div className="flex items-center space-x-1 text-xs text-gray-500">
               <Clock className="w-3 h-3" />
               <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
@@ -243,25 +417,108 @@ export default function AnalyticsPage() {
               <SelectItem value="custom">Custom Range</SelectItem>
             </SelectContent>
           </Select>
+          <Dialog open={showReportBuilder} onOpenChange={setShowReportBuilder}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Create Report
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Custom Report Builder</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Report Name</Label>
+                    <Input placeholder="Enter report name" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Report Type</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="executive">Executive Summary</SelectItem>
+                        <SelectItem value="departmental">Departmental Analysis</SelectItem>
+                        <SelectItem value="compliance">Compliance Report</SelectItem>
+                        <SelectItem value="custom">Custom Dashboard</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Textarea placeholder="Describe the report purpose and content..." />
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Schedule</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select frequency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="quarterly">Quarterly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Recipients</Label>
+                    <Input placeholder="Enter email addresses" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Metrics to Include</Label>
+                  <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                    {executiveMetrics.map((metric, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Checkbox id={`metric-${index}`} />
+                        <Label htmlFor={`metric-${index}`} className="text-sm">
+                          {metric.metric}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setShowReportBuilder(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreateReport}>
+                    <Save className="w-4 h-4 mr-2" />
+                    Create Report
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button variant="outline">
             <Download className="w-4 h-4 mr-2" />
-            Export Report
+            Export
           </Button>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="executive">Executive</TabsTrigger>
+          <TabsTrigger value="predictive">Predictive</TabsTrigger>
           <TabsTrigger value="payroll">Payroll</TabsTrigger>
           <TabsTrigger value="workforce">Workforce</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
-          <TabsTrigger value="insights">Insights</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {/* Key Metrics */}
+          {/* Enhanced Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveTab("payroll")}>
               <CardContent className="p-4">
@@ -343,12 +600,12 @@ export default function AnalyticsPage() {
             </Card>
           </div>
 
-          {/* Performance Indicators */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Target className="w-5 h-5" />
                 <span>Key Performance Indicators</span>
+                <Badge variant="secondary">vs Industry Benchmark</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -386,13 +643,13 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
 
-          {/* Quick Charts */}
           <div className="grid lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <TrendingUp className="w-5 h-5" />
-                  <span>Payroll Trends</span>
+                  <span>Payroll Trends & Predictions</span>
+                  <Badge variant="outline">3-month forecast</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -416,6 +673,7 @@ export default function AnalyticsPage() {
                       dataKey="employees"
                       stroke="#ef4444"
                       strokeWidth={2}
+                      strokeDashArray={(entry: any) => (entry.predicted ? "5 5" : "0")}
                       name="Employees"
                     />
                   </ComposedChart>
@@ -454,6 +712,14 @@ export default function AnalyticsPage() {
           </div>
         </TabsContent>
 
+        <TabsContent value="executive" className="space-y-6">
+          <ExecutiveDashboard metrics={executiveMetrics} />
+        </TabsContent>
+
+        <TabsContent value="predictive" className="space-y-6">
+          <PredictiveAnalytics insights={predictiveInsights} payrollData={payrollTrends} />
+        </TabsContent>
+
         <TabsContent value="payroll" className="space-y-6">
           <PayrollAnalytics data={payrollTrends} departments={filteredDepartmentData} />
         </TabsContent>
@@ -479,45 +745,247 @@ export default function AnalyticsPage() {
           <ComplianceAnalytics data={complianceData} />
         </TabsContent>
 
-        <TabsContent value="insights" className="space-y-6">
-          <InsightsAnalytics
-            payrollData={payrollTrends}
-            departmentData={filteredDepartmentData}
-            performanceData={performanceMetrics}
-          />
+        <TabsContent value="reports" className="space-y-6">
+          <ReportsManagement reports={customReports} />
         </TabsContent>
       </Tabs>
     </div>
   )
 }
 
+function ExecutiveDashboard({ metrics }: { metrics: any[] }) {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {metrics.map((metric, index) => (
+          <Card key={index} className="relative overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-lg">{metric.metric}</h3>
+                <Badge variant={metric.current >= metric.target ? "default" : "secondary"}>
+                  {metric.current >= metric.target ? "On Track" : "Below Target"}
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-end">
+                  <span className="text-3xl font-bold text-gray-900">
+                    {metric.metric.includes("Cost") ? "GHS " : ""}
+                    {metric.current.toLocaleString()}
+                  </span>
+                  <div className="text-right">
+                    <div className="flex items-center space-x-1">
+                      {metric.trend === "up" ? (
+                        <TrendingUp className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <TrendingDown className="w-4 h-4 text-red-600" />
+                      )}
+                      <span className="text-sm text-gray-600">vs Target</span>
+                    </div>
+                  </div>
+                </div>
+                <Progress value={(metric.current / metric.target) * 100} className="h-3" />
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Target: {metric.target.toLocaleString()}</span>
+                  <span>Benchmark: {metric.benchmark.toLocaleString()}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PredictiveAnalytics({ insights, payrollData }: { insights: any[]; payrollData: any[] }) {
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Brain className="w-5 h-5" />
+            <span>AI-Powered Predictions</span>
+            <Badge variant="outline">Machine Learning</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4">
+            {insights.map((insight, index) => (
+              <div key={index} className="p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <h4 className="font-semibold">{insight.title}</h4>
+                      <Badge variant={insight.impact === "High" ? "destructive" : "secondary"}>
+                        {insight.impact} Impact
+                      </Badge>
+                      <Badge variant="outline">{insight.probability}% Confidence</Badge>
+                    </div>
+                    <p className="text-sm text-gray-700 mb-2">{insight.description}</p>
+                    <div className="flex items-center space-x-4 text-sm text-gray-600">
+                      <span className="flex items-center">
+                        <Clock className="w-4 h-4 mr-1" />
+                        {insight.timeframe}
+                      </span>
+                      <span className="flex items-center">
+                        <Target className="w-4 h-4 mr-1" />
+                        {insight.category}
+                      </span>
+                    </div>
+                    <div className="mt-3 p-2 bg-white rounded border-l-4 border-l-blue-500">
+                      <p className="text-sm font-medium text-blue-900">Recommended Action:</p>
+                      <p className="text-sm text-blue-800">{insight.action}</p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    <Eye className="w-4 h-4 mr-2" />
+                    Details
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Predictive Payroll Modeling</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart data={payrollData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="period" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="gross"
+                stroke="#10b981"
+                strokeWidth={2}
+                strokeDashArray={(entry: any) => (entry.predicted ? "5 5" : "0")}
+                name="Gross Payroll"
+              />
+              <Line
+                type="monotone"
+                dataKey="net"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                strokeDashArray={(entry: any) => (entry.predicted ? "5 5" : "0")}
+                name="Net Payroll"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function ReportsManagement({ reports }: { reports: any[] }) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Scheduled Reports</h2>
+        <Button>
+          <Plus className="w-4 h-4 mr-2" />
+          Schedule New Report
+        </Button>
+      </div>
+
+      <div className="grid gap-4">
+        {reports.map((report) => (
+          <Card key={report.id}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <h3 className="font-semibold text-lg">{report.name}</h3>
+                    <Badge
+                      className={
+                        report.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
+                      }
+                    >
+                      {report.status}
+                    </Badge>
+                  </div>
+                  <p className="text-gray-600 mb-3">{report.description}</p>
+                  <div className="flex items-center space-x-6 text-sm text-gray-500">
+                    <span className="flex items-center">
+                      <Calendar className="w-4 h-4 mr-1" />
+                      {report.schedule}
+                    </span>
+                    <span className="flex items-center">
+                      <Users className="w-4 h-4 mr-1" />
+                      {report.recipients.length} recipients
+                    </span>
+                    <span className="flex items-center">
+                      <Clock className="w-4 h-4 mr-1" />
+                      Last run: {report.lastRun}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm">
+                    <Eye className="w-4 h-4 mr-2" />
+                    Preview
+                  </Button>
+                  <Button variant="outline" size="sm">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Configure
+                  </Button>
+                  <Button variant="outline" size="sm">
+                    <Zap className="w-4 h-4 mr-2" />
+                    Run Now
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function PayrollAnalytics({ data, departments }: { data: any[]; departments: any[] }) {
+  const actualData = data.filter((d) => !d.predicted)
+  const predictedData = data.filter((d) => d.predicted)
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-emerald-600">
-              GHS {data[data.length - 1].gross.toLocaleString()}
+              GHS {actualData[actualData.length - 1].gross.toLocaleString()}
             </div>
             <p className="text-sm text-gray-600">Current Gross Payroll</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600">GHS {data[data.length - 1].paye.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-red-600">
+              GHS {actualData[actualData.length - 1].paye.toLocaleString()}
+            </div>
             <p className="text-sm text-gray-600">PAYE Tax</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">GHS {data[data.length - 1].ssnit.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-blue-600">
+              GHS {actualData[actualData.length - 1].ssnit.toLocaleString()}
+            </div>
             <p className="text-sm text-gray-600">SSNIT Contributions</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-purple-600">GHS {data[data.length - 1].tier3.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-purple-600">
+              GHS {actualData[actualData.length - 1].tier3.toLocaleString()}
+            </div>
             <p className="text-sm text-gray-600">Tier 3 Contributions</p>
           </CardContent>
         </Card>

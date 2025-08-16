@@ -16,6 +16,7 @@ import {
   UserPlus,
   Target,
   BookOpen,
+  Plug,
 } from "lucide-react"
 import { Suspense } from "react"
 
@@ -151,6 +152,13 @@ export default function AppLayout({
 
               <div className="pt-4">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">System</p>
+                <a
+                  href="/app/integrations"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Plug className="w-5 h-5" />
+                  <span>Integrations</span>
+                </a>
                 <a
                   href="/app/settings"
                   className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
