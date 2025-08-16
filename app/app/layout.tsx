@@ -1,6 +1,17 @@
+"use client"
+
 import type React from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Badge } from "@/components/ui/badge"
 import {
   LayoutDashboard,
   Users,
@@ -17,6 +28,8 @@ import {
   Target,
   BookOpen,
   Plug,
+  User,
+  ChevronDown,
 } from "lucide-react"
 import { Suspense } from "react"
 
@@ -25,6 +38,40 @@ export default function AppLayout({
 }: {
   children: React.ReactNode
 }) {
+  const notifications = [
+    {
+      id: 1,
+      title: "New Leave Request",
+      message: "John Doe has submitted a leave request for approval",
+      time: "2 minutes ago",
+      unread: true,
+    },
+    {
+      id: 2,
+      title: "Payroll Processing Complete",
+      message: "March 2024 payroll has been processed successfully",
+      time: "1 hour ago",
+      unread: true,
+    },
+    {
+      id: 3,
+      title: "New Employee Onboarded",
+      message: "Sarah Johnson has completed onboarding process",
+      time: "3 hours ago",
+      unread: false,
+    },
+  ]
+
+  const unreadCount = notifications.filter((n) => n.unread).length
+
+  const handleSignOut = () => {
+    // Clear any stored authentication data
+    localStorage.removeItem("authToken")
+    sessionStorage.clear()
+    // Redirect to login page
+    window.location.href = "/login"
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
@@ -51,20 +98,97 @@ export default function AppLayout({
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent w-64"
               />
             </div>
-            <Button variant="ghost" size="sm" className="relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs"></span>
-            </Button>
-            <div className="flex items-center space-x-2">
-              <Avatar className="w-8 h-8">
-                <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                <AvatarFallback>KA</AvatarFallback>
-              </Avatar>
-              <div className="hidden md:block">
-                <p className="text-sm font-medium text-gray-900">Kwame Asante</p>
-                <p className="text-xs text-gray-500">Admin</p>
-              </div>
-            </div>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="relative">
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full p-0 flex items-center justify-center text-xs"
+                    >
+                      {unreadCount}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="end">
+                <div className="p-4 border-b">
+                  <h3 className="font-semibold text-gray-900">Notifications</h3>
+                  {unreadCount > 0 && <p className="text-sm text-gray-500">{unreadCount} unread notifications</p>}
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {notifications.length > 0 ? (
+                    notifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`p-4 border-b hover:bg-gray-50 cursor-pointer ${
+                          notification.unread ? "bg-blue-50" : ""
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 text-sm">{notification.title}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                            <p className="text-xs text-gray-400 mt-2">{notification.time}</p>
+                          </div>
+                          {notification.unread && <div className="w-2 h-2 bg-blue-500 rounded-full ml-2 mt-1"></div>}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-gray-500">
+                      <Bell className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                      <p>No notifications</p>
+                    </div>
+                  )}
+                </div>
+                {notifications.length > 0 && (
+                  <div className="p-2 border-t">
+                    <Button variant="ghost" size="sm" className="w-full text-emerald-600">
+                      View all notifications
+                    </Button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center space-x-2 hover:bg-gray-50">
+                  <Avatar className="w-8 h-8">
+                    <AvatarImage src="/placeholder.svg?height=32&width=32" />
+                    <AvatarFallback>KA</AvatarFallback>
+                  </Avatar>
+                  <div className="hidden md:block text-left">
+                    <p className="text-sm font-medium text-gray-900">Kwame Asante</p>
+                    <p className="text-xs text-gray-500">Admin</p>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="px-2 py-1.5">
+                  <p className="text-sm font-medium">Kwame Asante</p>
+                  <p className="text-xs text-gray-500">kwame.asante@company.com</p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <User className="w-4 h-4 mr-2" />
+                  My Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Account Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -166,18 +290,18 @@ export default function AppLayout({
                   <Settings className="w-5 h-5" />
                   <span>Settings</span>
                 </a>
+                <div className="pt-4 mt-4 border-t border-gray-200">
+                  <Button
+                    variant="ghost"
+                    onClick={handleSignOut}
+                    className="w-full justify-start text-gray-700 hover:text-red-600 hover:bg-red-50"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </Button>
+                </div>
               </div>
             </Suspense>
-
-            {/* User Menu at Bottom */}
-            <div className="absolute bottom-4 left-4 right-4">
-              <div className="border-t border-gray-200 pt-4">
-                <Button variant="ghost" className="w-full justify-start text-gray-700 hover:text-red-600">
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
-                </Button>
-              </div>
-            </div>
           </nav>
         </aside>
 
