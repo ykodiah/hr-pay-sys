@@ -1,44 +1,91 @@
 "use client"
-import { useState } from "react"
+
 import type React from "react"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Progress } from "@/components/ui/progress"
-import { toast } from "@/hooks/use-toast"
+import { Switch } from "@/components/ui/switch"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 import {
   Building2,
-  Users,
-  Calculator,
+  Upload,
+  Save,
+  Trash2,
   Shield,
   Bell,
-  Globe,
-  CreditCard,
-  Mail,
-  Save,
-  RefreshCw,
-  AlertTriangle,
-  CheckCircle,
-  SettingsIcon,
-  Database,
-  Key,
-  FileText,
-  Upload,
-  Download,
-  Trash2,
+  Users,
+  Building,
+  UserCheck,
   Plus,
   Edit,
-  Target,
-  TrendingUp,
-  DollarSign,
+  MoreHorizontal,
+  Calculator,
+  FileText,
+  Key,
+  Download,
+  Mail,
+  SettingsIcon,
+  CheckCircle,
+  Database,
+  AlertTriangle,
+  RefreshCw,
+  Globe,
+  CreditCard,
 } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Progress } from "@/components/ui/progress"
+
+interface Company {
+  id: string
+  name: string
+  taxId: string
+  ssnitNumber: string
+  industry: string
+  address: string
+  phone: string
+  email: string
+  logo?: string
+  status: "active" | "inactive"
+  subsidiaries: Subsidiary[]
+}
+
+interface Subsidiary {
+  id: string
+  name: string
+  location: string
+  costCenter: string
+  manager: string
+  status: "active" | "inactive"
+}
+
+interface Role {
+  id: string
+  name: string
+  description: string
+  permissions: string[]
+  userCount: number
+  isSystem: boolean
+}
+
+interface User {
+  id: string
+  name: string
+  email: string
+  role: string
+  companies: string[]
+  status: "active" | "inactive"
+  lastLogin: string
+}
 
 interface CompanySettings {
   name: string
@@ -97,54 +144,104 @@ interface NotificationSettings {
   webhookUrl?: string
 }
 
-interface OrganizationSettings {
-  subsidiaries: Array<{
-    id: string
-    name: string
-    taxId: string
-    currency: string
-    address: string
-    isActive: boolean
-  }>
-  costCenters: Array<{
-    id: string
-    name: string
-    code: string
-    subsidiaryId: string
-    budget: number
-    isActive: boolean
-  }>
-  departments: Array<{
-    id: string
-    name: string
-    code: string
-    managerId?: string
-    costCenterId: string
-    isActive: boolean
-  }>
-  jobGrades: Array<{
-    id: string
-    name: string
-    level: number
-    minSalary: number
-    maxSalary: number
-    currency: string
-  }>
-}
-
-interface MultiCurrencySettings {
-  baseCurrency: string
-  supportedCurrencies: string[]
-  exchangeRates: Record<string, number>
-  autoUpdateRates: boolean
-  rateSource: string
-}
-
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("company")
   const [isLoading, setIsLoading] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+
+  const [companies, setCompanies] = useState<Company[]>([
+    {
+      id: "1",
+      name: "Akwaaba Technologies Ltd",
+      taxId: "C0012345678",
+      ssnitNumber: "1234567890",
+      industry: "technology",
+      address: "123 Liberation Road, Labone, Accra, Ghana",
+      phone: "+233 30 123 4567",
+      email: "info@akwaabatech.com",
+      status: "active",
+      subsidiaries: [
+        {
+          id: "1",
+          name: "Akwaaba Tech Solutions",
+          location: "Accra",
+          costCenter: "CC001",
+          manager: "John Doe",
+          status: "active",
+        },
+        {
+          id: "2",
+          name: "Akwaaba Consulting",
+          location: "Kumasi",
+          costCenter: "CC002",
+          manager: "Jane Smith",
+          status: "active",
+        },
+      ],
+    },
+  ])
+
+  const [roles, setRoles] = useState<Role[]>([
+    {
+      id: "1",
+      name: "Super Admin",
+      description: "Full system access",
+      permissions: ["all"],
+      userCount: 1,
+      isSystem: true,
+    },
+    {
+      id: "2",
+      name: "HR Manager",
+      description: "HR operations management",
+      permissions: ["hr.manage", "payroll.view", "employees.manage"],
+      userCount: 3,
+      isSystem: true,
+    },
+    {
+      id: "3",
+      name: "Payroll Manager",
+      description: "Payroll processing",
+      permissions: ["payroll.manage", "employees.view"],
+      userCount: 2,
+      isSystem: true,
+    },
+    {
+      id: "4",
+      name: "Employee",
+      description: "Self-service access",
+      permissions: ["profile.view", "payslips.view", "leave.request"],
+      userCount: 45,
+      isSystem: true,
+    },
+  ])
+
+  const [users, setUsers] = useState<User[]>([
+    {
+      id: "1",
+      name: "Admin User",
+      email: "admin@akwaabatech.com",
+      role: "Super Admin",
+      companies: ["1"],
+      status: "active",
+      lastLogin: "2024-01-15 09:30",
+    },
+    {
+      id: "2",
+      name: "HR Manager",
+      email: "hr@akwaabatech.com",
+      role: "HR Manager",
+      companies: ["1"],
+      status: "active",
+      lastLogin: "2024-01-15 08:45",
+    },
+  ])
+
+  const [selectedCompany, setSelectedCompany] = useState<Company>(companies[0])
+  const [showCompanyDialog, setShowCompanyDialog] = useState(false)
+  const [showRoleDialog, setShowRoleDialog] = useState(false)
+  const [showUserDialog, setShowUserDialog] = useState(false)
 
   const [companySettings, setCompanySettings] = useState<CompanySettings>({
     name: "Akwaaba Technologies Ltd",
@@ -199,83 +296,6 @@ export default function SettingsPage() {
     systemAlerts: true,
     notificationEmail: "admin@akwaabatech.com",
     smsNotifications: false,
-  })
-
-  const [organizationSettings, setOrganizationSettings] = useState<OrganizationSettings>({
-    subsidiaries: [
-      {
-        id: "1",
-        name: "Akwaaba Technologies Ltd",
-        taxId: "C0012345678",
-        currency: "GHS",
-        address: "123 Liberation Road, Labone, Accra, Ghana",
-        isActive: true,
-      },
-    ],
-    costCenters: [
-      {
-        id: "1",
-        name: "Information Technology",
-        code: "IT001",
-        subsidiaryId: "1",
-        budget: 500000,
-        isActive: true,
-      },
-      {
-        id: "2",
-        name: "Human Resources",
-        code: "HR001",
-        subsidiaryId: "1",
-        budget: 200000,
-        isActive: true,
-      },
-    ],
-    departments: [
-      {
-        id: "1",
-        name: "Software Development",
-        code: "DEV001",
-        costCenterId: "1",
-        isActive: true,
-      },
-      {
-        id: "2",
-        name: "HR Operations",
-        code: "HRO001",
-        costCenterId: "2",
-        isActive: true,
-      },
-    ],
-    jobGrades: [
-      {
-        id: "1",
-        name: "Junior Level",
-        level: 1,
-        minSalary: 2000,
-        maxSalary: 4000,
-        currency: "GHS",
-      },
-      {
-        id: "2",
-        name: "Senior Level",
-        level: 2,
-        minSalary: 4000,
-        maxSalary: 8000,
-        currency: "GHS",
-      },
-    ],
-  })
-
-  const [multiCurrencySettings, setMultiCurrencySettings] = useState<MultiCurrencySettings>({
-    baseCurrency: "GHS",
-    supportedCurrencies: ["GHS", "USD", "EUR"],
-    exchangeRates: {
-      USD: 12.5,
-      EUR: 13.75,
-      GHS: 1.0,
-    },
-    autoUpdateRates: true,
-    rateSource: "bank-of-ghana",
   })
 
   const handleSaveSettings = async () => {
@@ -347,61 +367,437 @@ export default function SettingsPage() {
     setHasUnsavedChanges(true)
   }
 
-  const updateOrganizationSettings = (field: keyof OrganizationSettings, value: any) => {
-    setOrganizationSettings((prev) => ({ ...prev, [field]: value }))
-    setHasUnsavedChanges(true)
-  }
-
-  const updateMultiCurrencySettings = (field: keyof MultiCurrencySettings, value: any) => {
-    setMultiCurrencySettings((prev) => ({ ...prev, [field]: value }))
-    setHasUnsavedChanges(true)
-  }
-
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-600">Manage your AkwaabaHRPay system configuration and preferences.</p>
-          {hasUnsavedChanges && (
-            <div className="flex items-center space-x-2 mt-2">
-              <AlertTriangle className="w-4 h-4 text-yellow-600" />
-              <span className="text-sm text-yellow-600">You have unsaved changes</span>
-            </div>
-          )}
+          <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+          <p className="text-gray-600 mt-1">Manage your system configuration and preferences</p>
         </div>
-        <div className="flex items-center space-x-3">
-          <Button
-            variant="outline"
-            onClick={handleResetSettings}
-            className="flex items-center space-x-2 bg-transparent"
-          >
-            <RefreshCw className="w-4 h-4" />
-            <span>Reset to Defaults</span>
+        {hasUnsavedChanges && (
+          <Button onClick={handleSaveSettings} disabled={isLoading}>
+            <Save className="w-4 h-4 mr-2" />
+            {isLoading ? "Saving..." : "Save Changes"}
           </Button>
-          <Button
-            onClick={handleSaveSettings}
-            disabled={isLoading || !hasUnsavedChanges}
-            className="bg-emerald-600 hover:bg-emerald-700 flex items-center space-x-2"
-          >
-            {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            <span>{isLoading ? "Saving..." : "Save Changes"}</span>
-          </Button>
-        </div>
+        )}
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="company">Company</TabsTrigger>
-          <TabsTrigger value="organization">Organization</TabsTrigger>
-          <TabsTrigger value="currency">Multi-Currency</TabsTrigger>
+          <TabsTrigger value="multi-company">Multi-Company</TabsTrigger>
+          <TabsTrigger value="rbac">Roles & Access</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="payroll">Payroll</TabsTrigger>
           <TabsTrigger value="hr">HR</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="system">System</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="multi-company" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Multi-Company Management</h2>
+              <p className="text-gray-600">Manage multiple companies and subsidiaries</p>
+            </div>
+            <Dialog open={showCompanyDialog} onOpenChange={setShowCompanyDialog}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Company
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Add New Company</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Company Name *</Label>
+                      <Input placeholder="Enter company name" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tax ID / TIN *</Label>
+                      <Input placeholder="Enter tax ID" />
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>SSNIT Number *</Label>
+                      <Input placeholder="Enter SSNIT number" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Industry</Label>
+                      <Select>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select industry" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="technology">Technology</SelectItem>
+                          <SelectItem value="finance">Finance</SelectItem>
+                          <SelectItem value="healthcare">Healthcare</SelectItem>
+                          <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setShowCompanyDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button>Create Company</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="grid gap-6">
+            {companies.map((company) => (
+              <Card key={company.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Building className="w-5 h-5 text-emerald-600" />
+                      <div>
+                        <CardTitle>{company.name}</CardTitle>
+                        <p className="text-sm text-gray-600">{company.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={company.status === "active" ? "default" : "secondary"}>{company.status}</Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Company
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Building2 className="w-4 h-4 mr-2" />
+                            Manage Subsidiaries
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <Label className="text-sm font-medium">Tax ID</Label>
+                      <p className="text-sm text-gray-600">{company.taxId}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">SSNIT Number</Label>
+                      <p className="text-sm text-gray-600">{company.ssnitNumber}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Industry</Label>
+                      <p className="text-sm text-gray-600 capitalize">{company.industry}</p>
+                    </div>
+                  </div>
+
+                  <Separator className="my-4" />
+
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <Label className="text-sm font-medium">Subsidiaries ({company.subsidiaries.length})</Label>
+                      <Button variant="outline" size="sm">
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add Subsidiary
+                      </Button>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      {company.subsidiaries.map((subsidiary) => (
+                        <div key={subsidiary.id} className="p-3 border rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-sm">{subsidiary.name}</p>
+                              <p className="text-xs text-gray-600">
+                                {subsidiary.location} • {subsidiary.costCenter}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {subsidiary.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="rbac" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Roles & Access Control</h2>
+              <p className="text-gray-600">Manage user roles and permissions</p>
+            </div>
+            <Dialog open={showRoleDialog} onOpenChange={setShowRoleDialog}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Role
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Create New Role</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Role Name *</Label>
+                      <Input placeholder="Enter role name" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Description</Label>
+                      <Input placeholder="Enter role description" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label>Permissions</Label>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        <h4 className="font-medium">Employee Management</h4>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox id="emp-view" />
+                            <Label htmlFor="emp-view" className="text-sm">
+                              View Employees
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox id="emp-create" />
+                            <Label htmlFor="emp-create" className="text-sm">
+                              Create Employees
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox id="emp-edit" />
+                            <Label htmlFor="emp-edit" className="text-sm">
+                              Edit Employees
+                            </Label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <h4 className="font-medium">Payroll Management</h4>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox id="payroll-view" />
+                            <Label htmlFor="payroll-view" className="text-sm">
+                              View Payroll
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox id="payroll-process" />
+                            <Label htmlFor="payroll-process" className="text-sm">
+                              Process Payroll
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox id="payroll-approve" />
+                            <Label htmlFor="payroll-approve" className="text-sm">
+                              Approve Payroll
+                            </Label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setShowRoleDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button>Create Role</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="grid gap-4">
+            {roles.map((role) => (
+              <Card key={role.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Shield className="w-5 h-5 text-emerald-600" />
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h3 className="font-medium">{role.name}</h3>
+                          {role.isSystem && (
+                            <Badge variant="secondary" className="text-xs">
+                              System
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600">{role.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <p className="text-sm font-medium">{role.userCount} users</p>
+                        <p className="text-xs text-gray-600">{role.permissions.length} permissions</p>
+                      </div>
+                      {!role.isSystem && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Role
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-red-600">
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Role
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="users" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">User Management</h2>
+              <p className="text-gray-600">Manage system users and their access</p>
+            </div>
+            <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add User
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New User</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Full Name *</Label>
+                      <Input placeholder="Enter full name" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Email Address *</Label>
+                      <Input type="email" placeholder="Enter email address" />
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Role *</Label>
+                      <Select>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {roles.map((role) => (
+                            <SelectItem key={role.id} value={role.id}>
+                              {role.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Company Access</Label>
+                      <Select>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select companies" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {companies.map((company) => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setShowUserDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button>Create User</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="grid gap-4">
+            {users.map((user) => (
+              <Card key={user.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <UserCheck className="w-5 h-5 text-emerald-600" />
+                      <div>
+                        <h3 className="font-medium">{user.name}</h3>
+                        <p className="text-sm text-gray-600">{user.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <p className="text-sm font-medium">{user.role}</p>
+                        <p className="text-xs text-gray-600">Last login: {user.lastLogin}</p>
+                      </div>
+                      <Badge variant={user.status === "active" ? "default" : "secondary"}>{user.status}</Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit User
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Shield className="w-4 h-4 mr-2" />
+                            Reset Password
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600">
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Deactivate User
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
 
         <TabsContent value="company" className="space-y-6">
           <div className="grid lg:grid-cols-3 gap-6">
@@ -547,244 +943,6 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="organization" className="space-y-6">
-          <div className="grid lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Building2 className="w-5 h-5 text-emerald-600" />
-                  <span>Subsidiaries</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  {organizationSettings.subsidiaries.map((subsidiary) => (
-                    <div key={subsidiary.id} className="p-3 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <p className="font-medium">{subsidiary.name}</p>
-                          <p className="text-sm text-gray-500">
-                            {subsidiary.taxId} • {subsidiary.currency}
-                          </p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge variant={subsidiary.isActive ? "default" : "secondary"}>
-                            {subsidiary.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                          <Button variant="outline" size="sm">
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-600">{subsidiary.address}</p>
-                    </div>
-                  ))}
-                </div>
-                <Button variant="outline" className="w-full bg-transparent">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Subsidiary
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Target className="w-5 h-5 text-emerald-600" />
-                  <span>Cost Centers</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  {organizationSettings.costCenters.map((center) => (
-                    <div key={center.id} className="p-3 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <p className="font-medium">{center.name}</p>
-                          <p className="text-sm text-gray-500">{center.code}</p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="outline">GHS {center.budget.toLocaleString()}</Badge>
-                          <Button variant="outline" size="sm">
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <Button variant="outline" className="w-full bg-transparent">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Cost Center
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Users className="w-5 h-5 text-emerald-600" />
-                  <span>Departments</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  {organizationSettings.departments.map((dept) => (
-                    <div key={dept.id} className="p-3 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <p className="font-medium">{dept.name}</p>
-                          <p className="text-sm text-gray-500">{dept.code}</p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge variant={dept.isActive ? "default" : "secondary"}>
-                            {dept.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                          <Button variant="outline" size="sm">
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <Button variant="outline" className="w-full bg-transparent">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Department
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <TrendingUp className="w-5 h-5 text-emerald-600" />
-                  <span>Job Grades</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  {organizationSettings.jobGrades.map((grade) => (
-                    <div key={grade.id} className="p-3 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <p className="font-medium">{grade.name}</p>
-                          <p className="text-sm text-gray-500">Level {grade.level}</p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="outline">
-                            {grade.currency} {grade.minSalary.toLocaleString()} - {grade.maxSalary.toLocaleString()}
-                          </Badge>
-                          <Button variant="outline" size="sm">
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <Button variant="outline" className="w-full bg-transparent">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Job Grade
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="currency" className="space-y-6">
-          <div className="grid lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <DollarSign className="w-5 h-5 text-emerald-600" />
-                  <span>Currency Configuration</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="base-currency">Base Currency</Label>
-                  <Select
-                    value={multiCurrencySettings.baseCurrency}
-                    onValueChange={(value) => updateMultiCurrencySettings("baseCurrency", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="GHS">Ghana Cedis (GHS)</SelectItem>
-                      <SelectItem value="USD">US Dollar (USD)</SelectItem>
-                      <SelectItem value="EUR">Euro (EUR)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="rate-source">Exchange Rate Source</Label>
-                  <Select
-                    value={multiCurrencySettings.rateSource}
-                    onValueChange={(value) => updateMultiCurrencySettings("rateSource", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="bank-of-ghana">Bank of Ghana</SelectItem>
-                      <SelectItem value="xe-com">XE.com</SelectItem>
-                      <SelectItem value="manual">Manual Entry</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="auto-update">Auto-update Rates</Label>
-                    <p className="text-sm text-gray-500">Update exchange rates daily</p>
-                  </div>
-                  <Switch
-                    id="auto-update"
-                    checked={multiCurrencySettings.autoUpdateRates}
-                    onCheckedChange={(checked) => updateMultiCurrencySettings("autoUpdateRates", checked)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <RefreshCw className="w-5 h-5 text-emerald-600" />
-                  <span>Exchange Rates</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  {Object.entries(multiCurrencySettings.exchangeRates).map(([currency, rate]) => (
-                    <div key={currency} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
-                          <DollarSign className="w-4 h-4 text-emerald-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{currency}</p>
-                          <p className="text-sm text-gray-500">
-                            1 {multiCurrencySettings.baseCurrency} = {rate} {currency}
-                          </p>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                <Button variant="outline" className="w-full bg-transparent">
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Update All Rates
-                </Button>
               </CardContent>
             </Card>
           </div>
