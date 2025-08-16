@@ -1,6 +1,19 @@
+"use client"
+
 import type React from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Badge } from "@/components/ui/badge"
 import {
   User,
   FileText,
@@ -10,18 +23,50 @@ import {
   Bell,
   LogOut,
   Home,
-  LogInIcon as Logo,
   Target,
   Star,
   BookOpen,
   Award,
+  ChevronDown,
 } from "lucide-react"
+import { Logo } from "@/components/logo"
 
 export default function SelfServiceLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const [notifications] = useState([
+    {
+      id: 1,
+      title: "Payslip Available",
+      message: "Your May 2024 payslip is ready for download",
+      time: "2 hours ago",
+      unread: true,
+    },
+    {
+      id: 2,
+      title: "Leave Request Approved",
+      message: "Your annual leave request has been approved",
+      time: "1 day ago",
+      unread: true,
+    },
+    {
+      id: 3,
+      title: "Performance Review Due",
+      message: "Your Q2 performance review is due next week",
+      time: "3 days ago",
+      unread: false,
+    },
+  ])
+
+  const unreadCount = notifications.filter((n) => n.unread).length
+
+  const handleSignOut = () => {
+    // Redirect to login page
+    window.location.href = "/login"
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
@@ -36,20 +81,83 @@ export default function SelfServiceLayout({
           </div>
 
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" className="relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs"></span>
-            </Button>
-            <div className="flex items-center space-x-2">
-              <Avatar className="w-8 h-8">
-                <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                <AvatarFallback>KA</AvatarFallback>
-              </Avatar>
-              <div className="hidden md:block">
-                <p className="text-sm font-medium text-gray-900">Kwame Asante</p>
-                <p className="text-xs text-gray-500">Software Engineer</p>
-              </div>
-            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="relative">
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-xs bg-red-500 hover:bg-red-500">
+                      {unreadCount}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80" align="end">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold">Notifications</h4>
+                    <Badge variant="secondary">{notifications.length}</Badge>
+                  </div>
+                  {notifications.length > 0 ? (
+                    <div className="space-y-3">
+                      {notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          className={`p-3 rounded-lg border ${notification.unread ? "bg-blue-50 border-blue-200" : "bg-gray-50 border-gray-200"}`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">{notification.title}</p>
+                              <p className="text-xs text-gray-600 mt-1">{notification.message}</p>
+                              <p className="text-xs text-gray-400 mt-2">{notification.time}</p>
+                            </div>
+                            {notification.unread && <div className="w-2 h-2 bg-blue-500 rounded-full mt-1"></div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-gray-500">
+                      <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p>No notifications</p>
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center space-x-2 hover:bg-gray-50">
+                  <Avatar className="w-8 h-8">
+                    <AvatarImage src="/placeholder.svg?height=32&width=32" />
+                    <AvatarFallback>KA</AvatarFallback>
+                  </Avatar>
+                  <div className="hidden md:block text-left">
+                    <p className="text-sm font-medium text-gray-900">Kwame Asante</p>
+                    <p className="text-xs text-gray-500">Software Engineer</p>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <User className="w-4 h-4 mr-2" />
+                  View Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Account Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -147,16 +255,15 @@ export default function SelfServiceLayout({
                 <Settings className="w-5 h-5" />
                 <span>Account Settings</span>
               </a>
-            </div>
 
-            {/* User Menu at Bottom */}
-            <div className="absolute bottom-4 left-4 right-4">
-              <div className="border-t border-gray-200 pt-4">
-                <Button variant="ghost" className="w-full justify-start text-gray-700 hover:text-red-600">
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
-                </Button>
-              </div>
+              <Button
+                variant="ghost"
+                onClick={handleSignOut}
+                className="w-full justify-start text-gray-700 hover:text-red-600 hover:bg-red-50 mt-2 transition-colors"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
+              </Button>
             </div>
           </nav>
         </aside>
