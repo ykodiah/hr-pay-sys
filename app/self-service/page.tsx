@@ -3,7 +3,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { FileText, Calendar, CreditCard, DollarSign, Clock, CheckCircle, AlertCircle, TrendingUp } from "lucide-react"
+import {
+  FileText,
+  Calendar,
+  CreditCard,
+  DollarSign,
+  AlertCircle,
+  User,
+  Settings,
+  GraduationCap,
+  Target,
+  Award,
+  Bell,
+} from "lucide-react"
 
 export default function SelfServiceDashboard() {
   return (
@@ -12,15 +24,19 @@ export default function SelfServiceDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Welcome back, Kwame!</h1>
-          <p className="text-gray-600">Here's your personal HR dashboard</p>
+          <p className="text-gray-600">Here's your personal HR dashboard with all your information</p>
         </div>
-        <Badge variant="outline" className="text-emerald-600 border-emerald-200">
-          January 2025
-        </Badge>
+        <div className="flex items-center space-x-3">
+          <Badge variant="outline" className="text-emerald-600 border-emerald-200">
+            January 2025
+          </Badge>
+          <Button variant="outline" size="sm">
+            <Bell className="w-4 h-4 mr-2" />3 Notifications
+          </Button>
+        </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
@@ -46,10 +62,10 @@ export default function SelfServiceDashboard() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Clock className="w-5 h-5 text-orange-600" />
+              <Target className="w-5 h-5 text-purple-600" />
               <div>
-                <div className="text-2xl font-bold text-gray-900">1</div>
-                <p className="text-sm text-gray-600">Pending Requests</p>
+                <div className="text-2xl font-bold text-gray-900">85%</div>
+                <p className="text-sm text-gray-600">Goal Progress</p>
               </div>
             </div>
           </CardContent>
@@ -57,23 +73,22 @@ export default function SelfServiceDashboard() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <TrendingUp className="w-5 h-5 text-purple-600" />
+              <GraduationCap className="w-5 h-5 text-indigo-600" />
               <div>
-                <div className="text-2xl font-bold text-gray-900">3.2</div>
-                <p className="text-sm text-gray-600">Years of Service</p>
+                <div className="text-2xl font-bold text-gray-900">3</div>
+                <p className="text-sm text-gray-600">Courses Enrolled</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Quick Actions */}
       <Card>
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Button className="h-20 flex-col space-y-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
               <Calendar className="w-6 h-6" />
               <span>Request Leave</span>
@@ -87,15 +102,30 @@ export default function SelfServiceDashboard() {
               <span>Apply for Loan</span>
             </Button>
             <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
-              <CheckCircle className="w-6 h-6" />
+              <User className="w-6 h-6" />
               <span>Update Profile</span>
+            </Button>
+            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+              <Target className="w-6 h-6" />
+              <span>View Goals</span>
+            </Button>
+            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+              <GraduationCap className="w-6 h-6" />
+              <span>Browse Courses</span>
+            </Button>
+            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+              <Award className="w-6 h-6" />
+              <span>Performance</span>
+            </Button>
+            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+              <Settings className="w-6 h-6" />
+              <span>Settings</span>
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Recent Activity & Current Status */}
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-3 gap-6">
         {/* Recent Payslips */}
         <Card>
           <CardHeader>
@@ -110,29 +140,33 @@ export default function SelfServiceDashboard() {
                 <div>
                   <p className="font-medium text-gray-900">January 2025</p>
                   <p className="text-sm text-gray-600">Net Pay: GHS 7,372</p>
+                  <p className="text-xs text-gray-500">Total Allowances: GHS 1,200</p>
+                  <p className="text-xs text-gray-500">PF Total: GHS 1,456</p>
+                  <p className="text-xs text-gray-500">Total Deductions: GHS 2,890</p>
                 </div>
                 <Button
                   size="sm"
                   variant="outline"
                   className="bg-transparent"
                   onClick={() => {
-                    // Simulate PDF download
                     const link = document.createElement("a")
                     link.href = "#"
                     link.download = "Payslip_January_2025.pdf"
                     link.click()
-                    // Show success message
                     alert("Payslip downloaded successfully!")
                   }}
                 >
                   <FileText className="w-4 h-4 mr-2" />
-                  Download PDF
+                  PDF
                 </Button>
               </div>
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
                   <p className="font-medium text-gray-900">December 2024</p>
                   <p className="text-sm text-gray-600">Net Pay: GHS 7,285</p>
+                  <p className="text-xs text-gray-500">Total Allowances: GHS 1,150</p>
+                  <p className="text-xs text-gray-500">PF Total: GHS 1,398</p>
+                  <p className="text-xs text-gray-500">Total Deductions: GHS 2,765</p>
                 </div>
                 <Button
                   size="sm"
@@ -147,29 +181,114 @@ export default function SelfServiceDashboard() {
                   }}
                 >
                   <FileText className="w-4 h-4 mr-2" />
-                  Download PDF
+                  PDF
                 </Button>
               </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900">November 2024</p>
-                  <p className="text-sm text-gray-600">Net Pay: GHS 7,156</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Performance & Goals */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Target className="w-5 h-5" />
+              <span>Performance & Goals</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="p-3 bg-purple-50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="font-medium text-gray-900">Q1 2025 Goals</p>
+                  <Badge className="bg-purple-100 text-purple-800">85% Complete</Badge>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="bg-transparent"
-                  onClick={() => {
-                    const link = document.createElement("a")
-                    link.href = "#"
-                    link.download = "Payslip_November_2024.pdf"
-                    link.click()
-                    alert("Payslip downloaded successfully!")
-                  }}
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  Download PDF
-                </Button>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-purple-600 h-2 rounded-full" style={{ width: "85%" }}></div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <p className="text-xl font-bold text-blue-600">4.2</p>
+                  <p className="text-xs text-gray-600">Performance Rating</p>
+                </div>
+                <div className="p-3 bg-green-50 rounded-lg">
+                  <p className="text-xl font-bold text-green-600">3</p>
+                  <p className="text-xs text-gray-600">Goals Achieved</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Learning & Development */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <GraduationCap className="w-5 h-5" />
+              <span>Learning Progress</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="p-3 bg-indigo-50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="font-medium text-gray-900">Leadership Skills</p>
+                  <Badge className="bg-indigo-100 text-indigo-800">In Progress</Badge>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-indigo-600 h-2 rounded-full" style={{ width: "60%" }}></div>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">60% Complete</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div className="p-3 bg-green-50 rounded-lg">
+                  <p className="text-xl font-bold text-green-600">2</p>
+                  <p className="text-xs text-gray-600">Completed</p>
+                </div>
+                <div className="p-3 bg-orange-50 rounded-lg">
+                  <p className="text-xl font-bold text-orange-600">1</p>
+                  <p className="text-xs text-gray-600">In Progress</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Personal Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Personal Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Employee ID</p>
+                <p className="text-lg font-semibold text-gray-900">EMP-001</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Department</p>
+                <p className="text-lg font-semibold text-gray-900">Technology</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Position</p>
+                <p className="text-lg font-semibold text-gray-900">Senior Software Engineer</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Start Date</p>
+                <p className="text-lg font-semibold text-gray-900">March 15, 2022</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Years of Service</p>
+                <p className="text-lg font-semibold text-gray-900">3.2 years</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Employment Status</p>
+                <p className="text-lg font-semibold text-emerald-600">Active</p>
               </div>
             </div>
           </CardContent>
@@ -214,33 +333,6 @@ export default function SelfServiceDashboard() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Personal Information Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Employee ID</p>
-              <p className="text-lg font-semibold text-gray-900">EMP-001</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Department</p>
-              <p className="text-lg font-semibold text-gray-900">Technology</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Position</p>
-              <p className="text-lg font-semibold text-gray-900">Senior Software Engineer</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Start Date</p>
-              <p className="text-lg font-semibold text-gray-900">March 15, 2022</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
