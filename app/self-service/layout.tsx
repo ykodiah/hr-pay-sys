@@ -1,7 +1,21 @@
 import type React from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { User, FileText, Calendar, CreditCard, Settings, Bell, LogOut, Home } from "lucide-react"
+import {
+  User,
+  FileText,
+  Calendar,
+  CreditCard,
+  Settings,
+  Bell,
+  LogOut,
+  Home,
+  LogInIcon as Logo,
+  Target,
+  Star,
+  BookOpen,
+  Award,
+} from "lucide-react"
 
 export default function SelfServiceLayout({
   children,
@@ -15,9 +29,7 @@ export default function SelfServiceLayout({
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">A</span>
-              </div>
+              <Logo variant="icon" size="sm" />
               <span className="text-xl font-bold text-gray-900">AkwaabaHRPay</span>
               <span className="text-sm text-gray-500 ml-2">Employee Portal</span>
             </div>
@@ -69,6 +81,42 @@ export default function SelfServiceLayout({
               >
                 <FileText className="w-5 h-5" />
                 <span>Payslips</span>
+              </a>
+            </div>
+
+            <div className="pt-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Performance</p>
+              <a
+                href="/self-service/goals"
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <Target className="w-5 h-5" />
+                <span>My Goals</span>
+              </a>
+              <a
+                href="/self-service/reviews"
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <Star className="w-5 h-5" />
+                <span>Performance Reviews</span>
+              </a>
+            </div>
+
+            <div className="pt-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Learning</p>
+              <a
+                href="/self-service/courses"
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <BookOpen className="w-5 h-5" />
+                <span>My Courses</span>
+              </a>
+              <a
+                href="/self-service/certifications"
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <Award className="w-5 h-5" />
+                <span>Certifications</span>
               </a>
             </div>
 
