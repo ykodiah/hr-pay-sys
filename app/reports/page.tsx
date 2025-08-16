@@ -46,6 +46,7 @@ import {
   LineChart as RechartsLineChart,
   Line,
 } from "recharts"
+import "xlsx"
 
 interface ReportTemplate {
   id: string
@@ -264,10 +265,19 @@ export default function ReportsPage() {
         reportContent = `Generated ${reportName} report`
     }
 
-    const link = document.createElement("a")
-    link.href = "#"
-    link.download = `${reportName.replace(/\s+/g, "_")}.${format}`
-    link.click()
+    if (format === "pdf") {
+      // Generate PDF content
+      const pdfContent = generatePDFContent(reportContent, reportName)
+      downloadFile(pdfContent, `${reportName.replace(/\s+/g, "_")}.pdf`, "application/pdf")
+    } else if (format === "excel") {
+      // Generate Excel content
+      const excelContent = generateExcelContent(reportContent, reportName)
+      downloadFile(
+        excelContent,
+        `${reportName.replace(/\s+/g, "_")}.xlsx`,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      )
+    }
 
     toast({
       title: "Download Started",
@@ -290,14 +300,27 @@ export default function ReportsPage() {
       description: `Preparing ${selectedReports.length} reports in ${format.toUpperCase()} format...`,
     })
 
-    // Simulate bulk download
-    setTimeout(() => {
-      toast({
-        title: "Download Complete",
-        description: `${selectedReports.length} reports downloaded successfully.`,
-      })
-      setSelectedReports([])
-    }, 3000)
+    // Generate and download each selected report
+    selectedReports.forEach((reportId, index) => {
+      const report = reportTemplates.find((r) => r.id === reportId)
+
+      if (report) {
+        setTimeout(() => {
+          handleDownloadReport(reportId, report.name, format as "pdf" | "excel")
+        }, index * 500) // Stagger downloads
+      }
+    })
+
+    setTimeout(
+      () => {
+        toast({
+          title: "Download Complete",
+          description: `${selectedReports.length} reports downloaded successfully.`,
+        })
+        setSelectedReports([])
+      },
+      selectedReports.length * 500 + 1000,
+    )
   }
 
   const handleScheduleReport = (reportId: string) => {
@@ -481,6 +504,68 @@ Prepared by: AkwaabaHRPay - Welcome to Growth
       "performance_rating",
     ],
     analytics: ["department", "headcount", "avg_salary", "turnover_rate", "productivity_score"],
+  }
+
+  const generatePDFContent = (content: string, title: string) => {
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>${title}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .company-logo { font-size: 24px; font-weight: bold; color: #059669; margin-bottom: 10px; }
+        .report-title { font-size: 20px; font-weight: bold; margin-bottom: 20px; }
+        .content { white-space: pre-line; font-family: monospace; font-size: 12px; }
+        .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-logo">AkwaabaHRPay - Welcome to Growth</div>
+        <div class="report-title">${title}</div>
+    </div>
+    <div class="content">${content}</div>
+    <div class="footer">
+        Generated on ${new Date().toLocaleString()} | AkwaabaHRPay System
+    </div>
+</body>
+</html>`
+    return htmlContent
+  }
+
+  const generateExcelContent = (content: string, title: string) => {
+    // Convert text content to CSV format for Excel compatibility
+    const lines = content.split("\n").filter((line) => line.trim())
+    const csvContent = lines
+      .map((line) => {
+        // Convert table-like content to CSV
+        if (line.includes("|")) {
+          return line
+            .split("|")
+            .map((cell) => `"${cell.trim()}"`)
+            .join(",")
+        }
+        return `"${line}"`
+      })
+      .join("\n")
+
+    const excelHeader = `"${title}"\n"Generated: ${new Date().toLocaleString()}"\n"AkwaabaHRPay - Welcome to Growth"\n\n`
+    return excelHeader + csvContent
+  }
+
+  const downloadFile = (content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
   }
 
   return (

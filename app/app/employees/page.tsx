@@ -158,6 +158,7 @@ export default function EmployeesPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
 
   const filteredEmployees = employees.filter((employee) => {
     const matchesSearch =
@@ -206,6 +207,208 @@ export default function EmployeesPage() {
     })
   }
 
+  const handleImportEmployees = (importedData: any[]) => {
+    const newEmployees = importedData.map((data, index) => ({
+      ...data,
+      id: employees.length + index + 1,
+      employeeId: data.employeeId || `EMP${String(employees.length + index + 1).padStart(3, "0")}`,
+      leaveBalance: { annual: 21, sick: 10, casual: 5 },
+      documents: [],
+      avatar: "/placeholder.svg?height=40&width=40",
+    }))
+
+    setEmployees([...employees, ...newEmployees])
+    setIsImportDialogOpen(false)
+
+    toast({
+      title: "Import Successful",
+      description: `${importedData.length} employees have been imported successfully.`,
+    })
+  }
+
+  const downloadTemplate = (templateType: string) => {
+    let csvContent = ""
+    let filename = ""
+
+    switch (templateType) {
+      case "employees":
+        csvContent = generateEmployeeTemplate()
+        filename = "Employee_Import_Template.csv"
+        break
+      case "payroll":
+        csvContent = generatePayrollTemplate()
+        filename = "Payroll_Import_Template.csv"
+        break
+      case "allowances":
+        csvContent = generateAllowancesTemplate()
+        filename = "Allowances_Import_Template.csv"
+        break
+      case "leave":
+        csvContent = generateLeaveTemplate()
+        filename = "Leave_Import_Template.csv"
+        break
+      default:
+        return
+    }
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", filename)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    toast({
+      title: "Template Downloaded",
+      description: `${filename} has been downloaded successfully.`,
+    })
+  }
+
+  const generateEmployeeTemplate = () => {
+    const headers = [
+      "name",
+      "email",
+      "phone",
+      "position",
+      "department",
+      "location",
+      "salary",
+      "startDate",
+      "dateOfBirth",
+      "address",
+      "emergencyContact",
+      "bankName",
+      "bankAccount",
+      "ssnit",
+      "ghanaCard",
+      "status",
+    ]
+
+    const sampleData = [
+      "John Doe",
+      "john.doe@company.com",
+      "+233 24 123 4567",
+      "Software Engineer",
+      "Technology",
+      "Accra",
+      "6500",
+      "2024-01-15",
+      "1990-05-15",
+      "East Legon, Accra",
+      "Jane Doe - +233 20 111 2222",
+      "GT Bank",
+      "1234567890",
+      "GHA-123456789-0",
+      "GHA-987654321-0",
+      "Active",
+    ]
+
+    return `${headers.join(",")}\n${sampleData.join(",")}\n`
+  }
+
+  const generatePayrollTemplate = () => {
+    const headers = [
+      "employeeId",
+      "employeeName",
+      "basicSalary",
+      "transportAllowance",
+      "housingAllowance",
+      "medicalAllowance",
+      "otherAllowances",
+      "overtimeHours",
+      "overtimeRate",
+      "loans",
+      "advances",
+      "otherDeductions",
+      "payPeriod",
+    ]
+
+    const sampleData = [
+      "EMP001",
+      "John Doe",
+      "6500",
+      "500",
+      "600",
+      "100",
+      "0",
+      "10",
+      "50",
+      "200",
+      "0",
+      "0",
+      "January 2025",
+    ]
+
+    return `${headers.join(",")}\n${sampleData.join(",")}\n`
+  }
+
+  const generateAllowancesTemplate = () => {
+    const headers = [
+      "employeeId",
+      "employeeName",
+      "transportAllowance",
+      "housingAllowance",
+      "medicalAllowance",
+      "mealAllowance",
+      "uniformAllowance",
+      "trainingAllowance",
+      "toolsAllowance",
+      "communicationAllowance",
+      "effectiveDate",
+      "notes",
+    ]
+
+    const sampleData = [
+      "EMP001",
+      "John Doe",
+      "500",
+      "600",
+      "100",
+      "200",
+      "50",
+      "100",
+      "75",
+      "150",
+      "2025-01-01",
+      "Monthly allowances",
+    ]
+
+    return `${headers.join(",")}\n${sampleData.join(",")}\n`
+  }
+
+  const generateLeaveTemplate = () => {
+    const headers = [
+      "employeeId",
+      "employeeName",
+      "leaveType",
+      "startDate",
+      "endDate",
+      "days",
+      "reason",
+      "status",
+      "approvedBy",
+      "appliedDate",
+    ]
+
+    const sampleData = [
+      "EMP001",
+      "John Doe",
+      "Annual Leave",
+      "2025-02-15",
+      "2025-02-20",
+      "5",
+      "Family vacation",
+      "Approved",
+      "Jane Smith",
+      "2025-01-15",
+    ]
+
+    return `${headers.join(",")}\n${sampleData.join(",")}\n`
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -215,10 +418,24 @@ export default function EmployeesPage() {
           <p className="text-gray-600">Manage your team members and their information</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
-            <Upload className="w-4 h-4 mr-2" />
-            Import CSV
-          </Button>
+          <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Upload className="w-4 h-4 mr-2" />
+                Import Data
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Import Data</DialogTitle>
+              </DialogHeader>
+              <ImportDataDialog
+                onImport={handleImportEmployees}
+                onDownloadTemplate={downloadTemplate}
+                onClose={() => setIsImportDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
           <Button variant="outline">
             <Download className="w-4 h-4 mr-2" />
             Export
@@ -436,6 +653,443 @@ export default function EmployeesPage() {
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function ImportDataDialog({
+  onImport,
+  onDownloadTemplate,
+  onClose,
+}: {
+  onImport: (data: any[]) => void
+  onDownloadTemplate: (type: string) => void
+  onClose: () => void
+}) {
+  const [activeTab, setActiveTab] = useState("employees")
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [previewData, setPreviewData] = useState<any[]>([])
+  const [importErrors, setImportErrors] = useState<string[]>([])
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      if (file.type !== "text/csv" && !file.name.endsWith(".csv")) {
+        toast({
+          title: "Invalid File Type",
+          description: "Please select a CSV file.",
+          variant: "destructive",
+        })
+        return
+      }
+      setSelectedFile(file)
+      processFile(file)
+    }
+  }
+
+  const processFile = (file: File) => {
+    setIsProcessing(true)
+    const reader = new FileReader()
+
+    reader.onload = (e) => {
+      try {
+        const csv = e.target?.result as string
+        const lines = csv.split("\n").filter((line) => line.trim())
+
+        if (lines.length < 2) {
+          throw new Error("CSV file must contain at least a header row and one data row")
+        }
+
+        const headers = lines[0].split(",").map((h) => h.trim().replace(/"/g, ""))
+        const data = lines.slice(1).map((line, index) => {
+          const values = line.split(",").map((v) => v.trim().replace(/"/g, ""))
+          const row: any = {}
+
+          headers.forEach((header, i) => {
+            row[header] = values[i] || ""
+          })
+
+          row._rowIndex = index + 2 // +2 because we start from line 2 (after header)
+          return row
+        })
+
+        // Validate data based on import type
+        const errors = validateImportData(data, activeTab)
+        setImportErrors(errors)
+        setPreviewData(data.slice(0, 10)) // Show first 10 rows for preview
+      } catch (error) {
+        toast({
+          title: "File Processing Error",
+          description: error instanceof Error ? error.message : "Failed to process the CSV file",
+          variant: "destructive",
+        })
+        setPreviewData([])
+        setImportErrors([])
+      } finally {
+        setIsProcessing(false)
+      }
+    }
+
+    reader.readAsText(file)
+  }
+
+  const validateImportData = (data: any[], type: string): string[] => {
+    const errors: string[] = []
+
+    switch (type) {
+      case "employees":
+        data.forEach((row, index) => {
+          if (!row.name) errors.push(`Row ${row._rowIndex}: Name is required`)
+          if (!row.email) errors.push(`Row ${row._rowIndex}: Email is required`)
+          if (!row.position) errors.push(`Row ${row._rowIndex}: Position is required`)
+          if (!row.department) errors.push(`Row ${row._rowIndex}: Department is required`)
+          if (!row.salary || isNaN(Number(row.salary))) errors.push(`Row ${row._rowIndex}: Valid salary is required`)
+
+          // Email validation
+          if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
+            errors.push(`Row ${row._rowIndex}: Invalid email format`)
+          }
+
+          // Phone validation
+          if (row.phone && !/^\+233\s\d{2}\s\d{3}\s\d{4}$/.test(row.phone)) {
+            errors.push(`Row ${row._rowIndex}: Phone must be in format +233 XX XXX XXXX`)
+          }
+        })
+        break
+
+      case "payroll":
+        data.forEach((row) => {
+          if (!row.employeeId) errors.push(`Row ${row._rowIndex}: Employee ID is required`)
+          if (!row.employeeName) errors.push(`Row ${row._rowIndex}: Employee Name is required`)
+          if (!row.basicSalary || isNaN(Number(row.basicSalary)))
+            errors.push(`Row ${row._rowIndex}: Valid basic salary is required`)
+          if (!row.payPeriod) errors.push(`Row ${row._rowIndex}: Pay period is required`)
+        })
+        break
+
+      case "allowances":
+        data.forEach((row) => {
+          if (!row.employeeId) errors.push(`Row ${row._rowIndex}: Employee ID is required`)
+          if (!row.employeeName) errors.push(`Row ${row._rowIndex}: Employee Name is required`)
+          if (!row.effectiveDate) errors.push(`Row ${row._rowIndex}: Effective date is required`)
+        })
+        break
+
+      case "leave":
+        data.forEach((row) => {
+          if (!row.employeeId) errors.push(`Row ${row._rowIndex}: Employee ID is required`)
+          if (!row.employeeName) errors.push(`Row ${row._rowIndex}: Employee Name is required`)
+          if (!row.leaveType) errors.push(`Row ${row._rowIndex}: Leave type is required`)
+          if (!row.startDate) errors.push(`Row ${row._rowIndex}: Start date is required`)
+          if (!row.endDate) errors.push(`Row ${row._rowIndex}: End date is required`)
+          if (!row.days || isNaN(Number(row.days)))
+            errors.push(`Row ${row._rowIndex}: Valid number of days is required`)
+        })
+        break
+    }
+
+    return errors
+  }
+
+  const handleImport = () => {
+    if (!selectedFile || previewData.length === 0) {
+      toast({
+        title: "No Data to Import",
+        description: "Please select and process a CSV file first.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (importErrors.length > 0) {
+      toast({
+        title: "Validation Errors",
+        description: "Please fix all validation errors before importing.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Process all data (not just preview)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const csv = e.target?.result as string
+      const lines = csv.split("\n").filter((line) => line.trim())
+      const headers = lines[0].split(",").map((h) => h.trim().replace(/"/g, ""))
+      const allData = lines.slice(1).map((line) => {
+        const values = line.split(",").map((v) => v.trim().replace(/"/g, ""))
+        const row: any = {}
+        headers.forEach((header, i) => {
+          row[header] = values[i] || ""
+        })
+        return row
+      })
+
+      onImport(allData)
+    }
+    reader.readAsText(selectedFile)
+  }
+
+  return (
+    <div className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="employees">Employees</TabsTrigger>
+          <TabsTrigger value="payroll">Payroll</TabsTrigger>
+          <TabsTrigger value="allowances">Allowances</TabsTrigger>
+          <TabsTrigger value="leave">Leave Records</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="employees" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Import Employee Data</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-blue-900">Download Template First</h4>
+                  <p className="text-sm text-blue-700">Use our template to ensure proper data format</p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => onDownloadTemplate("employees")}
+                  className="bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Template
+                </Button>
+              </div>
+
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+                <div className="text-center">
+                  <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                  <div className="space-y-2">
+                    <p className="text-gray-600">Upload your employee CSV file</p>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="employee-file-upload"
+                    />
+                    <label htmlFor="employee-file-upload">
+                      <Button variant="outline" className="cursor-pointer bg-transparent" asChild>
+                        <span>Choose CSV File</span>
+                      </Button>
+                    </label>
+                    <p className="text-xs text-gray-500">Supported format: CSV (Max 10MB)</p>
+                  </div>
+                </div>
+              </div>
+
+              {selectedFile && (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{selectedFile.name}</p>
+                      <p className="text-sm text-gray-600">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                    {isProcessing && <div className="text-sm text-blue-600">Processing...</div>}
+                  </div>
+                </div>
+              )}
+
+              {importErrors.length > 0 && (
+                <div className="p-4 bg-red-50 rounded-lg">
+                  <h4 className="font-medium text-red-900 mb-2">Validation Errors ({importErrors.length})</h4>
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {importErrors.slice(0, 10).map((error, index) => (
+                      <p key={index} className="text-sm text-red-700">
+                        • {error}
+                      </p>
+                    ))}
+                    {importErrors.length > 10 && (
+                      <p className="text-sm text-red-600 font-medium">... and {importErrors.length - 10} more errors</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {previewData.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-medium">Data Preview (First 10 rows)</h4>
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto max-h-64">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            {Object.keys(previewData[0])
+                              .filter((key) => key !== "_rowIndex")
+                              .map((header) => (
+                                <th key={header} className="px-3 py-2 text-left font-medium text-gray-900 border-b">
+                                  {header}
+                                </th>
+                              ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {previewData.map((row, index) => (
+                            <tr key={index} className="border-b">
+                              {Object.entries(row)
+                                .filter(([key]) => key !== "_rowIndex")
+                                .map(([key, value]) => (
+                                  <td key={key} className="px-3 py-2 text-gray-700">
+                                    {String(value)}
+                                  </td>
+                                ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="payroll" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Import Payroll Data</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-green-900">Payroll Import Template</h4>
+                  <p className="text-sm text-green-700">Import salary, allowances, and deduction data</p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => onDownloadTemplate("payroll")}
+                  className="bg-green-600 text-white hover:bg-green-700"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Template
+                </Button>
+              </div>
+
+              <div className="p-4 bg-yellow-50 rounded-lg">
+                <h4 className="font-medium text-yellow-900 mb-2">Template Fields</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm text-yellow-800">
+                  <div>• Employee ID (Required)</div>
+                  <div>• Employee Name (Required)</div>
+                  <div>• Basic Salary (Required)</div>
+                  <div>• Transport Allowance</div>
+                  <div>• Housing Allowance</div>
+                  <div>• Medical Allowance</div>
+                  <div>• Other Allowances</div>
+                  <div>• Overtime Hours</div>
+                  <div>• Overtime Rate</div>
+                  <div>• Loans</div>
+                  <div>• Advances</div>
+                  <div>• Other Deductions</div>
+                  <div>• Pay Period (Required)</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="allowances" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Import Allowances Data</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-purple-900">Allowances Import Template</h4>
+                  <p className="text-sm text-purple-700">Import employee allowances and benefits</p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => onDownloadTemplate("allowances")}
+                  className="bg-purple-600 text-white hover:bg-purple-700"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Template
+                </Button>
+              </div>
+
+              <div className="p-4 bg-yellow-50 rounded-lg">
+                <h4 className="font-medium text-yellow-900 mb-2">Template Fields</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm text-yellow-800">
+                  <div>• Employee ID (Required)</div>
+                  <div>• Employee Name (Required)</div>
+                  <div>• Transport Allowance</div>
+                  <div>• Housing Allowance</div>
+                  <div>• Medical Allowance</div>
+                  <div>• Meal Allowance</div>
+                  <div>• Uniform Allowance</div>
+                  <div>• Training Allowance</div>
+                  <div>• Tools Allowance</div>
+                  <div>• Communication Allowance</div>
+                  <div>• Effective Date (Required)</div>
+                  <div>• Notes</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="leave" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Import Leave Records</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-orange-900">Leave Records Import Template</h4>
+                  <p className="text-sm text-orange-700">Import employee leave applications and history</p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => onDownloadTemplate("leave")}
+                  className="bg-orange-600 text-white hover:bg-orange-700"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Template
+                </Button>
+              </div>
+
+              <div className="p-4 bg-yellow-50 rounded-lg">
+                <h4 className="font-medium text-yellow-900 mb-2">Template Fields</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm text-yellow-800">
+                  <div>• Employee ID (Required)</div>
+                  <div>• Employee Name (Required)</div>
+                  <div>• Leave Type (Required)</div>
+                  <div>• Start Date (Required)</div>
+                  <div>• End Date (Required)</div>
+                  <div>• Days (Required)</div>
+                  <div>• Reason</div>
+                  <div>• Status</div>
+                  <div>• Approved By</div>
+                  <div>• Applied Date</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <div className="flex justify-end space-x-3 pt-4 border-t">
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          onClick={handleImport}
+          disabled={!selectedFile || previewData.length === 0 || importErrors.length > 0}
+          className="bg-emerald-600 hover:bg-emerald-700"
+        >
+          <Upload className="w-4 h-4 mr-2" />
+          Import Data ({previewData.length} records)
+        </Button>
+      </div>
     </div>
   )
 }

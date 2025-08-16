@@ -8,12 +8,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   User,
   FileText,
@@ -28,6 +28,7 @@ import {
   BookOpen,
   Award,
   ChevronDown,
+  X,
 } from "lucide-react"
 import { Logo } from "@/components/logo"
 
@@ -36,11 +37,14 @@ export default function SelfServiceLayout({
 }: {
   children: React.ReactNode
 }) {
-  const [notifications] = useState([
+  const [selectedNotification, setSelectedNotification] = useState<any>(null)
+  const [notifications, setNotifications] = useState([
     {
       id: 1,
       title: "Payslip Available",
       message: "Your May 2024 payslip is ready for download",
+      fullMessage:
+        "Your payslip for May 2024 has been processed and is now available for download. The payslip includes your basic salary, allowances, deductions, and net pay details. Please review and download it from the Payslips section.",
       time: "2 hours ago",
       unread: true,
     },
@@ -48,6 +52,8 @@ export default function SelfServiceLayout({
       id: 2,
       title: "Leave Request Approved",
       message: "Your annual leave request has been approved",
+      fullMessage:
+        "Your annual leave request for June 15-20, 2024 has been approved by your manager. The leave has been added to your leave balance and calendar. Please ensure proper handover of your responsibilities before the leave period.",
       time: "1 day ago",
       unread: true,
     },
@@ -55,6 +61,8 @@ export default function SelfServiceLayout({
       id: 3,
       title: "Performance Review Due",
       message: "Your Q2 performance review is due next week",
+      fullMessage:
+        "Your Q2 2024 performance review is scheduled for completion by June 30, 2024. Please complete your self-assessment and prepare for the review meeting with your manager. Access the performance review section to get started.",
       time: "3 days ago",
       unread: false,
     },
@@ -62,8 +70,14 @@ export default function SelfServiceLayout({
 
   const unreadCount = notifications.filter((n) => n.unread).length
 
+  const handleNotificationClick = (notification: any) => {
+    setSelectedNotification(notification)
+    setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, unread: false } : n)))
+  }
+
   const handleSignOut = () => {
-    // Redirect to login page
+    localStorage.removeItem("authToken")
+    sessionStorage.clear()
     window.location.href = "/login"
   }
 
@@ -92,37 +106,45 @@ export default function SelfServiceLayout({
                   )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80" align="end">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold">Notifications</h4>
-                    <Badge variant="secondary">{notifications.length}</Badge>
-                  </div>
+              <PopoverContent className="w-80 p-0" align="end">
+                <div className="p-4 border-b">
+                  <h3 className="font-semibold text-gray-900">Notifications</h3>
+                  {unreadCount > 0 && <p className="text-sm text-gray-500">{unreadCount} unread notifications</p>}
+                </div>
+                <div className="max-h-80 overflow-y-auto">
                   {notifications.length > 0 ? (
-                    <div className="space-y-3">
-                      {notifications.map((notification) => (
-                        <div
-                          key={notification.id}
-                          className={`p-3 rounded-lg border ${notification.unread ? "bg-blue-50 border-blue-200" : "bg-gray-50 border-gray-200"}`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <p className="font-medium text-sm">{notification.title}</p>
-                              <p className="text-xs text-gray-600 mt-1">{notification.message}</p>
-                              <p className="text-xs text-gray-400 mt-2">{notification.time}</p>
-                            </div>
-                            {notification.unread && <div className="w-2 h-2 bg-blue-500 rounded-full mt-1"></div>}
+                    notifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`p-4 border-b hover:bg-gray-50 cursor-pointer ${
+                          notification.unread ? "bg-blue-50" : ""
+                        }`}
+                        onClick={() => handleNotificationClick(notification)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 text-sm">{notification.title}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                            <p className="text-xs text-gray-400 mt-2">{notification.time}</p>
                           </div>
+                          {notification.unread && <div className="w-2 h-2 bg-blue-500 rounded-full ml-2 mt-1"></div>}
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))
                   ) : (
-                    <div className="text-center py-6 text-gray-500">
-                      <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <div className="p-4 text-center text-gray-500">
+                      <Bell className="w-8 h-8 mx-auto mb-2 text-gray-300" />
                       <p>No notifications</p>
                     </div>
                   )}
                 </div>
+                {notifications.length > 0 && (
+                  <div className="p-2 border-t">
+                    <Button variant="ghost" size="sm" className="w-full text-emerald-600">
+                      View all notifications
+                    </Button>
+                  </div>
+                )}
               </PopoverContent>
             </Popover>
 
@@ -141,13 +163,16 @@ export default function SelfServiceLayout({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <div className="px-2 py-1.5">
+                  <p className="text-sm font-medium">Kwame Asante</p>
+                  <p className="text-xs text-gray-500">kwame.asante@company.com</p>
+                </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => (window.location.href = "/self-service/profile")}>
                   <User className="w-4 h-4 mr-2" />
                   View Profile
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => (window.location.href = "/self-service/settings")}>
                   <Settings className="w-4 h-4 mr-2" />
                   Account Settings
                 </DropdownMenuItem>
@@ -161,6 +186,31 @@ export default function SelfServiceLayout({
           </div>
         </div>
       </header>
+
+      <Dialog open={!!selectedNotification} onOpenChange={() => setSelectedNotification(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              {selectedNotification?.title}
+              <Button variant="ghost" size="sm" onClick={() => setSelectedNotification(null)} className="h-6 w-6 p-0">
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogTitle>
+            <DialogDescription className="text-left">
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600">{selectedNotification?.fullMessage}</p>
+                <p className="text-xs text-gray-400">{selectedNotification?.time}</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end space-x-2 mt-4">
+            <Button variant="outline" onClick={() => setSelectedNotification(null)}>
+              Close
+            </Button>
+            <Button onClick={() => setSelectedNotification(null)}>Mark as Read</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex">
         {/* Sidebar */}
@@ -256,14 +306,16 @@ export default function SelfServiceLayout({
                 <span>Account Settings</span>
               </a>
 
-              <Button
-                variant="ghost"
-                onClick={handleSignOut}
-                className="w-full justify-start text-gray-700 hover:text-red-600 hover:bg-red-50 mt-2 transition-colors"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
-              </Button>
+              <div className="pt-4 mt-4 border-t border-gray-200">
+                <Button
+                  variant="ghost"
+                  onClick={handleSignOut}
+                  className="w-full justify-start text-gray-700 hover:text-red-600 hover:bg-red-50"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </Button>
+              </div>
             </div>
           </nav>
         </aside>
