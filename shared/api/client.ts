@@ -1,4 +1,4 @@
-import { AsyncStorage } from "@react-native-async-storage/async-storage"
+import { localStorage } from "localStorage"
 
 export interface ApiResponse<T> {
   success: boolean
@@ -26,6 +26,7 @@ class ApiClient {
   async setAuthToken(token: string) {
     this.token = token
     if (this.platform === "mobile") {
+      const { AsyncStorage } = await import("@react-native-async-storage/async-storage")
       await AsyncStorage.setItem("auth_token", token)
     } else {
       localStorage.setItem("auth_token", token)
@@ -36,6 +37,7 @@ class ApiClient {
     if (this.token) return this.token
 
     if (this.platform === "mobile") {
+      const { AsyncStorage } = await import("@react-native-async-storage/async-storage")
       this.token = await AsyncStorage.getItem("auth_token")
     } else {
       this.token = localStorage.getItem("auth_token")
