@@ -279,6 +279,86 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Benefits Section */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <Badge className="mb-4 bg-emerald-100 text-emerald-800">Benefits</Badge>
+              <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-6">Transform your HR operations</h2>
+              <p className="text-lg text-gray-600 mb-8 leading-relaxed">
+                Join thousands of companies that have revolutionized their HR processes with PayrollPro. Experience
+                measurable improvements from day one.
+              </p>
+
+              <ul className="space-y-4 mb-8">
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                  <span className="text-gray-700">
+                    Reduce payroll processing time by <span className="font-semibold text-emerald-600">99.9%</span>
+                  </span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                  <span className="text-gray-700">Eliminate manual errors and compliance risks</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                  <span className="text-gray-700">Streamline employee onboarding and offboarding</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                  <span className="text-gray-700">Access real-time workforce analytics</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                  <span className="text-gray-700">Integrate with existing business tools</span>
+                </li>
+              </ul>
+
+              <Link href="/setup">
+                <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4">
+                  Start Your Free Trial
+                </Button>
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <Card className="p-6 text-center hover:shadow-lg transition-shadow">
+                <CardContent className="p-0">
+                  <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <TrendingUp className="w-6 h-6 text-emerald-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Real-time Analytics</h3>
+                  <p className="text-sm text-gray-600">Monitor key HR metrics and make data-driven decisions.</p>
+                </CardContent>
+              </Card>
+
+              <Card className="p-6 text-center hover:shadow-lg transition-shadow">
+                <CardContent className="p-0">
+                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <Zap className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 mb-2">AI-Powered Insights</h3>
+                  <p className="text-sm text-gray-600">Get intelligent recommendations for HR decisions.</p>
+                </CardContent>
+              </Card>
+
+              <Card className="p-6 text-center hover:shadow-lg transition-shadow">
+                <CardContent className="p-0">
+                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <Users className="w-6 h-6 text-orange-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 mb-2">24/7 Support</h3>
+                  <p className="text-sm text-gray-600">Expert support whenever you need it.</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
       <section id="pricing" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -380,6 +460,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Security & Compliance Section */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -444,6 +525,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Integrations Section */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
