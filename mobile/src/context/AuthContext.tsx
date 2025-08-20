@@ -3,6 +3,9 @@
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import AsyncStorage from "@react-native-async-storage/async-storage"
+import { apiClient } from "../../../shared/api/apiClient"
+import { syncService } from "../../../shared/services/syncService"
+import { realtimeService } from "../../../shared/services/realtimeService"
 
 interface User {
   id: string
@@ -38,8 +41,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = await AsyncStorage.getItem("userData")
 
       if (token && userData) {
-        setUser(JSON.parse(userData))
+        const parsedUser = JSON.parse(userData)
+        setUser(parsedUser)
         setIsAuthenticated(true)
+
+        apiClient.setToken(token)
+        syncService.startSync()
+        realtimeService.connect(parsedUser.id, "mobile")
       }
     } catch (error) {
       console.error("Error checking auth status:", error)
@@ -50,7 +58,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      // Demo credentials check
+      const response = await apiClient.login({ email, password })
+
+      if (response.success) {
+        const { user: userData, token } = response.data
+
+        await AsyncStorage.setItem("authToken", token)
+        await AsyncStorage.setItem("userData", JSON.stringify(userData))
+
+        setUser(userData)
+        setIsAuthenticated(true)
+
+        apiClient.setToken(token)
+        syncService.startSync()
+        realtimeService.connect(userData.id, "mobile")
+
+        return true
+      }
+
+      // Fallback to demo credentials for development
       if (email === "employee@demo.akwaabahr.com" && password === "Employee123!") {
         const demoUser: User = {
           id: "1",
@@ -66,6 +92,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setUser(demoUser)
         setIsAuthenticated(true)
+
+        apiClient.setToken("demo-token")
+        syncService.startSync()
+        realtimeService.connect(demoUser.id, "mobile")
+
         return true
       }
 
@@ -78,6 +109,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
+      await apiClient.logout()
+      syncService.stopSync()
+      realtimeService.disconnect()
+
       await AsyncStorage.removeItem("authToken")
       await AsyncStorage.removeItem("userData")
       setUser(null)

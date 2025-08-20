@@ -279,86 +279,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Benefits Section */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <div>
-              <Badge className="mb-4 bg-emerald-100 text-emerald-800">Benefits</Badge>
-              <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-6">Transform your HR operations</h2>
-              <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-                Join thousands of companies that have revolutionized their HR processes with PayrollPro. Experience
-                measurable improvements from day one.
-              </p>
-
-              <ul className="space-y-4 mb-8">
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                  <span className="text-gray-700">
-                    Reduce payroll processing time by <span className="font-semibold text-emerald-600">99.9%</span>
-                  </span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                  <span className="text-gray-700">Eliminate manual errors and compliance risks</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                  <span className="text-gray-700">Streamline employee onboarding and offboarding</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                  <span className="text-gray-700">Access real-time workforce analytics</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                  <span className="text-gray-700">Integrate with existing business tools</span>
-                </li>
-              </ul>
-
-              <Link href="/setup">
-                <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4">
-                  Start Your Free Trial
-                </Button>
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-2 gap-6">
-              <Card className="p-6 text-center hover:shadow-lg transition-shadow">
-                <CardContent className="p-0">
-                  <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <TrendingUp className="w-6 h-6 text-emerald-600" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Real-time Analytics</h3>
-                  <p className="text-sm text-gray-600">Monitor key HR metrics and make data-driven decisions.</p>
-                </CardContent>
-              </Card>
-
-              <Card className="p-6 text-center hover:shadow-lg transition-shadow">
-                <CardContent className="p-0">
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <Zap className="w-6 h-6 text-purple-600" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-2">AI-Powered Insights</h3>
-                  <p className="text-sm text-gray-600">Get intelligent recommendations for HR decisions.</p>
-                </CardContent>
-              </Card>
-
-              <Card className="p-6 text-center hover:shadow-lg transition-shadow">
-                <CardContent className="p-0">
-                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <Users className="w-6 h-6 text-orange-600" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-2">24/7 Support</h3>
-                  <p className="text-sm text-gray-600">Expert support whenever you need it.</p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
       <section id="pricing" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -460,7 +380,52 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Security & Compliance Section */}
+      {/* Social Proof */}
+      <section className="py-16 bg-emerald-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Trusted by Growing Ghanaian Businesses</h2>
+            <p className="text-gray-600">Join hundreds of companies already using AkwaabaHRPay</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <img
+                src="/ghanaian-business-owner.png"
+                alt="Ghanaian business owner"
+                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+              />
+              <blockquote className="text-gray-600 italic mb-4">
+                "AkwaabaHRPay simplified our payroll completely. The Ghana tax calculations are always accurate."
+              </blockquote>
+              <cite className="text-sm font-semibold text-gray-900">Kwame, CEO at Accra Tech Solutions</cite>
+            </div>
+            <div className="text-center">
+              <img
+                src="/professional-ghanaian-woman.png"
+                alt="Ghanaian HR manager"
+                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+              />
+              <blockquote className="text-gray-600 italic mb-4">
+                "The employee self-service portal reduced our HR workload by 70%. Highly recommended!"
+              </blockquote>
+              <cite className="text-sm font-semibold text-gray-900">Kofi, HR Director at Kumasi Manufacturing</cite>
+            </div>
+            <div className="text-center">
+              <img
+                src="/placeholder-xuqky.png"
+                alt="Ghanaian finance manager"
+                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+              />
+              <blockquote className="text-gray-600 italic mb-4">
+                "Multi-location reporting gives us perfect visibility across all our branches."
+              </blockquote>
+              <cite className="text-sm font-semibold text-gray-900">Kofi Mensah, CFO at Ghana Retail Group</cite>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Bank-Grade Security & Compliance */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -490,8 +455,8 @@ export default function HomePage() {
 
             <Card className="p-6 text-center">
               <CardContent className="p-0">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Shield className="w-8 h-8 text-green-600" />
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <Shield className="w-6 h-6 text-green-600" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">Access Control</h3>
                 <p className="text-gray-600 mb-4">
@@ -525,11 +490,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Integrations Section */}
+      {/* Seamless Integrations */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Seamless Integrations</h2>
+          <div className="text-center mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Seamless Integrations</h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Connect AkwaabaHRPay with your existing business tools and banking systems.
             </p>
@@ -575,51 +540,6 @@ export default function HomePage() {
                 <p className="text-sm text-gray-600">Direct filing with GRA and SSNIT systems</p>
               </CardContent>
             </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Social Proof */}
-      <section className="py-16 bg-emerald-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Trusted by Growing Ghanaian Businesses</h2>
-            <p className="text-gray-600">Join hundreds of companies already using AkwaabaHRPay</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <img
-                src="/ghanaian-business-owner.png"
-                alt="Ghanaian business owner"
-                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
-              />
-              <blockquote className="text-gray-600 italic mb-4">
-                "AkwaabaHRPay simplified our payroll completely. The Ghana tax calculations are always accurate."
-              </blockquote>
-              <cite className="text-sm font-semibold text-gray-900">Kwame Asante, CEO at Accra Tech Solutions</cite>
-            </div>
-            <div className="text-center">
-              <img
-                src="/professional-ghanaian-woman.png"
-                alt="Ghanaian HR manager"
-                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
-              />
-              <blockquote className="text-gray-600 italic mb-4">
-                "The employee self-service portal reduced our HR workload by 70%. Highly recommended!"
-              </blockquote>
-              <cite className="text-sm font-semibold text-gray-900">Ama Osei, HR Director at Kumasi Manufacturing</cite>
-            </div>
-            <div className="text-center">
-              <img
-                src="/placeholder-xuqky.png"
-                alt="Ghanaian finance manager"
-                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
-              />
-              <blockquote className="text-gray-600 italic mb-4">
-                "Multi-location reporting gives us perfect visibility across all our branches."
-              </blockquote>
-              <cite className="text-sm font-semibold text-gray-900">Kofi Mensah, CFO at Ghana Retail Group</cite>
-            </div>
           </div>
         </div>
       </section>
