@@ -222,7 +222,7 @@ export default function HomePage() {
               <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
                 <CardContent className="p-0">
                   <img
-                    src="/placeholder-4xx9r.png"
+                    src="/employee-self-service-app.png"
                     alt="Mobile App"
                     className="w-full h-32 object-cover rounded-lg mb-4"
                   />
@@ -251,7 +251,7 @@ export default function HomePage() {
               <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
                 <CardContent className="p-0">
                   <img
-                    src="/placeholder-qg4br.png"
+                    src="/security-dashboard-encryption-access.png"
                     alt="Enterprise Security"
                     className="w-full h-32 object-cover rounded-lg mb-4"
                   />
@@ -279,7 +279,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Pricing Section */}
       <section id="pricing" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -381,52 +380,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Social Proof */}
-      <section className="py-16 bg-emerald-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Trusted by Growing Ghanaian Businesses</h2>
-            <p className="text-gray-600">Join hundreds of companies already using AkwaabaHRPay</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <img
-                src="/ghanaian-business-owner-headshot.png"
-                alt="Ghanaian business owner"
-                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
-              />
-              <blockquote className="text-gray-600 italic mb-4">
-                "AkwaabaHRPay simplified our payroll completely. The Ghana tax calculations are always accurate."
-              </blockquote>
-              <cite className="text-sm font-semibold text-gray-900">Kwame, CEO at Accra Tech Solutions</cite>
-            </div>
-            <div className="text-center">
-              <img
-                src="/ghanaian-hr-manager.png"
-                alt="Ghanaian HR manager"
-                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
-              />
-              <blockquote className="text-gray-600 italic mb-4">
-                "The employee self-service portal reduced our HR workload by 70%. Highly recommended!"
-              </blockquote>
-              <cite className="text-sm font-semibold text-gray-900">Kofi, HR Director at Kumasi Manufacturing</cite>
-            </div>
-            <div className="text-center">
-              <img
-                src="/placeholder-qjcip.png"
-                alt="Ghanaian finance manager"
-                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
-              />
-              <blockquote className="text-gray-600 italic mb-4">
-                "Multi-location reporting gives us perfect visibility across all our branches."
-              </blockquote>
-              <cite className="text-sm font-semibold text-gray-900">Kofi Mensah, CFO at Ghana Retail Group</cite>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Bank-Grade Security & Compliance */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -456,8 +409,8 @@ export default function HomePage() {
 
             <Card className="p-6 text-center">
               <CardContent className="p-0">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <Shield className="w-6 h-6 text-green-600" />
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Shield className="w-8 h-8 text-green-600" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">Access Control</h3>
                 <p className="text-gray-600 mb-4">
@@ -491,11 +444,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Seamless Integrations */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Seamless Integrations</h2>
+          <div className="text-center mb-16">
+            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Seamless Integrations</h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Connect AkwaabaHRPay with your existing business tools and banking systems.
             </p>
@@ -541,6 +493,51 @@ export default function HomePage() {
                 <p className="text-sm text-gray-600">Direct filing with GRA and SSNIT systems</p>
               </CardContent>
             </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Social Proof */}
+      <section className="py-16 bg-emerald-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Trusted by Growing Ghanaian Businesses</h2>
+            <p className="text-gray-600">Join hundreds of companies already using AkwaabaHRPay</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <img
+                src="/ghanaian-business-owner.png"
+                alt="Ghanaian business owner"
+                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+              />
+              <blockquote className="text-gray-600 italic mb-4">
+                "AkwaabaHRPay simplified our payroll completely. The Ghana tax calculations are always accurate."
+              </blockquote>
+              <cite className="text-sm font-semibold text-gray-900">Kwame Asante, CEO at Accra Tech Solutions</cite>
+            </div>
+            <div className="text-center">
+              <img
+                src="/professional-ghanaian-woman.png"
+                alt="Ghanaian HR manager"
+                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+              />
+              <blockquote className="text-gray-600 italic mb-4">
+                "The employee self-service portal reduced our HR workload by 70%. Highly recommended!"
+              </blockquote>
+              <cite className="text-sm font-semibold text-gray-900">Ama Osei, HR Director at Kumasi Manufacturing</cite>
+            </div>
+            <div className="text-center">
+              <img
+                src="/placeholder-xuqky.png"
+                alt="Ghanaian finance manager"
+                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+              />
+              <blockquote className="text-gray-600 italic mb-4">
+                "Multi-location reporting gives us perfect visibility across all our branches."
+              </blockquote>
+              <cite className="text-sm font-semibold text-gray-900">Kofi Mensah, CFO at Ghana Retail Group</cite>
+            </div>
           </div>
         </div>
       </section>

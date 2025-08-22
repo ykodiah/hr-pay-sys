@@ -1,6 +1,6 @@
 "use client"
 
-import type { ReactNode } from "react"
+import type React from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -32,19 +32,13 @@ import {
   User,
   ChevronDown,
   X,
-  Wifi,
-  WifiOff,
 } from "lucide-react"
-import { Suspense, useState, useEffect } from "react"
-import { useFeatures } from "../../shared/hooks/useFeatures"
-import { useRealtime } from "../../shared/hooks/useRealtime"
-import { apiClient } from "../../shared/api/apiClient"
-import { syncService } from "../../shared/services/syncService"
+import { Suspense, useState } from "react"
 
 export default function ClientAppLayout({
   children,
 }: {
-  children: ReactNode
+  children: React.ReactNode
 }) {
   const [selectedNotification, setSelectedNotification] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState("")
@@ -78,33 +72,6 @@ export default function ClientAppLayout({
     },
   ])
 
-  const { isFeatureEnabled } = useFeatures("web")
-  const { isConnected, subscribe } = useRealtime("admin-user", "web")
-
-  useEffect(() => {
-    const unsubscribe = subscribe("notification", (notification: any) => {
-      setNotifications((prev) => [
-        {
-          id: Date.now(),
-          title: notification.title,
-          message: notification.message,
-          fullMessage: notification.fullMessage || notification.message,
-          time: "Just now",
-          unread: true,
-        },
-        ...prev,
-      ])
-    })
-
-    return unsubscribe
-  }, [subscribe])
-
-  const token = localStorage.getItem("authToken")
-  if (token) {
-    apiClient.setToken(token)
-    syncService.startSync()
-  }
-
   const unreadCount = notifications.filter((n) => n.unread).length
 
   const handleNotificationClick = (notification: any) => {
@@ -112,7 +79,7 @@ export default function ClientAppLayout({
     setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, unread: false } : n)))
   }
 
-  const handleSearch = (e: any) => {
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     if (searchQuery.trim()) {
       window.location.href = `/app/search?q=${encodeURIComponent(searchQuery)}`
@@ -143,20 +110,6 @@ export default function ClientAppLayout({
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              {isConnected ? (
-                <div className="flex items-center space-x-1 text-emerald-600">
-                  <Wifi className="w-4 h-4" />
-                  <span className="text-xs hidden sm:block">Live</span>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-1 text-gray-400">
-                  <WifiOff className="w-4 h-4" />
-                  <span className="text-xs hidden sm:block">Offline</span>
-                </div>
-              )}
-            </div>
-
             <form onSubmit={handleSearch} className="relative hidden md:block">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
@@ -304,86 +257,70 @@ export default function ClientAppLayout({
 
               <div className="pt-4">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">HR Management</p>
-                {isFeatureEnabled("EMPLOYEE_MANAGEMENT") && (
-                  <a
-                    href="/app/employees"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <Users className="w-5 h-5" />
-                    <span>Employees</span>
-                  </a>
-                )}
-                {isFeatureEnabled("RECRUITMENT") && (
-                  <a
-                    href="/app/recruitment"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <UserPlus className="w-5 h-5" />
-                    <span>Recruitment</span>
-                  </a>
-                )}
-                {isFeatureEnabled("PERFORMANCE_MANAGEMENT") && (
-                  <a
-                    href="/app/performance"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <Target className="w-5 h-5" />
-                    <span>Performance</span>
-                  </a>
-                )}
-                {isFeatureEnabled("LEARNING_DEVELOPMENT") && (
-                  <a
-                    href="/app/learning"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <BookOpen className="w-5 h-5" />
-                    <span>Learning & Development</span>
-                  </a>
-                )}
-                {isFeatureEnabled("LEAVE_MANAGEMENT") && (
-                  <a
-                    href="/app/leave"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <Calendar className="w-5 h-5" />
-                    <span>Leave Management</span>
-                  </a>
-                )}
+                <a
+                  href="/app/employees"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Users className="w-5 h-5" />
+                  <span>Employees</span>
+                </a>
+                <a
+                  href="/app/recruitment"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <UserPlus className="w-5 h-5" />
+                  <span>Recruitment</span>
+                </a>
+                <a
+                  href="/app/performance"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Target className="w-5 h-5" />
+                  <span>Performance</span>
+                </a>
+                <a
+                  href="/app/learning"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <BookOpen className="w-5 h-5" />
+                  <span>Learning & Development</span>
+                </a>
+                <a
+                  href="/app/leave"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Calendar className="w-5 h-5" />
+                  <span>Leave Management</span>
+                </a>
               </div>
 
               <div className="pt-4">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Payroll</p>
-                {isFeatureEnabled("PAYROLL_PROCESSING") && (
-                  <a
-                    href="/app/payroll"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <Calculator className="w-5 h-5" />
-                    <span>Payroll Processing</span>
-                  </a>
-                )}
-                {isFeatureEnabled("LOAN_MANAGEMENT") && (
-                  <a
-                    href="/app/loans"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <CreditCard className="w-5 h-5" />
-                    <span>Loans & Advances</span>
-                  </a>
-                )}
+                <a
+                  href="/app/payroll"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Calculator className="w-5 h-5" />
+                  <span>Payroll Processing</span>
+                </a>
+                <a
+                  href="/app/loans"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <CreditCard className="w-5 h-5" />
+                  <span>Loans & Advances</span>
+                </a>
               </div>
 
               <div className="pt-4">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Analytics</p>
-                {isFeatureEnabled("ANALYTICS_REPORTING") && (
-                  <a
-                    href="/app/analytics"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <BarChart3 className="w-5 h-5" />
-                    <span>Reports & Analytics</span>
-                  </a>
-                )}
+                <a
+                  href="/app/analytics"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <BarChart3 className="w-5 h-5" />
+                  <span>Reports & Analytics</span>
+                </a>
               </div>
 
               <div className="pt-4">
