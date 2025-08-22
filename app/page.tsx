@@ -222,7 +222,7 @@ export default function HomePage() {
               <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
                 <CardContent className="p-0">
                   <img
-                    src="/employee-self-service-app.png"
+                    src="/placeholder-4xx9r.png"
                     alt="Mobile App"
                     className="w-full h-32 object-cover rounded-lg mb-4"
                   />
@@ -251,7 +251,7 @@ export default function HomePage() {
               <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
                 <CardContent className="p-0">
                   <img
-                    src="/security-dashboard-encryption-access.png"
+                    src="/placeholder-qg4br.png"
                     alt="Enterprise Security"
                     className="w-full h-32 object-cover rounded-lg mb-4"
                   />
@@ -279,6 +279,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Pricing Section */}
       <section id="pricing" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -390,7 +391,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
               <img
-                src="/ghanaian-business-owner.png"
+                src="/ghanaian-business-owner-headshot.png"
                 alt="Ghanaian business owner"
                 className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
               />
@@ -401,7 +402,7 @@ export default function HomePage() {
             </div>
             <div className="text-center">
               <img
-                src="/professional-ghanaian-woman.png"
+                src="/ghanaian-hr-manager.png"
                 alt="Ghanaian HR manager"
                 className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
               />
@@ -412,7 +413,7 @@ export default function HomePage() {
             </div>
             <div className="text-center">
               <img
-                src="/placeholder-xuqky.png"
+                src="/placeholder-qjcip.png"
                 alt="Ghanaian finance manager"
                 className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
               />
