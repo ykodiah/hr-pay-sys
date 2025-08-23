@@ -11,7 +11,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
 import {
@@ -1104,8 +1103,13 @@ function AddEmployeeForm({
   onClose: () => void
 }) {
   const [formData, setFormData] = useState({
-    name: employee?.name || "",
-    email: employee?.email || "",
+    prefix: employee?.prefix || "",
+    firstName: employee?.firstName || "",
+    otherNames: employee?.otherNames || "",
+    lastName: employee?.lastName || "",
+    maritalStatus: employee?.maritalStatus || "",
+    corporateEmail: employee?.corporateEmail || "",
+    personalEmail: employee?.personalEmail || "",
     phone: employee?.phone || "",
     position: employee?.position || "",
     department: employee?.department || "",
@@ -1114,7 +1118,10 @@ function AddEmployeeForm({
     startDate: employee?.startDate || "",
     dateOfBirth: employee?.dateOfBirth || "",
     address: employee?.address || "",
-    emergencyContact: employee?.emergencyContact || "",
+    emergencyContactName: employee?.emergencyContactName || "",
+    emergencyContactTel: employee?.emergencyContactTel || "",
+    educationalLevel: employee?.educationalLevel || "",
+    gender: employee?.gender || "",
     bankName: employee?.bankName || "",
     bankAccount: employee?.bankAccount || "",
     ssnit: employee?.ssnit || "",
@@ -1127,8 +1134,9 @@ function AddEmployeeForm({
   const validateForm = () => {
     const newErrors: any = {}
 
-    if (!formData.name.trim()) newErrors.name = "Name is required"
-    if (!formData.email.trim()) newErrors.email = "Email is required"
+    if (!formData.firstName.trim()) newErrors.firstName = "First name is required"
+    if (!formData.lastName.trim()) newErrors.lastName = "Last name is required"
+    if (!formData.personalEmail.trim()) newErrors.personalEmail = "Personal email is required"
     if (!formData.phone.trim()) newErrors.phone = "Phone is required"
     if (!formData.position.trim()) newErrors.position = "Position is required"
     if (!formData.department) newErrors.department = "Department is required"
@@ -1140,10 +1148,13 @@ function AddEmployeeForm({
     if (!formData.ssnit) newErrors.ssnit = "SSNIT Number is required"
     if (!formData.ghanaCard) newErrors.ghanaCard = "Ghana Card Number is required"
 
-    // Email validation
+    // Email validation for both emails
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (formData.email && !emailRegex.test(formData.email)) {
-      newErrors.email = "Invalid email format"
+    if (formData.personalEmail && !emailRegex.test(formData.personalEmail)) {
+      newErrors.personalEmail = "Invalid email format"
+    }
+    if (formData.corporateEmail && !emailRegex.test(formData.corporateEmail)) {
+      newErrors.corporateEmail = "Invalid email format"
     }
 
     // Phone validation
@@ -1181,29 +1192,112 @@ function AddEmployeeForm({
         </TabsList>
 
         <TabsContent value="personal" className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <div>
-              <Label htmlFor="name">Full Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
-                placeholder="Enter full name"
-                className={errors.name ? "border-red-500" : ""}
-              />
-              {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
+              <Label htmlFor="prefix">Prefix</Label>
+              <Select value={formData.prefix} onValueChange={(value) => handleInputChange("prefix", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select prefix" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Mr">Mr</SelectItem>
+                  <SelectItem value="Mrs">Mrs</SelectItem>
+                  <SelectItem value="Miss">Miss</SelectItem>
+                  <SelectItem value="Ms">Ms</SelectItem>
+                  <SelectItem value="Dr">Dr</SelectItem>
+                  <SelectItem value="Prof">Prof</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <Label htmlFor="email">Email Address *</Label>
+              <Label htmlFor="firstName">First Name *</Label>
               <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange("email", e.target.value)}
-                placeholder="employee@company.com"
-                className={errors.email ? "border-red-500" : ""}
+                id="firstName"
+                value={formData.firstName}
+                onChange={(e) => handleInputChange("firstName", e.target.value)}
+                placeholder="Enter first name"
+                className={errors.firstName ? "border-red-500" : ""}
               />
-              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+              {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
+            </div>
+            <div>
+              <Label htmlFor="otherNames">Other Name(s)</Label>
+              <Input
+                id="otherNames"
+                value={formData.otherNames}
+                onChange={(e) => handleInputChange("otherNames", e.target.value)}
+                placeholder="Middle names"
+              />
+            </div>
+            <div>
+              <Label htmlFor="lastName">Last Name *</Label>
+              <Input
+                id="lastName"
+                value={formData.lastName}
+                onChange={(e) => handleInputChange("lastName", e.target.value)}
+                placeholder="Enter last name"
+                className={errors.lastName ? "border-red-500" : ""}
+              />
+              {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="maritalStatus">Marital Status</Label>
+              <Select
+                value={formData.maritalStatus}
+                onValueChange={(value) => handleInputChange("maritalStatus", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select marital status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Single">Single</SelectItem>
+                  <SelectItem value="Married">Married</SelectItem>
+                  <SelectItem value="Divorced">Divorced</SelectItem>
+                  <SelectItem value="Separated">Separated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="gender">Gender</Label>
+              <Select value={formData.gender} onValueChange={(value) => handleInputChange("gender", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="corporateEmail">Corporate Email Address</Label>
+              <Input
+                id="corporateEmail"
+                type="email"
+                value={formData.corporateEmail}
+                onChange={(e) => handleInputChange("corporateEmail", e.target.value)}
+                placeholder="employee@company.com"
+                className={errors.corporateEmail ? "border-red-500" : ""}
+              />
+              {errors.corporateEmail && <p className="text-red-500 text-sm mt-1">{errors.corporateEmail}</p>}
+            </div>
+            <div>
+              <Label htmlFor="personalEmail">Personal Email Address *</Label>
+              <Input
+                id="personalEmail"
+                type="email"
+                value={formData.personalEmail}
+                onChange={(e) => handleInputChange("personalEmail", e.target.value)}
+                placeholder="personal@email.com"
+                className={errors.personalEmail ? "border-red-500" : ""}
+              />
+              {errors.personalEmail && <p className="text-red-500 text-sm mt-1">{errors.personalEmail}</p>}
             </div>
           </div>
 
@@ -1230,24 +1324,59 @@ function AddEmployeeForm({
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="address">Address</Label>
-            <Textarea
-              id="address"
-              value={formData.address}
-              onChange={(e) => handleInputChange("address", e.target.value)}
-              placeholder="Full address"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="address">Address</Label>
+              <Input
+                id="address"
+                value={formData.address}
+                onChange={(e) => handleInputChange("address", e.target.value)}
+                placeholder="Full address"
+              />
+            </div>
+            <div>
+              <Label htmlFor="educationalLevel">Educational Level</Label>
+              <Select
+                value={formData.educationalLevel}
+                onValueChange={(value) => handleInputChange("educationalLevel", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select education level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="JHS">JHS</SelectItem>
+                  <SelectItem value="SHS">SHS</SelectItem>
+                  <SelectItem value="Diploma">Diploma</SelectItem>
+                  <SelectItem value="HND">HND</SelectItem>
+                  <SelectItem value="Degree">Degree</SelectItem>
+                  <SelectItem value="Masters">Masters</SelectItem>
+                  <SelectItem value="Doctorate">Doctorate</SelectItem>
+                  <SelectItem value="Professional">Professional</SelectItem>
+                  <SelectItem value="Other Certificate">Other Certificate</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div>
-            <Label htmlFor="emergencyContact">Emergency Contact</Label>
-            <Input
-              id="emergencyContact"
-              value={formData.emergencyContact}
-              onChange={(e) => handleInputChange("emergencyContact", e.target.value)}
-              placeholder="Name - Phone Number"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="emergencyContactName">Emergency Contact Name</Label>
+              <Input
+                id="emergencyContactName"
+                value={formData.emergencyContactName}
+                onChange={(e) => handleInputChange("emergencyContactName", e.target.value)}
+                placeholder="Contact person name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="emergencyContactTel">Emergency Contact Tel</Label>
+              <Input
+                id="emergencyContactTel"
+                value={formData.emergencyContactTel}
+                onChange={(e) => handleInputChange("emergencyContactTel", e.target.value)}
+                placeholder="+233 XX XXX XXXX"
+              />
+            </div>
           </div>
         </TabsContent>
 
