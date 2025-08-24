@@ -446,9 +446,9 @@ export default function EmployeesPage() {
                 Add Employee
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Add New Employee</DialogTitle>
+                <DialogTitle className="text-xl font-semibold">Add New Employee</DialogTitle>
               </DialogHeader>
               <AddEmployeeForm onSubmit={handleAddEmployee} onClose={() => setIsAddDialogOpen(false)} />
             </DialogContent>
@@ -636,9 +636,9 @@ export default function EmployeesPage() {
 
       {/* Edit Employee Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Employee</DialogTitle>
+            <DialogTitle className="text-xl font-semibold">Edit Employee</DialogTitle>
           </DialogHeader>
           {selectedEmployee && (
             <AddEmployeeForm

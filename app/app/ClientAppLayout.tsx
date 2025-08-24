@@ -32,16 +32,101 @@ import {
   User,
   ChevronDown,
   X,
+  Palette,
 } from "lucide-react"
-import { Suspense, useState } from "react"
+import { Suspense, useState, useEffect } from "react"
+
+// Theme configuration and state management
+const themes = {
+  emerald: {
+    name: "Emerald",
+    primary: "emerald",
+    colors: {
+      50: "#ecfdf5",
+      100: "#d1fae5",
+      500: "#10b981",
+      600: "#059669",
+      700: "#047857",
+    },
+  },
+  blue: {
+    name: "Ocean Blue",
+    primary: "blue",
+    colors: {
+      50: "#eff6ff",
+      100: "#dbeafe",
+      500: "#3b82f6",
+      600: "#2563eb",
+      700: "#1d4ed8",
+    },
+  },
+  purple: {
+    name: "Royal Purple",
+    primary: "purple",
+    colors: {
+      50: "#faf5ff",
+      100: "#f3e8ff",
+      500: "#8b5cf6",
+      600: "#7c3aed",
+      700: "#6d28d9",
+    },
+  },
+  orange: {
+    name: "Sunset Orange",
+    primary: "orange",
+    colors: {
+      50: "#fff7ed",
+      100: "#ffedd5",
+      500: "#f97316",
+      600: "#ea580c",
+      700: "#c2410c",
+    },
+  },
+  rose: {
+    name: "Rose Pink",
+    primary: "rose",
+    colors: {
+      50: "#fff1f2",
+      100: "#ffe4e6",
+      500: "#f43f5e",
+      600: "#e11d48",
+      700: "#be123c",
+    },
+  },
+}
 
 export default function ClientAppLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // Theme state management
+  const [currentTheme, setCurrentTheme] = useState("emerald")
   const [selectedNotification, setSelectedNotification] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState("")
+
+  useEffect(() => {
+    const theme = themes[currentTheme as keyof typeof themes]
+    const root = document.documentElement
+
+    // Apply CSS custom properties for the selected theme
+    root.style.setProperty("--theme-primary-50", theme.colors[50])
+    root.style.setProperty("--theme-primary-100", theme.colors[100])
+    root.style.setProperty("--theme-primary-500", theme.colors[500])
+    root.style.setProperty("--theme-primary-600", theme.colors[600])
+    root.style.setProperty("--theme-primary-700", theme.colors[700])
+
+    // Store theme preference
+    localStorage.setItem("akwaaba-theme", currentTheme)
+  }, [currentTheme])
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("akwaaba-theme")
+    if (savedTheme && themes[savedTheme as keyof typeof themes]) {
+      setCurrentTheme(savedTheme)
+    }
+  }, [])
+
   const [notifications, setNotifications] = useState([
     {
       id: 1,
@@ -73,6 +158,7 @@ export default function ClientAppLayout({
   ])
 
   const unreadCount = notifications.filter((n) => n.unread).length
+  const theme = themes[currentTheme as keyof typeof themes]
 
   const handleNotificationClick = (notification: any) => {
     setSelectedNotification(notification)
@@ -102,7 +188,10 @@ export default function ClientAppLayout({
               <Menu className="w-5 h-5" />
             </Button>
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: theme.colors[600] }}
+              >
                 <span className="text-white font-bold text-sm">A</span>
               </div>
               <span className="text-xl font-bold text-gray-900 hidden sm:block">AkwaabaHRPay</span>
@@ -117,9 +206,44 @@ export default function ClientAppLayout({
                 placeholder="Search employees, payroll..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent w-64"
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent w-64"
+                style={
+                  {
+                    "--tw-ring-color": theme.colors[500],
+                    focusRingColor: theme.colors[500],
+                  } as React.CSSProperties
+                }
               />
             </form>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="relative">
+                  <Palette className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <div className="px-2 py-1.5">
+                  <p className="text-sm font-medium">Choose Theme</p>
+                  <p className="text-xs text-gray-500">Customize your experience</p>
+                </div>
+                <DropdownMenuSeparator />
+                {Object.entries(themes).map(([key, themeOption]) => (
+                  <DropdownMenuItem
+                    key={key}
+                    onClick={() => setCurrentTheme(key)}
+                    className="flex items-center space-x-3"
+                  >
+                    <div
+                      className="w-4 h-4 rounded-full border-2 border-gray-200"
+                      style={{ backgroundColor: themeOption.colors[500] }}
+                    />
+                    <span className={currentTheme === key ? "font-medium" : ""}>{themeOption.name}</span>
+                    {currentTheme === key && <span className="ml-auto text-xs">✓</span>}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <Popover>
               <PopoverTrigger asChild>
@@ -156,7 +280,12 @@ export default function ClientAppLayout({
                             <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
                             <p className="text-xs text-gray-400 mt-2">{notification.time}</p>
                           </div>
-                          {notification.unread && <div className="w-2 h-2 bg-blue-500 rounded-full ml-2 mt-1"></div>}
+                          {notification.unread && (
+                            <div
+                              className="w-2 h-2 rounded-full ml-2 mt-1"
+                              style={{ backgroundColor: theme.colors[500] }}
+                            />
+                          )}
                         </div>
                       </div>
                     ))
@@ -169,7 +298,7 @@ export default function ClientAppLayout({
                 </div>
                 {notifications.length > 0 && (
                   <div className="p-2 border-t">
-                    <Button variant="ghost" size="sm" className="w-full text-emerald-600">
+                    <Button variant="ghost" size="sm" className="w-full" style={{ color: theme.colors[600] }}>
                       View all notifications
                     </Button>
                   </div>
@@ -249,7 +378,11 @@ export default function ClientAppLayout({
             <Suspense fallback={<div>Loading...</div>}>
               <a
                 href="/app"
-                className="flex items-center space-x-3 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 font-medium"
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg font-medium"
+                style={{
+                  backgroundColor: theme.colors[50],
+                  color: theme.colors[700],
+                }}
               >
                 <LayoutDashboard className="w-5 h-5" />
                 <span>Dashboard</span>

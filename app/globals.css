@@ -35,6 +35,13 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Added theme color variables for dynamic theme switching */
+  --theme-primary-50: #ecfdf5;
+  --theme-primary-100: #d1fae5;
+  --theme-primary-500: #10b981;
+  --theme-primary-600: #059669;
+  --theme-primary-700: #047857;
 }
 
 .dark {
@@ -209,5 +216,25 @@
   nav,
   .sidebar {
     font-size: var(--font-size-sm);
+  }
+
+  /* Added theme-aware utility classes for dynamic color application */
+  .theme-bg-primary-50 {
+    background-color: var(--theme-primary-50);
+  }
+  .theme-bg-primary-600 {
+    background-color: var(--theme-primary-600);
+  }
+  .theme-bg-primary-700 {
+    background-color: var(--theme-primary-700);
+  }
+  .theme-text-primary-600 {
+    color: var(--theme-primary-600);
+  }
+  .theme-text-primary-700 {
+    color: var(--theme-primary-700);
+  }
+  .theme-border-primary-500 {
+    border-color: var(--theme-primary-500);
   }
 }
