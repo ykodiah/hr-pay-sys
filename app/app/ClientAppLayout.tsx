@@ -392,35 +392,75 @@ export default function ClientAppLayout({
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">HR Management</p>
                 <a
                   href="/app/employees"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
+                    e.currentTarget.style.color = "white"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = ""
+                    e.currentTarget.style.color = ""
+                  }}
                 >
                   <Users className="w-5 h-5" />
                   <span>Employees</span>
                 </a>
                 <a
                   href="/app/recruitment"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
+                    e.currentTarget.style.color = "white"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = ""
+                    e.currentTarget.style.color = ""
+                  }}
                 >
                   <UserPlus className="w-5 h-5" />
                   <span>Recruitment</span>
                 </a>
                 <a
                   href="/app/performance"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
+                    e.currentTarget.style.color = "white"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = ""
+                    e.currentTarget.style.color = ""
+                  }}
                 >
                   <Target className="w-5 h-5" />
                   <span>Performance</span>
                 </a>
                 <a
                   href="/app/learning"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
+                    e.currentTarget.style.color = "white"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = ""
+                    e.currentTarget.style.color = ""
+                  }}
                 >
                   <BookOpen className="w-5 h-5" />
                   <span>Learning & Development</span>
                 </a>
                 <a
                   href="/app/leave"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
+                    e.currentTarget.style.color = "white"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = ""
+                    e.currentTarget.style.color = ""
+                  }}
                 >
                   <Calendar className="w-5 h-5" />
                   <span>Leave Management</span>
@@ -431,14 +471,30 @@ export default function ClientAppLayout({
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Payroll</p>
                 <a
                   href="/app/payroll"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
+                    e.currentTarget.style.color = "white"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = ""
+                    e.currentTarget.style.color = ""
+                  }}
                 >
                   <Calculator className="w-5 h-5" />
                   <span>Payroll Processing</span>
                 </a>
                 <a
                   href="/app/loans"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
+                    e.currentTarget.style.color = "white"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = ""
+                    e.currentTarget.style.color = ""
+                  }}
                 >
                   <CreditCard className="w-5 h-5" />
                   <span>Loans & Advances</span>
@@ -449,7 +505,15 @@ export default function ClientAppLayout({
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Analytics</p>
                 <a
                   href="/app/analytics"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
+                    e.currentTarget.style.color = "white"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = ""
+                    e.currentTarget.style.color = ""
+                  }}
                 >
                   <BarChart3 className="w-5 h-5" />
                   <span>Reports & Analytics</span>
@@ -460,14 +524,30 @@ export default function ClientAppLayout({
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">System</p>
                 <a
                   href="/app/integrations"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
+                    e.currentTarget.style.color = "white"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = ""
+                    e.currentTarget.style.color = ""
+                  }}
                 >
                   <Plug className="w-5 h-5" />
                   <span>Integrations</span>
                 </a>
                 <a
                   href="/app/settings"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
+                    e.currentTarget.style.color = "white"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = ""
+                    e.currentTarget.style.color = ""
+                  }}
                 >
                   <Settings className="w-5 h-5" />
                   <span>Settings</span>
