@@ -1197,32 +1197,33 @@ function AddEmployeeForm({
         </TabsList>
 
         <TabsContent value="personal" className="space-y-8">
-          <div className="grid grid-cols-2 gap-x-12 gap-y-8">
-            {/* Name Fields Row */}
-            <div className="col-span-2 grid grid-cols-4 gap-6">
-              <div className="space-y-3">
-                <Label htmlFor="prefix" className="text-base font-medium">
-                  Prefix
-                </Label>
-                <Select value={formData.prefix} onValueChange={(value) => handleInputChange("prefix", value)}>
-                  <SelectTrigger className="h-12 text-base">
-                    <SelectValue placeholder="Select prefix" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Mr">Mr</SelectItem>
-                    <SelectItem value="Mrs">Mrs</SelectItem>
-                    <SelectItem value="Miss">Miss</SelectItem>
-                    <SelectItem value="Ms">Ms</SelectItem>
-                    <SelectItem value="Dr">Dr</SelectItem>
-                    <SelectItem value="Prof">Prof</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="space-y-6">
+            {/* Field 1: Prefix */}
+            <div className="flex items-center gap-8">
+              <Label htmlFor="prefix" className="text-base font-medium w-48 flex-shrink-0">
+                1. Prefix
+              </Label>
+              <Select value={formData.prefix} onValueChange={(value) => handleInputChange("prefix", value)}>
+                <SelectTrigger className="h-12 text-base flex-1 max-w-md">
+                  <SelectValue placeholder="Select prefix" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Mr">Mr</SelectItem>
+                  <SelectItem value="Mrs">Mrs</SelectItem>
+                  <SelectItem value="Miss">Miss</SelectItem>
+                  <SelectItem value="Ms">Ms</SelectItem>
+                  <SelectItem value="Dr">Dr</SelectItem>
+                  <SelectItem value="Prof">Prof</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div className="space-y-3">
-                <Label htmlFor="firstName" className="text-base font-medium">
-                  First Name <span className="text-red-500">*</span>
-                </Label>
+            {/* Field 2: First Name */}
+            <div className="flex items-center gap-8">
+              <Label htmlFor="firstName" className="text-base font-medium w-48 flex-shrink-0">
+                2. First Name <span className="text-red-500">*</span>
+              </Label>
+              <div className="flex-1 max-w-md">
                 <Input
                   id="firstName"
                   value={formData.firstName}
@@ -1230,26 +1231,30 @@ function AddEmployeeForm({
                   placeholder="Enter first name"
                   className={`h-12 text-base ${errors.firstName ? "border-red-500" : ""}`}
                 />
-                {errors.firstName && <p className="text-red-500 text-sm">{errors.firstName}</p>}
+                {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
               </div>
+            </div>
 
-              <div className="space-y-3">
-                <Label htmlFor="otherNames" className="text-base font-medium">
-                  Other Name(s)
-                </Label>
-                <Input
-                  id="otherNames"
-                  value={formData.otherNames}
-                  onChange={(e) => handleInputChange("otherNames", e.target.value)}
-                  placeholder="Middle names"
-                  className="h-12 text-base"
-                />
-              </div>
+            {/* Field 3: Other Name(s) */}
+            <div className="flex items-center gap-8">
+              <Label htmlFor="otherNames" className="text-base font-medium w-48 flex-shrink-0">
+                3. Other Name(s)
+              </Label>
+              <Input
+                id="otherNames"
+                value={formData.otherNames}
+                onChange={(e) => handleInputChange("otherNames", e.target.value)}
+                placeholder="Middle names"
+                className="h-12 text-base flex-1 max-w-md"
+              />
+            </div>
 
-              <div className="space-y-3">
-                <Label htmlFor="lastName" className="text-base font-medium">
-                  Last Name <span className="text-red-500">*</span>
-                </Label>
+            {/* Field 4: Last Name */}
+            <div className="flex items-center gap-8">
+              <Label htmlFor="lastName" className="text-base font-medium w-48 flex-shrink-0">
+                4. Last Name <span className="text-red-500">*</span>
+              </Label>
+              <div className="flex-1 max-w-md">
                 <Input
                   id="lastName"
                   value={formData.lastName}
@@ -1257,20 +1262,20 @@ function AddEmployeeForm({
                   placeholder="Enter last name"
                   className={`h-12 text-base ${errors.lastName ? "border-red-500" : ""}`}
                 />
-                {errors.lastName && <p className="text-red-500 text-sm">{errors.lastName}</p>}
+                {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
               </div>
             </div>
 
-            {/* Personal Details Row */}
-            <div className="space-y-3">
-              <Label htmlFor="maritalStatus" className="text-base font-medium">
-                Marital Status
+            {/* Field 5: Marital Status */}
+            <div className="flex items-center gap-8">
+              <Label htmlFor="maritalStatus" className="text-base font-medium w-48 flex-shrink-0">
+                5. Marital Status
               </Label>
               <Select
                 value={formData.maritalStatus}
                 onValueChange={(value) => handleInputChange("maritalStatus", value)}
               >
-                <SelectTrigger className="h-12 text-base">
+                <SelectTrigger className="h-12 text-base flex-1 max-w-md">
                   <SelectValue placeholder="Select marital status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1282,12 +1287,13 @@ function AddEmployeeForm({
               </Select>
             </div>
 
-            <div className="space-y-3">
-              <Label htmlFor="gender" className="text-base font-medium">
-                Gender
+            {/* Field 6: Gender */}
+            <div className="flex items-center gap-8">
+              <Label htmlFor="gender" className="text-base font-medium w-48 flex-shrink-0">
+                6. Gender
               </Label>
               <Select value={formData.gender} onValueChange={(value) => handleInputChange("gender", value)}>
-                <SelectTrigger className="h-12 text-base">
+                <SelectTrigger className="h-12 text-base flex-1 max-w-md">
                   <SelectValue placeholder="Select gender" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1297,88 +1303,97 @@ function AddEmployeeForm({
               </Select>
             </div>
 
-            {/* Email Fields Row */}
-            <div className="space-y-3">
-              <Label htmlFor="corporateEmail" className="text-base font-medium">
-                Corporate Email Address
+            {/* Field 7: Corporate Email Address */}
+            <div className="flex items-center gap-8">
+              <Label htmlFor="corporateEmail" className="text-base font-medium w-48 flex-shrink-0">
+                7. Corporate Email Address
               </Label>
-              <Input
-                id="corporateEmail"
-                type="email"
-                value={formData.corporateEmail}
-                onChange={(e) => handleInputChange("corporateEmail", e.target.value)}
-                placeholder="employee@company.com"
-                className={`h-12 text-base ${errors.corporateEmail ? "border-red-500" : ""}`}
-              />
-              {errors.corporateEmail && <p className="text-red-500 text-sm">{errors.corporateEmail}</p>}
+              <div className="flex-1 max-w-md">
+                <Input
+                  id="corporateEmail"
+                  type="email"
+                  value={formData.corporateEmail}
+                  onChange={(e) => handleInputChange("corporateEmail", e.target.value)}
+                  placeholder="employee@company.com"
+                  className={`h-12 text-base ${errors.corporateEmail ? "border-red-500" : ""}`}
+                />
+                {errors.corporateEmail && <p className="text-red-500 text-sm mt-1">{errors.corporateEmail}</p>}
+              </div>
             </div>
 
-            <div className="space-y-3">
-              <Label htmlFor="personalEmail" className="text-base font-medium">
-                Personal Email Address <span className="text-red-500">*</span>
+            {/* Field 8: Personal Email Address */}
+            <div className="flex items-center gap-8">
+              <Label htmlFor="personalEmail" className="text-base font-medium w-48 flex-shrink-0">
+                8. Personal Email Address <span className="text-red-500">*</span>
               </Label>
-              <Input
-                id="personalEmail"
-                type="email"
-                value={formData.personalEmail}
-                onChange={(e) => handleInputChange("personalEmail", e.target.value)}
-                placeholder="personal@email.com"
-                className={`h-12 text-base ${errors.personalEmail ? "border-red-500" : ""}`}
-              />
-              {errors.personalEmail && <p className="text-red-500 text-sm">{errors.personalEmail}</p>}
+              <div className="flex-1 max-w-md">
+                <Input
+                  id="personalEmail"
+                  type="email"
+                  value={formData.personalEmail}
+                  onChange={(e) => handleInputChange("personalEmail", e.target.value)}
+                  placeholder="personal@email.com"
+                  className={`h-12 text-base ${errors.personalEmail ? "border-red-500" : ""}`}
+                />
+                {errors.personalEmail && <p className="text-red-500 text-sm mt-1">{errors.personalEmail}</p>}
+              </div>
             </div>
 
-            {/* Contact Details Row */}
-            <div className="space-y-3">
-              <Label htmlFor="phone" className="text-base font-medium">
-                Phone Number <span className="text-red-500">*</span>
+            {/* Field 9: Phone Number */}
+            <div className="flex items-center gap-8">
+              <Label htmlFor="phone" className="text-base font-medium w-48 flex-shrink-0">
+                9. Phone Number <span className="text-red-500">*</span>
               </Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => handleInputChange("phone", e.target.value)}
-                placeholder="+233 XX XXX XXXX"
-                className={`h-12 text-base ${errors.phone ? "border-red-500" : ""}`}
-              />
-              {errors.phone && <p className="text-red-500 text-sm">{errors.phone}</p>}
+              <div className="flex-1 max-w-md">
+                <Input
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange("phone", e.target.value)}
+                  placeholder="+233 XX XXX XXXX"
+                  className={`h-12 text-base ${errors.phone ? "border-red-500" : ""}`}
+                />
+                {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
+              </div>
             </div>
 
-            <div className="space-y-3">
-              <Label htmlFor="dateOfBirth" className="text-base font-medium">
-                Date of Birth
+            {/* Field 10: Date of Birth */}
+            <div className="flex items-center gap-8">
+              <Label htmlFor="dateOfBirth" className="text-base font-medium w-48 flex-shrink-0">
+                10. Date of Birth
               </Label>
               <Input
                 id="dateOfBirth"
                 type="date"
                 value={formData.dateOfBirth}
                 onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
-                className="h-12 text-base"
+                className="h-12 text-base flex-1 max-w-md"
               />
             </div>
 
-            {/* Address and Education Row */}
-            <div className="space-y-3">
-              <Label htmlFor="address" className="text-base font-medium">
-                Address
+            {/* Field 11: Address */}
+            <div className="flex items-center gap-8">
+              <Label htmlFor="address" className="text-base font-medium w-48 flex-shrink-0">
+                11. Address
               </Label>
               <Input
                 id="address"
                 value={formData.address}
                 onChange={(e) => handleInputChange("address", e.target.value)}
                 placeholder="Full address"
-                className="h-12 text-base"
+                className="h-12 text-base flex-1 max-w-md"
               />
             </div>
 
-            <div className="space-y-3">
-              <Label htmlFor="educationalLevel" className="text-base font-medium">
-                Educational Level
+            {/* Field 12: Educational Level */}
+            <div className="flex items-center gap-8">
+              <Label htmlFor="educationalLevel" className="text-base font-medium w-48 flex-shrink-0">
+                12. Educational Level
               </Label>
               <Select
                 value={formData.educationalLevel}
                 onValueChange={(value) => handleInputChange("educationalLevel", value)}
               >
-                <SelectTrigger className="h-12 text-base">
+                <SelectTrigger className="h-12 text-base flex-1 max-w-md">
                   <SelectValue placeholder="Select education level" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1395,30 +1410,31 @@ function AddEmployeeForm({
               </Select>
             </div>
 
-            {/* Emergency Contact Row */}
-            <div className="space-y-3">
-              <Label htmlFor="emergencyContactName" className="text-base font-medium">
-                Emergency Contact Name
+            {/* Field 13: Emergency Contact Name */}
+            <div className="flex items-center gap-8">
+              <Label htmlFor="emergencyContactName" className="text-base font-medium w-48 flex-shrink-0">
+                13. Emergency Contact Name
               </Label>
               <Input
                 id="emergencyContactName"
                 value={formData.emergencyContactName}
                 onChange={(e) => handleInputChange("emergencyContactName", e.target.value)}
                 placeholder="Contact person name"
-                className="h-12 text-base"
+                className="h-12 text-base flex-1 max-w-md"
               />
             </div>
 
-            <div className="space-y-3">
-              <Label htmlFor="emergencyContactTel" className="text-base font-medium">
-                Emergency Contact Tel
+            {/* Field 14: Emergency Contact Tel */}
+            <div className="flex items-center gap-8">
+              <Label htmlFor="emergencyContactTel" className="text-base font-medium w-48 flex-shrink-0">
+                14. Emergency Contact Tel
               </Label>
               <Input
                 id="emergencyContactTel"
                 value={formData.emergencyContactTel}
                 onChange={(e) => handleInputChange("emergencyContactTel", e.target.value)}
                 placeholder="+233 XX XXX XXXX"
-                className="h-12 text-base"
+                className="h-12 text-base flex-1 max-w-md"
               />
             </div>
           </div>
