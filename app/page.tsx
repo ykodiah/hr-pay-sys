@@ -79,7 +79,7 @@ export default function HomePage() {
             <div className="relative">
               <div className="relative z-10">
                 <img
-                  src="/ghana-payroll-dashboard.png"
+                  src="/professional-ghana-payroll-dashboard-showing-paye-.png"
                   alt="Professional Ghana payroll dashboard showing PAYE and SSNIT calculations"
                   className="rounded-2xl shadow-2xl"
                 />
@@ -106,7 +106,7 @@ export default function HomePage() {
               <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
                 <CardContent className="p-0">
                   <img
-                    src="/ghana-payroll-dashboard.png"
+                    src="/ghana-payroll-engine-dashboard.png"
                     alt="Ghana Payroll Engine"
                     className="w-full h-32 object-cover rounded-lg mb-4"
                   />
@@ -193,7 +193,7 @@ export default function HomePage() {
               <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
                 <CardContent className="p-0">
                   <img
-                    src="/ghana-office-dashboard.png"
+                    src="/ghana-office-dashboard-multi-location.png"
                     alt="Multi-Location Management"
                     className="w-full h-32 object-cover rounded-lg mb-4"
                   />
@@ -222,7 +222,7 @@ export default function HomePage() {
               <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
                 <CardContent className="p-0">
                   <img
-                    src="/employee-self-service-app.png"
+                    src="/employee-self-service-mobile-app.png"
                     alt="Mobile App"
                     className="w-full h-32 object-cover rounded-lg mb-4"
                   />
@@ -251,7 +251,7 @@ export default function HomePage() {
               <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
                 <CardContent className="p-0">
                   <img
-                    src="/security-dashboard-encryption-access.png"
+                    src="/security-dashboard-with-encryption-and-access-cont.png"
                     alt="Enterprise Security"
                     className="w-full h-32 object-cover rounded-lg mb-4"
                   />
@@ -507,7 +507,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
               <img
-                src="/ghanaian-business-owner.png"
+                src="/professional-ghanaian-business-owner.png"
                 alt="Ghanaian business owner"
                 className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
               />
@@ -518,7 +518,7 @@ export default function HomePage() {
             </div>
             <div className="text-center">
               <img
-                src="/professional-ghanaian-woman.png"
+                src="/professional-ghanaian-woman-hr-manager.png"
                 alt="Ghanaian HR manager"
                 className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
               />
@@ -529,7 +529,7 @@ export default function HomePage() {
             </div>
             <div className="text-center">
               <img
-                src="/placeholder-xuqky.png"
+                src="/professional-ghanaian-finance-manager.png"
                 alt="Ghanaian finance manager"
                 className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
               />
