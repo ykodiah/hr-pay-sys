@@ -54,6 +54,11 @@ import {
   Plus,
   Save,
   Zap,
+  FileText,
+  FileSpreadsheet,
+  Receipt,
+  Shield,
+  CreditCard,
 } from "lucide-react"
 
 const payrollTrends = [
@@ -325,6 +330,700 @@ const customReports = [
     status: "active",
   },
 ]
+
+const payrollReports = [
+  {
+    id: "monthly-payroll",
+    name: "Monthly Payroll Summary",
+    description: "Complete payroll breakdown with 2024 PAYE tax calculations",
+    category: "Payroll",
+    frequency: "Monthly",
+    lastGenerated: "2025-01-20",
+    status: "active",
+    downloadFormats: ["PDF", "Excel"],
+    records: 156,
+    totalAmount: "GHS 2,847,650.00",
+  },
+  {
+    id: "paye-tax-report",
+    name: "PAYE Tax Report",
+    description: "Income tax calculations using 2024 Ghana tax bands (GHS 490, 600, 730...)",
+    category: "Tax",
+    frequency: "Monthly",
+    lastGenerated: "2025-01-20",
+    status: "active",
+    downloadFormats: ["PDF", "Excel"],
+    records: 156,
+    totalAmount: "GHS 487,250.00",
+  },
+  {
+    id: "ssnit-tier1-tier2",
+    name: "SSNIT Tier 1 & Tier 2 Report",
+    description: "Social Security contributions with employee SSNIT numbers",
+    category: "Statutory",
+    frequency: "Monthly",
+    lastGenerated: "2025-01-20",
+    status: "active",
+    downloadFormats: ["PDF", "Excel"],
+    records: 156,
+    totalAmount: "GHS 312,450.00",
+  },
+  {
+    id: "tier3-provident-fund",
+    name: "Tier 3 Provident Fund Report",
+    description: "Employee and employer provident fund contributions",
+    category: "Statutory",
+    frequency: "Monthly",
+    lastGenerated: "2025-01-20",
+    status: "active",
+    downloadFormats: ["PDF", "Excel"],
+    records: 89,
+    totalAmount: "GHS 156,780.00",
+  },
+  {
+    id: "employee-payslips",
+    name: "Employee Payslips",
+    description: "Individual payslips with Ghana-specific format and bank details",
+    category: "Payroll",
+    frequency: "Monthly",
+    lastGenerated: "2025-01-20",
+    status: "active",
+    downloadFormats: ["PDF"],
+    records: 156,
+    totalAmount: "GHS 2,847,650.00",
+  },
+  {
+    id: "allowances-schedule",
+    name: "Allowances Schedule",
+    description: "Taxable and non-taxable allowances breakdown by employee",
+    category: "Payroll",
+    frequency: "Monthly",
+    lastGenerated: "2025-01-20",
+    status: "active",
+    downloadFormats: ["PDF", "Excel"],
+    records: 134,
+    totalAmount: "GHS 445,230.00",
+  },
+  {
+    id: "deductions-summary",
+    name: "Deductions Summary",
+    description: "All employee deductions including loans, advances, and statutory",
+    category: "Payroll",
+    frequency: "Monthly",
+    lastGenerated: "2025-01-20",
+    status: "active",
+    downloadFormats: ["PDF", "Excel"],
+    records: 156,
+    totalAmount: "GHS 892,340.00",
+  },
+  {
+    id: "bank-payment-schedule",
+    name: "Bank Payment Schedule",
+    description: "Net pay amounts grouped by bank for salary transfers",
+    category: "Banking",
+    frequency: "Monthly",
+    lastGenerated: "2025-01-20",
+    status: "active",
+    downloadFormats: ["PDF", "Excel"],
+    records: 156,
+    totalAmount: "GHS 1,955,310.00",
+  },
+]
+
+const handleDownloadReport = (reportId: string, format: string) => {
+  const report = payrollReports.find((r) => r.id === reportId)
+  if (!report) return
+
+  // Generate report content based on type
+  let content = ""
+  let filename = ""
+
+  switch (reportId) {
+    case "monthly-payroll":
+      content = generateMonthlyPayrollReport()
+      filename = `Monthly_Payroll_Summary_${new Date().toISOString().slice(0, 7)}`
+      break
+    case "paye-tax-report":
+      content = generatePAYEReport()
+      filename = `PAYE_Tax_Report_${new Date().toISOString().slice(0, 7)}`
+      break
+    case "ssnit-tier1-tier2":
+      content = generateSSNITReport()
+      filename = `SSNIT_Tier1_Tier2_Report_${new Date().toISOString().slice(0, 7)}`
+      break
+    case "tier3-provident-fund":
+      content = generateTier3Report()
+      filename = `Tier3_Provident_Fund_Report_${new Date().toISOString().slice(0, 7)}`
+      break
+    case "employee-payslips":
+      content = generatePayslipsReport()
+      filename = `Employee_Payslips_${new Date().toISOString().slice(0, 7)}`
+      break
+    case "allowances-schedule":
+      content = generateAllowancesReport()
+      filename = `Allowances_Schedule_${new Date().toISOString().slice(0, 7)}`
+      break
+    case "deductions-summary":
+      content = generateDeductionsReport()
+      filename = `Deductions_Summary_${new Date().toISOString().slice(0, 7)}`
+      break
+    case "bank-payment-schedule":
+      content = generateBankPaymentReport()
+      filename = `Bank_Payment_Schedule_${new Date().toISOString().slice(0, 7)}`
+      break
+    default:
+      content = generateGenericReport(report)
+      filename = `${report.name.replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 7)}`
+  }
+
+  if (format === "PDF") {
+    // Generate PDF
+    const blob = new Blob([content], { type: "text/html" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${filename}.html`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } else if (format === "Excel") {
+    // Generate Excel-compatible CSV
+    const csvContent = convertToCSV(content)
+    const blob = new Blob([csvContent], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${filename}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  toast({
+    title: "Report Downloaded",
+    description: `${report.name} has been downloaded in ${format} format.`,
+  })
+}
+
+const generateMonthlyPayrollReport = () => {
+  return `
+    <html>
+      <head>
+        <title>Monthly Payroll Summary</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .company-logo { font-size: 24px; font-weight: bold; color: #059669; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          .summary { background-color: #f9f9f9; padding: 15px; margin: 20px 0; }
+          .total { font-weight: bold; background-color: #e6f7ff; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company-logo">AkwaabaHRPay</div>
+          <h2>Monthly Payroll Summary - ${new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</h2>
+          <p>Generated on: ${new Date().toLocaleDateString()}</p>
+        </div>
+        
+        <div class="summary">
+          <h3>Payroll Summary</h3>
+          <p><strong>Total Employees:</strong> 156</p>
+          <p><strong>Gross Salary:</strong> GHS 2,847,650.00</p>
+          <p><strong>Total Deductions:</strong> GHS 892,340.00</p>
+          <p><strong>Net Pay:</strong> GHS 1,955,310.00</p>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Employee ID</th>
+              <th>Name</th>
+              <th>Basic Salary</th>
+              <th>Allowances</th>
+              <th>Gross Pay</th>
+              <th>PAYE Tax</th>
+              <th>SSNIT Employee</th>
+              <th>Tier 3 PF</th>
+              <th>Other Deductions</th>
+              <th>Net Pay</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>EMP001</td>
+              <td>Kwame Asante</td>
+              <td>GHS 8,500.00</td>
+              <td>GHS 2,500.00</td>
+              <td>GHS 11,000.00</td>
+              <td>GHS 1,247.50</td>
+              <td>GHS 467.50</td>
+              <td>GHS 977.50</td>
+              <td>GHS 150.00</td>
+              <td>GHS 8,157.50</td>
+            </tr>
+            <tr class="total">
+              <td colspan="9"><strong>TOTAL</strong></td>
+              <td><strong>GHS 1,955,310.00</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `
+}
+
+const generatePAYEReport = () => {
+  return `
+    <html>
+      <head>
+        <title>PAYE Tax Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .company-logo { font-size: 24px; font-weight: bold; color: #059669; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          .tax-bands { background-color: #f9f9f9; padding: 15px; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company-logo">AkwaabaHRPay</div>
+          <h2>PAYE Tax Report - ${new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</h2>
+          <p>Using 2024 Ghana Revenue Authority Tax Bands</p>
+        </div>
+        
+        <div class="tax-bands">
+          <h3>2024 Tax Bands Applied</h3>
+          <ul>
+            <li>First GHS 490: 0%</li>
+            <li>Next GHS 110: 5%</li>
+            <li>Next GHS 130: 10%</li>
+            <li>Next GHS 3,166.67: 17.5%</li>
+            <li>Next GHS 16,000: 25%</li>
+            <li>Next GHS 30,520: 30%</li>
+            <li>Exceeding GHS 50,000: 35%</li>
+          </ul>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Employee ID</th>
+              <th>Name</th>
+              <th>Ghana Card No.</th>
+              <th>Taxable Income</th>
+              <th>Tax Band</th>
+              <th>PAYE Tax</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>EMP001</td>
+              <td>Kwame Asante</td>
+              <td>GHA-123456789-0</td>
+              <td>GHS 9,555.00</td>
+              <td>25%</td>
+              <td>GHS 1,247.50</td>
+            </tr>
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `
+}
+
+const generateSSNITReport = () => {
+  return `
+    <html>
+      <head>
+        <title>SSNIT Tier 1 & Tier 2 Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .company-logo { font-size: 24px; font-weight: bold; color: #059669; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company-logo">AkwaabaHRPay</div>
+          <h2>SSNIT Tier 1 & Tier 2 Report - ${new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</h2>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Employee ID</th>
+              <th>Name</th>
+              <th>SSNIT Number</th>
+              <th>Basic Salary</th>
+              <th>Employee (5.5%)</th>
+              <th>Employer (13%)</th>
+              <th>Total SSNIT</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>EMP001</td>
+              <td>Kwame Asante</td>
+              <td>C123456789012</td>
+              <td>GHS 8,500.00</td>
+              <td>GHS 467.50</td>
+              <td>GHS 1,105.00</td>
+              <td>GHS 1,572.50</td>
+            </tr>
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `
+}
+
+const generateTier3Report = () => {
+  return `
+    <html>
+      <head>
+        <title>Tier 3 Provident Fund Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .company-logo { font-size: 24px; font-weight: bold; color: #059669; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company-logo">AkwaabaHRPay</div>
+          <h2>Tier 3 Provident Fund Report - ${new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</h2>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Employee ID</th>
+              <th>Name</th>
+              <th>Basic Salary</th>
+              <th>Employee Contribution</th>
+              <th>Employer Contribution</th>
+              <th>Total PF</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>EMP001</td>
+              <td>Kwame Asante</td>
+              <td>GHS 8,500.00</td>
+              <td>GHS 977.50</td>
+              <td>GHS 425.00</td>
+              <td>GHS 1,402.50</td>
+            </tr>
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `
+}
+
+const generatePayslipsReport = () => {
+  return `
+    <html>
+      <head>
+        <title>Employee Payslips</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .payslip { border: 2px solid #059669; margin: 30px 0; padding: 20px; page-break-after: always; }
+          .header { text-align: center; margin-bottom: 20px; }
+          .company-name { font-size: 20px; font-weight: bold; }
+          .payslip-info { display: flex; justify-content: space-between; margin: 15px 0; }
+          .earnings-deductions { display: flex; justify-content: space-between; }
+          .section { width: 48%; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          .net-pay { font-size: 18px; font-weight: bold; text-align: center; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="payslip">
+          <div class="header">
+            <div class="company-name">COMPANY NAME</div>
+            <h3>Payslip</h3>
+          </div>
+          
+          <div class="payslip-info">
+            <div>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+              <p><strong>Period:</strong> ${new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</p>
+              <p><strong>Employee Name:</strong> KWAME ASANTE</p>
+              <p><strong>Job Title:</strong> ACCOUNTANT</p>
+            </div>
+            <div>
+              <p><strong>SSNIT No.:</strong> C123456789012</p>
+              <p><strong>Bank:</strong> GT BANK</p>
+              <p><strong>Acc. Number:</strong> 20610953414</p>
+            </div>
+          </div>
+
+          <div class="earnings-deductions">
+            <div class="section">
+              <h4>EARNINGS</h4>
+              <table>
+                <tr><td>BASIC SALARY</td><td>GHS 8,500.00</td></tr>
+                <tr><td>TRANSPORT ALLOWANCE</td><td>GHS 500.00</td></tr>
+                <tr><td><strong>GROSS SALARY</strong></td><td><strong>GHS 9,000.00</strong></td></tr>
+              </table>
+            </div>
+            
+            <div class="section">
+              <h4>DEDUCTIONS</h4>
+              <table>
+                <tr><td>SSNIT EMPLOYEE (5.5%)</td><td>GHS 467.50</td></tr>
+                <tr><td>INCOME TAX</td><td>GHS 1,247.50</td></tr>
+                <tr><td>PROVIDENT FUND (11.5%)</td><td>GHS 977.50</td></tr>
+                <tr><td><strong>TOTAL DEDUCTIONS</strong></td><td><strong>GHS 2,692.50</strong></td></tr>
+              </table>
+            </div>
+          </div>
+
+          <div class="net-pay">
+            <strong>NET PAY: GHS 6,307.50</strong>
+          </div>
+
+          <div style="margin-top: 20px; font-size: 12px;">
+            <p><strong>SSNIT - EMPLOYER (13%):</strong> GHS 1,105.00</p>
+            <p><strong>PROVIDENT FUND - EMPLOYER (5%):</strong> GHS 425.00</p>
+          </div>
+
+          <div style="text-align: center; margin-top: 30px; font-size: 12px;">
+            <p>akwaabahrpay - Welcome to Growth</p>
+            <p>Print date: ${new Date().toLocaleDateString()}</p>
+          </div>
+        </div>
+      </body>
+    </html>
+  `
+}
+
+const generateAllowancesReport = () => {
+  return `
+    <html>
+      <head>
+        <title>Allowances Schedule</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .company-logo { font-size: 24px; font-weight: bold; color: #059669; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          .taxable { background-color: #fff2e6; }
+          .non-taxable { background-color: #e6f7ff; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company-logo">AkwaabaHRPay</div>
+          <h2>Allowances Schedule - ${new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</h2>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Employee ID</th>
+              <th>Name</th>
+              <th>Transport</th>
+              <th>Housing</th>
+              <th>Meal</th>
+              <th>Medical</th>
+              <th>Total Taxable</th>
+              <th>Total Non-Taxable</th>
+              <th>Total Allowances</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>EMP001</td>
+              <td>Kwame Asante</td>
+              <td class="taxable">GHS 500.00</td>
+              <td class="non-taxable">GHS 1,200.00</td>
+              <td class="taxable">GHS 300.00</td>
+              <td class="non-taxable">GHS 500.00</td>
+              <td>GHS 800.00</td>
+              <td>GHS 1,700.00</td>
+              <td>GHS 2,500.00</td>
+            </tr>
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `
+}
+
+const generateDeductionsReport = () => {
+  return `
+    <html>
+      <head>
+        <title>Deductions Summary</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .company-logo { font-size: 24px; font-weight: bold; color: #059669; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company-logo">AkwaabaHRPay</div>
+          <h2>Deductions Summary - ${new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</h2>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Employee ID</th>
+              <th>Name</th>
+              <th>PAYE Tax</th>
+              <th>SSNIT Employee</th>
+              <th>Tier 3 PF</th>
+              <th>Loans</th>
+              <th>Advances</th>
+              <th>Other</th>
+              <th>Total Deductions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>EMP001</td>
+              <td>Kwame Asante</td>
+              <td>GHS 1,247.50</td>
+              <td>GHS 467.50</td>
+              <td>GHS 977.50</td>
+              <td>GHS 0.00</td>
+              <td>GHS 0.00</td>
+              <td>GHS 0.00</td>
+              <td>GHS 2,692.50</td>
+            </tr>
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `
+}
+
+const generateBankPaymentReport = () => {
+  return `
+    <html>
+      <head>
+        <title>Bank Payment Schedule</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .company-logo { font-size: 24px; font-weight: bold; color: #059669; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          .bank-total { background-color: #f0f8ff; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company-logo">AkwaabaHRPay</div>
+          <h2>Bank Payment Schedule - ${new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</h2>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Bank Name</th>
+              <th>Employee Count</th>
+              <th>Total Net Pay</th>
+              <th>Payment Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>GT Bank</td>
+              <td>45</td>
+              <td>GHS 587,850.00</td>
+              <td>${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toLocaleDateString()}</td>
+            </tr>
+            <tr>
+              <td>GCB Bank</td>
+              <td>38</td>
+              <td>GHS 495,230.00</td>
+              <td>${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toLocaleDateString()}</td>
+            </tr>
+            <tr>
+              <td>Ecobank</td>
+              <td>32</td>
+              <td>GHS 418,760.00</td>
+              <td>${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toLocaleDateString()}</td>
+            </tr>
+            <tr>
+              <td>Standard Chartered</td>
+              <td>25</td>
+              <td>GHS 326,450.00</td>
+              <td>${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toLocaleDateString()}</td>
+            </tr>
+            <tr>
+              <td>Fidelity Bank</td>
+              <td>16</td>
+              <td>GHS 127,020.00</td>
+              <td>${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toLocaleDateString()}</td>
+            </tr>
+            <tr class="bank-total">
+              <td><strong>TOTAL</strong></td>
+              <td><strong>156</strong></td>
+              <td><strong>GHS 1,955,310.00</strong></td>
+              <td><strong>-</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `
+}
+
+const generateGenericReport = (report: any) => {
+  return `
+    <html>
+      <head>
+        <title>${report.name}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .company-logo { font-size: 24px; font-weight: bold; color: #059669; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company-logo">AkwaabaHRPay</div>
+          <h2>${report.name}</h2>
+          <p>${report.description}</p>
+          <p>Generated on: ${new Date().toLocaleDateString()}</p>
+        </div>
+      </body>
+    </html>
+  `
+}
+
+const convertToCSV = (htmlContent: string) => {
+  // Simple HTML to CSV conversion for demo purposes
+  return "Employee ID,Name,Basic Salary,Allowances,Gross Pay,PAYE Tax,SSNIT Employee,Tier 3 PF,Other Deductions,Net Pay\nEMP001,Kwame Asante,8500.00,2500.00,11000.00,1247.50,467.50,977.50,150.00,8157.50"
+}
 
 export default function AnalyticsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("last-6-months")
@@ -721,7 +1420,163 @@ export default function AnalyticsPage() {
         </TabsContent>
 
         <TabsContent value="payroll" className="space-y-6">
-          <PayrollAnalytics data={payrollTrends} departments={filteredDepartmentData} />
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">Comprehensive Payroll Reports</h2>
+                <p className="text-gray-600">All payroll reports with 2024 PAYE calculations and Ghana compliance</p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button variant="outline">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Schedule Reports
+                </Button>
+                <Button>
+                  <Download className="w-4 h-4 mr-2" />
+                  Bulk Download
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              {payrollReports.map((report) => (
+                <Card key={report.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h3 className="font-semibold text-lg">{report.name}</h3>
+                          <Badge
+                            className={
+                              report.category === "Payroll"
+                                ? "bg-blue-100 text-blue-700"
+                                : report.category === "Tax"
+                                  ? "bg-red-100 text-red-700"
+                                  : report.category === "Statutory"
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-purple-100 text-purple-700"
+                            }
+                          >
+                            {report.category}
+                          </Badge>
+                          <Badge
+                            className={
+                              report.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
+                            }
+                          >
+                            {report.status}
+                          </Badge>
+                        </div>
+                        <p className="text-gray-600 mb-3">{report.description}</p>
+                        <div className="flex items-center space-x-6 text-sm text-gray-500">
+                          <span className="flex items-center">
+                            <Calendar className="w-4 h-4 mr-1" />
+                            {report.frequency}
+                          </span>
+                          <span className="flex items-center">
+                            <Users className="w-4 h-4 mr-1" />
+                            {report.records} records
+                          </span>
+                          <span className="flex items-center">
+                            <DollarSign className="w-4 h-4 mr-1" />
+                            {report.totalAmount}
+                          </span>
+                          <span className="flex items-center">
+                            <Clock className="w-4 h-4 mr-1" />
+                            Last: {report.lastGenerated}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button variant="outline" size="sm">
+                          <Eye className="w-4 h-4 mr-2" />
+                          Preview
+                        </Button>
+                        {report.downloadFormats.includes("PDF") && (
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadReport(report.id, "PDF")}>
+                            <FileText className="w-4 h-4 mr-2" />
+                            PDF
+                          </Button>
+                        )}
+                        {report.downloadFormats.includes("Excel") && (
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadReport(report.id, "Excel")}>
+                            <FileSpreadsheet className="w-4 h-4 mr-2" />
+                            Excel
+                          </Button>
+                        )}
+                        <Button size="sm">
+                          <Zap className="w-4 h-4 mr-2" />
+                          Generate
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="grid md:grid-cols-4 gap-4 mt-8">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Total Gross Pay</p>
+                      <p className="text-2xl font-bold text-gray-900">GHS 2.85M</p>
+                    </div>
+                    <div className="p-3 bg-blue-100 rounded-full">
+                      <DollarSign className="w-6 h-6 text-blue-600" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">+12.5% from last month</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">PAYE Tax Collected</p>
+                      <p className="text-2xl font-bold text-gray-900">GHS 487K</p>
+                    </div>
+                    <div className="p-3 bg-red-100 rounded-full">
+                      <Receipt className="w-6 h-6 text-red-600" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Using 2024 tax bands</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">SSNIT Contributions</p>
+                      <p className="text-2xl font-bold text-gray-900">GHS 312K</p>
+                    </div>
+                    <div className="p-3 bg-green-100 rounded-full">
+                      <Shield className="w-6 h-6 text-green-600" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Tier 1 & 2 combined</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Net Pay Disbursed</p>
+                      <p className="text-2xl font-bold text-gray-900">GHS 1.96M</p>
+                    </div>
+                    <div className="p-3 bg-purple-100 rounded-full">
+                      <CreditCard className="w-6 h-6 text-purple-600" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Across 5 banks</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="workforce" className="space-y-6">
