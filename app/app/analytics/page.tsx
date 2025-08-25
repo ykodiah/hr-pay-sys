@@ -39,10 +39,7 @@ const simpleReports = [
 export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState("overview")
 
-  console.log("[v0] Analytics page rendering...")
-
   const handleRefreshData = () => {
-    console.log("[v0] Refresh data clicked")
     toast({
       title: "Data Refreshed",
       description: "Analytics data has been updated.",
@@ -50,7 +47,6 @@ export default function AnalyticsPage() {
   }
 
   const handleDownloadReport = (reportId: number) => {
-    console.log("[v0] Download report:", reportId)
     toast({
       title: "Download Started",
       description: "Report is being generated.",
@@ -58,7 +54,7 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">HR Analytics & Reports</h1>

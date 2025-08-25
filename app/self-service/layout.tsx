@@ -254,7 +254,7 @@ export default function SelfServiceLayout({
                 <span>My Goals</span>
               </a>
               <a
-                href="/self-service/reviews"
+                href="/self-service/performance"
                 className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <Star className="w-5 h-5" />
