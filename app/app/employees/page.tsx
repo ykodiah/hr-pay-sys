@@ -1,5 +1,6 @@
 "use client"
-import { useState } from "react"
+
+import { useState, useEffect } from "react"
 import type React from "react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -7,32 +8,23 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
-import {
-  Search,
-  Filter,
-  Plus,
-  MoreHorizontal,
-  Edit,
-  Trash2,
-  Mail,
-  Phone,
-  MapPin,
-  Calendar,
-  Briefcase,
-  User,
-  FileText,
-  Download,
-  Upload,
-  X,
-} from "lucide-react"
+import { Search, Filter, Plus, Edit, FileText, Download, Upload, X } from "lucide-react"
 
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
+import { useToast } from "@/hooks/use-toast"
+import { createClient } from "@/lib/supabase/client"
 
 const initialEmployees = [
   {
@@ -152,52 +144,168 @@ const initialEmployees = [
   },
 ]
 
+const departments = ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+
 export default function EmployeesPage() {
-  const [employees, setEmployees] = useState(initialEmployees)
+  const [employees, setEmployees] = useState<any[]>([])
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedDepartment, setSelectedDepartment] = useState("all")
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [selectedEmployee, setSelectedEmployee] = useState<any>(null)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const { toast } = useToast()
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
 
-  const filteredEmployees = employees.filter((employee) => {
-    const matchesSearch =
-      employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesDepartment = selectedDepartment === "all" || employee.department === selectedDepartment
-    return matchesSearch && matchesDepartment
-  })
+  useEffect(() => {
+    loadEmployees()
+  }, [])
 
-  const departments = [...new Set(employees.map((emp) => emp.department))]
+  const loadEmployees = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.from("employees").select("*").order("created_at", { ascending: false })
 
-  const handleAddEmployee = (employeeData: any) => {
-    const newEmployee = {
-      ...employeeData,
-      id: employees.length + 1,
-      employeeId: `EMP${String(employees.length + 1).padStart(3, "0")}`,
-      leaveBalance: { annual: 21, sick: 10, casual: 5 },
-      documents: [],
+      if (error) {
+        console.error("Error loading employees:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load employees from database.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setEmployees(data || [])
+    } catch (error) {
+      console.error("Error loading employees:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load employees from database.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
-    setEmployees([...employees, newEmployee])
-    setIsAddDialogOpen(false)
-    toast({
-      title: "Employee Added",
-      description: `${employeeData.name} has been successfully added to the system.`,
-    })
   }
 
-  const handleEditEmployee = (employeeData: any) => {
-    setEmployees(employees.map((emp) => (emp.id === selectedEmployee.id ? { ...emp, ...employeeData } : emp)))
-    setIsEditDialogOpen(false)
-    setSelectedEmployee(null)
-    toast({
-      title: "Employee Updated",
-      description: "Employee information has been successfully updated.",
-    })
+  const handleAddEmployee = async (employeeData: any) => {
+    try {
+      const supabase = createClient()
+
+      // Generate employee ID
+      const employeeCount = employees.length
+      const employeeId = `EMP${String(employeeCount + 1).padStart(3, "0")}`
+
+      const newEmployee = {
+        employee_id: employeeId,
+        prefix: employeeData.prefix,
+        first_name: employeeData.firstName,
+        other_names: employeeData.otherNames,
+        last_name: employeeData.lastName,
+        display_name: employeeData.displayName,
+        personal_email: employeeData.personalEmail,
+        corporate_email: employeeData.corporateEmail,
+        phone_number: employeeData.phone,
+        address: employeeData.address,
+        date_of_birth: employeeData.dateOfBirth || null,
+        gender: employeeData.gender,
+        marital_status: employeeData.maritalStatus,
+        educational_level: employeeData.educationalLevel,
+        emergency_contact_name: employeeData.emergencyContactName,
+        emergency_contact_tel: employeeData.emergencyContactTel,
+        department: employeeData.department,
+        position: employeeData.position,
+        hire_date: employeeData.startDate || new Date().toISOString().split("T")[0],
+        employment_type: "Full-time",
+        salary: Number.parseFloat(employeeData.salary) || 0,
+        status: employeeData.status || "Active",
+      }
+
+      const { data, error } = await supabase.from("employees").insert([newEmployee]).select()
+
+      if (error) {
+        console.error("Error adding employee:", error)
+        toast({
+          title: "Error",
+          description: "Failed to add employee to database.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Reload employees from database
+      await loadEmployees()
+
+      setIsAddDialogOpen(false)
+      toast({
+        title: "Employee Added Successfully",
+        description: `${employeeData.displayName} has been successfully added to the system.`,
+      })
+    } catch (error) {
+      console.error("Error adding employee:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add employee to database.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleEditEmployee = async (employeeData: any) => {
+    try {
+      const supabase = createClient()
+
+      const updatedEmployee = {
+        prefix: employeeData.prefix,
+        first_name: employeeData.firstName,
+        other_names: employeeData.otherNames,
+        last_name: employeeData.lastName,
+        display_name: employeeData.displayName,
+        personal_email: employeeData.personalEmail,
+        corporate_email: employeeData.corporateEmail,
+        phone_number: employeeData.phone,
+        address: employeeData.address,
+        date_of_birth: employeeData.dateOfBirth || null,
+        gender: employeeData.gender,
+        marital_status: employeeData.maritalStatus,
+        educational_level: employeeData.educationalLevel,
+        emergency_contact_name: employeeData.emergencyContactName,
+        emergency_contact_tel: employeeData.emergencyContactTel,
+        department: employeeData.department,
+        position: employeeData.position,
+        salary: Number.parseFloat(employeeData.salary) || 0,
+        status: employeeData.status || "Active",
+      }
+
+      const { error } = await supabase.from("employees").update(updatedEmployee).eq("id", selectedEmployee.id)
+
+      if (error) {
+        console.error("Error updating employee:", error)
+        toast({
+          title: "Error",
+          description: "Failed to update employee in database.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Reload employees from database
+      await loadEmployees()
+
+      setIsEditDialogOpen(false)
+      toast({
+        title: "Employee Updated Successfully",
+        description: `${employeeData.displayName} has been successfully updated.`,
+      })
+    } catch (error) {
+      console.error("Error updating employee:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update employee in database.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleDeleteEmployee = (employeeId: number) => {
@@ -411,57 +519,51 @@ export default function EmployeesPage() {
     return `${headers.join(",")}\n${sampleData.join(",")}\n`
   }
 
+  const filteredEmployees = employees.filter((employee) => {
+    const matchesSearch =
+      employee.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employee.employee_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employee.personal_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employee.department?.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesDepartment = selectedDepartment === "all" || employee.department === selectedDepartment
+
+    return matchesSearch && matchesDepartment
+  })
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading employees...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Employee Management</h1>
-          <p className="text-gray-600">Manage your team members and their information</p>
+          <h1 className="text-3xl font-bold tracking-tight">Employee Management</h1>
+          <p className="text-muted-foreground">Manage your team members and their information</p>
         </div>
-        <div className="flex gap-2">
-          <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Upload className="w-4 h-4 mr-2" />
-                Import Data
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Import Data</DialogTitle>
-              </DialogHeader>
-              <ImportDataDialog
-                onImport={handleImportEmployees}
-                onDownloadTemplate={downloadTemplate}
-                onClose={() => setIsImportDialogOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
-          <Button variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                className="text-white hover:opacity-90"
-                style={{
-                  backgroundColor: "var(--theme-primary-600)",
-                }}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Employee
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-[95vw] max-h-[95vh] w-[95vw] h-[95vh] overflow-y-auto p-12">
-              <DialogHeader className="mb-8">
-                <DialogTitle className="text-3xl font-semibold">Add New Employee</DialogTitle>
-              </DialogHeader>
-              <AddEmployeeForm onSubmit={handleAddEmployee} onClose={() => setIsAddDialogOpen(false)} />
-            </DialogContent>
-          </Dialog>
-        </div>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-emerald-600 hover:bg-emerald-700">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Employee
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Add New Employee</DialogTitle>
+              <DialogDescription>Enter the employee's information below.</DialogDescription>
+            </DialogHeader>
+            <AddEmployeeForm onSubmit={handleAddEmployee} onClose={() => setIsAddDialogOpen(false)} />
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Filters and Search */}
@@ -534,106 +636,51 @@ export default function EmployeesPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {filteredEmployees.map((employee) => (
-              <div
-                key={employee.id}
-                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center space-x-4">
-                  <Avatar className="w-12 h-12">
-                    <AvatarImage src={employee.avatar || "/placeholder.svg"} />
-                    <AvatarFallback>
-                      {employee.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-gray-900">{employee.name}</h3>
-                      <Badge variant="outline" className="text-xs">
-                        {employee.employeeId}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-gray-600">{employee.position}</p>
-                    <div className="flex items-center space-x-4 mt-1">
-                      <div className="flex items-center text-xs text-gray-500">
-                        <Mail className="w-3 h-3 mr-1" />
-                        {employee.email}
-                      </div>
-                      <div className="flex items-center text-xs text-gray-500">
-                        <Phone className="w-3 h-3 mr-1" />
-                        {employee.phone}
-                      </div>
-                      <div className="flex items-center text-xs text-gray-500">
-                        <MapPin className="w-3 h-3 mr-1" />
-                        {employee.location}
+            <div className="grid gap-6">
+              {filteredEmployees.map((employee) => (
+                <Card key={employee.id} className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${employee.display_name}`} />
+                        <AvatarFallback>
+                          {employee.display_name
+                            ?.split(" ")
+                            .map((n: string) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h3 className="text-lg font-semibold">{employee.display_name}</h3>
+                        <p className="text-sm text-muted-foreground">{employee.position}</p>
+                        <p className="text-sm text-muted-foreground">{employee.personal_email}</p>
                       </div>
                     </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">GHS {employee.salary?.toLocaleString()}</p>
-                    <p className="text-sm text-gray-600">{employee.department}</p>
-                  </div>
-                  <Badge
-                    variant={employee.status === "Active" ? "default" : "secondary"}
-                    className={
-                      employee.status === "Active" ? "bg-emerald-100 text-emerald-800" : "bg-orange-100 text-orange-800"
-                    }
-                  >
-                    {employee.status}
-                  </Badge>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSelectedEmployee(employee)
-                          setIsProfileDialogOpen(true)
-                        }}
-                      >
-                        <User className="w-4 h-4 mr-2" />
-                        View Profile
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
+                    <div className="flex items-center space-x-4">
+                      <Badge variant={employee.status === "Active" ? "default" : "secondary"}>{employee.status}</Badge>
+                      <Badge variant="outline">{employee.department}</Badge>
+                      <p className="text-sm font-medium">GHS {employee.salary?.toLocaleString()}</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => {
                           setSelectedEmployee(employee)
                           setIsEditDialogOpen(true)
                         }}
                       >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit Employee
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Calendar className="w-4 h-4 mr-2" />
-                        Leave History
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Briefcase className="w-4 h-4 mr-2" />
-                        Payroll Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteEmployee(employee.id)}>
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Remove Employee
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            ))}
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Employee Profile Dialog */}
-      <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
+      <Dialog open={false} onOpenChange={() => {}}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Employee Profile</DialogTitle>
@@ -660,6 +707,29 @@ export default function EmployeesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Import Data Dialog */}
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Employee Data</DialogTitle>
+            <DialogDescription>Import employee data from a CSV file.</DialogDescription>
+          </DialogHeader>
+          <ImportDataDialog
+            onImport={handleImportEmployees}
+            onDownloadTemplate={downloadTemplate}
+            onClose={() => setIsImportDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Action Bar */}
+      <div className="flex justify-end space-x-2">
+        <Button onClick={() => setIsImportDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
+          <Upload className="w-4 h-4 mr-2" />
+          Import Data
+        </Button>
+      </div>
     </div>
   )
 }

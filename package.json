@@ -42,6 +42,8 @@
     "@react-navigation/bottom-tabs": "latest",
     "@react-navigation/native": "latest",
     "@react-navigation/stack": "latest",
+    "@supabase/ssr": "latest",
+    "@supabase/supabase-js": "latest",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
