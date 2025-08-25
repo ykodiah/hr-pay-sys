@@ -1349,12 +1349,17 @@ function OffboardingDetailView({ case: selectedCase }: { case: OffboardingCase }
   const [checklist, setChecklist] = useState(selectedCase.checklist)
 
   const handleChecklistUpdate = (itemId: string, completed: boolean) => {
-    setChecklist(prev => 
-      prev.map(item => 
-        item.id === itemId 
-          ? { ...item, completed, completedDate: completed ? new Date() : undefined, completedBy: completed ? "Current User" : undefined }
-          : item
-      )
+    setChecklist((prev) =>
+      prev.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              completed,
+              completedDate: completed ? new Date() : undefined,
+              completedBy: completed ? "Current User" : undefined,
+            }
+          : item,
+      ),
     )
   }
 
@@ -1413,4 +1418,225 @@ function OffboardingDetailView({ case: selectedCase }: { case: OffboardingCase }
           <div>
             <h2 className="text-xl font-semibold">{selectedCase.employeeName}</h2>
             <p className="text-gray-600">
-              {selectedCase.position
+              {selectedCase.position} • {selectedCase.department}
+            </p>
+            <Badge className={getStatusColor(selectedCase.status)}>
+              {getStatusIcon(selectedCase.status)}
+              <span className="ml-1 capitalize">{selectedCase.status.replace("_", " ")}</span>
+            </Badge>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-sm text-gray-600">Last Working Day</p>
+          <p className="font-semibold">{selectedCase.lastWorkingDay.toLocaleDateString()}</p>
+        </div>
+      </div>
+
+      <Tabs defaultValue="checklist" className="w-full">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="checklist">Checklist</TabsTrigger>
+          <TabsTrigger value="clearance">Clearance</TabsTrigger>
+          <TabsTrigger value="settlement">Settlement</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="checklist" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Offboarding Checklist</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {checklist.map((item) => (
+                  <div key={item.id} className="flex items-start space-x-3 p-4 border rounded-lg">
+                    <Checkbox
+                      checked={item.completed}
+                      onCheckedChange={(checked) => handleChecklistUpdate(item.id, !!checked)}
+                      className="mt-1"
+                    />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Badge className={getCategoryColor(item.category)}>
+                            {getCategoryIcon(item.category)}
+                            <span className="ml-1 capitalize">{item.category}</span>
+                          </Badge>
+                          <h4 className={`font-medium ${item.completed ? "line-through text-gray-500" : ""}`}>
+                            {item.task}
+                          </h4>
+                          {item.required && (
+                            <Badge variant="outline" className="text-xs">
+                              Required
+                            </Badge>
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-500">{item.assignedTo}</span>
+                      </div>
+                      <p className="text-sm text-gray-600">{item.description}</p>
+                      {item.ghanaLabourActCompliance && (
+                        <p className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                          <strong>Ghana Labour Act Compliance:</strong> {item.ghanaLabourActCompliance}
+                        </p>
+                      )}
+                      {item.completed && item.completedDate && (
+                        <p className="text-xs text-green-600">
+                          Completed on {item.completedDate.toLocaleDateString()} by {item.completedBy}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="clearance" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Department Clearances</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {Object.entries(selectedCase.clearanceStatus).map(([dept, cleared]) => (
+                  <div key={dept} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      {getCategoryIcon(dept)}
+                      <span className="capitalize font-medium">{dept}</span>
+                    </div>
+                    {cleared ? (
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-600" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="settlement" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Final Settlement</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-green-50 rounded-lg">
+                    <h4 className="font-medium text-green-800">Settlement Status</h4>
+                    <p className="text-2xl font-bold text-green-600">
+                      {selectedCase.finalSettlementCalculated ? "Calculated" : "Pending"}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <h4 className="font-medium text-blue-800">Final Amount</h4>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {selectedCase.finalSettlementAmount
+                        ? `GHS ${selectedCase.finalSettlementAmount.toLocaleString()}`
+                        : "TBD"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-medium">Settlement Breakdown</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between p-2 bg-gray-50 rounded">
+                      <span>Outstanding Salary</span>
+                      <span>GHS 8,500</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-gray-50 rounded">
+                      <span>Accrued Leave Days (15 days)</span>
+                      <span>GHS 4,250</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-gray-50 rounded">
+                      <span>Bonus/Allowances</span>
+                      <span>GHS 2,250</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-red-50 rounded text-red-600">
+                      <span>Deductions (Loans/Advances)</span>
+                      <span>-GHS 0</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-green-100 rounded font-semibold">
+                      <span>Total Final Settlement</span>
+                      <span>GHS {selectedCase.finalSettlementAmount?.toLocaleString() || "15,000"}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="documents" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Offboarding Documents</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {selectedCase.documents.map((doc, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <FileText className="w-4 h-4 text-gray-500" />
+                      <span>{doc}</span>
+                    </div>
+                    <Button variant="ghost" size="sm">
+                      <Download className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+                {selectedCase.documents.length === 0 && (
+                  <p className="text-gray-500 text-center py-4">No documents uploaded yet</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="timeline" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Offboarding Timeline</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="border-l-2 border-blue-500 pl-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                    <h4 className="font-medium">Resignation Submitted</h4>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">{selectedCase.resignationDate.toLocaleDateString()}</p>
+                  <p className="text-sm text-gray-500">Employee submitted resignation letter</p>
+                </div>
+
+                {selectedCase.exitInterviewCompleted && selectedCase.exitInterviewDate && (
+                  <div className="border-l-2 border-green-500 pl-4">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <h4 className="font-medium">Exit Interview Completed</h4>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">{selectedCase.exitInterviewDate.toLocaleDateString()}</p>
+                    <p className="text-sm text-gray-500">Rating: {selectedCase.exitInterviewRating}/5</p>
+                  </div>
+                )}
+
+                <div className="border-l-2 border-orange-500 pl-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                    <h4 className="font-medium">Last Working Day</h4>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">{selectedCase.lastWorkingDay.toLocaleDateString()}</p>
+                  <p className="text-sm text-gray-500">Final day of employment</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
