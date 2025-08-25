@@ -662,15 +662,13 @@ export default function EmployeesPage() {
   )
 }
 
-function ImportDataDialog({
-  onImport,
-  onDownloadTemplate,
-  onClose,
-}: {
+interface ImportDataDialogProps {
   onImport: (data: any[]) => void
   onDownloadTemplate: (type: string) => void
   onClose: () => void
-}) {
+}
+
+function ImportDataDialog({ onImport, onDownloadTemplate, onClose }: ImportDataDialogProps) {
   const [activeTab, setActiveTab] = useState("employees")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -1099,15 +1097,13 @@ function ImportDataDialog({
   )
 }
 
-function AddEmployeeForm({
-  employee,
-  onSubmit,
-  onClose,
-}: {
+interface AddEmployeeFormProps {
   employee?: any
   onSubmit: (data: any) => void
   onClose: () => void
-}) {
+}
+
+function AddEmployeeForm({ employee, onSubmit, onClose }: AddEmployeeFormProps) {
   const [formData, setFormData] = useState({
     prefix: employee?.prefix || "",
     firstName: employee?.firstName || "",
@@ -1852,17 +1848,14 @@ function AddEmployeeForm({
   )
 }
 
-function FormRow({
-  label,
-  children,
-  full = false,
-  error,
-}: {
+interface FormRowProps {
   label: string
   children: React.ReactNode
   full?: boolean
   error?: string\
-}) {
+}
+
+function FormRow({ label, children, full = false, error }: FormRowProps) {
   return (
     <div className={full ? "lg:col-span-2" : ""}>\
       <div className="grid items-center gap-3 sm:grid-cols-[200px_1fr]">
@@ -1876,9 +1869,13 @@ function FormRow({
   )
 }
 
-function EmployeeProfile({ employee }: { employee: any }) {
+interface EmployeeProfileProps {
+  employee: any
+}
+\
+function EmployeeProfile({ employee }: EmployeeProfileProps) {\
   return (
-    <Tabs defaultValue="overview" className=\"w-full">\
+    <Tabs defaultValue="overview" className="w-full">\
       <TabsList className="grid w-full grid-cols-5">
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="employment">Employment</TabsTrigger>
