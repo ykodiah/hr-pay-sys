@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -24,6 +22,7 @@ import {
   Calendar,
   Clock,
   AlertTriangle,
+  Shield,
   FileText,
   Users,
   Gavel,
@@ -32,6 +31,7 @@ import {
   XCircle,
   AlertCircle,
   Scale,
+  BookOpen,
   Download,
   User,
   BarChart3,
@@ -308,11 +308,11 @@ export default function DisciplinaryGrievancePage() {
     return matchesSearch && matchesStatus && matchesSeverity
   })
 
-  const filteredGrievances = grievanceCases.filter((grievance) => {
+  const filteredGrievanceCases = grievanceCases.filter((case_) => {
     const matchesSearch =
-      grievance.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      grievance.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      grievance.id.toLowerCase().includes(searchTerm.toLowerCase())
+      case_.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      case_.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      case_.id.toLowerCase().includes(searchTerm.toLowerCase())
     return matchesSearch
   })
 
@@ -395,12 +395,10 @@ export default function DisciplinaryGrievancePage() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Total Cases</p>
-                    <p className="text-2xl font-bold text-gray-900">{disciplinaryStats.total + grievanceStats.total}</p>
+                    <div className="text-2xl font-bold text-gray-900">{disciplinaryStats.total}</div>
+                    <p className="text-sm text-gray-600">Total Disciplinary Cases</p>
                   </div>
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <FileText className="w-4 h-4 text-blue-600" />
-                  </div>
+                  <Shield className="w-8 h-8 text-red-400" />
                 </div>
               </CardContent>
             </Card>
@@ -408,14 +406,10 @@ export default function DisciplinaryGrievancePage() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Under Investigation</p>
-                    <p className="text-2xl font-bold text-yellow-600">
-                      {disciplinaryStats.investigating + grievanceStats.investigating}
-                    </p>
+                    <div className="text-2xl font-bold text-yellow-600">{disciplinaryStats.investigating}</div>
+                    <p className="text-sm text-gray-600">Under Investigation</p>
                   </div>
-                  <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                    <Search className="w-4 h-4 text-yellow-600" />
-                  </div>
+                  <Search className="w-8 h-8 text-yellow-400" />
                 </div>
               </CardContent>
             </Card>
@@ -423,14 +417,10 @@ export default function DisciplinaryGrievancePage() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Critical/Urgent</p>
-                    <p className="text-2xl font-bold text-red-600">
-                      {disciplinaryStats.critical + grievanceStats.urgent}
-                    </p>
+                    <div className="text-2xl font-bold text-blue-600">{grievanceStats.total}</div>
+                    <p className="text-sm text-gray-600">Total Grievances</p>
                   </div>
-                  <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-                    <AlertTriangle className="w-4 h-4 text-red-600" />
-                  </div>
+                  <MessageSquare className="w-8 h-8 text-blue-400" />
                 </div>
               </CardContent>
             </Card>
@@ -438,25 +428,364 @@ export default function DisciplinaryGrievancePage() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Resolved</p>
-                    <p className="text-2xl font-bold text-green-600">
+                    <div className="text-2xl font-bold text-green-600">
                       {disciplinaryStats.resolved + grievanceStats.resolved}
-                    </p>
+                    </div>
+                    <p className="text-sm text-gray-600">Cases Resolved</p>
                   </div>
-                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                  </div>
+                  <CheckCircle className="w-8 h-8 text-green-400" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Cases */}
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                  <span>Recent Disciplinary Cases</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {disciplinaryCases.slice(0, 3).map((case_) => (
+                    <div key={case_.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={case_.employeeAvatar || "/placeholder.svg"} />
+                          <AvatarFallback>
+                            {case_.employeeName
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-sm">{case_.title}</p>
+                          <p className="text-xs text-gray-600">
+                            {case_.employeeName} • {case_.id}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge className={getSeverityColor(case_.severity)}>{case_.severity}</Badge>
+                        <Badge className={getStatusColor(case_.status)}>{case_.status.replace("_", " ")}</Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <MessageSquare className="w-5 h-5 text-blue-600" />
+                  <span>Recent Grievances</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {grievanceCases.slice(0, 3).map((grievance) => (
+                    <div key={grievance.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={grievance.employeeAvatar || "/placeholder.svg"} />
+                          <AvatarFallback>
+                            {grievance.employeeName
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-sm">{grievance.title}</p>
+                          <p className="text-xs text-gray-600">
+                            {grievance.employeeName} • {grievance.id}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge className={getSeverityColor(grievance.priority)}>{grievance.priority}</Badge>
+                        <Badge className={getStatusColor(grievance.status)}>{grievance.status}</Badge>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Ghana Labour Act Compliance */}
-          <div className="grid md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Scale className="w-5 h-5 text-purple-600" />
+                <span>Ghana Labour Act 2003 Compliance</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <span className="font-medium text-green-900">Progressive Discipline</span>
+                  </div>
+                  <p className="text-sm text-green-700">
+                    All cases follow progressive discipline procedures as required by Section 61
+                  </p>
+                </div>
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <BookOpen className="w-5 h-5 text-blue-600" />
+                    <span className="font-medium text-blue-900">Due Process</span>
+                  </div>
+                  <p className="text-sm text-blue-700">
+                    Fair hearing procedures implemented in accordance with natural justice principles
+                  </p>
+                </div>
+                <div className="p-4 bg-purple-50 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <FileText className="w-5 h-5 text-purple-600" />
+                    <span className="font-medium text-purple-900">Documentation</span>
+                  </div>
+                  <p className="text-sm text-purple-700">
+                    Comprehensive record keeping for all disciplinary actions and grievances
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+        <TabsContent value="disciplinary" className="space-y-6">
+          {/* Filters */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <Input
+                    placeholder="Search cases by employee name, case ID, or title..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="w-full md:w-48">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="investigating">Investigating</SelectItem>
+                    <SelectItem value="hearing_scheduled">Hearing Scheduled</SelectItem>
+                    <SelectItem value="resolved">Resolved</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={selectedSeverity} onValueChange={setSelectedSeverity}>
+                  <SelectTrigger className="w-full md:w-48">
+                    <SelectValue placeholder="Filter by severity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Severity</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Disciplinary Cases List */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Disciplinary Cases ({disciplinaryCases.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {disciplinaryCases.map((case_) => (
+                  <div
+                    key={case_.id}
+                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={case_.employeeAvatar || "/placeholder.svg"} />
+                        <AvatarFallback>
+                          {case_.employeeName
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-gray-900">{case_.title}</h3>
+                          <Badge variant="outline" className="text-xs">
+                            {case_.id}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          {case_.employeeName} ({case_.employeeId}) • {case_.category}
+                        </p>
+                        <div className="flex items-center space-x-4 mt-1">
+                          <div className="flex items-center text-xs text-gray-500">
+                            <Calendar className="w-3 h-3 mr-1" />
+                            Reported: {case_.reportedDate.toLocaleDateString()}
+                          </div>
+                          <div className="flex items-center text-xs text-gray-500">
+                            <User className="w-3 h-3 mr-1" />
+                            By: {case_.reportedBy}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <Badge className={getSeverityColor(case_.severity)}>{case_.severity.toUpperCase()}</Badge>
+                        <p className="text-sm text-gray-600 mt-1">{case_.actions.length} Actions</p>
+                      </div>
+                      <Badge className={getStatusColor(case_.status)}>
+                        {case_.status.replace("_", " ").toUpperCase()}
+                      </Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedCase(case_)
+                              setIsCaseDetailOpen(true)
+                            }}
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Case
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Calendar className="w-4 h-4 mr-2" />
+                            Schedule Hearing
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <FileText className="w-4 h-4 mr-2" />
+                            Add Action
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="grievances" className="space-y-6">
+          {/* Grievances List */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Employee Grievances ({grievanceCases.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {grievanceCases.map((grievance) => (
+                  <div
+                    key={grievance.id}
+                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={grievance.employeeAvatar || "/placeholder.svg"} />
+                        <AvatarFallback>
+                          {grievance.employeeName
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-gray-900">{grievance.title}</h3>
+                          <Badge variant="outline" className="text-xs">
+                            {grievance.id}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          {grievance.employeeName} ({grievance.employeeId}) • {grievance.grievanceType}
+                        </p>
+                        <div className="flex items-center space-x-4 mt-1">
+                          <div className="flex items-center text-xs text-gray-500">
+                            <Calendar className="w-3 h-3 mr-1" />
+                            Submitted: {grievance.submittedDate.toLocaleDateString()}
+                          </div>
+                          {grievance.investigator && (
+                            <div className="flex items-center text-xs text-gray-500">
+                              <User className="w-3 h-3 mr-1" />
+                              Investigator: {grievance.investigator}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <Badge className={getSeverityColor(grievance.priority)}>{grievance.priority.toUpperCase()}</Badge>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {grievance.status.replace("_", " ").toUpperCase()}
+                        </p>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Eye className="w-4 h-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Update Status
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Users className="w-4 h-4 mr-2" />
+                            Assign Investigator
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Calendar className="w-4 h-4 mr-2" />
+                            Schedule Mediation
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="compliance" className="space-y-6">
+          {/* Compliance Dashboard */}
+          <div className="grid lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Scale className="w-5 h-5 text-green-600" />
+                  <Scale className="w-5 h-5 text-purple-600" />
                   <span>Ghana Labour Act Compliance</span>
                 </CardTitle>
               </CardHeader>
@@ -497,27 +826,81 @@ export default function DisciplinaryGrievancePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{disciplinaryStats.total}</div>
-                    <p className="text-sm text-red-700">Disciplinary Cases</p>
-                  </div>
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">{grievanceStats.total}</div>
-                    <p className="text-sm text-blue-700">Grievances Filed</p>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{disciplinaryStats.resolved}</div>
-                    <p className="text-sm text-green-700">Cases Resolved</p>
-                  </div>
-                  <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                    <div className="text-2xl font-bold text-yellow-600">{disciplinaryStats.investigating}</div>
-                    <p className="text-sm text-yellow-700">Under Investigation</p>
-                  </div>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="text-2xl font-bold text-blue-600">{disciplinaryStats.total}</div>
+                      <p className="text-sm text-gray-600">Total Cases</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="text-2xl font-bold text-yellow-600">{disciplinaryStats.investigating}</div>
+                      <p className="text-sm text-gray-600">Under Investigation</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="text-2xl font-bold text-green-600">{disciplinaryStats.resolved}</div>
+                      <p className="text-sm text-gray-600">Resolved Cases</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="text-2xl font-bold text-red-600">{disciplinaryStats.critical}</div>
+                      <p className="text-sm text-gray-600">Critical Cases</p>
+                    </CardContent>
+                  </Card>
                 </div>
                 <Button variant="outline" className="w-full bg-transparent">
                   <Download className="w-4 h-4 mr-2" />
                   Download Compliance Report
                 </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                  <span>Urgent Actions Required</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {disciplinaryCases
+                  .filter((c) => c.severity === "critical" || c.status === "hearing_scheduled")
+                  .slice(0, 3)
+                  .map((case_) => (
+                    <div key={case_.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                      <div>
+                        <p className="font-medium text-sm">{case_.title}</p>
+                        <p className="text-xs text-gray-600">{case_.employeeName}</p>
+                      </div>
+                      <Badge className="bg-red-100 text-red-800">{case_.status.replace("_", " ")}</Badge>
+                    </div>
+                  ))}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <MessageSquare className="w-5 h-5 text-blue-600" />
+                  <span>Recent Grievances</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {grievanceCases.slice(0, 3).map((grievance) => (
+                  <div key={grievance.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-sm">{grievance.title}</p>
+                      <p className="text-xs text-gray-600">{grievance.employeeName}</p>
+                    </div>
+                    <Badge className="bg-blue-100 text-blue-800">{grievance.status}</Badge>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           </div>
@@ -566,318 +949,24 @@ export default function DisciplinaryGrievancePage() {
             </CardContent>
           </Card>
         </TabsContent>
-
-        <TabsContent value="disciplinary" className="space-y-6">
-          {/* Filters */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <Input
-                    placeholder="Search cases by title, employee, or case ID..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger className="w-full md:w-48">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="investigating">Investigating</SelectItem>
-                    <SelectItem value="hearing_scheduled">Hearing Scheduled</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={selectedSeverity} onValueChange={setSelectedSeverity}>
-                  <SelectTrigger className="w-full md:w-48">
-                    <SelectValue placeholder="Filter by severity" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Severities</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Disciplinary Cases List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Disciplinary Cases ({filteredDisciplinaryCases.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {filteredDisciplinaryCases.map((case_) => (
-                  <div
-                    key={case_.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                    onClick={() => {
-                      setSelectedCase(case_)
-                      setIsCaseDetailOpen(true)
-                    }}
-                  >
-                    <div className="flex items-center space-x-4">
-                      <Avatar className="w-12 h-12">
-                        <AvatarImage src={case_.employeeAvatar || "/placeholder.svg"} />
-                        <AvatarFallback>
-                          {case_.employeeName
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-gray-900">{case_.title}</h3>
-                          <Badge variant="outline" className="text-xs">
-                            {case_.id}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          {case_.employeeName} - {case_.category}
-                        </p>
-                        <div className="flex items-center space-x-4 mt-1">
-                          <div className="flex items-center text-xs text-gray-500">
-                            <Calendar className="w-3 h-3 mr-1" />
-                            {case_.reportedDate.toLocaleDateString()}
-                          </div>
-                          <div className="flex items-center text-xs text-gray-500">
-                            <User className="w-3 h-3 mr-1" />
-                            {case_.reportedBy}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <Badge className={getSeverityColor(case_.severity)}>{case_.severity.toUpperCase()}</Badge>
-                        <p className="text-sm text-gray-600 mt-1">{case_.actions.length} actions</p>
-                      </div>
-                      <Badge className={getStatusColor(case_.status)}>
-                        {case_.status.replace("_", " ").toUpperCase()}
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit Case
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Gavel className="w-4 h-4 mr-2" />
-                            Add Action
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Calendar className="w-4 h-4 mr-2" />
-                            Schedule Hearing
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="grievances" className="space-y-6">
-          {/* Grievances List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Employee Grievances ({filteredGrievances.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {filteredGrievances.map((grievance) => (
-                  <div
-                    key={grievance.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <Avatar className="w-12 h-12">
-                        <AvatarImage src={grievance.employeeAvatar || "/placeholder.svg"} />
-                        <AvatarFallback>
-                          {grievance.employeeName
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-gray-900">{grievance.title}</h3>
-                          <Badge variant="outline" className="text-xs">
-                            {grievance.id}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          {grievance.employeeName} - {grievance.grievanceType}
-                        </p>
-                        <div className="flex items-center space-x-4 mt-1">
-                          <div className="flex items-center text-xs text-gray-500">
-                            <Calendar className="w-3 h-3 mr-1" />
-                            {grievance.submittedDate.toLocaleDateString()}
-                          </div>
-                          {grievance.investigator && (
-                            <div className="flex items-center text-xs text-gray-500">
-                              <User className="w-3 h-3 mr-1" />
-                              {grievance.investigator}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <Badge className={getSeverityColor(grievance.priority)}>
-                          {grievance.priority.toUpperCase()}
-                        </Badge>
-                      </div>
-                      <Badge className={getStatusColor(grievance.status)}>
-                        {grievance.status.replace("_", " ").toUpperCase()}
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Update Status
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Users className="w-4 h-4 mr-2" />
-                            Assign Mediator
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Calendar className="w-4 h-4 mr-2" />
-                            Schedule Meeting
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="compliance" className="space-y-6">
-          {/* Ghana Labour Act Compliance */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Scale className="w-5 h-5 text-green-600" />
-                  <span>Ghana Labour Act Compliance</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Section 61 - Progressive Discipline</h4>
-                  <p className="text-sm text-gray-600 mb-2">Ensures fair and progressive disciplinary procedures</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Compliance Rate</span>
-                    <Badge className="bg-green-100 text-green-800">100%</Badge>
-                  </div>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Section 62 - Grounds for Termination</h4>
-                  <p className="text-sm text-gray-600 mb-2">Valid reasons and procedures for employment termination</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Cases Following Guidelines</span>
-                    <Badge className="bg-green-100 text-green-800">100%</Badge>
-                  </div>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Section 63 - Notice Requirements</h4>
-                  <p className="text-sm text-gray-600 mb-2">Proper notice periods for disciplinary actions</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Notice Compliance</span>
-                    <Badge className="bg-green-100 text-green-800">100%</Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <BarChart3 className="w-5 h-5 text-blue-600" />
-                  <span>Case Analytics</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{disciplinaryStats.total}</div>
-                    <p className="text-sm text-red-700">Disciplinary Cases</p>
-                  </div>
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">{grievanceStats.total}</div>
-                    <p className="text-sm text-blue-700">Grievances Filed</p>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{disciplinaryStats.resolved}</div>
-                    <p className="text-sm text-green-700">Cases Resolved</p>
-                  </div>
-                  <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                    <div className="text-2xl font-bold text-yellow-600">{disciplinaryStats.investigating}</div>
-                    <p className="text-sm text-yellow-700">Under Investigation</p>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full bg-transparent">
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Compliance Report
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Case Detail Dialog */}
-        <Dialog open={isCaseDetailOpen} onOpenChange={setIsCaseDetailOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Case Details - {selectedCase?.id}</DialogTitle>
-            </DialogHeader>
-            {selectedCase && <CaseDetailView case={selectedCase} />}
-          </DialogContent>
-        </Dialog>
       </Tabs>
+
+      {/* Case Detail Dialog */}
+      <Dialog open={isCaseDetailOpen} onOpenChange={setIsCaseDetailOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Case Details - {selectedCase?.id}</DialogTitle>
+          </DialogHeader>
+          {selectedCase && <CaseDetailView case={selectedCase} />}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
-
-function NewDisciplinaryCaseForm({ onSubmit, onClose }: { onSubmit: (data: any) => void; onClose: () => void }) {
+\
+function NewDisciplinaryCaseForm({ onSubmit, onClose }: { onSubmit: (data: any) => void; onClose: () => void }) {\
   const [formData, setFormData] = useState({
-    employeeId: "",
+    employeeId: "",\
     employeeName: "",
     category: "",
     severity: "medium",
@@ -889,9 +978,9 @@ function NewDisciplinaryCaseForm({ onSubmit, onClose }: { onSubmit: (data: any) 
   })
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault()\
     onSubmit({
-      ...formData,
+      ...formData,\
       witnesses: formData.witnesses
         .split(",")
         .map((w) => w.trim())
@@ -964,7 +1053,7 @@ function NewDisciplinaryCaseForm({ onSubmit, onClose }: { onSubmit: (data: any) 
         <Input
           value={formData.title}
           onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-          placeholder="Brief description of the incident"
+          placeholder="Brief summary of the incident"
           required
         />
       </div>
@@ -973,7 +1062,7 @@ function NewDisciplinaryCaseForm({ onSubmit, onClose }: { onSubmit: (data: any) 
         <Textarea
           value={formData.description}
           onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-          placeholder="Detailed description of the incident or issue"
+          placeholder="Detailed description of the incident"
           rows={4}
           required
         />
@@ -993,7 +1082,7 @@ function NewDisciplinaryCaseForm({ onSubmit, onClose }: { onSubmit: (data: any) 
           <Input
             value={formData.assignedTo}
             onChange={(e) => setFormData((prev) => ({ ...prev, assignedTo: e.target.value }))}
-            placeholder="Department or person handling the case"
+            placeholder="Department or person assigned"
           />
         </div>
       </div>
@@ -1002,7 +1091,7 @@ function NewDisciplinaryCaseForm({ onSubmit, onClose }: { onSubmit: (data: any) 
         <Input
           value={formData.witnesses}
           onChange={(e) => setFormData((prev) => ({ ...prev, witnesses: e.target.value }))}
-          placeholder="Comma-separated list of witness names"
+          placeholder="Comma-separated list of witnesses"
         />
       </div>
       <div className="flex justify-end space-x-2">
@@ -1014,10 +1103,10 @@ function NewDisciplinaryCaseForm({ onSubmit, onClose }: { onSubmit: (data: any) 
     </form>
   )
 }
-
-function NewGrievanceForm({ onSubmit, onClose }: { onSubmit: (data: any) => void; onClose: () => void }) {
+\
+function NewGrievanceForm({ onSubmit, onClose }: { onSubmit: (data: any) => void; onClose: () => void }) {\
   const [formData, setFormData] = useState({
-    employeeId: "",
+    employeeId: "",\
     employeeName: "",
     grievanceType: "",
     priority: "medium",
@@ -1027,7 +1116,7 @@ function NewGrievanceForm({ onSubmit, onClose }: { onSubmit: (data: any) => void
   })
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault()\
     onSubmit(formData)
   }
 
@@ -1130,8 +1219,8 @@ function NewGrievanceForm({ onSubmit, onClose }: { onSubmit: (data: any) => void
     </form>
   )
 }
-
-function CaseDetailView({ case: selectedCase }: { case: DisciplinaryCase }) {
+\
+function CaseDetailView({ case: selectedCase }: { case: DisciplinaryCase }) {\
   return (
     <div className="space-y-6">
       {/* Case Header */}
@@ -1157,169 +1246,179 @@ function CaseDetailView({ case: selectedCase }: { case: DisciplinaryCase }) {
                   selectedCase.severity === "critical"
                     ? "bg-red-100 text-red-800"
                     : selectedCase.severity === "high"
-                      ? "bg-orange-100 text-orange-800"
-                      : selectedCase.severity === "medium"
-                        ? "bg-yellow-100 text-yellow-800"
-                        : "bg-green-100 text-green-800"
+                    ? "bg-orange-100 text-orange-800"
+                    : selectedCase.severity === "medium"
+                    ? "bg-yellow-100 text-yellow-800"
+                    : "bg-green-100 text-green-800"
                 }
               >
                 {selectedCase.severity.toUpperCase()}
               </Badge>
-              <Badge
-                className={
-                  selectedCase.status === "resolved"
-                    ? "bg-green-100 text-green-800"
-                    : selectedCase.status === "investigating"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-blue-100 text-blue-800"
-                }
-              >
+              <Badge className={getStatusColor(selectedCase.status)}>
                 {selectedCase.status.replace("_", " ").toUpperCase()}
               </Badge>
             </div>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-500">Case ID</p>
-          <p className="font-semibold">{selectedCase.id}</p>
-          <p className="text-sm text-gray-500 mt-1">Reported: {selectedCase.reportedDate.toLocaleDateString()}</p>
+        <div className="flex space-x-2">
+          <Button variant="outline">
+            <Edit className="w-4 h-4 mr-2" />
+            Edit Case
+          </Button>
+          <Button variant="outline">
+            <Calendar className="w-4 h-4 mr-2" />
+            Schedule Hearing
+          </Button>
+          <Button>
+            <FileText className="w-4 h-4 mr-2" />
+            Add Action
+          </Button>
         </div>
       </div>
 
-      {/* Case Details */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Case Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Category:</span>
-              <span>{selectedCase.category}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Reported By:</span>
-              <span>{selectedCase.reportedBy}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Assigned To:</span>
-              <span>{selectedCase.assignedTo || "Unassigned"}</span>
-            </div>
-            {selectedCase.dueDate && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Due Date:</span>
-                <span>{selectedCase.dueDate.toLocaleDateString()}</span>
-              </div>
-            )}
-            {selectedCase.hearingDate && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Hearing Date:</span>
-                <span>{selectedCase.hearingDate.toLocaleDateString()}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Case Details Tabs */}
+      <Tabs defaultValue="details" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="details">Case Details</TabsTrigger>
+          <TabsTrigger value="actions">Actions Taken</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Description</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-700">{selectedCase.description}</p>
-            {selectedCase.complianceNotes && (
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm font-medium text-blue-900">Compliance Notes</p>
-                <p className="text-sm text-blue-700">{selectedCase.complianceNotes}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Actions Timeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Disciplinary Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {selectedCase.actions.map((action, index) => (
-              <div key={action.id} className="flex items-start space-x-4 p-4 border rounded-lg">
-                <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <AlertTriangle className="w-4 h-4 text-red-600" />
+        <TabsContent value="details" className="space-y-4">
+          <div className="grid grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Case Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Category:</span>
+                  <span>{selectedCase.category}</span>
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">{action.type.replace("_", " ").toUpperCase()}</h4>
-                    <Badge
-                      className={action.acknowledged ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}
-                    >
-                      {action.acknowledged ? "Acknowledged" : "Pending"}
-                    </Badge>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Reported Date:</span>
+                  <span>{selectedCase.reportedDate.toLocaleDateString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Reported By:</span>
+                  <span>{selectedCase.reportedBy}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Assigned To:</span>
+                  <span>{selectedCase.assignedTo || "Unassigned"}</span>
+                </div>
+                {selectedCase.dueDate && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Due Date:</span>
+                    <span>{selectedCase.dueDate.toLocaleDateString()}</span>
                   </div>
-                  <p className="text-sm text-gray-600 mt-1">{action.description}</p>
-                  <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                    <span>Issued by {action.issuedBy}</span>
-                    <span>{action.date.toLocaleDateString()}</span>
-                    {action.ghanaLabourActReference && (
-                      <Badge variant="outline" className="text-xs">
-                        {action.ghanaLabourActReference}
-                      </Badge>
-                    )}
-                  </div>
-                  {action.followUpRequired && action.followUpDate && (
-                    <div className="mt-2 p-2 bg-yellow-50 rounded text-xs">
-                      <span className="text-yellow-800">
-                        Follow-up required by {action.followUpDate.toLocaleDateString()}
-                      </span>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Description</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-700">{selectedCase.description}</p>
+                {selectedCase.witnesses && selectedCase.witnesses.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="font-medium mb-2">Witnesses:</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedCase.witnesses.map((witness, index) => (
+                        <Badge key={index} variant="outline">
+                          {witness}
+                        </Badge>
+                      ))}
                     </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Documents and Witnesses */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Documents</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {selectedCase.documents.map((doc, index) => (
-                <div key={index} className="flex items-center justify-between p-2 border rounded">
-                  <div className="flex items-center">
-                    <FileText className="w-4 h-4 mr-2 text-gray-500" />
-                    <span className="text-sm">{doc}</span>
                   </div>
-                  <Button variant="ghost" size="sm">
-                    <Download className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Witnesses</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {selectedCase.witnesses?.map((witness, index) => (
-                <div key={index} className="flex items-center p-2 border rounded">
-                  <Users className="w-4 h-4 mr-2 text-gray-500" />
-                  <span className="text-sm">{witness}</span>
+        <TabsContent value="actions" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Disciplinary Actions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {selectedCase.actions.map((action) => (
+                  <div key={action.id} className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium">{action.type.replace("_", " ").toUpperCase()}</h4>
+                      <Badge className={action.acknowledged ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
+                        {action.acknowledged ? "Acknowledged" : "Pending"}
+                      </Badge>
+                    </div>
+                    <p className="text-gray-700 mb-2">{action.description}</p>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <p>Issued by: {action.issuedBy} on {action.date.toLocaleDateString()}</p>
+                      {action.ghanaLabourActReference && (
+                        <p>Legal Reference: {action.ghanaLabourActReference}</p>
+                      )}
+                      {action.followUpRequired && action.followUpDate && (
+                        <p>Follow-up Required: {action.followUpDate.toLocaleDateString()}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="documents" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Case Documents</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {selectedCase.documents.map((doc, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 border rounded">
+                    <div className="flex items-center">
+                      <FileText className="w-4 h-4 mr-2" />
+                      <span>{doc}</span>
+                    </div>
+                    <Button variant="ghost" size="sm">
+                      <Download className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="timeline" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Case Timeline</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="border-l-2 border-blue-500 pl-4">
+                  <h4 className="font-semibold">Case Reported</h4>
+                  <p className="text-sm text-gray-600">{selectedCase.reportedDate.toLocaleDateString()}</p>
+                  <p className="text-sm">Initial incident reported by {selectedCase.reportedBy}</p>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                {selectedCase.actions.map((action) => (
+                  <div key={action.id} className="border-l-2 border-yellow-500 pl-4">
+                    <h4 className="font-semibold">{action.type.replace("_", " ").toUpperCase()}</h4>
+                    <p className="text-sm text-gray-600">{action.date.toLocaleDateString()}</p>
+                    <p className="text-sm">{action.description}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
-  )
+  )\
 }
