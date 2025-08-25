@@ -117,7 +117,12 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Reduced base font size from 16px to 14px and adjusted typography scale */
+  /* Added system font stack as fallback */
+  --font-family-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Noto Color Emoji";
+  --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+
   --font-size-xs: 0.625rem; /* 10px - reduced from 12px */
   --font-size-sm: 0.75rem; /* 12px - reduced from 14px */
   --font-size-base: 0.875rem; /* 14px - reduced from 16px */
@@ -136,7 +141,8 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Set smaller base font size for the entire application */
+    /* Using CSS custom property for font family */
+    font-family: var(--font-family-sans);
     font-size: var(--font-size-base);
     line-height: 1.5;
   }
