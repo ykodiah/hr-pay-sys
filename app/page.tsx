@@ -26,7 +26,7 @@ export default function HomePage() {
               </Link>
             </nav>
             <div className="flex items-center space-x-4">
-              <Link href="/login">
+              <Link href="/auth/login">
                 <Button variant="ghost" className="text-gray-600">
                   Sign In
                 </Button>
@@ -54,7 +54,7 @@ export default function HomePage() {
                 subsidiaries with multi-location controls.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                <Link href="/launch">
+                <Link href="/auth/login">
                   <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-lg px-8 py-4 w-full sm:w-auto">
                     Launch App
                   </Button>
