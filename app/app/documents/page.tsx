@@ -46,6 +46,8 @@ const mockDocuments = [
     status: "approved",
     notes: "Verified with university records",
     avatar: "/placeholder.svg?height=40&width=40",
+    uploadSource: "employee-onboarding",
+    category: "employee-documents",
   },
   {
     id: "doc_002",
@@ -60,6 +62,8 @@ const mockDocuments = [
     fileUrl: "https://storage.akwaabahrpay.com/documents/passport_photo.jpg",
     status: "approved",
     avatar: "/placeholder.svg?height=40&width=40",
+    uploadSource: "employee-onboarding",
+    category: "employee-documents",
   },
   {
     id: "doc_003",
@@ -74,6 +78,8 @@ const mockDocuments = [
     fileUrl: "https://storage.akwaabahrpay.com/documents/Medical_Report_2024.pdf",
     status: "pending",
     avatar: "/placeholder.svg?height=40&width=40",
+    uploadSource: "employee-onboarding",
+    category: "employee-documents",
   },
   {
     id: "doc_004",
@@ -89,6 +95,8 @@ const mockDocuments = [
     status: "rejected",
     notes: "Image quality too low, please resubmit",
     avatar: "/placeholder.svg?height=40&width=40",
+    uploadSource: "employee-onboarding",
+    category: "employee-documents",
   },
   {
     id: "doc_005",
@@ -103,6 +111,56 @@ const mockDocuments = [
     fileUrl: "https://storage.akwaabahrpay.com/documents/Resume_Akosua_Boateng.pdf",
     status: "approved",
     avatar: "/placeholder.svg?height=40&width=40",
+    uploadSource: "employee-onboarding",
+    category: "employee-documents",
+  },
+  {
+    id: "doc_006",
+    employeeId: "COMPANY",
+    employeeName: "Company Assets",
+    documentType: "company-logo",
+    fileName: "AkwaabaHRPay_Logo.png",
+    fileSize: 256000,
+    fileType: "image/png",
+    uploadDate: new Date("2024-01-10"),
+    uploadedBy: "Admin",
+    fileUrl: "https://storage.akwaabahrpay.com/documents/AkwaabaHRPay_Logo.png",
+    status: "approved",
+    avatar: "/placeholder.svg?height=40&width=40",
+    uploadSource: "settings",
+    category: "company-assets",
+  },
+  {
+    id: "doc_007",
+    employeeId: "TRAINING",
+    employeeName: "Training Materials",
+    documentType: "training-material",
+    fileName: "Employee_Handbook_2024.pdf",
+    fileSize: 5120000,
+    fileType: "application/pdf",
+    uploadDate: new Date("2024-02-01"),
+    uploadedBy: "HR Manager",
+    fileUrl: "https://storage.akwaabahrpay.com/documents/Employee_Handbook_2024.pdf",
+    status: "approved",
+    avatar: "/placeholder.svg?height=40&width=40",
+    uploadSource: "training",
+    category: "training-materials",
+  },
+  {
+    id: "doc_008",
+    employeeId: "BULK_IMPORT",
+    employeeName: "CSV Employee Import",
+    documentType: "csv-import",
+    fileName: "Employee_Data_Import_Feb2024.csv",
+    fileSize: 1024000,
+    fileType: "text/csv",
+    uploadDate: new Date("2024-02-15"),
+    uploadedBy: "HR Admin",
+    fileUrl: "https://storage.akwaabahrpay.com/documents/Employee_Data_Import_Feb2024.csv",
+    status: "approved",
+    avatar: "/placeholder.svg?height=40&width=40",
+    uploadSource: "bulk-import",
+    category: "system-files",
   },
 ]
 
@@ -115,6 +173,16 @@ const documentTypeLabels = {
   medical: "Medical Report",
   police: "Police Report",
   other: "Other Documents",
+  "company-logo": "Company Logo",
+  "csv-import": "CSV Import File",
+  "training-material": "Training Material",
+}
+
+const categoryLabels = {
+  "employee-documents": "Employee Documents",
+  "company-assets": "Company Assets",
+  "training-materials": "Training Materials",
+  "system-files": "System Files",
 }
 
 export default function DocumentVaultPage() {
@@ -126,6 +194,7 @@ export default function DocumentVaultPage() {
   const [selectedDocument, setSelectedDocument] = useState<any>(null)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
+  const [selectedCategory, setSelectedCategory] = useState("all")
 
   const filteredDocuments = documents.filter((doc) => {
     const matchesSearch =
@@ -136,12 +205,14 @@ export default function DocumentVaultPage() {
     const matchesDocumentType = selectedDocumentType === "all" || doc.documentType === selectedDocumentType
     const matchesStatus = selectedStatus === "all" || doc.status === selectedStatus
     const matchesTab = activeTab === "all" || doc.status === activeTab
+    const matchesCategory = selectedCategory === "all" || doc.category === selectedCategory
 
-    return matchesSearch && matchesEmployee && matchesDocumentType && matchesStatus && matchesTab
+    return matchesSearch && matchesEmployee && matchesDocumentType && matchesStatus && matchesTab && matchesCategory
   })
 
   const employees = [...new Set(documents.map((doc) => ({ id: doc.employeeId, name: doc.employeeName })))]
   const documentTypes = [...new Set(documents.map((doc) => doc.documentType))]
+  const categories = [...new Set(documents.map((doc) => doc.category))]
 
   const getFileIcon = (fileType: string) => {
     if (fileType.startsWith("image/")) return <ImageIcon className="w-5 h-5" />
@@ -217,7 +288,12 @@ export default function DocumentVaultPage() {
     const approved = documents.filter((doc) => doc.status === "approved").length
     const pending = documents.filter((doc) => doc.status === "pending").length
     const rejected = documents.filter((doc) => doc.status === "rejected").length
-    return { total, approved, pending, rejected }
+    const employeeDocs = documents.filter((doc) => doc.category === "employee-documents").length
+    const companyAssets = documents.filter((doc) => doc.category === "company-assets").length
+    const trainingMaterials = documents.filter((doc) => doc.category === "training-materials").length
+    const systemFiles = documents.filter((doc) => doc.category === "system-files").length
+
+    return { total, approved, pending, rejected, employeeDocs, companyAssets, trainingMaterials, systemFiles }
   }
 
   const stats = getDocumentStats()
@@ -228,7 +304,7 @@ export default function DocumentVaultPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Document Vault</h1>
-          <p className="text-gray-600">Centralized document management for all employees</p>
+          <p className="text-gray-600">Centralized document management for all system uploads</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline">
@@ -246,8 +322,8 @@ export default function DocumentVaultPage() {
         </div>
       </div>
 
-      {/* Document Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Enhanced Document Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -292,9 +368,53 @@ export default function DocumentVaultPage() {
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-blue-600">{stats.employeeDocs}</div>
+                <p className="text-sm text-gray-600">Employee Docs</p>
+              </div>
+              <FileText className="w-8 h-8 text-blue-400" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-purple-600">{stats.companyAssets}</div>
+                <p className="text-sm text-gray-600">Company Assets</p>
+              </div>
+              <ImageIcon className="w-8 h-8 text-purple-400" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-orange-600">{stats.trainingMaterials}</div>
+                <p className="text-sm text-gray-600">Training</p>
+              </div>
+              <File className="w-8 h-8 text-orange-400" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-indigo-600">{stats.systemFiles}</div>
+                <p className="text-sm text-gray-600">System Files</p>
+              </div>
+              <Archive className="w-8 h-8 text-indigo-400" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Filters and Search */}
+      {/* Enhanced Filters and Search */}
       <Card>
         <CardContent className="p-6">
           <div className="flex flex-col lg:flex-row gap-4">
@@ -342,6 +462,19 @@ export default function DocumentVaultPage() {
                 <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-full lg:w-48">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {categoryLabels[category as keyof typeof categoryLabels]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -408,6 +541,14 @@ export default function DocumentVaultPage() {
                               {document.uploadDate.toLocaleDateString()}
                             </div>
                             <div className="text-sm text-gray-500">{formatFileSize(document.fileSize)}</div>
+                            <div className="flex items-center text-sm text-gray-500">
+                              <Upload className="w-4 h-4 mr-1" />
+                              {document.uploadSource.replace("-", " ")}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-500">
+                              <Archive className="w-4 h-4 mr-1" />
+                              {categoryLabels[document.category as keyof typeof categoryLabels]}
+                            </div>
                           </div>
                           {document.notes && (
                             <p className="text-sm text-gray-600 mt-1 italic">Note: {document.notes}</p>
@@ -533,6 +674,14 @@ export default function DocumentVaultPage() {
                     <div className="flex justify-between">
                       <span className="text-gray-600">File type:</span>
                       <span>{selectedDocument.fileType}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Upload Source:</span>
+                      <span>{selectedDocument.uploadSource.replace("-", " ")}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Category:</span>
+                      <span>{categoryLabels[selectedDocument.category as keyof typeof categoryLabels]}</span>
                     </div>
                   </div>
                 </div>

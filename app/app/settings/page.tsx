@@ -45,6 +45,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 
+import { DocumentVaultService } from "@/lib/storage/documentVault"
+
 interface Company {
   id: string
   name: string
@@ -329,16 +331,29 @@ export default function SettingsPage() {
     })
   }
 
-  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      // Simulate file upload
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setCompanySettings((prev) => ({ ...prev, logo: e.target?.result as string }))
-        setHasUnsavedChanges(true)
+      console.log("[v0] Company logo file selected:", file.name)
+
+      const documentVault = DocumentVaultService.getInstance()
+      try {
+        const documentId = await documentVault.uploadCompanyDocument(file, "company-logo", "settings", "Admin")
+
+        console.log(`[v0] Company logo uploaded to Document Vault: ${documentId}`)
+
+        toast({
+          title: "Logo Uploaded",
+          description: `${file.name} has been uploaded and added to Document Vault.`,
+        })
+      } catch (error) {
+        console.error("[v0] Error uploading logo:", error)
+        toast({
+          title: "Upload Error",
+          description: "Failed to upload logo. Please try again.",
+          variant: "destructive",
+        })
       }
-      reader.readAsDataURL(file)
     }
   }
 

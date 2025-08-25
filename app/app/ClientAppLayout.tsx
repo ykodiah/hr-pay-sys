@@ -34,7 +34,7 @@ import {
   X,
   Palette,
   FileText,
-  Clock,
+  Shield,
 } from "lucide-react"
 import { Suspense, useState, useEffect } from "react"
 
@@ -468,51 +468,6 @@ export default function ClientAppLayout({
                   <span>Learning & Development</span>
                 </a>
                 <a
-                  href="/app/disciplinary"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                    e.currentTarget.style.color = "white"
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = ""
-                    e.currentTarget.style.color = ""
-                  }}
-                >
-                  <FileText className="w-5 h-5" />
-                  <span>Disciplinary & Grievance</span>
-                </a>
-                <a
-                  href="/app/offboarding"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                    e.currentTarget.style.color = "white"
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = ""
-                    e.currentTarget.style.color = ""
-                  }}
-                >
-                  <User className="w-5 h-5" />
-                  <span>Employee Offboarding</span>
-                </a>
-                <a
-                  href="/app/attendance"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                    e.currentTarget.style.color = "white"
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = ""
-                    e.currentTarget.style.color = ""
-                  }}
-                >
-                  <Clock className="w-5 h-5" />
-                  <span>Time & Attendance</span>
-                </a>
-                <a
                   href="/app/leave"
                   className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
                   onMouseEnter={(e) => {
@@ -526,6 +481,21 @@ export default function ClientAppLayout({
                 >
                   <Calendar className="w-5 h-5" />
                   <span>Leave Management</span>
+                </a>
+                <a
+                  href="/app/disciplinary"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
+                    e.currentTarget.style.color = "white"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = ""
+                    e.currentTarget.style.color = ""
+                  }}
+                >
+                  <Shield className="w-5 h-5" />
+                  <span>Disciplinary & Grievance</span>
                 </a>
               </div>
 
