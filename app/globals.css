@@ -27,7 +27,7 @@
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
+  --sidebar: oklch(1 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -118,90 +118,75 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   /* Added system font stack as fallback */
-  --font-family-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
-    "Noto Color Emoji";
-  --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New",
-    monospace;
-
-  --font-size-xs: 0.625rem; /* 10px - reduced from 12px */
-  --font-size-sm: 0.75rem; /* 12px - reduced from 14px */
-  --font-size-base: 0.875rem; /* 14px - reduced from 16px */
-  --font-size-lg: 1rem; /* 16px - reduced from 18px */
-  --font-size-xl: 1.125rem; /* 18px - reduced from 20px */
-  --font-size-2xl: 1.25rem; /* 20px - reduced from 24px */
-  --font-size-3xl: 1.5rem; /* 24px - reduced from 30px */
-  --font-size-4xl: 1.875rem; /* 30px - reduced from 36px */
-  --font-size-5xl: 2.25rem; /* 36px - reduced from 48px */
-  --font-size-6xl: 3rem; /* 48px - reduced from 60px */
+  --font-family-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, Monaco, Consolas, monospace;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
     /* Using CSS custom property for font family */
     font-family: var(--font-family-sans);
-    font-size: var(--font-size-base);
-    line-height: 1.5;
   }
 
   /* Override default Tailwind font sizes with smaller values */
   .text-xs {
-    font-size: var(--font-size-xs);
+    font-size: 0.625rem; /* 10px - reduced from 12px */
   }
   .text-sm {
-    font-size: var(--font-size-sm);
+    font-size: 0.75rem; /* 12px - reduced from 14px */
   }
   .text-base {
-    font-size: var(--font-size-base);
+    font-size: 0.875rem; /* 14px - reduced from 16px */
   }
   .text-lg {
-    font-size: var(--font-size-lg);
+    font-size: 1rem; /* 16px - reduced from 18px */
   }
   .text-xl {
-    font-size: var(--font-size-xl);
+    font-size: 1.125rem; /* 18px - reduced from 20px */
   }
   .text-2xl {
-    font-size: var(--font-size-2xl);
+    font-size: 1.25rem; /* 20px - reduced from 24px */
   }
   .text-3xl {
-    font-size: var(--font-size-3xl);
+    font-size: 1.5rem; /* 24px - reduced from 30px */
   }
   .text-4xl {
-    font-size: var(--font-size-4xl);
+    font-size: 1.875rem; /* 30px - reduced from 36px */
   }
   .text-5xl {
-    font-size: var(--font-size-5xl);
+    font-size: 2.25rem; /* 36px - reduced from 48px */
   }
   .text-6xl {
-    font-size: var(--font-size-6xl);
+    font-size: 3rem; /* 48px - reduced from 60px */
   }
 
   /* Reduce heading sizes across the system */
   h1 {
-    font-size: var(--font-size-3xl);
+    font-size: 1.5rem;
     font-weight: 700;
   }
   h2 {
-    font-size: var(--font-size-2xl);
+    font-size: 1.25rem;
     font-weight: 600;
   }
   h3 {
-    font-size: var(--font-size-xl);
+    font-size: 1.125rem;
     font-weight: 600;
   }
   h4 {
-    font-size: var(--font-size-lg);
+    font-size: 1rem;
     font-weight: 500;
   }
   h5 {
-    font-size: var(--font-size-base);
+    font-size: 0.875rem;
     font-weight: 500;
   }
   h6 {
-    font-size: var(--font-size-sm);
+    font-size: 0.75rem;
     font-weight: 500;
   }
 
@@ -210,18 +195,18 @@
   input,
   select,
   textarea {
-    font-size: var(--font-size-sm);
+    font-size: 0.75rem;
   }
 
   /* Reduce table font sizes for better data density */
   table {
-    font-size: var(--font-size-sm);
+    font-size: 0.75rem;
   }
 
   /* Reduce navigation and sidebar font sizes */
   nav,
   .sidebar {
-    font-size: var(--font-size-sm);
+    font-size: 0.75rem;
   }
 
   /* Added theme-aware utility classes for dynamic color application */
@@ -243,9 +228,9 @@
   .theme-border-primary-500 {
     border-color: var(--theme-primary-500);
   }
+}
 
-  /* Adding form-input class for consistent form styling */
-  .form-input {
-    @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200;
-  }
+/* Added essential form styling */
+.form-input {
+  @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200;
 }

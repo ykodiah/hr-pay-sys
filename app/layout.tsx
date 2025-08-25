@@ -15,15 +15,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  console.log("[v0] RootLayout is rendering")
+
   return (
     <html lang="en" className="antialiased">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body className="font-sans bg-background text-foreground min-h-screen">
-        <div id="root">{children}</div>
-      </body>
+      <body className="font-sans bg-background text-foreground min-h-screen">{children}</body>
     </html>
   )
 }
