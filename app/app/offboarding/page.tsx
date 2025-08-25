@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
@@ -18,25 +17,20 @@ import { toast } from "@/hooks/use-toast"
 import {
   Search,
   Plus,
-  MoreHorizontal,
-  Edit,
-  Eye,
   Calendar,
-  Clock,
   CheckCircle,
   XCircle,
-  AlertCircle,
   FileText,
   Users,
   Laptop,
   Download,
-  User,
-  BarChart3,
   MessageSquare,
   Calculator,
   Building,
   Shield,
   Briefcase,
+  Filter,
+  Star,
 } from "lucide-react"
 
 interface OffboardingCase {
@@ -273,10 +267,10 @@ export default function OffboardingPage() {
   }
 
   const generateDefaultChecklist = (resignationType: string): OffboardingChecklistItem[] => {
-    const baseChecklist = [
+    const baseChecklist: OffboardingChecklistItem[] = [
       {
         id: `CHK-${Date.now()}-1`,
-        category: "hr" as const,
+        category: "hr",
         task: "Exit Interview",
         description: "Conduct comprehensive exit interview",
         assignedTo: "HR Manager",
@@ -286,58 +280,78 @@ export default function OffboardingPage() {
       },
       {
         id: `CHK-${Date.now()}-2`,
-        category: "it" as const,
-        task: "Return IT Assets",
-        description: "Return laptop, phone, and other IT equipment",
+        category: "hr",
+        task: "Final Settlement Calculation",
+        description: "Calculate final pay, benefits, and deductions",
+        assignedTo: "HR Manager",
+        completed: false,
+        required: true,
+        ghanaLabourActCompliance: "Section 21 - Payment of Benefits",
+      },
+      {
+        id: `CHK-${Date.now()}-3`,
+        category: "it",
+        task: "Return IT Equipment",
+        description: "Return laptop, phone, and other IT assets",
         assignedTo: "IT Department",
         completed: false,
         required: true,
       },
       {
-        id: `CHK-${Date.now()}-3`,
-        category: "finance" as const,
-        task: "Final Settlement",
-        description: "Calculate final pay, benefits, and deductions",
+        id: `CHK-${Date.now()}-4`,
+        category: "it",
+        task: "Disable System Access",
+        description: "Revoke all system and application access",
+        assignedTo: "IT Department",
+        completed: false,
+        required: true,
+      },
+      {
+        id: `CHK-${Date.now()}-5`,
+        category: "finance",
+        task: "Process Final Payment",
+        description: "Process final salary and benefit payments",
         assignedTo: "Finance Team",
         completed: false,
         required: true,
         ghanaLabourActCompliance: "Section 21 - Payment of Benefits",
       },
       {
-        id: `CHK-${Date.now()}-4`,
-        category: "facilities" as const,
-        task: "Return Access Cards",
-        description: "Return ID card, access cards, and keys",
+        id: `CHK-${Date.now()}-6`,
+        category: "facilities",
+        task: "Return Office Keys",
+        description: "Return office keys and access cards",
         assignedTo: "Facilities Team",
         completed: false,
         required: true,
       },
       {
-        id: `CHK-${Date.now()}-5`,
-        category: "security" as const,
-        task: "Revoke Access",
-        description: "Disable system access and security clearances",
+        id: `CHK-${Date.now()}-7`,
+        category: "security",
+        task: "Security Clearance",
+        description: "Complete security clearance procedures",
         assignedTo: "Security Team",
         completed: false,
         required: true,
       },
       {
-        id: `CHK-${Date.now()}-6`,
-        category: "handover" as const,
+        id: `CHK-${Date.now()}-8`,
+        category: "handover",
         task: "Knowledge Transfer",
-        description: "Complete handover of responsibilities and projects",
+        description: "Complete handover of responsibilities",
         assignedTo: "Direct Manager",
         completed: false,
         required: true,
       },
     ]
 
+    // Add specific items based on resignation type
     if (resignationType === "involuntary") {
       baseChecklist.push({
-        id: `CHK-${Date.now()}-7`,
-        category: "hr" as const,
-        task: "Documentation Review",
-        description: "Review disciplinary records and termination documentation",
+        id: `CHK-${Date.now()}-9`,
+        category: "hr",
+        task: "Performance Documentation",
+        description: "Compile performance improvement records",
         assignedTo: "HR Manager",
         completed: false,
         required: true,
@@ -347,6 +361,15 @@ export default function OffboardingPage() {
 
     return baseChecklist
   }
+
+  const filteredCases = offboardingCases.filter((offboardingCase) => {
+    const matchesSearch =
+      offboardingCase.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      offboardingCase.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      offboardingCase.department.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = selectedStatus === "all" || offboardingCase.status === selectedStatus
+    return matchesSearch && matchesStatus
+  })
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -359,48 +382,26 @@ export default function OffboardingPage() {
       case "completed":
         return "bg-green-100 text-green-800"
       case "cancelled":
-        return "bg-gray-100 text-gray-800"
+        return "bg-red-100 text-red-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "initiated":
-        return <AlertCircle className="w-4 h-4" />
-      case "in_progress":
-        return <Clock className="w-4 h-4" />
-      case "pending_clearance":
-        return <FileText className="w-4 h-4" />
-      case "completed":
-        return <CheckCircle className="w-4 h-4" />
-      case "cancelled":
-        return <XCircle className="w-4 h-4" />
+  const getResignationTypeColor = (type: string) => {
+    switch (type) {
+      case "voluntary":
+        return "bg-green-100 text-green-800"
+      case "involuntary":
+        return "bg-red-100 text-red-800"
+      case "retirement":
+        return "bg-purple-100 text-purple-800"
+      case "contract_end":
+        return "bg-blue-100 text-blue-800"
       default:
-        return <Clock className="w-4 h-4" />
+        return "bg-gray-100 text-gray-800"
     }
   }
-
-  const filteredCases = offboardingCases.filter((case_) => {
-    const matchesSearch =
-      case_.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      case_.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      case_.department.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = selectedStatus === "all" || case_.status === selectedStatus
-    return matchesSearch && matchesStatus
-  })
-
-  const getOffboardingStats = () => {
-    const total = offboardingCases.length
-    const initiated = offboardingCases.filter((c) => c.status === "initiated").length
-    const inProgress = offboardingCases.filter((c) => c.status === "in_progress").length
-    const completed = offboardingCases.filter((c) => c.status === "completed").length
-    const pendingClearance = offboardingCases.filter((c) => c.status === "pending_clearance").length
-    return { total, initiated, inProgress, completed, pendingClearance }
-  }
-
-  const stats = getOffboardingStats()
 
   return (
     <div className="space-y-6">
@@ -408,7 +409,7 @@ export default function OffboardingPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Employee Offboarding</h1>
-          <p className="text-gray-600">Manage employee departures, exit processes, and final settlements</p>
+          <p className="text-gray-600">Manage employee departures and exit processes</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={isExitInterviewDialogOpen} onOpenChange={setIsExitInterviewDialogOpen}>
@@ -418,7 +419,7 @@ export default function OffboardingPage() {
                 Exit Interview
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Conduct Exit Interview</DialogTitle>
               </DialogHeader>
@@ -427,14 +428,19 @@ export default function OffboardingPage() {
           </Dialog>
           <Dialog open={isNewOffboardingDialogOpen} onOpenChange={setIsNewOffboardingDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button
+                className="text-white hover:opacity-90"
+                style={{
+                  backgroundColor: "var(--theme-primary-600)",
+                }}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Start Offboarding
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Initiate Employee Offboarding</DialogTitle>
+                <DialogTitle>Start Employee Offboarding</DialogTitle>
               </DialogHeader>
               <NewOffboardingForm
                 onSubmit={handleNewOffboarding}
@@ -445,207 +451,58 @@ export default function OffboardingPage() {
         </div>
       </div>
 
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-gray-900">{offboardingCases.length}</div>
+            <p className="text-sm text-gray-600">Total Cases</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-blue-600">
+              {offboardingCases.filter((c) => c.status === "initiated").length}
+            </div>
+            <p className="text-sm text-gray-600">Initiated</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-yellow-600">
+              {offboardingCases.filter((c) => c.status === "in_progress").length}
+            </div>
+            <p className="text-sm text-gray-600">In Progress</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-orange-600">
+              {offboardingCases.filter((c) => c.status === "pending_clearance").length}
+            </div>
+            <p className="text-sm text-gray-600">Pending Clearance</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-green-600">
+              {offboardingCases.filter((c) => c.status === "completed").length}
+            </div>
+            <p className="text-sm text-gray-600">Completed</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="cases">Offboarding Cases</TabsTrigger>
+          <TabsTrigger value="cases">Active Cases</TabsTrigger>
           <TabsTrigger value="interviews">Exit Interviews</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics & Reports</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Cases</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-                  </div>
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <FileText className="w-4 h-4 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Initiated</p>
-                    <p className="text-2xl font-bold text-blue-600">{stats.initiated}</p>
-                  </div>
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <AlertCircle className="w-4 h-4 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">In Progress</p>
-                    <p className="text-2xl font-bold text-yellow-600">{stats.inProgress}</p>
-                  </div>
-                  <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                    <Clock className="w-4 h-4 text-yellow-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Pending Clearance</p>
-                    <p className="text-2xl font-bold text-orange-600">{stats.pendingClearance}</p>
-                  </div>
-                  <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <FileText className="w-4 h-4 text-orange-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Completed</p>
-                    <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
-                  </div>
-                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Ghana Labour Act Compliance */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5 text-green-600" />
-                  <span>Ghana Labour Act Compliance</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Section 20 - Notice of Termination</h4>
-                  <p className="text-sm text-gray-600 mb-2">Proper notice periods and termination procedures</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Compliance Rate</span>
-                    <Badge className="bg-green-100 text-green-800">100%</Badge>
-                  </div>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Section 21 - Payment of Benefits</h4>
-                  <p className="text-sm text-gray-600 mb-2">Final settlement and benefit calculations</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Settlement Compliance</span>
-                    <Badge className="bg-green-100 text-green-800">100%</Badge>
-                  </div>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Section 62 - Termination Grounds</h4>
-                  <p className="text-sm text-gray-600 mb-2">Valid reasons and documentation for termination</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Documentation Complete</span>
-                    <Badge className="bg-green-100 text-green-800">100%</Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <BarChart3 className="w-5 h-5 text-blue-600" />
-                  <span>Offboarding Analytics</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {offboardingCases.filter((c) => c.resignationType === "voluntary").length}
-                    </div>
-                    <p className="text-sm text-blue-700">Voluntary</p>
-                  </div>
-                  <div className="text-center p-3 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">
-                      {offboardingCases.filter((c) => c.resignationType === "involuntary").length}
-                    </div>
-                    <p className="text-sm text-red-700">Involuntary</p>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">
-                      {offboardingCases.filter((c) => c.exitInterviewCompleted).length}
-                    </div>
-                    <p className="text-sm text-green-700">Exit Interviews</p>
-                  </div>
-                  <div className="text-center p-3 bg-purple-50 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {exitInterviews.reduce((sum, interview) => sum + interview.overallRating, 0) /
-                        exitInterviews.length || 0}
-                    </div>
-                    <p className="text-sm text-purple-700">Avg Rating</p>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full bg-transparent">
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Offboarding Report
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Recent Offboarding Activities */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Offboarding Activities</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {offboardingCases.slice(0, 5).map((case_) => (
-                  <div key={case_.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Avatar className="w-10 h-10">
-                        <AvatarImage src={case_.employeeAvatar || "/placeholder.svg"} />
-                        <AvatarFallback>
-                          {case_.employeeName
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-sm">{case_.employeeName}</p>
-                        <p className="text-xs text-gray-600">
-                          {case_.department} • Last working day: {case_.lastWorkingDay.toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge className={getStatusColor(case_.status)}>
-                        {case_.status.replace("_", " ").toUpperCase()}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {case_.id}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="cases" className="space-y-6">
-          {/* Filters */}
+          {/* Search and Filters */}
           <Card>
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row gap-4">
@@ -660,6 +517,7 @@ export default function OffboardingPage() {
                 </div>
                 <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                   <SelectTrigger className="w-full md:w-48">
+                    <Filter className="w-4 h-4 mr-2" />
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -682,20 +540,20 @@ export default function OffboardingPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {filteredCases.map((case_) => (
+                {filteredCases.map((offboardingCase) => (
                   <div
-                    key={case_.id}
+                    key={offboardingCase.id}
                     className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
                     onClick={() => {
-                      setSelectedCase(case_)
+                      setSelectedCase(offboardingCase)
                       setIsCaseDetailOpen(true)
                     }}
                   >
                     <div className="flex items-center space-x-4">
                       <Avatar className="w-12 h-12">
-                        <AvatarImage src={case_.employeeAvatar || "/placeholder.svg"} />
+                        <AvatarImage src={offboardingCase.employeeAvatar || "/placeholder.svg"} />
                         <AvatarFallback>
-                          {case_.employeeName
+                          {offboardingCase.employeeName
                             .split(" ")
                             .map((n) => n[0])
                             .join("")}
@@ -703,68 +561,39 @@ export default function OffboardingPage() {
                       </Avatar>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-gray-900">{case_.employeeName}</h3>
+                          <h3 className="font-semibold text-gray-900">{offboardingCase.employeeName}</h3>
                           <Badge variant="outline" className="text-xs">
-                            {case_.id}
+                            {offboardingCase.id}
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-600">
-                          {case_.position} • {case_.department}
-                        </p>
+                        <p className="text-sm text-gray-600">{offboardingCase.position}</p>
                         <div className="flex items-center space-x-4 mt-1">
                           <div className="flex items-center text-xs text-gray-500">
-                            <Calendar className="w-3 h-3 mr-1" />
-                            Last day: {case_.lastWorkingDay.toLocaleDateString()}
+                            <Building className="w-3 h-3 mr-1" />
+                            {offboardingCase.department}
                           </div>
                           <div className="flex items-center text-xs text-gray-500">
-                            <User className="w-3 h-3 mr-1" />
-                            {case_.resignationType.replace("_", " ")}
+                            <Calendar className="w-3 h-3 mr-1" />
+                            Last Day: {offboardingCase.lastWorkingDay.toLocaleDateString()}
                           </div>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
-                        <div className="flex items-center space-x-2 mb-1">
-                          {case_.exitInterviewCompleted && (
-                            <Badge className="bg-green-100 text-green-800 text-xs">Interview Done</Badge>
-                          )}
-                          {case_.finalSettlementCalculated && (
-                            <Badge className="bg-blue-100 text-blue-800 text-xs">Settlement Ready</Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          {case_.checklist.filter((item) => item.completed).length}/{case_.checklist.length} tasks
-                        </p>
+                        <Badge className={getResignationTypeColor(offboardingCase.resignationType)}>
+                          {offboardingCase.resignationType.replace("_", " ").toUpperCase()}
+                        </Badge>
+                        <p className="text-sm text-gray-600 mt-1">{offboardingCase.reason}</p>
                       </div>
-                      <Badge className={getStatusColor(case_.status)}>
-                        {case_.status.replace("_", " ").toUpperCase()}
+                      <Badge className={getStatusColor(offboardingCase.status)}>
+                        {offboardingCase.status.replace("_", " ").toUpperCase()}
                       </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Update Status
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <MessageSquare className="w-4 h-4 mr-2" />
-                            Exit Interview
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Calculator className="w-4 h-4 mr-2" />
-                            Final Settlement
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center space-x-2">
+                        {offboardingCase.exitInterviewCompleted && <CheckCircle className="w-4 h-4 text-green-600" />}
+                        {offboardingCase.handoverCompleted && <Briefcase className="w-4 h-4 text-blue-600" />}
+                        {offboardingCase.assetsReturned && <Laptop className="w-4 h-4 text-purple-600" />}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -773,78 +602,179 @@ export default function OffboardingPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="interviews" className="space-y-6">
-          {/* Exit Interviews List */}
+        <TabsContent value="cases" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Exit Interviews ({exitInterviews.length})</CardTitle>
+              <CardTitle>Active Offboarding Cases</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {offboardingCases
+                  .filter((c) => c.status !== "completed" && c.status !== "cancelled")
+                  .map((offboardingCase) => (
+                    <div key={offboardingCase.id} className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="font-semibold">{offboardingCase.employeeName}</h3>
+                          <p className="text-sm text-gray-600">
+                            {offboardingCase.position} - {offboardingCase.department}
+                          </p>
+                        </div>
+                        <Badge className={getStatusColor(offboardingCase.status)}>
+                          {offboardingCase.status.replace("_", " ").toUpperCase()}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div className="text-center">
+                          <div
+                            className={`w-8 h-8 rounded-full mx-auto mb-1 flex items-center justify-center ${
+                              offboardingCase.exitInterviewCompleted
+                                ? "bg-green-100 text-green-600"
+                                : "bg-gray-100 text-gray-400"
+                            }`}
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </div>
+                          <p className="text-xs">Exit Interview</p>
+                        </div>
+                        <div className="text-center">
+                          <div
+                            className={`w-8 h-8 rounded-full mx-auto mb-1 flex items-center justify-center ${
+                              offboardingCase.handoverCompleted
+                                ? "bg-green-100 text-green-600"
+                                : "bg-gray-100 text-gray-400"
+                            }`}
+                          >
+                            <Briefcase className="w-4 h-4" />
+                          </div>
+                          <p className="text-xs">Handover</p>
+                        </div>
+                        <div className="text-center">
+                          <div
+                            className={`w-8 h-8 rounded-full mx-auto mb-1 flex items-center justify-center ${
+                              offboardingCase.assetsReturned
+                                ? "bg-green-100 text-green-600"
+                                : "bg-gray-100 text-gray-400"
+                            }`}
+                          >
+                            <Laptop className="w-4 h-4" />
+                          </div>
+                          <p className="text-xs">Assets</p>
+                        </div>
+                        <div className="text-center">
+                          <div
+                            className={`w-8 h-8 rounded-full mx-auto mb-1 flex items-center justify-center ${
+                              offboardingCase.finalSettlementCalculated
+                                ? "bg-green-100 text-green-600"
+                                : "bg-gray-100 text-gray-400"
+                            }`}
+                          >
+                            <Calculator className="w-4 h-4" />
+                          </div>
+                          <p className="text-xs">Settlement</p>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <div className="text-sm text-gray-600">
+                          Last Working Day: {offboardingCase.lastWorkingDay.toLocaleDateString()}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCase(offboardingCase)
+                            setIsCaseDetailOpen(true)
+                          }}
+                        >
+                          View Details
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="interviews" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Exit Interviews</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {exitInterviews.map((interview) => (
-                  <div key={interview.id} className="p-4 border border-gray-200 rounded-lg">
+                  <div key={interview.id} className="p-4 border rounded-lg">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h3 className="font-semibold text-gray-900">{interview.employeeName}</h3>
+                        <h3 className="font-semibold">{interview.employeeName}</h3>
                         <p className="text-sm text-gray-600">
-                          Interview Date: {interview.interviewDate.toLocaleDateString()} • Interviewer:{" "}
-                          {interview.interviewer}
+                          Interviewed by {interview.interviewer} on {interview.interviewDate.toLocaleDateString()}
                         </p>
                       </div>
                       <div className="text-right">
-                        <div className="flex items-center space-x-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <div
-                              key={star}
-                              className={`w-4 h-4 ${
-                                star <= interview.overallRating ? "text-yellow-400" : "text-gray-300"
-                              }`}
-                            >
-                              ★
-                            </div>
-                          ))}
-                        </div>
-                        <p className="text-sm text-gray-600">Overall Rating</p>
+                        <div className="text-2xl font-bold text-emerald-600">{interview.overallRating}/5</div>
+                        <p className="text-xs text-gray-500">Overall Rating</p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-                      <div className="text-center p-2 bg-gray-50 rounded">
+
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                      <div className="text-center">
                         <div className="text-lg font-semibold">{interview.jobSatisfaction}/5</div>
                         <p className="text-xs text-gray-600">Job Satisfaction</p>
                       </div>
-                      <div className="text-center p-2 bg-gray-50 rounded">
+                      <div className="text-center">
                         <div className="text-lg font-semibold">{interview.managementRating}/5</div>
                         <p className="text-xs text-gray-600">Management</p>
                       </div>
-                      <div className="text-center p-2 bg-gray-50 rounded">
+                      <div className="text-center">
+                        <div className="text-lg font-semibold">{interview.workEnvironmentRating}/5</div>
+                        <p className="text-xs text-gray-600">Environment</p>
+                      </div>
+                      <div className="text-center">
                         <div className="text-lg font-semibold">{interview.compensationRating}/5</div>
                         <p className="text-xs text-gray-600">Compensation</p>
                       </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold">{interview.careerDevelopmentRating}/5</div>
+                        <p className="text-xs text-gray-600">Career Dev</p>
+                      </div>
                     </div>
+
                     <div className="space-y-2">
                       <div>
                         <p className="text-sm font-medium text-gray-700">Reason for Leaving:</p>
                         <p className="text-sm text-gray-600">{interview.reasonForLeaving}</p>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Feedback:</p>
-                        <p className="text-sm text-gray-600">{interview.feedback}</p>
-                      </div>
-                      <div className="flex items-center space-x-4 pt-2">
-                        <Badge
-                          className={
-                            interview.wouldRecommendCompany ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                          }
+                      {interview.improvements && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Suggestions:</p>
+                          <p className="text-sm text-gray-600">{interview.improvements}</p>
+                        </div>
+                      )}
+                      <div className="flex items-center space-x-4 text-sm">
+                        <div
+                          className={`flex items-center ${interview.wouldRecommendCompany ? "text-green-600" : "text-red-600"}`}
                         >
-                          {interview.wouldRecommendCompany ? "Would Recommend" : "Would Not Recommend"}
-                        </Badge>
-                        <Badge
-                          className={
-                            interview.rehireEligible ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"
-                          }
+                          {interview.wouldRecommendCompany ? (
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                          ) : (
+                            <XCircle className="w-4 h-4 mr-1" />
+                          )}
+                          Would Recommend
+                        </div>
+                        <div
+                          className={`flex items-center ${interview.rehireEligible ? "text-green-600" : "text-red-600"}`}
                         >
-                          {interview.rehireEligible ? "Rehire Eligible" : "Not Eligible for Rehire"}
-                        </Badge>
+                          {interview.rehireEligible ? (
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                          ) : (
+                            <XCircle className="w-4 h-4 mr-1" />
+                          )}
+                          Rehire Eligible
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -855,49 +785,39 @@ export default function OffboardingPage() {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
-          {/* Analytics Dashboard */}
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Turnover Analysis</CardTitle>
+                <CardTitle>Resignation Reasons</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {(
-                        (offboardingCases.filter((c) => c.resignationType === "voluntary").length /
-                          offboardingCases.length) *
-                        100
-                      ).toFixed(1)}
-                      %
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Career advancement</span>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-24 bg-gray-200 rounded-full h-2">
+                        <div className="bg-emerald-600 h-2 rounded-full" style={{ width: "60%" }}></div>
+                      </div>
+                      <span className="text-sm text-gray-600">60%</span>
                     </div>
-                    <p className="text-sm text-blue-700">Voluntary Turnover</p>
                   </div>
-                  <div className="text-center p-4 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">
-                      {(
-                        (offboardingCases.filter((c) => c.resignationType === "involuntary").length /
-                          offboardingCases.length) *
-                        100
-                      ).toFixed(1)}
-                      %
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Better compensation</span>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-24 bg-gray-200 rounded-full h-2">
+                        <div className="bg-blue-600 h-2 rounded-full" style={{ width: "25%" }}></div>
+                      </div>
+                      <span className="text-sm text-gray-600">25%</span>
                     </div>
-                    <p className="text-sm text-red-700">Involuntary Turnover</p>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Technology</span>
-                    <span>{offboardingCases.filter((c) => c.department === "Technology").length}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Sales</span>
-                    <span>{offboardingCases.filter((c) => c.department === "Sales").length}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>HR</span>
-                    <span>{offboardingCases.filter((c) => c.department === "Human Resources").length}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Work-life balance</span>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-24 bg-gray-200 rounded-full h-2">
+                        <div className="bg-purple-600 h-2 rounded-full" style={{ width: "15%" }}></div>
+                      </div>
+                      <span className="text-sm text-gray-600">15%</span>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -905,73 +825,572 @@ export default function OffboardingPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Exit Interview Insights</CardTitle>
+                <CardTitle>Average Ratings</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">
-                      {(exitInterviews.reduce((sum, i) => sum + i.overallRating, 0) / exitInterviews.length).toFixed(1)}
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Overall Experience</span>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex space-x-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`w-4 h-4 ${star <= 4 ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600">4.0</span>
                     </div>
-                    <p className="text-sm text-green-700">Avg Overall Rating</p>
                   </div>
-                  <div className="text-center p-4 bg-purple-50 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {(
-                        (exitInterviews.filter((i) => i.wouldRecommendCompany).length / exitInterviews.length) *
-                        100
-                      ).toFixed(0)}
-                      %
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Management Quality</span>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex space-x-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`w-4 h-4 ${star <= 5 ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600">5.0</span>
                     </div>
-                    <p className="text-sm text-purple-700">Would Recommend</p>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Job Satisfaction</span>
-                    <span>
-                      {(exitInterviews.reduce((sum, i) => sum + i.jobSatisfaction, 0) / exitInterviews.length).toFixed(
-                        1,
-                      )}
-                      /5
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Management Rating</span>
-                    <span>
-                      {(exitInterviews.reduce((sum, i) => sum + i.managementRating, 0) / exitInterviews.length).toFixed(
-                        1,
-                      )}
-                      /5
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Work Environment</span>
-                    <span>
-                      {(
-                        exitInterviews.reduce((sum, i) => sum + i.workEnvironmentRating, 0) / exitInterviews.length
-                      ).toFixed(1)}
-                      /5
-                    </span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Work Environment</span>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex space-x-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`w-4 h-4 ${star <= 4 ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600">4.0</span>
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
-      </Tabs>
 
-      {/* Case Detail Dialog */}
-      <Dialog open={isCaseDetailOpen} onOpenChange={setIsCaseDetailOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Offboarding Details - {selectedCase?.id}</DialogTitle>
-          </DialogHeader>
-          {selectedCase && <OffboardingDetailView case={selectedCase} />}
-        </DialogContent>
-      </Dialog>
+        <TabsContent value="documents" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Offboarding Documents</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {selectedCase?.documents?.length > 0 ? (
+                  selectedCase.documents.map((doc, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 border rounded">
+                      <div className="flex items-center">
+                        <FileText className="w-4 h-4 mr-2" />
+                        <span>{doc}</span>
+                      </div>
+                      <Button variant="ghost" size="sm">
+                        <Download className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-center py-4">No documents uploaded</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="settlement" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Final Settlement Calculation</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {selectedCase?.finalSettlementCalculated ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="font-medium text-green-600 mb-2">Payments Due</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Outstanding Salary:</span>
+                          <span>GHS 8,500</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Accrued Leave:</span>
+                          <span>GHS 3,200</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Bonus/Allowances:</span>
+                          <span>GHS 1,800</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Notice Pay:</span>
+                          <span>GHS 2,500</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-red-600 mb-2">Deductions</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Outstanding Loans:</span>
+                          <span>GHS 1,000</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Equipment Damage:</span>
+                          <span>GHS 0</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Other Deductions:</span>
+                          <span>GHS 0</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border-t pt-4">
+                    <div className="flex justify-between items-center text-lg font-semibold">
+                      <span>Net Final Settlement:</span>
+                      <span className="text-emerald-600">
+                        GHS {selectedCase.finalSettlementAmount?.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Calculator className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-600">Final settlement calculation pending</p>
+                  <Button className="mt-4">Calculate Settlement</Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="checklist" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Offboarding Checklist</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {selectedCase?.checklist?.map((item) => (
+                  <div key={item.id} className="flex items-start space-x-3 p-3 border rounded-lg">
+                    <Checkbox
+                      checked={item.completed}
+                      onCheckedChange={(checked) => handleChecklistUpdate(item.id, !!checked)}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <Badge className={getCategoryColor(item.category)} variant="outline">
+                          {getCategoryIcon(item.category)}
+                          <span className="ml-1 capitalize">{item.category}</span>
+                        </Badge>
+                        {item.required && (
+                          <Badge variant="destructive" className="text-xs">
+                            Required
+                          </Badge>
+                        )}
+                      </div>
+                      <h4 className="font-medium">{item.task}</h4>
+                      <p className="text-sm text-gray-600">{item.description}</p>
+                      <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                        <span>Assigned to: {item.assignedTo}</span>
+                        {item.completed && item.completedDate && (
+                          <span>Completed: {item.completedDate.toLocaleDateString()}</span>
+                        )}
+                      </div>
+                      {item.ghanaLabourActCompliance && (
+                        <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-800">
+                          <strong>Ghana Labour Act Compliance:</strong> {item.ghanaLabourActCompliance}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
+
+  function OffboardingDetailView({ case: selectedCase, onClose }: { case: OffboardingCase; onClose: () => void }) {
+    const [checklist, setChecklist] = useState(selectedCase.checklist)
+
+    const handleChecklistUpdate = (itemId: string, completed: boolean) => {
+      setChecklist((prev) =>
+        prev.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                completed,
+                completedDate: completed ? new Date() : undefined,
+                completedBy: completed ? "Current User" : undefined,
+              }
+            : item,
+        ),
+      )
+    }
+
+    const getCategoryIcon = (category: string) => {
+      switch (category) {
+        case "hr":
+          return <Users className="w-4 h-4" />
+        case "finance":
+          return <Calculator className="w-4 h-4" />
+        case "it":
+          return <Laptop className="w-4 h-4" />
+        case "facilities":
+          return <Building className="w-4 h-4" />
+        case "security":
+          return <Shield className="w-4 h-4" />
+        case "handover":
+          return <Briefcase className="w-4 h-4" />
+        default:
+          return <FileText className="w-4 h-4" />
+      }
+    }
+
+    const getCategoryColor = (category: string) => {
+      switch (category) {
+        case "hr":
+          return "bg-blue-100 text-blue-800"
+        case "finance":
+          return "bg-green-100 text-green-800"
+        case "it":
+          return "bg-purple-100 text-purple-800"
+        case "facilities":
+          return "bg-orange-100 text-orange-800"
+        case "security":
+          return "bg-red-100 text-red-800"
+        case "handover":
+          return "bg-yellow-100 text-yellow-800"
+        default:
+          return "bg-gray-100 text-gray-800"
+      }
+    }
+
+    return (
+      <Dialog open={!!selectedCase} onOpenChange={() => onClose()}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {selectedCase && (
+            <div className="space-y-6">
+              <div className="flex items-center space-x-4">
+                <Avatar className="w-16 h-16">
+                  <AvatarImage src={selectedCase.employeeAvatar || "/placeholder.svg"} />
+                  <AvatarFallback className="text-lg">
+                    {selectedCase.employeeName
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h2 className="text-2xl font-bold">{selectedCase.employeeName}</h2>
+                  <p className="text-gray-600">
+                    {selectedCase.position} - {selectedCase.department}
+                  </p>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <Badge variant="outline">{selectedCase.id}</Badge>
+                    <Badge className={getCategoryColor(selectedCase.resignationType)}>
+                      {selectedCase.resignationType.replace("_", " ").toUpperCase()}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              <Tabs defaultValue="overview" className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="checklist">Checklist</TabsTrigger>
+                  <TabsTrigger value="settlement">Settlement</TabsTrigger>
+                  <TabsTrigger value="documents">Documents</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="overview" className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Offboarding Information</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Resignation Date:</span>
+                          <span>{selectedCase.resignationDate.toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Last Working Day:</span>
+                          <span>{selectedCase.lastWorkingDay.toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Reason:</span>
+                          <span className="text-right">{selectedCase.reason}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Status:</span>
+                          <Badge className={getCategoryColor(selectedCase.status)}>
+                            {selectedCase.status.replace("_", " ").toUpperCase()}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Created By:</span>
+                          <span>{selectedCase.createdBy}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Progress Status</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <MessageSquare className="w-4 h-4" />
+                            <span className="text-sm">Exit Interview</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {selectedCase.exitInterviewCompleted ? (
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <XCircle className="w-4 h-4 text-red-600" />
+                            )}
+                            <span className="text-sm">
+                              {selectedCase.exitInterviewCompleted ? "Completed" : "Pending"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Briefcase className="w-4 h-4" />
+                            <span className="text-sm">Handover</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {selectedCase.handoverCompleted ? (
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <XCircle className="w-4 h-4 text-red-600" />
+                            )}
+                            <span className="text-sm">{selectedCase.handoverCompleted ? "Completed" : "Pending"}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Laptop className="w-4 h-4" />
+                            <span className="text-sm">Assets Returned</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {selectedCase.assetsReturned ? (
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <XCircle className="w-4 h-4 text-red-600" />
+                            )}
+                            <span className="text-sm">{selectedCase.assetsReturned ? "Returned" : "Pending"}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Calculator className="w-4 h-4" />
+                            <span className="text-sm">Final Settlement</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {selectedCase.finalSettlementCalculated ? (
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <XCircle className="w-4 h-4 text-red-600" />
+                            )}
+                            <span className="text-sm">
+                              {selectedCase.finalSettlementCalculated ? "Calculated" : "Pending"}
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Department Clearance Status</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        {Object.entries(selectedCase.clearanceStatus).map(([dept, cleared]) => (
+                          <div key={dept} className="text-center">
+                            <div
+                              className={`w-12 h-12 rounded-full mx-auto mb-2 flex items-center justify-center ${
+                                cleared ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
+                              }`}
+                            >
+                              {getCategoryIcon(dept)}
+                            </div>
+                            <p className="text-sm font-medium capitalize">{dept}</p>
+                            <p className="text-xs text-gray-500">{cleared ? "Cleared" : "Pending"}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="checklist" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Offboarding Checklist</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {checklist.map((item) => (
+                          <div key={item.id} className="flex items-start space-x-3 p-3 border rounded-lg">
+                            <Checkbox
+                              checked={item.completed}
+                              onCheckedChange={(checked) => handleChecklistUpdate(item.id, !!checked)}
+                              className="mt-1"
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <Badge className={getCategoryColor(item.category)} variant="outline">
+                                  {getCategoryIcon(item.category)}
+                                  <span className="ml-1 capitalize">{item.category}</span>
+                                </Badge>
+                                {item.required && (
+                                  <Badge variant="destructive" className="text-xs">
+                                    Required
+                                  </Badge>
+                                )}
+                              </div>
+                              <h4 className="font-medium">{item.task}</h4>
+                              <p className="text-sm text-gray-600">{item.description}</p>
+                              <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                                <span>Assigned to: {item.assignedTo}</span>
+                                {item.completed && item.completedDate && (
+                                  <span>Completed: {item.completedDate.toLocaleDateString()}</span>
+                                )}
+                              </div>
+                              {item.ghanaLabourActCompliance && (
+                                <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-800">
+                                  <strong>Ghana Labour Act Compliance:</strong> {item.ghanaLabourActCompliance}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="settlement" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Final Settlement Calculation</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {selectedCase.finalSettlementCalculated ? (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <h4 className="font-medium text-green-600 mb-2">Payments Due</h4>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                  <span>Outstanding Salary:</span>
+                                  <span>GHS 8,500</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Accrued Leave:</span>
+                                  <span>GHS 3,200</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Bonus/Allowances:</span>
+                                  <span>GHS 1,800</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Notice Pay:</span>
+                                  <span>GHS 2,500</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="font-medium text-red-600 mb-2">Deductions</h4>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                  <span>Outstanding Loans:</span>
+                                  <span>GHS 1,000</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Equipment Damage:</span>
+                                  <span>GHS 0</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Other Deductions:</span>
+                                  <span>GHS 0</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="border-t pt-4">
+                            <div className="flex justify-between items-center text-lg font-semibold">
+                              <span>Net Final Settlement:</span>
+                              <span className="text-emerald-600">
+                                GHS {selectedCase.finalSettlementAmount?.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Calculator className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                          <p className="text-gray-600">Final settlement calculation pending</p>
+                          <Button className="mt-4">Calculate Settlement</Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="documents" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Offboarding Documents</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {selectedCase.documents.length > 0 ? (
+                          selectedCase.documents.map((doc, index) => (
+                            <div key={index} className="flex items-center justify-between p-2 border rounded">
+                              <div className="flex items-center">
+                                <FileText className="w-4 h-4 mr-2" />
+                                <span>{doc}</span>
+                              </div>
+                              <Button variant="ghost" size="sm">
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-gray-500 text-center py-4">No documents uploaded</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    )
+  }
 }
 
 function NewOffboardingForm({ onSubmit, onClose }: { onSubmit: (data: any) => void; onClose: () => void }) {
@@ -1229,414 +1648,4 @@ function ExitInterviewForm({ onClose }: { onClose: () => void }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1">1 - Very Poor</SelectItem>
-                <SelectItem value="2">2 - Poor</SelectItem>
-                <SelectItem value="3">3 - Average</SelectItem>
-                <SelectItem value="4">4 - Good</SelectItem>
-                <SelectItem value="5">5 - Excellent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Compensation & Benefits</Label>
-            <Select
-              value={formData.compensationRating.toString()}
-              onValueChange={(value) =>
-                setFormData((prev) => ({ ...prev, compensationRating: Number.parseInt(value) }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1 - Very Poor</SelectItem>
-                <SelectItem value="2">2 - Poor</SelectItem>
-                <SelectItem value="3">3 - Average</SelectItem>
-                <SelectItem value="4">4 - Good</SelectItem>
-                <SelectItem value="5">5 - Excellent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Career Development</Label>
-            <Select
-              value={formData.careerDevelopmentRating.toString()}
-              onValueChange={(value) =>
-                setFormData((prev) => ({ ...prev, careerDevelopmentRating: Number.parseInt(value) }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1 - Very Poor</SelectItem>
-                <SelectItem value="2">2 - Poor</SelectItem>
-                <SelectItem value="3">3 - Average</SelectItem>
-                <SelectItem value="4">4 - Good</SelectItem>
-                <SelectItem value="5">5 - Excellent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label>Primary Reason for Leaving *</Label>
-          <Textarea
-            value={formData.reasonForLeaving}
-            onChange={(e) => setFormData((prev) => ({ ...prev, reasonForLeaving: e.target.value }))}
-            placeholder="What is the main reason you are leaving?"
-            rows={3}
-            required
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Suggestions for Improvement</Label>
-          <Textarea
-            value={formData.improvements}
-            onChange={(e) => setFormData((prev) => ({ ...prev, improvements: e.target.value }))}
-            placeholder="What could the company do better?"
-            rows={3}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Additional Feedback</Label>
-          <Textarea
-            value={formData.feedback}
-            onChange={(e) => setFormData((prev) => ({ ...prev, feedback: e.target.value }))}
-            placeholder="Any other comments or feedback?"
-            rows={3}
-          />
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="recommend"
-            checked={formData.wouldRecommendCompany}
-            onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, wouldRecommendCompany: !!checked }))}
-          />
-          <Label htmlFor="recommend">Would recommend this company to others</Label>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="rehire"
-            checked={formData.rehireEligible}
-            onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, rehireEligible: !!checked }))}
-          />
-          <Label htmlFor="rehire">Eligible for rehire</Label>
-        </div>
-      </div>
-
-      <div className="flex justify-end space-x-2">
-        <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button type="submit">Complete Exit Interview</Button>
-      </div>
-    </form>
-  )
-}
-
-function OffboardingDetailView({ case: selectedCase }: { case: OffboardingCase }) {
-  const [checklist, setChecklist] = useState(selectedCase.checklist)
-
-  const handleChecklistUpdate = (itemId: string, completed: boolean) => {
-    setChecklist((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              completed,
-              completedDate: completed ? new Date() : undefined,
-              completedBy: completed ? "Current User" : undefined,
-            }
-          : item,
-      ),
-    )
-  }
-
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case "hr":
-        return <Users className="w-4 h-4" />
-      case "finance":
-        return <Calculator className="w-4 h-4" />
-      case "it":
-        return <Laptop className="w-4 h-4" />
-      case "facilities":
-        return <Building className="w-4 h-4" />
-      case "security":
-        return <Shield className="w-4 h-4" />
-      case "handover":
-        return <Briefcase className="w-4 h-4" />
-      default:
-        return <FileText className="w-4 h-4" />
-    }
-  }
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case "hr":
-        return "bg-blue-100 text-blue-800"
-      case "finance":
-        return "bg-green-100 text-green-800"
-      case "it":
-        return "bg-purple-100 text-purple-800"
-      case "facilities":
-        return "bg-orange-100 text-orange-800"
-      case "security":
-        return "bg-red-100 text-red-800"
-      case "handover":
-        return "bg-yellow-100 text-yellow-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Case Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Avatar className="w-16 h-16">
-            <AvatarImage src={selectedCase.employeeAvatar || "/placeholder.svg"} />
-            <AvatarFallback>
-              {selectedCase.employeeName
-                .split(" ")
-                .map((n) => n[0])
-                .join("")}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <h2 className="text-xl font-semibold">{selectedCase.employeeName}</h2>
-            <p className="text-gray-600">
-              {selectedCase.position} • {selectedCase.department}
-            </p>
-            <Badge className={getStatusColor(selectedCase.status)}>
-              {getStatusIcon(selectedCase.status)}
-              <span className="ml-1 capitalize">{selectedCase.status.replace("_", " ")}</span>
-            </Badge>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-600">Last Working Day</p>
-          <p className="font-semibold">{selectedCase.lastWorkingDay.toLocaleDateString()}</p>
-        </div>
-      </div>
-
-      <Tabs defaultValue="checklist" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="checklist">Checklist</TabsTrigger>
-          <TabsTrigger value="clearance">Clearance</TabsTrigger>
-          <TabsTrigger value="settlement">Settlement</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="checklist" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Offboarding Checklist</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {checklist.map((item) => (
-                  <div key={item.id} className="flex items-start space-x-3 p-4 border rounded-lg">
-                    <Checkbox
-                      checked={item.completed}
-                      onCheckedChange={(checked) => handleChecklistUpdate(item.id, !!checked)}
-                      className="mt-1"
-                    />
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Badge className={getCategoryColor(item.category)}>
-                            {getCategoryIcon(item.category)}
-                            <span className="ml-1 capitalize">{item.category}</span>
-                          </Badge>
-                          <h4 className={`font-medium ${item.completed ? "line-through text-gray-500" : ""}`}>
-                            {item.task}
-                          </h4>
-                          {item.required && (
-                            <Badge variant="outline" className="text-xs">
-                              Required
-                            </Badge>
-                          )}
-                        </div>
-                        <span className="text-sm text-gray-500">{item.assignedTo}</span>
-                      </div>
-                      <p className="text-sm text-gray-600">{item.description}</p>
-                      {item.ghanaLabourActCompliance && (
-                        <p className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
-                          <strong>Ghana Labour Act Compliance:</strong> {item.ghanaLabourActCompliance}
-                        </p>
-                      )}
-                      {item.completed && item.completedDate && (
-                        <p className="text-xs text-green-600">
-                          Completed on {item.completedDate.toLocaleDateString()} by {item.completedBy}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="clearance" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Department Clearances</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {Object.entries(selectedCase.clearanceStatus).map(([dept, cleared]) => (
-                  <div key={dept} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      {getCategoryIcon(dept)}
-                      <span className="capitalize font-medium">{dept}</span>
-                    </div>
-                    {cleared ? (
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                    ) : (
-                      <XCircle className="w-5 h-5 text-red-600" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="settlement" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Final Settlement</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-green-50 rounded-lg">
-                    <h4 className="font-medium text-green-800">Settlement Status</h4>
-                    <p className="text-2xl font-bold text-green-600">
-                      {selectedCase.finalSettlementCalculated ? "Calculated" : "Pending"}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <h4 className="font-medium text-blue-800">Final Amount</h4>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {selectedCase.finalSettlementAmount
-                        ? `GHS ${selectedCase.finalSettlementAmount.toLocaleString()}`
-                        : "TBD"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="font-medium">Settlement Breakdown</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between p-2 bg-gray-50 rounded">
-                      <span>Outstanding Salary</span>
-                      <span>GHS 8,500</span>
-                    </div>
-                    <div className="flex justify-between p-2 bg-gray-50 rounded">
-                      <span>Accrued Leave Days (15 days)</span>
-                      <span>GHS 4,250</span>
-                    </div>
-                    <div className="flex justify-between p-2 bg-gray-50 rounded">
-                      <span>Bonus/Allowances</span>
-                      <span>GHS 2,250</span>
-                    </div>
-                    <div className="flex justify-between p-2 bg-red-50 rounded text-red-600">
-                      <span>Deductions (Loans/Advances)</span>
-                      <span>-GHS 0</span>
-                    </div>
-                    <div className="flex justify-between p-2 bg-green-100 rounded font-semibold">
-                      <span>Total Final Settlement</span>
-                      <span>GHS {selectedCase.finalSettlementAmount?.toLocaleString() || "15,000"}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="documents" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Offboarding Documents</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {selectedCase.documents.map((doc, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <FileText className="w-4 h-4 text-gray-500" />
-                      <span>{doc}</span>
-                    </div>
-                    <Button variant="ghost" size="sm">
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-                {selectedCase.documents.length === 0 && (
-                  <p className="text-gray-500 text-center py-4">No documents uploaded yet</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="timeline" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Offboarding Timeline</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="border-l-2 border-blue-500 pl-4">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                    <h4 className="font-medium">Resignation Submitted</h4>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">{selectedCase.resignationDate.toLocaleDateString()}</p>
-                  <p className="text-sm text-gray-500">Employee submitted resignation letter</p>
-                </div>
-
-                {selectedCase.exitInterviewCompleted && selectedCase.exitInterviewDate && (
-                  <div className="border-l-2 border-green-500 pl-4">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <h4 className="font-medium">Exit Interview Completed</h4>
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">{selectedCase.exitInterviewDate.toLocaleDateString()}</p>
-                    <p className="text-sm text-gray-500">Rating: {selectedCase.exitInterviewRating}/5</p>
-                  </div>
-                )}
-
-                <div className="border-l-2 border-orange-500 pl-4">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                    <h4 className="font-medium">Last Working Day</h4>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">{selectedCase.lastWorkingDay.toLocaleDateString()}</p>
-                  <p className="text-sm text-gray-500">Final day of employment</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
-}
+\

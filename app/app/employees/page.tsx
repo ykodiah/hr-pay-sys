@@ -1193,7 +1193,7 @@ function AddEmployeeForm({
 
   const handleDocumentUpload = async (file: File, documentType: string, employeeData?: any) => {
     const documentService = CentralDocumentService.getInstance()
-    
+
     try {
       const documentId = await documentService.uploadDocument({
         file,
@@ -1202,21 +1202,24 @@ function AddEmployeeForm({
         documentType,
         source: "employee-onboarding",
         uploadedBy: "HR Admin",
-        notes: `Employee document: ${documentType}`
+        notes: `Employee document: ${documentType}`,
       })
-      
+
       // Update form data
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        documents: [...(prev.documents || []), { 
-          id: documentId,
-          type: documentType, 
-          file, 
-          name: file.name,
-          status: 'pending'
-        }]
+        documents: [
+          ...(prev.documents || []),
+          {
+            id: documentId,
+            type: documentType,
+            file,
+            name: file.name,
+            status: "pending",
+          },
+        ],
       }))
-      
+
       console.log("[v0] Document uploaded to vault:", documentId)
     } catch (error) {
       console.error("[v0] Document upload failed:", error)
@@ -1614,7 +1617,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        handleDocumentUpload(file, 'academic')
+                        handleDocumentUpload(file, "academic")
                       }
                     }}
                   />
@@ -1639,7 +1642,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        handleDocumentUpload(file, 'passport-picture')
+                        handleDocumentUpload(file, "passport-picture")
                       }
                     }}
                   />
@@ -1664,7 +1667,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        handleDocumentUpload(file, 'resume')
+                        handleDocumentUpload(file, "resume")
                       }
                     }}
                   />
@@ -1689,7 +1692,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        handleDocumentUpload(file, 'passport')
+                        handleDocumentUpload(file, "passport")
                       }
                     }}
                   />
@@ -1714,7 +1717,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        handleDocumentUpload(file, 'national-id')
+                        handleDocumentUpload(file, "national-id")
                       }
                     }}
                   />
@@ -1739,7 +1742,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        handleDocumentUpload(file, 'medical')
+                        handleDocumentUpload(file, "medical")
                       }
                     }}
                   />
@@ -1764,7 +1767,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        handleDocumentUpload(file, 'police')
+                        handleDocumentUpload(file, "police")
                       }
                     }}
                   />
@@ -1790,9 +1793,12 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const files = Array.from(e.target.files || [])
                       if (files.length > 0) {
-                        console.log("[v0] Other documents selected:", files.map(f => f.name))
-                        files.forEach(file => {
-                          handleDocumentUpload(file, 'other')
+                        console.log(
+                          "[v0] Other documents selected:",
+                          files.map((f) => f.name),
+                        )
+                        files.forEach((file) => {
+                          handleDocumentUpload(file, "other")
                         })
                       }
                     }}
@@ -1821,9 +1827,9 @@ function AddEmployeeForm({
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          setFormData(prev => ({
+                          setFormData((prev) => ({
                             ...prev,
-                            documents: prev.documents?.filter((_, i) => i !== index) || []
+                            documents: prev.documents?.filter((_, i) => i !== index) || [],
                           }))
                         }}
                       >
@@ -1837,20 +1843,22 @@ function AddEmployeeForm({
 
             <div className="mt-6 p-4 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Documents are stored securely in the employee's document vault. Supported file formats: PDF, DOC, DOCX, JPG, PNG. Maximum file size: 5MB per document.
+                <strong>Note:</strong> Documents are stored securely in the employee's document vault. Supported file
+                formats: PDF, DOC, DOCX, JPG, PNG. Maximum file size: 5MB per document.
               </p>
             </div>
           </div>
         </TabsContent>
 
-      <div className="flex justify-end gap-4 pt-6 border-t">
-        <Button type="button" variant="outline" onClick={onClose} className="px-6 bg-transparent">
-          Cancel
-        </Button>
-        <Button type="submit" className="px-6 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSubmit}>
-          {employee ? "Update Employee" : "Add Employee"}
-        </Button>
-      </div>
+        <div className="flex justify-end gap-4 pt-6 border-t">
+          <Button type="button" variant="outline" onClick={onClose} className="px-6 bg-transparent">
+            Cancel
+          </Button>
+          <Button type="submit" className="px-6 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSubmit}>
+            {employee ? "Update Employee" : "Add Employee"}
+          </Button>
+        </div>
+      </Tabs>
     </form>
   )
 }
@@ -1864,10 +1872,10 @@ function FormRow({
   label: string
   children: React.ReactNode
   full?: boolean
-  error?: string\
+  error?: string
 }) {
   return (
-    <div className={full ? "lg:col-span-2" : ""}>\
+    <div className={full ? "lg:col-span-2" : ""}>
       <div className="grid items-center gap-3 sm:grid-cols-[200px_1fr]">
         <Label className="text-sm font-medium text-gray-700">{label}</Label>
         <div>
@@ -1881,7 +1889,7 @@ function FormRow({
 
 function EmployeeProfile({ employee }: { employee: any }) {
   return (
-    <Tabs defaultValue="overview" className=\"w-full">\
+    <Tabs defaultValue="overview" className="w-full">
       <TabsList className="grid w-full grid-cols-5">
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="employment">Employment</TabsTrigger>
@@ -2081,5 +2089,5 @@ function EmployeeProfile({ employee }: { employee: any }) {
         </Card>
       </TabsContent>
     </Tabs>
-  )\
+  )
 }
