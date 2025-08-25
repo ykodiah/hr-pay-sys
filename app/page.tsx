@@ -6,6 +6,8 @@ import Link from "next/link"
 import { Logo } from "@/components/logo"
 
 export default function HomePage() {
+  console.log("[v0] Homepage is rendering successfully")
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       {/* Header */}
