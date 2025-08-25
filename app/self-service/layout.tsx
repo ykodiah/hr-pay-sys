@@ -30,7 +30,7 @@ import {
   ChevronDown,
   X,
   AlertTriangle,
-  UserX,
+  DoorOpen,
 } from "lucide-react"
 import { Logo } from "@/components/logo"
 
@@ -296,22 +296,22 @@ export default function SelfServiceLayout({
                 <CreditCard className="w-5 h-5" />
                 <span>Loan Requests</span>
               </a>
-            </div>
-
-            <div className="pt-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">HR Services</p>
               <a
-                href="/self-service/disciplinary"
+                href="/self-service/grievances"
                 className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <AlertTriangle className="w-5 h-5" />
-                <span>My Cases</span>
+                <span>Grievances</span>
               </a>
+            </div>
+
+            <div className="pt-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Support</p>
               <a
-                href="/self-service/offboarding"
+                href="/self-service/exit-process"
                 className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
-                <UserX className="w-5 h-5" />
+                <DoorOpen className="w-5 h-5" />
                 <span>Exit Process</span>
               </a>
             </div>
