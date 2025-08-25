@@ -11,35 +11,32 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
-import { Progress } from "@/components/ui/progress"
 import { toast } from "@/hooks/use-toast"
 import {
   Search,
   Plus,
   MoreHorizontal,
-  Clock,
-  Calendar,
   Users,
   TrendingUp,
-  AlertTriangle,
-  CheckCircle,
+  Download,
+  Filter,
   Eye,
   Edit,
-  Download,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
   Fingerprint,
   Camera,
   Timer,
-  UserCheck,
-  UserX,
-  ClockIcon,
   CalendarDays,
-  Zap,
+  UserCheck,
+  ClockIcon,
 } from "lucide-react"
 
-// Mock data for demonstration
+// Mock data for attendance records
 const mockAttendanceRecords = [
   {
-    id: "ATT001",
+    id: "ATT-001",
     employeeId: "EMP001",
     employeeName: "Kwame Asante",
     employeeAvatar: "/placeholder.svg?height=40&width=40",
@@ -49,286 +46,280 @@ const mockAttendanceRecords = [
     clockOut: "17:30",
     breakTime: 60,
     totalHours: 8.75,
-    regularHours: 8,
     overtimeHours: 0.75,
     status: "present",
-    clockInMethod: "biometric",
-    clockOutMethod: "biometric",
+    method: "biometric",
     location: "Main Office",
-    shift: "Day Shift",
-    notes: "",
+    shift: "Day Shift (8:00-17:00)",
+    lateMinutes: 15,
+    earlyDeparture: 0,
   },
   {
-    id: "ATT002",
+    id: "ATT-002",
     employeeId: "EMP002",
     employeeName: "Ama Osei",
     employeeAvatar: "/placeholder.svg?height=40&width=40",
     department: "Human Resources",
     date: new Date("2024-02-20"),
-    clockIn: "09:30",
-    clockOut: "18:00",
+    clockIn: "07:45",
+    clockOut: "16:45",
     breakTime: 60,
-    totalHours: 7.5,
-    regularHours: 7.5,
+    totalHours: 8.0,
     overtimeHours: 0,
-    status: "late",
-    clockInMethod: "manual",
-    clockOutMethod: "biometric",
+    status: "present",
+    method: "manual",
     location: "Main Office",
-    shift: "Day Shift",
-    notes: "Traffic delay",
+    shift: "Day Shift (8:00-17:00)",
+    lateMinutes: 0,
+    earlyDeparture: 15,
   },
   {
-    id: "ATT003",
+    id: "ATT-003",
     employeeId: "EMP003",
     employeeName: "Kofi Mensah",
     employeeAvatar: "/placeholder.svg?height=40&width=40",
-    department: "Sales",
+    department: "Finance",
     date: new Date("2024-02-20"),
     clockIn: null,
     clockOut: null,
     breakTime: 0,
     totalHours: 0,
-    regularHours: 0,
     overtimeHours: 0,
     status: "absent",
-    clockInMethod: null,
-    clockOutMethod: null,
+    method: null,
     location: null,
-    shift: "Day Shift",
-    notes: "Sick leave",
+    shift: "Day Shift (8:00-17:00)",
+    lateMinutes: 0,
+    earlyDeparture: 0,
   },
 ]
 
+// Mock shift data
 const mockShifts = [
   {
-    id: "SHIFT001",
+    id: "SHIFT-001",
     name: "Day Shift",
     startTime: "08:00",
     endTime: "17:00",
     breakDuration: 60,
-    employees: 45,
-    active: true,
+    employees: ["EMP001", "EMP002", "EMP003"],
+    isActive: true,
   },
   {
-    id: "SHIFT002",
+    id: "SHIFT-002",
     name: "Night Shift",
     startTime: "20:00",
     endTime: "05:00",
     breakDuration: 60,
-    employees: 12,
-    active: true,
+    employees: ["EMP004", "EMP005"],
+    isActive: true,
   },
   {
-    id: "SHIFT003",
+    id: "SHIFT-003",
     name: "Weekend Shift",
     startTime: "09:00",
     endTime: "15:00",
     breakDuration: 30,
-    employees: 8,
-    active: true,
+    employees: ["EMP006"],
+    isActive: false,
   },
 ]
 
-const mockBiometricDevices = [
+// Mock overtime requests
+const mockOvertimeRequests = [
   {
-    id: "BIO001",
-    name: "Main Entrance",
-    type: "fingerprint",
-    location: "Ground Floor - Main Entrance",
-    status: "online",
-    lastSync: new Date("2024-02-20T10:30:00"),
-    employeesRegistered: 150,
+    id: "OT-001",
+    employeeId: "EMP001",
+    employeeName: "Kwame Asante",
+    date: new Date("2024-02-21"),
+    requestedHours: 3,
+    reason: "Project deadline completion",
+    status: "pending",
+    requestedBy: "Kwame Asante",
+    approver: "John Manager",
+    submittedDate: new Date("2024-02-20"),
   },
   {
-    id: "BIO002",
-    name: "Office Floor 1",
-    type: "facial",
-    location: "First Floor - Office Area",
-    status: "online",
-    lastSync: new Date("2024-02-20T10:25:00"),
-    employeesRegistered: 85,
-  },
-  {
-    id: "BIO003",
-    name: "Warehouse Entry",
-    type: "fingerprint",
-    location: "Warehouse - Side Entrance",
-    status: "offline",
-    lastSync: new Date("2024-02-19T16:45:00"),
-    employeesRegistered: 25,
+    id: "OT-002",
+    employeeId: "EMP002",
+    employeeName: "Ama Osei",
+    date: new Date("2024-02-19"),
+    requestedHours: 2,
+    reason: "Monthly report preparation",
+    status: "approved",
+    requestedBy: "Ama Osei",
+    approver: "Sarah Director",
+    submittedDate: new Date("2024-02-18"),
+    approvedDate: new Date("2024-02-19"),
   },
 ]
 
-const attendanceStatus = {
-  present: { label: "Present", color: "bg-green-100 text-green-800", icon: CheckCircle },
-  late: { label: "Late", color: "bg-yellow-100 text-yellow-800", icon: AlertTriangle },
-  absent: { label: "Absent", color: "bg-red-100 text-red-800", icon: UserX },
-  "early-departure": { label: "Early Departure", color: "bg-orange-100 text-orange-800", icon: Clock },
-  overtime: { label: "Overtime", color: "bg-blue-100 text-blue-800", icon: TrendingUp },
+const statusColors = {
+  present: "bg-green-100 text-green-800",
+  absent: "bg-red-100 text-red-800",
+  late: "bg-yellow-100 text-yellow-800",
+  half_day: "bg-blue-100 text-blue-800",
 }
 
-const deviceTypes = {
-  fingerprint: { label: "Fingerprint", icon: Fingerprint },
-  facial: { label: "Facial Recognition", icon: Camera },
-  card: { label: "Access Card", icon: UserCheck },
+const overtimeStatusColors = {
+  pending: "bg-yellow-100 text-yellow-800",
+  approved: "bg-green-100 text-green-800",
+  rejected: "bg-red-100 text-red-800",
 }
 
 export default function AttendancePage() {
   const [attendanceRecords, setAttendanceRecords] = useState(mockAttendanceRecords)
   const [shifts, setShifts] = useState(mockShifts)
-  const [biometricDevices, setBiometricDevices] = useState(mockBiometricDevices)
+  const [overtimeRequests, setOvertimeRequests] = useState(mockOvertimeRequests)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
-  const [selectedDepartment, setSelectedDepartment] = useState("all")
-  const [selectedStatus, setSelectedStatus] = useState("all")
+  const [selectedRecord, setSelectedRecord] = useState<any>(null)
   const [isManualEntryOpen, setIsManualEntryOpen] = useState(false)
-  const [isShiftDialogOpen, setIsShiftDialogOpen] = useState(false)
+  const [isShiftManagementOpen, setIsShiftManagementOpen] = useState(false)
+  const [isOvertimeRequestOpen, setIsOvertimeRequestOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("attendance")
 
-  const [manualEntry, setManualEntry] = useState({
+  const [manualEntryForm, setManualEntryForm] = useState({
     employeeId: "",
     date: "",
     clockIn: "",
     clockOut: "",
-    breakTime: "",
-    notes: "",
+    breakTime: "60",
+    reason: "",
   })
 
-  const [newShift, setNewShift] = useState({
-    name: "",
-    startTime: "",
-    endTime: "",
-    breakDuration: "",
+  const [overtimeForm, setOvertimeForm] = useState({
+    employeeId: "",
+    date: "",
+    hours: "",
+    reason: "",
   })
 
-  const filteredRecords = attendanceRecords.filter((record) => {
-    const matchesSearch =
+  const filteredRecords = attendanceRecords.filter(
+    (record) =>
       record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesDate = record.date.toISOString().split("T")[0] === selectedDate
-    const matchesDepartment = selectedDepartment === "all" || record.department === selectedDepartment
-    const matchesStatus = selectedStatus === "all" || record.status === selectedStatus
+      record.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.department.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
-    return matchesSearch && matchesDate && matchesDepartment && matchesStatus
-  })
-
-  const getAttendanceStats = () => {
-    const todayRecords = attendanceRecords.filter(
-      (record) => record.date.toISOString().split("T")[0] === new Date().toISOString().split("T")[0],
-    )
-    const present = todayRecords.filter((r) => r.status === "present").length
-    const late = todayRecords.filter((r) => r.status === "late").length
-    const absent = todayRecords.filter((r) => r.status === "absent").length
-    const overtime = todayRecords.filter((r) => r.overtimeHours > 0).length
-    const totalEmployees = 150 // Would come from employee count
-    const attendanceRate = Math.round(((present + late) / totalEmployees) * 100)
-
-    return { present, late, absent, overtime, attendanceRate, totalEmployees }
-  }
-
-  const stats = getAttendanceStats()
+  const todayRecords = filteredRecords.filter(
+    (record) => record.date.toDateString() === new Date(selectedDate).toDateString(),
+  )
 
   const handleManualEntry = () => {
-    if (!manualEntry.employeeId || !manualEntry.date || !manualEntry.clockIn) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    const clockInTime = new Date(`${manualEntry.date}T${manualEntry.clockIn}`)
-    const clockOutTime = manualEntry.clockOut ? new Date(`${manualEntry.date}T${manualEntry.clockOut}`) : null
-    const breakTime = Number.parseInt(manualEntry.breakTime) || 0
-    const totalHours = clockOutTime
-      ? (clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60 * 60) - breakTime / 60
-      : 0
-    const regularHours = Math.min(totalHours, 8)
-    const overtimeHours = Math.max(totalHours - 8, 0)
-
-    const record = {
-      id: `ATT${String(attendanceRecords.length + 1).padStart(3, "0")}`,
-      employeeId: manualEntry.employeeId,
-      employeeName: "Employee Name", // Would fetch from employee data
+    const newRecord = {
+      id: `ATT-${String(attendanceRecords.length + 1).padStart(3, "0")}`,
+      employeeId: manualEntryForm.employeeId,
+      employeeName: "Selected Employee", // Would fetch from employee data
       employeeAvatar: "/placeholder.svg?height=40&width=40",
-      department: "Department",
-      date: new Date(manualEntry.date),
-      clockIn: manualEntry.clockIn,
-      clockOut: manualEntry.clockOut || null,
-      breakTime,
-      totalHours,
-      regularHours,
-      overtimeHours,
+      department: "Department", // Would fetch from employee data
+      date: new Date(manualEntryForm.date),
+      clockIn: manualEntryForm.clockIn,
+      clockOut: manualEntryForm.clockOut,
+      breakTime: Number.parseInt(manualEntryForm.breakTime),
+      totalHours: calculateTotalHours(
+        manualEntryForm.clockIn,
+        manualEntryForm.clockOut,
+        Number.parseInt(manualEntryForm.breakTime),
+      ),
+      overtimeHours: 0,
       status: "present",
-      clockInMethod: "manual",
-      clockOutMethod: manualEntry.clockOut ? "manual" : null,
+      method: "manual",
       location: "Manual Entry",
-      shift: "Day Shift",
-      notes: manualEntry.notes,
+      shift: "Day Shift (8:00-17:00)",
+      lateMinutes: 0,
+      earlyDeparture: 0,
     }
 
-    setAttendanceRecords([...attendanceRecords, record])
-    setManualEntry({
+    setAttendanceRecords([...attendanceRecords, newRecord])
+    setIsManualEntryOpen(false)
+    setManualEntryForm({
       employeeId: "",
       date: "",
       clockIn: "",
       clockOut: "",
-      breakTime: "",
-      notes: "",
+      breakTime: "60",
+      reason: "",
     })
-    setIsManualEntryOpen(false)
-
     toast({
       title: "Manual Entry Added",
-      description: `Attendance record for ${record.employeeName} has been created.`,
+      description: `Attendance record ${newRecord.id} has been created successfully.`,
     })
   }
 
-  const handleCreateShift = () => {
-    if (!newShift.name || !newShift.startTime || !newShift.endTime) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      })
-      return
+  const handleOvertimeRequest = () => {
+    const newRequest = {
+      id: `OT-${String(overtimeRequests.length + 1).padStart(3, "0")}`,
+      employeeId: overtimeForm.employeeId,
+      employeeName: "Selected Employee", // Would fetch from employee data
+      date: new Date(overtimeForm.date),
+      requestedHours: Number.parseInt(overtimeForm.hours),
+      reason: overtimeForm.reason,
+      status: "pending",
+      requestedBy: "Current User",
+      approver: "Manager",
+      submittedDate: new Date(),
     }
 
-    const shift = {
-      id: `SHIFT${String(shifts.length + 1).padStart(3, "0")}`,
-      name: newShift.name,
-      startTime: newShift.startTime,
-      endTime: newShift.endTime,
-      breakDuration: Number.parseInt(newShift.breakDuration) || 60,
-      employees: 0,
-      active: true,
-    }
-
-    setShifts([...shifts, shift])
-    setNewShift({
-      name: "",
-      startTime: "",
-      endTime: "",
-      breakDuration: "",
+    setOvertimeRequests([...overtimeRequests, newRequest])
+    setIsOvertimeRequestOpen(false)
+    setOvertimeForm({
+      employeeId: "",
+      date: "",
+      hours: "",
+      reason: "",
     })
-    setIsShiftDialogOpen(false)
-
     toast({
-      title: "Shift Created",
-      description: `${shift.name} has been created successfully.`,
+      title: "Overtime Request Submitted",
+      description: `Overtime request ${newRequest.id} has been submitted for approval.`,
     })
   }
 
-  const syncBiometricDevice = (deviceId: string) => {
-    setBiometricDevices((prev) =>
-      prev.map((device) => (device.id === deviceId ? { ...device, lastSync: new Date(), status: "online" } : device)),
+  const calculateTotalHours = (clockIn: string, clockOut: string, breakTime: number) => {
+    if (!clockIn || !clockOut) return 0
+    const [inHour, inMinute] = clockIn.split(":").map(Number)
+    const [outHour, outMinute] = clockOut.split(":").map(Number)
+    const inMinutes = inHour * 60 + inMinute
+    const outMinutes = outHour * 60 + outMinute
+    const totalMinutes = outMinutes - inMinutes - breakTime
+    return Math.round((totalMinutes / 60) * 100) / 100
+  }
+
+  const getAttendanceStats = () => {
+    const today = new Date().toDateString()
+    const todayAttendance = attendanceRecords.filter((record) => record.date.toDateString() === today)
+    const present = todayAttendance.filter((record) => record.status === "present").length
+    const absent = todayAttendance.filter((record) => record.status === "absent").length
+    const late = todayAttendance.filter((record) => record.lateMinutes > 0).length
+    const totalEmployees = todayAttendance.length
+    const attendanceRate = totalEmployees > 0 ? Math.round((present / totalEmployees) * 100) : 0
+
+    return { present, absent, late, attendanceRate }
+  }
+
+  const stats = getAttendanceStats()
+
+  const approveOvertimeRequest = (requestId: string) => {
+    setOvertimeRequests((prev) =>
+      prev.map((request) =>
+        request.id === requestId ? { ...request, status: "approved", approvedDate: new Date() } : request,
+      ),
     )
-
     toast({
-      title: "Device Synced",
-      description: "Biometric device has been synchronized successfully.",
+      title: "Overtime Approved",
+      description: "Overtime request has been approved successfully.",
+    })
+  }
+
+  const rejectOvertimeRequest = (requestId: string) => {
+    setOvertimeRequests((prev) =>
+      prev.map((request) =>
+        request.id === requestId ? { ...request, status: "rejected", rejectedDate: new Date() } : request,
+      ),
+    )
+    toast({
+      title: "Overtime Rejected",
+      description: "Overtime request has been rejected.",
     })
   }
 
@@ -338,17 +329,13 @@ export default function AttendancePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Time & Attendance</h1>
-          <p className="text-gray-600">Manage employee attendance with biometric integration and shift scheduling</p>
+          <p className="text-gray-600">Track employee attendance, manage shifts, and process overtime</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Export Report
-          </Button>
           <Dialog open={isManualEntryOpen} onOpenChange={setIsManualEntryOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
-                <Edit className="w-4 h-4 mr-2" />
+                <Plus className="w-4 h-4 mr-2" />
                 Manual Entry
               </Button>
             </DialogTrigger>
@@ -359,68 +346,62 @@ export default function AttendancePage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="employee">Employee *</Label>
+                    <Label htmlFor="employee">Employee</Label>
                     <Select
-                      value={manualEntry.employeeId}
-                      onValueChange={(value) => setManualEntry({ ...manualEntry, employeeId: value })}
+                      value={manualEntryForm.employeeId}
+                      onValueChange={(value) => setManualEntryForm({ ...manualEntryForm, employeeId: value })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select employee" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="EMP001">Kwame Asante</SelectItem>
-                        <SelectItem value="EMP002">Ama Osei</SelectItem>
-                        <SelectItem value="EMP003">Kofi Mensah</SelectItem>
+                        <SelectItem value="EMP001">Kwame Asante - Technology</SelectItem>
+                        <SelectItem value="EMP002">Ama Osei - Human Resources</SelectItem>
+                        <SelectItem value="EMP003">Kofi Mensah - Finance</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="date">Date *</Label>
+                    <Label htmlFor="date">Date</Label>
                     <Input
-                      id="date"
                       type="date"
-                      value={manualEntry.date}
-                      onChange={(e) => setManualEntry({ ...manualEntry, date: e.target.value })}
+                      value={manualEntryForm.date}
+                      onChange={(e) => setManualEntryForm({ ...manualEntryForm, date: e.target.value })}
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <Label htmlFor="clockIn">Clock In *</Label>
+                    <Label htmlFor="clockIn">Clock In</Label>
                     <Input
-                      id="clockIn"
                       type="time"
-                      value={manualEntry.clockIn}
-                      onChange={(e) => setManualEntry({ ...manualEntry, clockIn: e.target.value })}
+                      value={manualEntryForm.clockIn}
+                      onChange={(e) => setManualEntryForm({ ...manualEntryForm, clockIn: e.target.value })}
                     />
                   </div>
                   <div>
                     <Label htmlFor="clockOut">Clock Out</Label>
                     <Input
-                      id="clockOut"
                       type="time"
-                      value={manualEntry.clockOut}
-                      onChange={(e) => setManualEntry({ ...manualEntry, clockOut: e.target.value })}
+                      value={manualEntryForm.clockOut}
+                      onChange={(e) => setManualEntryForm({ ...manualEntryForm, clockOut: e.target.value })}
                     />
                   </div>
                   <div>
                     <Label htmlFor="breakTime">Break Time (minutes)</Label>
                     <Input
-                      id="breakTime"
                       type="number"
-                      value={manualEntry.breakTime}
-                      onChange={(e) => setManualEntry({ ...manualEntry, breakTime: e.target.value })}
-                      placeholder="60"
+                      value={manualEntryForm.breakTime}
+                      onChange={(e) => setManualEntryForm({ ...manualEntryForm, breakTime: e.target.value })}
                     />
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="notes">Notes</Label>
+                  <Label htmlFor="reason">Reason for Manual Entry</Label>
                   <Input
-                    id="notes"
-                    value={manualEntry.notes}
-                    onChange={(e) => setManualEntry({ ...manualEntry, notes: e.target.value })}
-                    placeholder="Reason for manual entry..."
+                    placeholder="e.g., Biometric system malfunction"
+                    value={manualEntryForm.reason}
+                    onChange={(e) => setManualEntryForm({ ...manualEntryForm, reason: e.target.value })}
                   />
                 </div>
                 <div className="flex justify-end space-x-2">
@@ -432,23 +413,106 @@ export default function AttendancePage() {
               </div>
             </DialogContent>
           </Dialog>
+          <Dialog open={isOvertimeRequestOpen} onOpenChange={setIsOvertimeRequestOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Timer className="w-4 h-4 mr-2" />
+                Request Overtime
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Overtime Request</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="employee">Employee</Label>
+                    <Select
+                      value={overtimeForm.employeeId}
+                      onValueChange={(value) => setOvertimeForm({ ...overtimeForm, employeeId: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select employee" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EMP001">Kwame Asante - Technology</SelectItem>
+                        <SelectItem value="EMP002">Ama Osei - Human Resources</SelectItem>
+                        <SelectItem value="EMP003">Kofi Mensah - Finance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="date">Date</Label>
+                    <Input
+                      type="date"
+                      value={overtimeForm.date}
+                      onChange={(e) => setOvertimeForm({ ...overtimeForm, date: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="hours">Overtime Hours</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="8"
+                      placeholder="3"
+                      value={overtimeForm.hours}
+                      onChange={(e) => setOvertimeForm({ ...overtimeForm, hours: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="reason">Reason for Overtime</Label>
+                  <Input
+                    placeholder="e.g., Project deadline, urgent client request"
+                    value={overtimeForm.reason}
+                    onChange={(e) => setOvertimeForm({ ...overtimeForm, reason: e.target.value })}
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setIsOvertimeRequestOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleOvertimeRequest}>Submit Request</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Clock In/Out
+            <CalendarDays className="w-4 h-4 mr-2" />
+            Manage Shifts
+          </Button>
+          <Button variant="outline">
+            <Download className="w-4 h-4 mr-2" />
+            Export Report
           </Button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-2xl font-bold text-green-600">{stats.present}</div>
-                <p className="text-sm text-gray-600">Present</p>
+                <p className="text-sm text-gray-600">Present Today</p>
               </div>
-              <CheckCircle className="w-8 h-8 text-green-400" />
+              <UserCheck className="w-8 h-8 text-green-400" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-red-600">{stats.absent}</div>
+                <p className="text-sm text-gray-600">Absent Today</p>
+              </div>
+              <XCircle className="w-8 h-8 text-red-400" />
             </div>
           </CardContent>
         </Card>
@@ -467,92 +531,51 @@ export default function AttendancePage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold text-red-600">{stats.absent}</div>
-                <p className="text-sm text-gray-600">Absent</p>
-              </div>
-              <UserX className="w-8 h-8 text-red-400" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-2xl font-bold text-blue-600">{stats.overtime}</div>
-                <p className="text-sm text-gray-600">Overtime</p>
+                <div className="text-2xl font-bold text-blue-600">{stats.attendanceRate}%</div>
+                <p className="text-sm text-gray-600">Attendance Rate</p>
               </div>
               <TrendingUp className="w-8 h-8 text-blue-400" />
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-2xl font-bold text-gray-900">{stats.attendanceRate}%</div>
-                <p className="text-sm text-gray-600">Attendance Rate</p>
-              </div>
-              <Users className="w-8 h-8 text-gray-400" />
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Filters */}
+      {/* Search and Date Filter */}
       <Card>
         <CardContent className="p-6">
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <Input
-                placeholder="Search by employee name or ID..."
+                placeholder="Search by employee name, ID, or department..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <Input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-full lg:w-48"
-            />
-            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-              <SelectTrigger className="w-full lg:w-48">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                <SelectItem value="Technology">Technology</SelectItem>
-                <SelectItem value="Human Resources">Human Resources</SelectItem>
-                <SelectItem value="Sales">Sales</SelectItem>
-                <SelectItem value="Finance">Finance</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-full lg:w-48">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                {Object.entries(attendanceStatus).map(([key, status]) => (
-                  <SelectItem key={key} value={key}>
-                    {status.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-40"
+              />
+              <Button variant="outline">
+                <Filter className="w-4 h-4 mr-2" />
+                Filters
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Main Content */}
+      {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="attendance">Daily Attendance ({filteredRecords.length})</TabsTrigger>
-          <TabsTrigger value="shifts">Shift Management ({shifts.length})</TabsTrigger>
-          <TabsTrigger value="biometric">Biometric Devices ({biometricDevices.length})</TabsTrigger>
-          <TabsTrigger value="reports">Reports & Analytics</TabsTrigger>
+          <TabsTrigger value="attendance">Daily Attendance</TabsTrigger>
+          <TabsTrigger value="overtime">Overtime Requests</TabsTrigger>
+          <TabsTrigger value="shifts">Shift Management</TabsTrigger>
+          <TabsTrigger value="biometric">Biometric Setup</TabsTrigger>
         </TabsList>
 
         <TabsContent value="attendance" className="space-y-4">
@@ -562,112 +585,156 @@ export default function AttendancePage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {filteredRecords.length > 0 ? (
-                  filteredRecords.map((record) => {
-                    const StatusIcon = attendanceStatus[record.status as keyof typeof attendanceStatus].icon
-                    return (
-                      <div
-                        key={record.id}
-                        className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-lg">
-                            <StatusIcon className="w-6 h-6 text-gray-600" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h3 className="font-semibold text-gray-900">{record.employeeName}</h3>
-                              <Badge className={attendanceStatus[record.status as keyof typeof attendanceStatus].color}>
-                                {attendanceStatus[record.status as keyof typeof attendanceStatus].label}
-                              </Badge>
-                              {record.overtimeHours > 0 && (
-                                <Badge className="bg-blue-100 text-blue-800">+{record.overtimeHours}h OT</Badge>
+                {todayRecords.map((record) => (
+                  <div
+                    key={record.id}
+                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={record.employeeAvatar || "/placeholder.svg"} />
+                        <AvatarFallback>
+                          {record.employeeName
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <h3 className="font-semibold text-gray-900">{record.employeeName}</h3>
+                          <Badge className={statusColors[record.status as keyof typeof statusColors]}>
+                            {record.status.toUpperCase()}
+                          </Badge>
+                          {record.method && (
+                            <Badge variant="outline" className="flex items-center gap-1">
+                              {record.method === "biometric" ? (
+                                <Fingerprint className="w-3 h-3" />
+                              ) : (
+                                <ClockIcon className="w-3 h-3" />
                               )}
-                            </div>
-                            <div className="flex items-center space-x-6 text-sm text-gray-600">
-                              <div className="flex items-center">
-                                <Avatar className="w-5 h-5 mr-2">
-                                  <AvatarImage src={record.employeeAvatar || "/placeholder.svg"} />
-                                  <AvatarFallback>
-                                    {record.employeeName
-                                      .split(" ")
-                                      .map((n) => n[0])
-                                      .join("")}
-                                  </AvatarFallback>
-                                </Avatar>
-                                {record.employeeId} • {record.department}
-                              </div>
-                              {record.clockIn && (
-                                <div className="flex items-center">
-                                  <ClockIcon className="w-4 h-4 mr-1 text-green-600" />
-                                  In: {record.clockIn}
-                                </div>
-                              )}
-                              {record.clockOut && (
-                                <div className="flex items-center">
-                                  <ClockIcon className="w-4 h-4 mr-1 text-red-600" />
-                                  Out: {record.clockOut}
-                                </div>
-                              )}
-                              <div className="flex items-center">
-                                <Timer className="w-4 h-4 mr-1" />
-                                {record.totalHours}h total
-                              </div>
-                              <div className="flex items-center">
-                                <CalendarDays className="w-4 h-4 mr-1" />
-                                {record.shift}
-                              </div>
-                              {record.clockInMethod && (
-                                <div className="flex items-center">
-                                  {record.clockInMethod === "biometric" ? (
-                                    <Fingerprint className="w-4 h-4 mr-1 text-blue-600" />
-                                  ) : (
-                                    <Edit className="w-4 h-4 mr-1 text-orange-600" />
-                                  )}
-                                  {record.clockInMethod}
-                                </div>
-                              )}
-                            </div>
-                            {record.notes && <p className="text-sm text-gray-600 mt-1 italic">Note: {record.notes}</p>}
-                          </div>
+                              {record.method}
+                            </Badge>
+                          )}
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
-                                <Eye className="w-4 h-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit Record
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Zap className="w-4 h-4 mr-2" />
-                                Request Overtime Approval
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Download className="w-4 h-4 mr-2" />
-                                Export Timesheet
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                        <div className="flex items-center space-x-4 mt-1">
+                          <span className="text-sm text-gray-600">
+                            {record.employeeId} • {record.department}
+                          </span>
+                          {record.clockIn && (
+                            <>
+                              <span className="text-sm text-gray-500">In: {record.clockIn}</span>
+                              <span className="text-sm text-gray-500">Out: {record.clockOut || "Not clocked out"}</span>
+                              <span className="text-sm text-gray-500">Hours: {record.totalHours}h</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-4 mt-1">
+                          {record.lateMinutes > 0 && (
+                            <span className="text-sm text-yellow-600">Late: {record.lateMinutes} min</span>
+                          )}
+                          {record.earlyDeparture > 0 && (
+                            <span className="text-sm text-orange-600">Early: {record.earlyDeparture} min</span>
+                          )}
+                          {record.overtimeHours > 0 && (
+                            <span className="text-sm text-blue-600">OT: {record.overtimeHours}h</span>
+                          )}
+                          <span className="text-sm text-gray-500">{record.shift}</span>
                         </div>
                       </div>
-                    )
-                  })
-                ) : (
-                  <div className="text-center py-12">
-                    <Clock className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No attendance records found</h3>
-                    <p className="text-gray-500">Try adjusting your search criteria or date selection.</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setSelectedRecord(record)}>
+                            <Eye className="w-4 h-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Record
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Timer className="w-4 h-4 mr-2" />
+                            Add Overtime
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
-                )}
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="overtime" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Overtime Requests</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {overtimeRequests.map((request) => (
+                  <div
+                    key={request.id}
+                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="font-semibold text-gray-900">{request.employeeName}</h3>
+                        <Badge className={overtimeStatusColors[request.status as keyof typeof overtimeStatusColors]}>
+                          {request.status.toUpperCase()}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center space-x-4 mt-1">
+                        <span className="text-sm text-gray-600">{request.id}</span>
+                        <span className="text-sm text-gray-500">Date: {request.date.toLocaleDateString()}</span>
+                        <span className="text-sm text-gray-500">Hours: {request.requestedHours}</span>
+                        <span className="text-sm text-gray-500">
+                          Submitted: {request.submittedDate.toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{request.reason}</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {request.status === "pending" && (
+                        <>
+                          <Button size="sm" onClick={() => approveOvertimeRequest(request.id)}>
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            Approve
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => rejectOvertimeRequest(request.id)}>
+                            <XCircle className="w-4 h-4 mr-1" />
+                            Reject
+                          </Button>
+                        </>
+                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Eye className="w-4 h-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Download className="w-4 h-4 mr-2" />
+                            Download Report
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -676,122 +743,41 @@ export default function AttendancePage() {
         <TabsContent value="shifts" className="space-y-4">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Shift Management</CardTitle>
-                <Dialog open={isShiftDialogOpen} onOpenChange={setIsShiftDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create Shift
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create New Shift</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="shiftName">Shift Name *</Label>
-                        <Input
-                          id="shiftName"
-                          value={newShift.name}
-                          onChange={(e) => setNewShift({ ...newShift, name: e.target.value })}
-                          placeholder="e.g., Morning Shift"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="startTime">Start Time *</Label>
-                          <Input
-                            id="startTime"
-                            type="time"
-                            value={newShift.startTime}
-                            onChange={(e) => setNewShift({ ...newShift, startTime: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="endTime">End Time *</Label>
-                          <Input
-                            id="endTime"
-                            type="time"
-                            value={newShift.endTime}
-                            onChange={(e) => setNewShift({ ...newShift, endTime: e.target.value })}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <Label htmlFor="breakDuration">Break Duration (minutes)</Label>
-                        <Input
-                          id="breakDuration"
-                          type="number"
-                          value={newShift.breakDuration}
-                          onChange={(e) => setNewShift({ ...newShift, breakDuration: e.target.value })}
-                          placeholder="60"
-                        />
-                      </div>
-                      <div className="flex justify-end space-x-2">
-                        <Button variant="outline" onClick={() => setIsShiftDialogOpen(false)}>
-                          Cancel
-                        </Button>
-                        <Button onClick={handleCreateShift}>Create Shift</Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
+              <CardTitle>Shift Management</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="space-y-4">
                 {shifts.map((shift) => (
-                  <Card key={shift.id} className="border-2">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-3">
+                  <div
+                    key={shift.id}
+                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
                         <h3 className="font-semibold text-gray-900">{shift.name}</h3>
-                        <Badge className={shift.active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
-                          {shift.active ? "Active" : "Inactive"}
+                        <Badge className={shift.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
+                          {shift.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </div>
-                      <div className="space-y-2 text-sm text-gray-600">
-                        <div className="flex justify-between">
-                          <span>Time:</span>
-                          <span className="font-medium">
-                            {shift.startTime} - {shift.endTime}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Break:</span>
-                          <span className="font-medium">{shift.breakDuration} min</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Employees:</span>
-                          <span className="font-medium">{shift.employees}</span>
-                        </div>
+                      <div className="flex items-center space-x-4 mt-1">
+                        <span className="text-sm text-gray-600">
+                          Time: {shift.startTime} - {shift.endTime}
+                        </span>
+                        <span className="text-sm text-gray-500">Break: {shift.breakDuration} min</span>
+                        <span className="text-sm text-gray-500">Employees: {shift.employees.length}</span>
                       </div>
-                      <div className="flex justify-end mt-4">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit Shift
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Users className="w-4 h-4 mr-2" />
-                              Assign Employees
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Calendar className="w-4 h-4 mr-2" />
-                              View Schedule
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button variant="outline" size="sm">
+                        <Edit className="w-4 h-4 mr-1" />
+                        Edit
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        <Users className="w-4 h-4 mr-1" />
+                        Assign
+                      </Button>
+                    </div>
+                  </div>
                 ))}
               </div>
             </CardContent>
@@ -801,150 +787,157 @@ export default function AttendancePage() {
         <TabsContent value="biometric" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Biometric Device Management</CardTitle>
+              <CardTitle>Biometric Device Integration</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {biometricDevices.map((device) => {
-                  const DeviceIcon = deviceTypes[device.type as keyof typeof deviceTypes].icon
-                  return (
-                    <Card key={device.id} className="border-2">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-2">
-                            <DeviceIcon className="w-5 h-5 text-gray-600" />
-                            <h3 className="font-semibold text-gray-900">{device.name}</h3>
-                          </div>
-                          <Badge
-                            className={
-                              device.status === "online" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                            }
-                          >
-                            {device.status}
-                          </Badge>
-                        </div>
-                        <div className="space-y-2 text-sm text-gray-600">
-                          <div>
-                            <span className="font-medium">Type:</span>{" "}
-                            {deviceTypes[device.type as keyof typeof deviceTypes].label}
-                          </div>
-                          <div>
-                            <span className="font-medium">Location:</span> {device.location}
-                          </div>
-                          <div>
-                            <span className="font-medium">Registered:</span> {device.employeesRegistered} employees
-                          </div>
-                          <div>
-                            <span className="font-medium">Last Sync:</span> {device.lastSync.toLocaleString()}
-                          </div>
-                        </div>
-                        <div className="flex justify-between mt-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => syncBiometricDevice(device.id)}
-                            disabled={device.status === "offline"}
-                          >
-                            Sync Now
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
-                                <Edit className="w-4 h-4 mr-2" />
-                                Configure Device
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Users className="w-4 h-4 mr-2" />
-                                Manage Registrations
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Download className="w-4 h-4 mr-2" />
-                                Download Logs
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <Fingerprint className="w-5 h-5" />
+                    Fingerprint Devices
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                      <div>
+                        <p className="font-medium">Main Entrance - Device 001</p>
+                        <p className="text-sm text-gray-600">ZKTeco F18 - IP: 192.168.1.100</p>
+                      </div>
+                      <Badge className="bg-green-100 text-green-800">Online</Badge>
+                    </div>
+                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                      <div>
+                        <p className="font-medium">Office Floor 2 - Device 002</p>
+                        <p className="text-sm text-gray-600">ZKTeco F18 - IP: 192.168.1.101</p>
+                      </div>
+                      <Badge className="bg-red-100 text-red-800">Offline</Badge>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <Camera className="w-5 h-5" />
+                    Facial Recognition
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                      <div>
+                        <p className="font-medium">Reception Area - Camera 001</p>
+                        <p className="text-sm text-gray-600">Hikvision DS-K1T341A</p>
+                      </div>
+                      <Badge className="bg-green-100 text-green-800">Online</Badge>
+                    </div>
+                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                      <div>
+                        <p className="font-medium">Cafeteria - Camera 002</p>
+                        <p className="text-sm text-gray-600">Hikvision DS-K1T341A</p>
+                      </div>
+                      <Badge className="bg-yellow-100 text-yellow-800">Maintenance</Badge>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <Fingerprint className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-blue-800">Biometric Integration Features</h4>
+                    <ul className="text-sm text-blue-700 mt-2 space-y-1">
+                      <li>• Real-time synchronization with attendance records</li>
+                      <li>• Support for multiple biometric devices (fingerprint, facial recognition)</li>
+                      <li>• Anti-passback and buddy punching prevention</li>
+                      <li>• Automatic backup to manual entry on device failure</li>
+                      <li>• Integration with popular Ghana market devices (ZKTeco, Hikvision)</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-
-        <TabsContent value="reports" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Attendance Trends</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Average Daily Attendance</span>
-                    <span className="font-semibold">92%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Late Arrivals (This Month)</span>
-                    <span className="font-semibold">8%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Overtime Hours (This Month)</span>
-                    <span className="font-semibold">245h</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Absenteeism Rate</span>
-                    <span className="font-semibold">3.2%</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Department Performance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Technology</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={95} className="w-20" />
-                      <span className="font-semibold text-sm">95%</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Human Resources</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={88} className="w-20" />
-                      <span className="font-semibold text-sm">88%</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Sales</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={91} className="w-20" />
-                      <span className="font-semibold text-sm">91%</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Finance</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={94} className="w-20" />
-                      <span className="font-semibold text-sm">94%</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
       </Tabs>
+
+      {/* Record Details Modal */}
+      <Dialog open={!!selectedRecord} onOpenChange={() => setSelectedRecord(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Attendance Details - {selectedRecord?.id}</DialogTitle>
+          </DialogHeader>
+          {selectedRecord && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Employee Information</h4>
+                  <div className="space-y-1">
+                    <p>
+                      <span className="text-gray-600">Name:</span> {selectedRecord.employeeName}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">ID:</span> {selectedRecord.employeeId}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Department:</span> {selectedRecord.department}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Shift:</span> {selectedRecord.shift}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Attendance Details</h4>
+                  <div className="space-y-1">
+                    <p>
+                      <span className="text-gray-600">Date:</span> {selectedRecord.date.toLocaleDateString()}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Clock In:</span> {selectedRecord.clockIn || "N/A"}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Clock Out:</span> {selectedRecord.clockOut || "N/A"}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Total Hours:</span> {selectedRecord.totalHours}h
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Method:</span> {selectedRecord.method || "N/A"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              {(selectedRecord.lateMinutes > 0 ||
+                selectedRecord.earlyDeparture > 0 ||
+                selectedRecord.overtimeHours > 0) && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Additional Information</h4>
+                  <div className="space-y-1">
+                    {selectedRecord.lateMinutes > 0 && (
+                      <p className="text-yellow-600">Late Arrival: {selectedRecord.lateMinutes} minutes</p>
+                    )}
+                    {selectedRecord.earlyDeparture > 0 && (
+                      <p className="text-orange-600">Early Departure: {selectedRecord.earlyDeparture} minutes</p>
+                    )}
+                    {selectedRecord.overtimeHours > 0 && (
+                      <p className="text-blue-600">Overtime: {selectedRecord.overtimeHours} hours</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end space-x-2 pt-4 border-t">
+                <Button variant="outline" onClick={() => setSelectedRecord(null)}>
+                  Close
+                </Button>
+                <Button variant="outline">
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Report
+                </Button>
+                <Button>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Record
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
