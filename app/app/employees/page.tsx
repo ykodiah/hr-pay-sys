@@ -1559,17 +1559,106 @@ function AddEmployeeForm({
         </TabsContent>
 
         <TabsContent value="documents" className="space-y-6">
-          <div
-            className="border-2 border-dashed rounded-lg p-8 text-center"
-            style={{ borderColor: "var(--theme-primary-300)" }}
-          >
-            <FileText className="w-16 h-16 mx-auto mb-4" style={{ color: "var(--theme-primary-400)" }} />
-            <p className="text-gray-600 mb-4 text-lg">Upload employee documents</p>
-            <Button type="button" variant="outline" className="h-12 px-6 bg-transparent">
-              <Upload className="w-5 h-5 mr-2" />
-              Choose Files
-            </Button>
-            <p className="text-sm text-gray-500 mt-4">Supported: PDF, DOC, DOCX, JPG, PNG (Max 5MB each)</p>
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Required Documents</h3>
+
+            <div className="grid gap-4">
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <span className="font-medium text-gray-900">1. Academic Certificate(s)</span>
+                  <p className="text-sm text-gray-500">Educational certificates and transcripts</p>
+                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <span className="font-medium text-gray-900">2. Passport Picture</span>
+                  <p className="text-sm text-gray-500">Professional passport-sized photograph</p>
+                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <span className="font-medium text-gray-900">3. Resume & Application Letter</span>
+                  <p className="text-sm text-gray-500">Current CV and cover letter</p>
+                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <span className="font-medium text-gray-900">4. Passport</span>
+                  <p className="text-sm text-gray-500">Valid passport copy</p>
+                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <span className="font-medium text-gray-900">5. National ID</span>
+                  <p className="text-sm text-gray-500">Ghana Card or Voter's ID</p>
+                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <span className="font-medium text-gray-900">6. Medical Report</span>
+                  <span className="font-medium text-gray-900">6. Medical Report</span>
+                  <p className="text-sm text-gray-500">Health clearance certificate</p>
+                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <span className="font-medium text-gray-900">7. Police Report</span>
+                  <p className="text-sm text-gray-500">Criminal background check</p>
+                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <span className="font-medium text-gray-900">8. Other Uploads</span>
+                  <p className="text-sm text-gray-500">Additional supporting documents</p>
+                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> Supported file formats: PDF, DOC, DOCX, JPG, PNG. Maximum file size: 5MB per
+                document.
+              </p>
+            </div>
           </div>
         </TabsContent>
       </Tabs>
@@ -1578,7 +1667,7 @@ function AddEmployeeForm({
         <Button type="button" variant="outline" onClick={onClose} className="px-6 bg-transparent">
           Cancel
         </Button>
-        <Button type="submit" className="px-6 bg-[var(--theme-primary)] hover:bg-[var(--theme-primary-dark)]">
+        <Button type="submit" className="px-6 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSubmit}>
           {employee ? "Update Employee" : "Add Employee"}
         </Button>
       </div>
