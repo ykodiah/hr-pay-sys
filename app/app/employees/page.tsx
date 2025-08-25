@@ -180,30 +180,13 @@ export default function EmployeesPage() {
       id: employees.length + 1,
       employeeId: `EMP${String(employees.length + 1).padStart(3, "0")}`,
       leaveBalance: { annual: 21, sick: 10, casual: 5 },
-      documents: employeeData.documents || [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      documents: [],
     }
-
-    // Add to employees list
-    const updatedEmployees = [...employees, newEmployee]
-    setEmployees(updatedEmployees)
-
-    // Persist to localStorage for tracking
-    try {
-      localStorage.setItem("akwaaba-employees", JSON.stringify(updatedEmployees))
-      console.log("[v0] Employee data saved to localStorage:", newEmployee)
-    } catch (error) {
-      console.error("[v0] Failed to save employee data:", error)
-    }
-
+    setEmployees([...employees, newEmployee])
     setIsAddDialogOpen(false)
-
-    // Enhanced success message
     toast({
-      title: "Employee Data Successfully Saved",
-      description: `${employeeData.firstName} ${employeeData.lastName} (${newEmployee.employeeId}) has been successfully added to the system.`,
-      duration: 5000,
+      title: "Employee Added",
+      description: `${employeeData.name} has been successfully added to the system.`,
     })
   }
 
@@ -1196,27 +1179,50 @@ function AddEmployeeForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("[v0] Form submission started", formData)
-
     if (validateForm()) {
-      console.log("[v0] Form validation passed, submitting data")
+      const fullName = [formData.prefix, formData.firstName, formData.otherNames, formData.lastName]
+        .filter(Boolean)
+        .join(" ")
 
-      // Ensure required fields are properly formatted
-      const submissionData = {
+      const employeeData = {
         ...formData,
-        name: `${formData.firstName} ${formData.lastName}`.trim(),
-        salary: formData.salary ? Number.parseFloat(formData.salary.toString()) : 0,
-        submittedAt: new Date().toISOString(),
+        name: fullName,
+        fullName: fullName,
+        displayName: `${formData.firstName} ${formData.lastName}`,
+        email: formData.personalEmail, // Primary email for system use
       }
 
-      onSubmit(submissionData)
-    } else {
-      console.log("[v0] Form validation failed", errors)
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields correctly.",
-        variant: "destructive",
+      console.log("[v0] Submitting employee data:", employeeData)
+      onSubmit(employeeData)
+
+      setFormData({
+        prefix: "",
+        firstName: "",
+        otherNames: "",
+        lastName: "",
+        maritalStatus: "",
+        corporateEmail: "",
+        personalEmail: "",
+        phone: "",
+        position: "",
+        department: "",
+        salary: "",
+        location: "",
+        startDate: "",
+        dateOfBirth: "",
+        address: "",
+        emergencyContactName: "",
+        emergencyContactTel: "",
+        educationalLevel: "",
+        gender: "",
+        bankName: "",
+        bankAccount: "",
+        ssnit: "",
+        ghanaCard: "",
+        status: "Active",
+        documents: [],
       })
+      setErrors({})
     }
   }
 
@@ -1890,12 +1896,7 @@ function AddEmployeeForm({
           <Button type="button" variant="outline" onClick={onClose} className="px-6 bg-transparent">
             Cancel
           </Button>
-          <Button
-            type="submit"
-            className="px-6 bg-emerald-600 hover:bg-emerald-700 text-white"
-            onClick={handleSubmit}
-            disabled={Object.keys(errors).length > 0}
-          >
+          <Button type="submit" className="px-6 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSubmit}>
             {employee ? "Update Employee" : "Add Employee"}
           </Button>
         </div>
