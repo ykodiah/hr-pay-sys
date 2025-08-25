@@ -32,7 +32,7 @@ import {
   X,
 } from "lucide-react"
 
-import { DocumentVaultService } from "@/lib/storage/documentVault"
+import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 
 const initialEmployees = [
   {
@@ -161,8 +161,6 @@ export default function EmployeesPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [setFormData, setForm] = useState<any>(null)
 
   const filteredEmployees = employees.filter((employee) => {
     const matchesSearch =
@@ -413,69 +411,6 @@ export default function EmployeesPage() {
     return `${headers.join(",")}\n${sampleData.join(",")}\n`
   }
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      console.log("[v0] CSV file selected:", file.name)
-      setSelectedFile(file)
-
-      const documentVault = DocumentVaultService.getInstance()
-      documentVault.uploadDocument(
-        "BULK_IMPORT",
-        "CSV Employee Import",
-        file,
-        "csv-import",
-        "bulk-import",
-        "system-files",
-        "HR Admin",
-      )
-    }
-  }
-
-  const handleDocumentUpload = async (file: File, documentType: string, employeeData: any) => {
-    const documentVault = DocumentVaultService.getInstance()
-
-    try {
-      const documentId = await documentVault.uploadDocument(
-        employeeData.employeeId || `EMP_${Date.now()}`,
-        `${employeeData.firstName} ${employeeData.lastName}`,
-        file,
-        documentType,
-        "employee-onboarding",
-        "employee-documents",
-        "HR Admin",
-      )
-
-      console.log(`[v0] Employee document uploaded to Document Vault: ${documentId}`)
-
-      // Update form data
-      setForm((prev) => ({
-        ...prev,
-        documents: [
-          ...(prev.documents || []),
-          {
-            type: documentType,
-            file,
-            name: file.name,
-            vaultId: documentId,
-          },
-        ],
-      }))
-
-      toast({
-        title: "Document Uploaded",
-        description: `${file.name} has been uploaded and added to Document Vault.`,
-      })
-    } catch (error) {
-      console.error("[v0] Error uploading document:", error)
-      toast({
-        title: "Upload Error",
-        description: "Failed to upload document. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -500,7 +435,6 @@ export default function EmployeesPage() {
                 onImport={handleImportEmployees}
                 onDownloadTemplate={downloadTemplate}
                 onClose={() => setIsImportDialogOpen(false)}
-                handleFileSelect={handleFileSelect}
               />
             </DialogContent>
           </Dialog>
@@ -524,11 +458,7 @@ export default function EmployeesPage() {
               <DialogHeader className="mb-8">
                 <DialogTitle className="text-3xl font-semibold">Add New Employee</DialogTitle>
               </DialogHeader>
-              <AddEmployeeForm
-                onSubmit={handleAddEmployee}
-                onClose={() => setIsAddDialogOpen(false)}
-                handleDocumentUpload={handleDocumentUpload}
-              />
+              <AddEmployeeForm onSubmit={handleAddEmployee} onClose={() => setIsAddDialogOpen(false)} />
             </DialogContent>
           </Dialog>
         </div>
@@ -726,7 +656,6 @@ export default function EmployeesPage() {
                 setIsEditDialogOpen(false)
                 setSelectedEmployee(null)
               }}
-              handleDocumentUpload={handleDocumentUpload}
             />
           )}
         </DialogContent>
@@ -739,18 +668,79 @@ function ImportDataDialog({
   onImport,
   onDownloadTemplate,
   onClose,
-  handleFileSelect,
 }: {
   onImport: (data: any[]) => void
   onDownloadTemplate: (type: string) => void
   onClose: () => void
-  handleFileSelect: (event: React.ChangeEvent<HTMLInputElement>) => void
 }) {
   const [activeTab, setActiveTab] = useState("employees")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [previewData, setPreviewData] = useState<any[]>([])
   const [importErrors, setImportErrors] = useState<string[]>([])
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const documentService = CentralDocumentService.getInstance()
+      documentService.uploadDocument({
+        file,
+        documentType: "employee-csv",
+        source: "employee-onboarding",
+        uploadedBy: "HR Admin",
+        notes: "Employee data import CSV file",
+      })
+
+      setSelectedFile(file)
+      console.log("[v0] CSV file selected:", file.name)
+    }
+  }
+
+  const processFile = (file: File) => {
+    setIsProcessing(true)
+    const reader = new FileReader()
+
+    reader.onload = (e) => {
+      try {
+        const csv = e.target?.result as string
+        const lines = csv.split("\n").filter((line) => line.trim())
+
+        if (lines.length < 2) {
+          throw new Error("CSV file must contain at least a header row and one data row")
+        }
+
+        const headers = lines[0].split(",").map((h) => h.trim().replace(/"/g, ""))
+        const data = lines.slice(1).map((line, index) => {
+          const values = line.split(",").map((v) => v.trim().replace(/"/g, ""))
+          const row: any = {}
+
+          headers.forEach((header, i) => {
+            row[header] = values[i] || ""
+          })
+
+          row._rowIndex = index + 2 // +2 because we start from line 2 (after header)
+          return row
+        })
+
+        // Validate data based on import type
+        const errors = validateImportData(data, activeTab)
+        setImportErrors(errors)
+        setPreviewData(data.slice(0, 10)) // Show first 10 rows for preview
+      } catch (error) {
+        toast({
+          title: "File Processing Error",
+          description: error instanceof Error ? error.message : "Failed to process the CSV file",
+          variant: "destructive",
+        })
+        setPreviewData([])
+        setImportErrors([])
+      } finally {
+        setIsProcessing(false)
+      }
+    }
+
+    reader.readAsText(file)
+  }
 
   const validateImportData = (data: any[], type: string): string[] => {
     const errors: string[] = []
@@ -847,52 +837,6 @@ function ImportDataDialog({
       onImport(allData)
     }
     reader.readAsText(selectedFile)
-  }
-
-  const processFile = (file: File) => {
-    setIsProcessing(true)
-    const reader = new FileReader()
-
-    reader.onload = (e) => {
-      try {
-        const csv = e.target?.result as string
-        const lines = csv.split("\n").filter((line) => line.trim())
-
-        if (lines.length < 2) {
-          throw new Error("CSV file must contain at least a header row and one data row")
-        }
-
-        const headers = lines[0].split(",").map((h) => h.trim().replace(/"/g, ""))
-        const data = lines.slice(1).map((line, index) => {
-          const values = line.split(",").map((v) => v.trim().replace(/"/g, ""))
-          const row: any = {}
-
-          headers.forEach((header, i) => {
-            row[header] = values[i] || ""
-          })
-
-          row._rowIndex = index + 2 // +2 because we start from line 2 (after header)
-          return row
-        })
-
-        // Validate data based on import type
-        const errors = validateImportData(data, activeTab)
-        setImportErrors(errors)
-        setPreviewData(data.slice(0, 10)) // Show first 10 rows for preview
-      } catch (error) {
-        toast({
-          title: "File Processing Error",
-          description: error instanceof Error ? error.message : "Failed to process the CSV file",
-          variant: "destructive",
-        })
-        setPreviewData([])
-        setImportErrors([])
-      } finally {
-        setIsProcessing(false)
-      }
-    }
-
-    reader.readAsText(file)
   }
 
   return (
@@ -1162,12 +1106,10 @@ function AddEmployeeForm({
   employee,
   onSubmit,
   onClose,
-  handleDocumentUpload
 }: {
   employee?: any
   onSubmit: (data: any) => void
   onClose: () => void
-  handleDocumentUpload: (file: File, documentType: string, employeeData: any) => void
 }) {
   const [formData, setFormData] = useState({
     prefix: employee?.prefix || "",
@@ -1246,6 +1188,38 @@ function AddEmployeeForm({
     setFormData((prev) => ({ ...prev, [field]: value }))
     if (errors[field]) {
       setErrors((prev: any) => ({ ...prev, [field]: "" }))
+    }
+  }
+
+  const handleDocumentUpload = async (file: File, documentType: string, employeeData?: any) => {
+    const documentService = CentralDocumentService.getInstance()
+    
+    try {
+      const documentId = await documentService.uploadDocument({
+        file,
+        employeeId: employeeData?.employeeId || formData.employeeId,
+        employeeName: employeeData?.name || `${formData.firstName} ${formData.lastName}`,
+        documentType,
+        source: "employee-onboarding",
+        uploadedBy: "HR Admin",
+        notes: `Employee document: ${documentType}`
+      })
+      
+      // Update form data
+      setFormData(prev => ({
+        ...prev,
+        documents: [...(prev.documents || []), { 
+          id: documentId,
+          type: documentType, 
+          file, 
+          name: file.name,
+          status: 'pending'
+        }]
+      }))
+      
+      console.log("[v0] Document uploaded to vault:", documentId)
+    } catch (error) {
+      console.error("[v0] Document upload failed:", error)
     }
   }
 
@@ -1637,11 +1611,10 @@ function AddEmployeeForm({
                     id="academic-certificates"
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={async (e) => {
+                    onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        console.log("[v0] Academic Certificate file selected:", file.name)
-                        await handleDocumentUpload(file, 'academic', formData)
+                        handleDocumentUpload(file, 'academic')
                       }
                     }}
                   />
@@ -1666,11 +1639,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        console.log("[v0] Passport Picture file selected:", file.name)
-                        setFormData(prev => ({
-                          ...prev,
-                          documents: [...(prev.documents || []), { type: 'passport-picture', file, name: file.name }]
-                        }))
+                        handleDocumentUpload(file, 'passport-picture')
                       }
                     }}
                   />
@@ -1695,11 +1664,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        console.log("[v0] Resume & Application file selected:", file.name)
-                        setFormData(prev => ({
-                          ...prev,
-                          documents: [...(prev.documents || []), { type: 'resume', file, name: file.name }]
-                        }))
+                        handleDocumentUpload(file, 'resume')
                       }
                     }}
                   />
@@ -1724,11 +1689,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        console.log("[v0] Passport file selected:", file.name)
-                        setFormData(prev => ({
-                          ...prev,
-                          documents: [...(prev.documents || []), { type: 'passport', file, name: file.name }]
-                        }))
+                        handleDocumentUpload(file, 'passport')
                       }
                     }}
                   />
@@ -1753,11 +1714,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        console.log("[v0] National ID file selected:", file.name)
-                        setFormData(prev => ({
-                          ...prev,
-                          documents: [...(prev.documents || []), { type: 'national-id', file, name: file.name }]
-                        }))
+                        handleDocumentUpload(file, 'national-id')
                       }
                     }}
                   />
@@ -1782,11 +1739,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        console.log("[v0] Medical Report file selected:", file.name)
-                        setFormData(prev => ({
-                          ...prev,
-                          documents: [...(prev.documents || []), { type: 'medical', file, name: file.name }]
-                        }))
+                        handleDocumentUpload(file, 'medical')
                       }
                     }}
                   />
@@ -1811,11 +1764,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        console.log("[v0] Police Report file selected:", file.name)
-                        setFormData(prev => ({
-                          ...prev,
-                          documents: [...(prev.documents || []), { type: 'police', file, name: file.name }]
-                        }))
+                        handleDocumentUpload(file, 'police')
                       }
                     }}
                   />
@@ -1843,10 +1792,7 @@ function AddEmployeeForm({
                       if (files.length > 0) {
                         console.log("[v0] Other documents selected:", files.map(f => f.name))
                         files.forEach(file => {
-                          setFormData(prev => ({
-                            ...prev,
-                            documents: [...(prev.documents || []), { type: 'other', file, name: file.name }]
-                          }))
+                          handleDocumentUpload(file, 'other')
                         })
                       }
                     }}
@@ -2116,7 +2062,7 @@ function EmployeeProfile({ employee }: { employee: any }) {
           <CardContent>
             <div className="space-y-2">
               {employee.documents?.length > 0 ? (
-                employee.documents.map((doc: string, index: number) => (
+                employee.documents.map((doc: any, index: number) => (
                   <div key={index} className="flex items-center justify-between p-2 border rounded">
                     <div className="flex items-center">
                       <FileText className="w-4 h-4 mr-2" />

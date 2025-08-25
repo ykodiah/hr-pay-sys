@@ -44,8 +44,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
-
-import { DocumentVaultService } from "@/lib/storage/documentVault"
+import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 
 interface Company {
   id: string
@@ -334,25 +333,26 @@ export default function SettingsPage() {
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      console.log("[v0] Company logo file selected:", file.name)
+      const documentService = CentralDocumentService.getInstance()
 
-      const documentVault = DocumentVaultService.getInstance()
       try {
-        const documentId = await documentVault.uploadCompanyDocument(file, "company-logo", "settings", "Admin")
-
-        console.log(`[v0] Company logo uploaded to Document Vault: ${documentId}`)
-
-        toast({
-          title: "Logo Uploaded",
-          description: `${file.name} has been uploaded and added to Document Vault.`,
+        const documentId = await documentService.uploadDocument({
+          file,
+          documentType: "company-logo",
+          source: "settings",
+          uploadedBy: "Admin",
+          notes: "Company logo upload",
         })
+
+        console.log("[v0] Company logo uploaded to vault:", documentId)
+
+        // Update UI state
+        setCompanySettings((prev) => ({
+          ...prev,
+          logo: URL.createObjectURL(file),
+        }))
       } catch (error) {
-        console.error("[v0] Error uploading logo:", error)
-        toast({
-          title: "Upload Error",
-          description: "Failed to upload logo. Please try again.",
-          variant: "destructive",
-        })
+        console.error("[v0] Logo upload failed:", error)
       }
     }
   }

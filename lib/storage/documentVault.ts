@@ -2,18 +2,7 @@ export interface EmployeeDocument {
   id: string
   employeeId: string
   employeeName: string
-  documentType:
-    | "academic"
-    | "passport-picture"
-    | "resume"
-    | "passport"
-    | "national-id"
-    | "medical"
-    | "police"
-    | "other"
-    | "company-logo"
-    | "csv-import"
-    | "training-material"
+  documentType: "academic" | "passport-picture" | "resume" | "passport" | "national-id" | "medical" | "police" | "other"
   fileName: string
   fileSize: number
   fileType: string
@@ -22,16 +11,11 @@ export interface EmployeeDocument {
   fileUrl: string
   status: "pending" | "approved" | "rejected"
   notes?: string
-  uploadSource: "employee-onboarding" | "settings" | "training" | "bulk-import" | "manual-upload"
-  category: "employee-documents" | "company-assets" | "training-materials" | "system-files"
-  departmentId?: string
-  companyId?: string
 }
 
 export class DocumentVaultService {
   private static instance: DocumentVaultService
   private documents: Map<string, EmployeeDocument[]> = new Map()
-  private globalDocuments: EmployeeDocument[] = []
 
   static getInstance(): DocumentVaultService {
     if (!DocumentVaultService.instance) {
@@ -40,16 +24,11 @@ export class DocumentVaultService {
     return DocumentVaultService.instance
   }
 
-  async uploadDocument(
-    employeeId: string,
-    employeeName: string,
-    file: File,
-    documentType: string,
-    uploadSource = "manual-upload",
-    category = "employee-documents",
-    uploadedBy = "current-user",
-  ): Promise<string> {
+  async uploadDocument(employeeId: string, employeeName: string, file: File, documentType: string): Promise<string> {
+    // In a real implementation, this would upload to cloud storage (Vercel Blob, AWS S3, etc.)
     const documentId = `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+    // Simulate file upload and get URL
     const fileUrl = await this.simulateFileUpload(file)
 
     const document: EmployeeDocument = {
@@ -61,91 +40,38 @@ export class DocumentVaultService {
       fileSize: file.size,
       fileType: file.type,
       uploadDate: new Date(),
-      uploadedBy,
+      uploadedBy: "current-user", // Would get from auth context
       fileUrl,
       status: "pending",
-      uploadSource: uploadSource as any,
-      category: category as any,
     }
 
     if (!this.documents.has(employeeId)) {
       this.documents.set(employeeId, [])
     }
+
     this.documents.get(employeeId)!.push(document)
 
-    this.globalDocuments.push(document)
-
-    console.log(
-      `[v0] Document uploaded to Document Vault - Employee: ${employeeName}, Type: ${documentType}, Source: ${uploadSource}`,
-    )
+    console.log(`[v0] Document uploaded for employee ${employeeName}:`, document)
     return documentId
   }
 
-  async uploadCompanyDocument(
-    file: File,
-    documentType: string,
-    uploadSource: string,
-    uploadedBy = "admin",
-  ): Promise<string> {
-    return this.uploadDocument(
-      "COMPANY",
-      "Company Assets",
-      file,
-      documentType,
-      uploadSource,
-      "company-assets",
-      uploadedBy,
-    )
-  }
-
-  async uploadTrainingDocument(file: File, uploadedBy = "trainer"): Promise<string> {
-    return this.uploadDocument(
-      "TRAINING",
-      "Training Materials",
-      file,
-      "training-material",
-      "training",
-      "training-materials",
-      uploadedBy,
-    )
+  private async simulateFileUpload(file: File): Promise<string> {
+    // In production, this would upload to actual storage service
+    return `https://storage.akwaabahrpay.com/documents/${file.name}`
   }
 
   getEmployeeDocuments(employeeId: string): EmployeeDocument[] {
     return this.documents.get(employeeId) || []
   }
 
-  getAllDocuments(filterBySource?: string, filterByCategory?: string): EmployeeDocument[] {
-    let filtered = [...this.globalDocuments]
-
-    if (filterBySource) {
-      filtered = filtered.filter((doc) => doc.uploadSource === filterBySource)
-    }
-
-    if (filterByCategory) {
-      filtered = filtered.filter((doc) => doc.category === filterByCategory)
-    }
-
-    return filtered.sort((a, b) => b.uploadDate.getTime() - a.uploadDate.getTime())
-  }
-
-  getDocumentsByCategory(): Record<string, EmployeeDocument[]> {
-    const categorized: Record<string, EmployeeDocument[]> = {
-      "employee-documents": [],
-      "company-assets": [],
-      "training-materials": [],
-      "system-files": [],
-    }
-
-    this.globalDocuments.forEach((doc) => {
-      if (categorized[doc.category]) {
-        categorized[doc.category].push(doc)
-      }
-    })
-
-    return categorized
+  getAllDocuments(): EmployeeDocument[] {
+    const allDocs: EmployeeDocument[] = []
+    this.documents.forEach((docs) => allDocs.push(...docs))
+    return allDocs
   }
 
   async downloadDocument(documentId: string): Promise<Blob | null> {
+    // In production, this would fetch from storage service
     console.log(`[v0] Downloading document: ${documentId}`)
     return null
   }
