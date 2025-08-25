@@ -1196,9 +1196,10 @@ function AddEmployeeForm({
           <TabsTrigger value="documents">Documents</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="personal" className="space-y-8">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <FormRow label="1. Prefix">
+        <TabsContent value="personal" className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">1. Prefix</Label>
               <Select value={formData.prefix} onValueChange={(value) => handleInputChange("prefix", value)}>
                 <SelectTrigger className="form-input">
                   <SelectValue placeholder="Select prefix" />
@@ -1212,12 +1213,12 @@ function AddEmployeeForm({
                   <SelectItem value="Prof">Prof</SelectItem>
                 </SelectContent>
               </Select>
-            </FormRow>
+            </div>
 
-            <FormRow label="2. First Name *">
-              <div>
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">2. First Name *</Label>
+              <div className="flex-1">
                 <Input
-                  id="firstName"
                   value={formData.firstName}
                   onChange={(e) => handleInputChange("firstName", e.target.value)}
                   placeholder="Enter first name"
@@ -1225,22 +1226,22 @@ function AddEmployeeForm({
                 />
                 {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
               </div>
-            </FormRow>
+            </div>
 
-            <FormRow label="3. Other Name(s)">
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">3. Other Name(s)</Label>
               <Input
-                id="otherNames"
                 value={formData.otherNames}
                 onChange={(e) => handleInputChange("otherNames", e.target.value)}
                 placeholder="Middle names"
-                className="form-input"
+                className="form-input flex-1"
               />
-            </FormRow>
+            </div>
 
-            <FormRow label="4. Last Name *">
-              <div>
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">4. Last Name *</Label>
+              <div className="flex-1">
                 <Input
-                  id="lastName"
                   value={formData.lastName}
                   onChange={(e) => handleInputChange("lastName", e.target.value)}
                   placeholder="Enter last name"
@@ -1248,14 +1249,15 @@ function AddEmployeeForm({
                 />
                 {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
               </div>
-            </FormRow>
+            </div>
 
-            <FormRow label="5. Marital Status">
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">5. Marital Status</Label>
               <Select
                 value={formData.maritalStatus}
                 onValueChange={(value) => handleInputChange("maritalStatus", value)}
               >
-                <SelectTrigger className="form-input">
+                <SelectTrigger className="form-input flex-1">
                   <SelectValue placeholder="Select marital status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1265,11 +1267,12 @@ function AddEmployeeForm({
                   <SelectItem value="Separated">Separated</SelectItem>
                 </SelectContent>
               </Select>
-            </FormRow>
+            </div>
 
-            <FormRow label="6. Gender">
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">6. Gender</Label>
               <Select value={formData.gender} onValueChange={(value) => handleInputChange("gender", value)}>
-                <SelectTrigger className="form-input">
+                <SelectTrigger className="form-input flex-1">
                   <SelectValue placeholder="Select gender" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1277,12 +1280,12 @@ function AddEmployeeForm({
                   <SelectItem value="Female">Female</SelectItem>
                 </SelectContent>
               </Select>
-            </FormRow>
+            </div>
 
-            <FormRow label="7. Corporate Email">
-              <div>
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">7. Corporate Email Address</Label>
+              <div className="flex-1">
                 <Input
-                  id="corporateEmail"
                   type="email"
                   value={formData.corporateEmail}
                   onChange={(e) => handleInputChange("corporateEmail", e.target.value)}
@@ -1291,12 +1294,12 @@ function AddEmployeeForm({
                 />
                 {errors.corporateEmail && <p className="text-red-500 text-sm mt-1">{errors.corporateEmail}</p>}
               </div>
-            </FormRow>
+            </div>
 
-            <FormRow label="8. Personal Email *">
-              <div>
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">8. Personal Email Address *</Label>
+              <div className="flex-1">
                 <Input
-                  id="personalEmail"
                   type="email"
                   value={formData.personalEmail}
                   onChange={(e) => handleInputChange("personalEmail", e.target.value)}
@@ -1305,12 +1308,12 @@ function AddEmployeeForm({
                 />
                 {errors.personalEmail && <p className="text-red-500 text-sm mt-1">{errors.personalEmail}</p>}
               </div>
-            </FormRow>
+            </div>
 
-            <FormRow label="9. Phone Number *">
-              <div>
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">9. Phone Number *</Label>
+              <div className="flex-1">
                 <Input
-                  id="phone"
                   value={formData.phone}
                   onChange={(e) => handleInputChange("phone", e.target.value)}
                   placeholder="+233 XX XXX XXXX"
@@ -1318,34 +1321,36 @@ function AddEmployeeForm({
                 />
                 {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
               </div>
-            </FormRow>
+            </div>
 
-            <FormRow label="10. Date of Birth">
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">10. Date of Birth</Label>
               <Input
-                id="dateOfBirth"
                 type="date"
                 value={formData.dateOfBirth}
                 onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
-                className="form-input"
+                className="form-input flex-1"
               />
-            </FormRow>
+            </div>
 
-            <FormRow label="11. Address" full>
-              <Input
-                id="address"
+            <div className="flex items-start gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48 pt-2">11. Address</Label>
+              <textarea
                 value={formData.address}
                 onChange={(e) => handleInputChange("address", e.target.value)}
                 placeholder="Full address"
-                className="form-input"
+                className="form-input flex-1 min-h-[80px] max-h-[120px] resize-none overflow-y-auto"
+                rows={3}
               />
-            </FormRow>
+            </div>
 
-            <FormRow label="12. Educational Level">
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">12. Educational Level</Label>
               <Select
                 value={formData.educationalLevel}
                 onValueChange={(value) => handleInputChange("educationalLevel", value)}
               >
-                <SelectTrigger className="form-input">
+                <SelectTrigger className="form-input flex-1">
                   <SelectValue placeholder="Select education level" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1360,27 +1365,27 @@ function AddEmployeeForm({
                   <SelectItem value="Other Certificate">Other Certificate</SelectItem>
                 </SelectContent>
               </Select>
-            </FormRow>
+            </div>
 
-            <FormRow label="13. Emergency Contact Name">
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">13. Emergency Contact Name</Label>
               <Input
-                id="emergencyContactName"
                 value={formData.emergencyContactName}
                 onChange={(e) => handleInputChange("emergencyContactName", e.target.value)}
                 placeholder="Contact person name"
-                className="form-input"
+                className="form-input flex-1"
               />
-            </FormRow>
+            </div>
 
-            <FormRow label="14. Emergency Contact Tel">
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">14. Emergency Contact Tel</Label>
               <Input
-                id="emergencyContactTel"
                 value={formData.emergencyContactTel}
                 onChange={(e) => handleInputChange("emergencyContactTel", e.target.value)}
                 placeholder="+233 XX XXX XXXX"
-                className="form-input"
+                className="form-input flex-1"
               />
-            </FormRow>
+            </div>
           </div>
         </TabsContent>
 
@@ -1569,21 +1574,39 @@ function AddEmployeeForm({
         </TabsContent>
       </Tabs>
 
-      <div className="flex justify-end space-x-6 pt-8 border-t mt-8">
-        <Button type="button" variant="outline" onClick={onClose} className="h-12 px-10 text-base bg-transparent">
+      <div className="flex justify-end gap-4 pt-6 border-t">
+        <Button type="button" variant="outline" onClick={onClose} className="px-6 bg-transparent">
           Cancel
         </Button>
-        <Button
-          type="submit"
-          className="h-12 px-10 text-base text-white hover:opacity-90"
-          style={{
-            backgroundColor: "var(--theme-primary-600)",
-          }}
-        >
+        <Button type="submit" className="px-6 bg-[var(--theme-primary)] hover:bg-[var(--theme-primary-dark)]">
           {employee ? "Update Employee" : "Add Employee"}
         </Button>
       </div>
     </form>
+  )
+}
+
+function FormRow({
+  label,
+  children,
+  full = false,
+  error,
+}: {
+  label: string
+  children: React.ReactNode
+  full?: boolean
+  error?: string
+}) {
+  return (
+    <div className={full ? "lg:col-span-2" : ""}>
+      <div className="grid items-center gap-3 sm:grid-cols-[200px_1fr]">
+        <Label className="text-sm font-medium text-gray-700">{label}</Label>
+        <div>
+          {children}
+          {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -1789,24 +1812,5 @@ function EmployeeProfile({ employee }: { employee: any }) {
         </Card>
       </TabsContent>
     </Tabs>
-  )
-}
-
-function FormRow({
-  label,
-  children,
-  full = false,
-}: {
-  label: string
-  children: React.ReactNode
-  full?: boolean
-}) {
-  return (
-    <div className={full ? "lg:col-span-2" : ""}>
-      <div className="grid items-center gap-3 sm:grid-cols-[200px_1fr]">
-        <label className="text-sm font-medium text-gray-700">{label}</label>
-        <div>{children}</div>
-      </div>
-    </div>
   )
 }
