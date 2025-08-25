@@ -29,6 +29,7 @@ import {
   FileText,
   Download,
   Upload,
+  X,
 } from "lucide-react"
 
 const initialEmployees = [
@@ -1132,6 +1133,7 @@ function AddEmployeeForm({
     ssnit: employee?.ssnit || "",
     ghanaCard: employee?.ghanaCard || "",
     status: employee?.status || "Active",
+    documents: employee?.documents || [],
   })
 
   const [errors, setErrors] = useState<any>({})
@@ -1568,10 +1570,29 @@ function AddEmployeeForm({
                   <span className="font-medium text-gray-900">1. Academic Certificate(s)</span>
                   <p className="text-sm text-gray-500">Educational certificates and transcripts</p>
                 </div>
-                <Button type="button" variant="outline" className="bg-transparent">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Choose File
-                </Button>
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="academic-certificates"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        console.log("[v0] Academic Certificate file selected:", file.name)
+                        // Store file in employee documents array
+                        setFormData(prev => ({
+                          ...prev,
+                          documents: [...(prev.documents || []), { type: 'academic', file, name: file.name }]
+                        }))
+                      }
+                    }}
+                  />
+                  <Button type="button" variant="outline" className="bg-transparent">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -1579,10 +1600,28 @@ function AddEmployeeForm({
                   <span className="font-medium text-gray-900">2. Passport Picture</span>
                   <p className="text-sm text-gray-500">Professional passport-sized photograph</p>
                 </div>
-                <Button type="button" variant="outline" className="bg-transparent">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Choose File
-                </Button>
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="passport-picture"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    accept=".jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        console.log("[v0] Passport Picture file selected:", file.name)
+                        setFormData(prev => ({
+                          ...prev,
+                          documents: [...(prev.documents || []), { type: 'passport-picture', file, name: file.name }]
+                        }))
+                      }
+                    }}
+                  />
+                  <Button type="button" variant="outline" className="bg-transparent">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -1590,10 +1629,28 @@ function AddEmployeeForm({
                   <span className="font-medium text-gray-900">3. Resume & Application Letter</span>
                   <p className="text-sm text-gray-500">Current CV and cover letter</p>
                 </div>
-                <Button type="button" variant="outline" className="bg-transparent">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Choose File
-                </Button>
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="resume-application"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        console.log("[v0] Resume & Application file selected:", file.name)
+                        setFormData(prev => ({
+                          ...prev,
+                          documents: [...(prev.documents || []), { type: 'resume', file, name: file.name }]
+                        }))
+                      }
+                    }}
+                  />
+                  <Button type="button" variant="outline" className="bg-transparent">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -1601,10 +1658,28 @@ function AddEmployeeForm({
                   <span className="font-medium text-gray-900">4. Passport</span>
                   <p className="text-sm text-gray-500">Valid passport copy</p>
                 </div>
-                <Button type="button" variant="outline" className="bg-transparent">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Choose File
-                </Button>
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="passport-copy"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        console.log("[v0] Passport file selected:", file.name)
+                        setFormData(prev => ({
+                          ...prev,
+                          documents: [...(prev.documents || []), { type: 'passport', file, name: file.name }]
+                        }))
+                      }
+                    }}
+                  />
+                  <Button type="button" variant="outline" className="bg-transparent">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -1612,10 +1687,28 @@ function AddEmployeeForm({
                   <span className="font-medium text-gray-900">5. National ID</span>
                   <p className="text-sm text-gray-500">Ghana Card or Voter's ID</p>
                 </div>
-                <Button type="button" variant="outline" className="bg-transparent">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Choose File
-                </Button>
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="national-id"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        console.log("[v0] National ID file selected:", file.name)
+                        setFormData(prev => ({
+                          ...prev,
+                          documents: [...(prev.documents || []), { type: 'national-id', file, name: file.name }]
+                        }))
+                      }
+                    }}
+                  />
+                  <Button type="button" variant="outline" className="bg-transparent">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -1633,7 +1726,10 @@ function AddEmployeeForm({
                       const file = e.target.files?.[0]
                       if (file) {
                         console.log("[v0] Medical Report file selected:", file.name)
-                        // Handle file upload logic here
+                        setFormData(prev => ({
+                          ...prev,
+                          documents: [...(prev.documents || []), { type: 'medical', file, name: file.name }]
+                        }))
                       }
                     }}
                   />
@@ -1649,10 +1745,28 @@ function AddEmployeeForm({
                   <span className="font-medium text-gray-900">7. Police Report</span>
                   <p className="text-sm text-gray-500">Criminal background check</p>
                 </div>
-                <Button type="button" variant="outline" className="bg-transparent">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Choose File
-                </Button>
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="police-report"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        console.log("[v0] Police Report file selected:", file.name)
+                        setFormData(prev => ({
+                          ...prev,
+                          documents: [...(prev.documents || []), { type: 'police', file, name: file.name }]
+                        }))
+                      }
+                    }}
+                  />
+                  <Button type="button" variant="outline" className="bg-transparent">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -1660,22 +1774,71 @@ function AddEmployeeForm({
                   <span className="font-medium text-gray-900">8. Other Uploads</span>
                   <p className="text-sm text-gray-500">Additional supporting documents</p>
                 </div>
-                <Button type="button" variant="outline" className="bg-transparent">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Choose File
-                </Button>
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="other-uploads"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    multiple
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || [])
+                      if (files.length > 0) {
+                        console.log("[v0] Other documents selected:", files.map(f => f.name))
+                        files.forEach(file => {
+                          setFormData(prev => ({
+                            ...prev,
+                            documents: [...(prev.documents || []), { type: 'other', file, name: file.name }]
+                          }))
+                        })
+                      }
+                    }}
+                  />
+                  <Button type="button" variant="outline" className="bg-transparent">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                </div>
               </div>
             </div>
 
+            {formData.documents && formData.documents.length > 0 && (
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-medium text-gray-900 mb-3">Uploaded Documents</h4>
+                <div className="space-y-2">
+                  {formData.documents.map((doc: any, index: number) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-white rounded border">
+                      <div className="flex items-center">
+                        <FileText className="w-4 h-4 mr-2 text-gray-500" />
+                        <span className="text-sm">{doc.name}</span>
+                        <span className="text-xs text-gray-500 ml-2">({doc.type})</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setFormData(prev => ({
+                            ...prev,
+                            documents: prev.documents?.filter((_, i) => i !== index) || []
+                          }))
+                        }}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mt-6 p-4 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Supported file formats: PDF, DOC, DOCX, JPG, PNG. Maximum file size: 5MB per
-                document.
+                <strong>Note:</strong> Documents are stored securely in the employee's document vault. Supported file formats: PDF, DOC, DOCX, JPG, PNG. Maximum file size: 5MB per document.
               </p>
             </div>
           </div>
         </TabsContent>
-      </Tabs>
 
       <div className="flex justify-end gap-4 pt-6 border-t">
         <Button type="button" variant="outline" onClick={onClose} className="px-6 bg-transparent">
@@ -1698,10 +1861,10 @@ function FormRow({
   label: string
   children: React.ReactNode
   full?: boolean
-  error?: string
+  error?: string\
 }) {
   return (
-    <div className={full ? "lg:col-span-2" : ""}>
+    <div className={full ? "lg:col-span-2" : ""}>\
       <div className="grid items-center gap-3 sm:grid-cols-[200px_1fr]">
         <Label className="text-sm font-medium text-gray-700">{label}</Label>
         <div>
@@ -1715,7 +1878,7 @@ function FormRow({
 
 function EmployeeProfile({ employee }: { employee: any }) {
   return (
-    <Tabs defaultValue="overview" className="w-full">
+    <Tabs defaultValue="overview" className=\"w-full">\
       <TabsList className="grid w-full grid-cols-5">
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="employment">Employment</TabsTrigger>
@@ -1915,5 +2078,5 @@ function EmployeeProfile({ employee }: { employee: any }) {
         </Card>
       </TabsContent>
     </Tabs>
-  )
+  )\
 }

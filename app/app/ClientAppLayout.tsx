@@ -33,6 +33,7 @@ import {
   ChevronDown,
   X,
   Palette,
+  FileText,
 } from "lucide-react"
 import { Suspense, useState, useEffect } from "react"
 
@@ -406,6 +407,21 @@ export default function ClientAppLayout({
                   <span>Employees</span>
                 </a>
                 <a
+                  href="/app/documents"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
+                    e.currentTarget.style.color = "white"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = ""
+                    e.currentTarget.style.color = ""
+                  }}
+                >
+                  <FileText className="w-5 h-5" />
+                  <span>Document Vault</span>
+                </a>
+                <a
                   href="/app/recruitment"
                   className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
                   onMouseEnter={(e) => {
@@ -549,7 +565,7 @@ export default function ClientAppLayout({
                     e.currentTarget.style.color = ""
                   }}
                 >
-                  <Settings className="w-5 h-5" />
+                  <Settings className="w-4 h-4 mr-2" />
                   <span>Settings</span>
                 </a>
                 <div className="pt-4 mt-4 border-t border-gray-200">
