@@ -13,7 +13,6 @@ import { Progress } from "@/components/ui/progress"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
-import { toast } from "@/hooks/use-toast"
 import {
   Briefcase,
   Users,
@@ -24,7 +23,6 @@ import {
   MoreHorizontal,
   Plus,
   Search,
-  Download,
   Clock,
   CheckCircle,
   XCircle,
@@ -38,10 +36,10 @@ import {
   Building,
   TrendingUp,
   BarChart3,
+  UserCheck,
+  ClipboardList,
   UserPlus,
-  Settings,
-  Award,
-  BookOpen,
+  Zap,
   Shield,
 } from "lucide-react"
 
@@ -89,9 +87,6 @@ interface Application {
   source: string
   dateApplied: string
   resumeUrl?: string
-  skills?: string[]
-  education?: string
-  previousCompany?: string
 }
 
 interface Interview {
@@ -108,53 +103,6 @@ interface Interview {
   rating?: number
 }
 
-interface OfferLetter {
-  id: string
-  applicationId: string
-  candidateName: string
-  jobTitle: string
-  salary: number
-  startDate: string
-  benefits: string[]
-  terms: string
-  status: "draft" | "sent" | "accepted" | "rejected"
-  generatedDate: string
-  acceptanceDeadline: string
-}
-
-interface OnboardingTask {
-  id: string
-  candidateId: string
-  candidateName: string
-  taskType: "document" | "policy" | "system" | "facility" | "training"
-  title: string
-  description: string
-  assignedTo: string
-  department: string
-  status: "pending" | "in-progress" | "completed"
-  dueDate: string
-  priority: "low" | "medium" | "high"
-  completedDate?: string
-}
-
-interface OnboardingChecklist {
-  id: string
-  candidateId: string
-  candidateName: string
-  jobTitle: string
-  startDate: string
-  status: "not-started" | "in-progress" | "completed"
-  progress: number
-  tasks: OnboardingTask[]
-  documents: {
-    contract: boolean
-    bankDetails: boolean
-    emergencyContact: boolean
-    taxForm: boolean
-    policyAcknowledgment: boolean
-  }
-}
-
 export default function RecruitmentPage() {
   const [activeTab, setActiveTab] = useState("overview")
   const [showRequisitionDialog, setShowRequisitionDialog] = useState(false)
@@ -162,7 +110,8 @@ export default function RecruitmentPage() {
   const [showInterviewDialog, setShowInterviewDialog] = useState(false)
   const [showOfferDialog, setShowOfferDialog] = useState(false)
   const [showOnboardingDialog, setShowOnboardingDialog] = useState(false)
-  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null)
+  const [showATSDialog, setShowATSDialog] = useState(false)
+  const [selectedCandidate, setSelectedCandidate] = useState<any>(null)
 
   const [requisitions] = useState<JobRequisition[]>([
     {
@@ -230,7 +179,7 @@ export default function RecruitmentPage() {
     },
   ])
 
-  const [applications, setApplications] = useState<Application[]>([
+  const [applications] = useState<Application[]>([
     {
       id: "1",
       jobId: "1",
@@ -242,9 +191,6 @@ export default function RecruitmentPage() {
       score: 85,
       source: "LinkedIn",
       dateApplied: "2024-01-15",
-      skills: ["React", "Node.js", "TypeScript", "AWS"],
-      education: "BSc Computer Science - University of Ghana",
-      previousCompany: "Tech Solutions Ghana",
     },
     {
       id: "2",
@@ -257,9 +203,6 @@ export default function RecruitmentPage() {
       score: 78,
       source: "Company Website",
       dateApplied: "2024-01-14",
-      skills: ["JavaScript", "Python", "SQL"],
-      education: "BSc Information Technology - KNUST",
-      previousCompany: "Digital Innovations Ltd",
     },
     {
       id: "3",
@@ -272,9 +215,6 @@ export default function RecruitmentPage() {
       score: 92,
       source: "Referral",
       dateApplied: "2024-01-12",
-      skills: ["HR Management", "Recruitment", "Employee Relations"],
-      education: "MBA Human Resources - University of Cape Coast",
-      previousCompany: "People First HR Consultancy",
     },
   ])
 
@@ -305,82 +245,214 @@ export default function RecruitmentPage() {
     },
   ])
 
-  const [offerLetters, setOfferLetters] = useState<OfferLetter[]>([
-    {
-      id: "1",
-      applicationId: "3",
-      candidateName: "David Mensah",
-      jobTitle: "HR Manager",
-      salary: 6000,
-      startDate: "2024-02-01",
-      benefits: ["Health Insurance", "Car Allowance", "Professional Development Fund"],
-      terms: "This offer is contingent upon successful completion of background checks and reference verification.",
-      status: "sent",
-      generatedDate: "2024-01-19",
-      acceptanceDeadline: "2024-01-26",
-    },
-  ])
+  const offerLetterTemplate = {
+    companyName: "AkwaabaHRPay Solutions Ltd",
+    companyAddress: "123 Independence Avenue, Accra, Ghana",
+    companyPhone: "+233 30 123 4567",
+    companyEmail: "hr@akwaabahrpay.com",
+    template: `
+Dear [CANDIDATE_NAME],
 
-  const [onboardingChecklists, setOnboardingChecklists] = useState<OnboardingChecklist[]>([
+We are pleased to offer you the position of [JOB_TITLE] at [COMPANY_NAME], subject to the terms and conditions outlined below.
+
+EMPLOYMENT DETAILS:
+- Position: [JOB_TITLE]
+- Department: [DEPARTMENT]
+- Reporting to: [SUPERVISOR]
+- Start Date: [START_DATE]
+- Employment Type: [EMPLOYMENT_TYPE]
+- Location: [WORK_LOCATION]
+
+COMPENSATION & BENEFITS:
+- Basic Salary: GHS [BASIC_SALARY] per month
+- Housing Allowance: GHS [HOUSING_ALLOWANCE] per month (if applicable)
+- Transport Allowance: GHS [TRANSPORT_ALLOWANCE] per month (if applicable)
+- Other Allowances: [OTHER_ALLOWANCES]
+- Annual Leave: [ANNUAL_LEAVE] working days per year
+- Sick Leave: As per Ghana Labour Act, 2003 (Act 651)
+
+STATUTORY COMPLIANCE:
+This offer is made in accordance with the Ghana Labour Act, 2003 (Act 651) and includes:
+- SSNIT contributions (Tier 1 & 2) as required by law
+- Income Tax (PAYE) deductions as per Ghana Revenue Authority
+- Provident Fund (Tier 3) contributions if applicable
+- Workers' compensation coverage
+- Maternity/Paternity leave as per statutory requirements
+
+TERMS & CONDITIONS:
+- Probationary period: [PROBATION_PERIOD] months
+- Notice period: [NOTICE_PERIOD] as per Ghana Labour Act
+- Confidentiality and non-disclosure agreements apply
+- Company policies and procedures must be adhered to
+
+This offer is valid until [OFFER_EXPIRY_DATE]. Please confirm your acceptance by signing and returning this letter.
+
+We look forward to welcoming you to our team.
+
+Sincerely,
+[HR_MANAGER_NAME]
+Human Resources Manager
+[COMPANY_NAME]
+
+Date: [OFFER_DATE]
+    `,
+  }
+
+  const onboardingChecklist = [
     {
-      id: "1",
-      candidateId: "3",
-      candidateName: "David Mensah",
-      jobTitle: "HR Manager",
-      startDate: "2024-02-01",
-      status: "in-progress",
-      progress: 60,
+      category: "Pre-boarding",
       tasks: [
         {
           id: "1",
-          candidateId: "3",
-          candidateName: "David Mensah",
-          taskType: "system",
-          title: "Setup IT Equipment",
-          description: "Provision laptop, phone, and system accounts",
-          assignedTo: "IT Department",
-          department: "IT",
-          status: "completed",
-          dueDate: "2024-01-30",
-          priority: "high",
-          completedDate: "2024-01-28",
+          task: "Send welcome email with first-day information",
+          assignee: "HR",
+          deadline: "3 days before start",
+          status: "pending",
         },
         {
           id: "2",
-          candidateId: "3",
-          candidateName: "David Mensah",
-          taskType: "facility",
-          title: "Office Setup",
-          description: "Assign desk, parking space, and access cards",
-          assignedTo: "Facilities Team",
-          department: "Facilities",
-          status: "in-progress",
-          dueDate: "2024-01-31",
-          priority: "medium",
+          task: "Prepare workspace and equipment",
+          assignee: "IT",
+          deadline: "1 day before start",
+          status: "pending",
         },
         {
           id: "3",
-          candidateId: "3",
-          candidateName: "David Mensah",
-          taskType: "training",
-          title: "HR Systems Training",
-          description: "Training on HRIS, payroll systems, and company policies",
-          assignedTo: "HR Training Team",
-          department: "HR",
+          task: "Create employee accounts (email, systems)",
+          assignee: "IT",
+          deadline: "1 day before start",
           status: "pending",
-          dueDate: "2024-02-05",
-          priority: "high",
+        },
+        {
+          id: "4",
+          task: "Prepare employment contract",
+          assignee: "HR",
+          deadline: "5 days before start",
+          status: "completed",
         },
       ],
-      documents: {
-        contract: true,
-        bankDetails: true,
-        emergencyContact: false,
-        taxForm: false,
-        policyAcknowledgment: true,
-      },
     },
-  ])
+    {
+      category: "Day 1 - Documentation",
+      tasks: [
+        { id: "5", task: "Complete employment contract signing", assignee: "HR", deadline: "Day 1", status: "pending" },
+        {
+          id: "6",
+          task: "Collect and verify identification documents",
+          assignee: "HR",
+          deadline: "Day 1",
+          status: "pending",
+        },
+        { id: "7", task: "Complete tax forms (PAYE, SSNIT)", assignee: "HR", deadline: "Day 1", status: "pending" },
+        { id: "8", task: "Bank details collection for salary", assignee: "HR", deadline: "Day 1", status: "pending" },
+        { id: "9", task: "Emergency contact information", assignee: "HR", deadline: "Day 1", status: "pending" },
+      ],
+    },
+    {
+      category: "Day 1 - Orientation",
+      tasks: [
+        {
+          id: "10",
+          task: "Company orientation and culture introduction",
+          assignee: "HR",
+          deadline: "Day 1",
+          status: "pending",
+        },
+        {
+          id: "11",
+          task: "Office tour and safety briefing",
+          assignee: "Facilities",
+          deadline: "Day 1",
+          status: "pending",
+        },
+        { id: "12", task: "IT setup and system access", assignee: "IT", deadline: "Day 1", status: "pending" },
+        { id: "13", task: "Introduction to team members", assignee: "Manager", deadline: "Day 1", status: "pending" },
+      ],
+    },
+    {
+      category: "Week 1 - Integration",
+      tasks: [
+        { id: "14", task: "Department-specific training", assignee: "Manager", deadline: "Week 1", status: "pending" },
+        { id: "15", task: "Assign buddy/mentor", assignee: "HR", deadline: "Week 1", status: "pending" },
+        {
+          id: "16",
+          task: "Review job description and expectations",
+          assignee: "Manager",
+          deadline: "Week 1",
+          status: "pending",
+        },
+        {
+          id: "17",
+          task: "Complete mandatory compliance training",
+          assignee: "Employee",
+          deadline: "Week 1",
+          status: "pending",
+        },
+      ],
+    },
+    {
+      category: "30-60-90 Day Reviews",
+      tasks: [
+        { id: "18", task: "30-day check-in meeting", assignee: "Manager", deadline: "30 days", status: "pending" },
+        { id: "19", task: "60-day performance review", assignee: "Manager", deadline: "60 days", status: "pending" },
+        { id: "20", task: "90-day probation review", assignee: "HR", deadline: "90 days", status: "pending" },
+      ],
+    },
+  ]
+
+  const atsWorkflow = [
+    { stage: "Application Received", description: "Initial application submitted", automated: true },
+    { stage: "Resume Screening", description: "AI-powered resume analysis", automated: true },
+    { stage: "Phone Screening", description: "Initial phone interview", automated: false },
+    { stage: "Skills Assessment", description: "Technical or competency test", automated: true },
+    { stage: "Panel Interview", description: "Face-to-face or video interview", automated: false },
+    { stage: "Reference Check", description: "Verify previous employment", automated: false },
+    { stage: "Background Check", description: "Criminal and credit checks", automated: true },
+    { stage: "Offer Generation", description: "Automated offer letter creation", automated: true },
+    { stage: "Offer Negotiation", description: "Salary and terms discussion", automated: false },
+    { stage: "Onboarding", description: "Digital onboarding process", automated: true },
+  ]
+
+  const generateOfferLetter = (candidate: any, jobDetails: any) => {
+    let offerLetter = offerLetterTemplate.template
+
+    // Replace placeholders with actual data
+    offerLetter = offerLetter
+      .replace(/\[CANDIDATE_NAME\]/g, candidate.candidateName)
+      .replace(/\[JOB_TITLE\]/g, jobDetails.title)
+      .replace(/\[COMPANY_NAME\]/g, offerLetterTemplate.companyName)
+      .replace(/\[DEPARTMENT\]/g, jobDetails.department)
+      .replace(/\[SUPERVISOR\]/g, "Department Manager")
+      .replace(/\[START_DATE\]/g, new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString())
+      .replace(/\[EMPLOYMENT_TYPE\]/g, jobDetails.type)
+      .replace(/\[WORK_LOCATION\]/g, jobDetails.location)
+      .replace(/\[BASIC_SALARY\]/g, "6,000")
+      .replace(/\[HOUSING_ALLOWANCE\]/g, "1,000")
+      .replace(/\[TRANSPORT_ALLOWANCE\]/g, "500")
+      .replace(/\[OTHER_ALLOWANCES\]/g, "Medical allowance: GHS 200")
+      .replace(/\[ANNUAL_LEAVE\]/g, "15")
+      .replace(/\[PROBATION_PERIOD\]/g, "6")
+      .replace(/\[NOTICE_PERIOD\]/g, "1 month")
+      .replace(/\[OFFER_EXPIRY_DATE\]/g, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString())
+      .replace(/\[HR_MANAGER_NAME\]/g, "Jane Smith")
+      .replace(/\[OFFER_DATE\]/g, new Date().toLocaleDateString())
+
+    return offerLetter
+  }
+
+  const handleGenerateOffer = (candidate: any) => {
+    const jobDetails = jobPostings.find((job) => job.id === candidate.jobId)
+    const offerLetter = generateOfferLetter(candidate, jobDetails)
+
+    // In a real app, this would save to database and send email
+    console.log("Generated offer letter:", offerLetter)
+    alert("Offer letter generated and sent to candidate!")
+  }
+
+  const handleStartOnboarding = (candidate: any) => {
+    setSelectedCandidate(candidate)
+    setShowOnboardingDialog(true)
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -388,20 +460,15 @@ export default function RecruitmentPage() {
       case "approved":
       case "hired":
       case "completed":
-      case "accepted":
         return "bg-green-100 text-green-700"
       case "interview":
       case "scheduled":
-      case "in-progress":
         return "bg-blue-100 text-blue-700"
       case "screening":
       case "posted":
-      case "sent":
         return "bg-yellow-100 text-yellow-700"
       case "draft":
       case "new":
-      case "pending":
-      case "not-started":
         return "bg-gray-100 text-gray-700"
       case "rejected":
       case "cancelled":
@@ -424,233 +491,21 @@ export default function RecruitmentPage() {
     }
   }
 
-  const generateOfferLetter = (application: Application) => {
-    const jobPosting = jobPostings.find((j) => j.id === application.jobId)
-    if (!jobPosting) return
-
-    const newOffer: OfferLetter = {
-      id: `offer_${Date.now()}`,
-      applicationId: application.id,
-      candidateName: application.candidateName,
-      jobTitle: jobPosting.title,
-      salary: 6000, // This would be calculated based on job posting and negotiations
-      startDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], // 2 weeks from now
-      benefits: jobPosting.benefits,
-      terms: `This offer is made in accordance with the Ghana Labour Act, 2003 (Act 651) and is contingent upon successful completion of background checks, reference verification, and medical examination. The employment is subject to a probationary period of 6 months as per Section 20 of the Labour Act.`,
-      status: "draft",
-      generatedDate: new Date().toISOString().split("T")[0],
-      acceptanceDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], // 1 week deadline
-    }
-
-    setOfferLetters((prev) => [...prev, newOffer])
-
-    setApplications((prev) =>
-      prev.map((app) => (app.id === application.id ? { ...app, status: "offer" as const } : app)),
-    )
-
-    toast({
-      title: "Offer Letter Generated",
-      description: `Offer letter for ${application.candidateName} has been created and is ready for review.`,
-    })
-  }
-
-  const createOnboardingChecklist = (application: Application) => {
-    const jobPosting = jobPostings.find((j) => j.id === application.jobId)
-    if (!jobPosting) return
-
-    const defaultTasks: OnboardingTask[] = [
-      {
-        id: `task_${Date.now()}_1`,
-        candidateId: application.id,
-        candidateName: application.candidateName,
-        taskType: "system",
-        title: "IT Equipment Setup",
-        description: "Provision laptop, mobile phone, email account, and system access",
-        assignedTo: "IT Department",
-        department: "IT",
-        status: "pending",
-        dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        priority: "high",
-      },
-      {
-        id: `task_${Date.now()}_2`,
-        candidateId: application.id,
-        candidateName: application.candidateName,
-        taskType: "facility",
-        title: "Workspace Preparation",
-        description: "Assign desk, parking space, access cards, and office supplies",
-        assignedTo: "Facilities Team",
-        department: "Facilities",
-        status: "pending",
-        dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        priority: "medium",
-      },
-      {
-        id: `task_${Date.now()}_3`,
-        candidateId: application.id,
-        candidateName: application.candidateName,
-        taskType: "document",
-        title: "Document Collection",
-        description: "Collect signed contract, bank details, emergency contacts, and tax forms",
-        assignedTo: "HR Team",
-        department: "HR",
-        status: "pending",
-        dueDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        priority: "high",
-      },
-      {
-        id: `task_${Date.now()}_4`,
-        candidateId: application.id,
-        candidateName: application.candidateName,
-        taskType: "training",
-        title: "Orientation Program",
-        description: "Company orientation, department introduction, and role-specific training",
-        assignedTo: "HR Training Team",
-        department: "HR",
-        status: "pending",
-        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        priority: "high",
-      },
-      {
-        id: `task_${Date.now()}_5`,
-        candidateId: application.id,
-        candidateName: application.candidateName,
-        taskType: "policy",
-        title: "Policy Acknowledgment",
-        description: "Review and sign company policies, code of conduct, and safety procedures",
-        assignedTo: "HR Compliance",
-        department: "HR",
-        status: "pending",
-        dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        priority: "medium",
-      },
-    ]
-
-    const newChecklist: OnboardingChecklist = {
-      id: `checklist_${Date.now()}`,
-      candidateId: application.id,
-      candidateName: application.candidateName,
-      jobTitle: jobPosting.title,
-      startDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-      status: "not-started",
-      progress: 0,
-      tasks: defaultTasks,
-      documents: {
-        contract: false,
-        bankDetails: false,
-        emergencyContact: false,
-        taxForm: false,
-        policyAcknowledgment: false,
-      },
-    }
-
-    setOnboardingChecklists((prev) => [...prev, newChecklist])
-
-    setApplications((prev) =>
-      prev.map((app) => (app.id === application.id ? { ...app, status: "hired" as const } : app)),
-    )
-
-    toast({
-      title: "Onboarding Checklist Created",
-      description: `Onboarding process initiated for ${application.candidateName}. Tasks have been assigned to relevant departments.`,
-    })
-  }
-
-  const updateTaskStatus = (
-    checklistId: string,
-    taskId: string,
-    newStatus: "pending" | "in-progress" | "completed",
-  ) => {
-    setOnboardingChecklists((prev) =>
-      prev.map((checklist) => {
-        if (checklist.id === checklistId) {
-          const updatedTasks = checklist.tasks.map((task) =>
-            task.id === taskId
-              ? {
-                  ...task,
-                  status: newStatus,
-                  completedDate: newStatus === "completed" ? new Date().toISOString().split("T")[0] : undefined,
-                }
-              : task,
-          )
-
-          const completedTasks = updatedTasks.filter((task) => task.status === "completed").length
-          const progress = Math.round((completedTasks / updatedTasks.length) * 100)
-
-          return {
-            ...checklist,
-            tasks: updatedTasks,
-            progress,
-            status:
-              progress === 100
-                ? ("completed" as const)
-                : progress > 0
-                  ? ("in-progress" as const)
-                  : ("not-started" as const),
-          }
-        }
-        return checklist
-      }),
-    )
-
-    toast({
-      title: "Task Updated",
-      description: `Task status has been updated to ${newStatus}.`,
-    })
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Advanced Recruitment & ATS</h1>
-          <p className="text-gray-600">Complete applicant tracking system with automated workflows</p>
+          <h1 className="text-3xl font-bold text-gray-900">Advanced Recruitment System</h1>
+          <p className="text-gray-600">Complete ATS with Ghana Labour Act compliance</p>
         </div>
-        <div className="flex gap-2">
-          <Dialog open={showRequisitionDialog} onOpenChange={setShowRequisitionDialog}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Plus className="w-4 h-4 mr-2" />
-                New Requisition
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Create Job Requisition</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="title">Job Title</Label>
-                    <Input id="title" placeholder="e.g. Senior Software Engineer" />
-                  </div>
-                  <div>
-                    <Label htmlFor="department">Department</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="engineering">Engineering</SelectItem>
-                        <SelectItem value="hr">Human Resources</SelectItem>
-                        <SelectItem value="finance">Finance</SelectItem>
-                        <SelectItem value="marketing">Marketing</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setShowRequisitionDialog(false)}>
-                    Cancel
-                  </Button>
-                  <Button>Create Requisition</Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-          <Button>
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={() => setShowATSDialog(true)}>
+            <Zap className="w-4 h-4 mr-2" />
+            ATS Workflow
+          </Button>
+          <Button onClick={() => setShowRequisitionDialog(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Post Job
+            New Requisition
           </Button>
         </div>
       </div>
@@ -658,12 +513,12 @@ export default function RecruitmentPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="ats">ATS Pipeline</TabsTrigger>
           <TabsTrigger value="requisitions">Requisitions</TabsTrigger>
           <TabsTrigger value="jobs">Job Postings</TabsTrigger>
           <TabsTrigger value="applications">Applications</TabsTrigger>
           <TabsTrigger value="interviews">Interviews</TabsTrigger>
           <TabsTrigger value="offers">Offers</TabsTrigger>
-          <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
@@ -795,6 +650,44 @@ export default function RecruitmentPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="ats" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Zap className="w-5 h-5 mr-2" />
+                Applicant Tracking System (ATS) Workflow
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {atsWorkflow.map((stage, index) => (
+                  <div key={index} className="flex items-center space-x-4 p-4 border rounded-lg">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-medium text-emerald-600">{index + 1}</span>
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium">{stage.stage}</h3>
+                      <p className="text-sm text-gray-600">{stage.description}</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {stage.automated ? (
+                        <Badge className="bg-blue-100 text-blue-700">
+                          <Zap className="w-3 h-3 mr-1" />
+                          Automated
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">Manual</Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="requisitions" className="space-y-6">
@@ -1046,79 +939,64 @@ export default function RecruitmentPage() {
         </TabsContent>
 
         <TabsContent value="applications" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Applications ({applications.length})</CardTitle>
-                <div className="flex items-center space-x-2">
-                  <div className="relative">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <Input placeholder="Search applications..." className="pl-10 w-64" />
-                  </div>
-                  <Select>
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="screening">Screening</SelectItem>
-                      <SelectItem value="interview">Interview</SelectItem>
-                      <SelectItem value="offer">Offer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Input placeholder="Search applications..." className="pl-10 w-64" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {applications.map((application) => (
-                  <div key={application.id} className="border rounded-lg p-4">
+              <Select defaultValue="all">
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="new">New</SelectItem>
+                  <SelectItem value="screening">Screening</SelectItem>
+                  <SelectItem value="interview">Interview</SelectItem>
+                  <SelectItem value="offer">Offer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            {applications.map((application) => {
+              const job = jobPostings.find((j) => j.id === application.jobId)
+              return (
+                <Card key={application.id}>
+                  <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
-                          <User className="w-6 h-6 text-emerald-600" />
+                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                          <User className="w-6 h-6 text-blue-600" />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900">{application.candidateName}</h3>
-                          <p className="text-sm text-gray-600">
-                            {jobPostings.find((j) => j.id === application.jobId)?.title}
-                          </p>
-                          <div className="flex items-center space-x-4 mt-1">
-                            <div className="flex items-center text-xs text-gray-500">
-                              <Mail className="w-3 h-3 mr-1" />
+                          <h3 className="font-semibold text-lg">{application.candidateName}</h3>
+                          <p className="text-gray-600">{job?.title}</p>
+                          <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                            <span className="flex items-center">
+                              <Mail className="w-4 h-4 mr-1" />
                               {application.email}
-                            </div>
-                            <div className="flex items-center text-xs text-gray-500">
-                              <Phone className="w-3 h-3 mr-1" />
+                            </span>
+                            <span className="flex items-center">
+                              <Phone className="w-4 h-4 mr-1" />
                               {application.phone}
-                            </div>
-                            <div className="flex items-center text-xs text-gray-500">
-                              <Briefcase className="w-3 h-3 mr-1" />
-                              {application.experience}
-                            </div>
+                            </span>
+                            <span>{application.experience} experience</span>
                           </div>
-                          {application.skills && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {application.skills.slice(0, 3).map((skill, index) => (
-                                <Badge key={index} variant="outline" className="text-xs">
-                                  {skill}
-                                </Badge>
-                              ))}
-                              {application.skills.length > 3 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{application.skills.length - 3} more
-                                </Badge>
-                              )}
-                            </div>
-                          )}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-4">
                         <div className="text-right">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <span className="text-sm text-gray-600">Score:</span>
+                            <div className="flex items-center space-x-1">
+                              <Progress value={application.score} className="w-16 h-2" />
+                              <span className="text-sm font-medium">{application.score}%</span>
+                            </div>
+                          </div>
                           <Badge className={getStatusColor(application.status)}>{application.status}</Badge>
-                          <p className="text-xs text-gray-500 mt-1">Score: {application.score}%</p>
-                          <p className="text-xs text-gray-500">{application.dateApplied}</p>
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -1126,259 +1004,253 @@ export default function RecruitmentPage() {
                               <MoreHorizontal className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent>
                             <DropdownMenuItem>
                               <Eye className="w-4 h-4 mr-2" />
-                              View Details
+                              View Profile
                             </DropdownMenuItem>
                             <DropdownMenuItem>
-                              <Download className="w-4 h-4 mr-2" />
+                              <FileText className="w-4 h-4 mr-2" />
                               Download Resume
                             </DropdownMenuItem>
                             <DropdownMenuItem>
                               <Calendar className="w-4 h-4 mr-2" />
                               Schedule Interview
                             </DropdownMenuItem>
-                            {application.status === "interview" && (
-                              <DropdownMenuItem onClick={() => generateOfferLetter(application)}>
-                                <FileText className="w-4 h-4 mr-2" />
-                                Generate Offer
-                              </DropdownMenuItem>
-                            )}
-                            {application.status === "offer" && (
-                              <DropdownMenuItem onClick={() => createOnboardingChecklist(application)}>
-                                <UserPlus className="w-4 h-4 mr-2" />
-                                Start Onboarding
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem className="text-red-600">
-                              <XCircle className="w-4 h-4 mr-2" />
-                              Reject Application
+                            <DropdownMenuItem>
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Move to Next Stage
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
                     </div>
-                  </div>
-                ))}
+                    <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+                      <span>
+                        Applied via {application.source} on {application.dateApplied}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="interviews" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Input placeholder="Search interviews..." className="pl-10 w-64" />
               </div>
-            </CardContent>
-          </Card>
+              <Select defaultValue="all">
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Dialog open={showInterviewDialog} onOpenChange={setShowInterviewDialog}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Schedule Interview
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Schedule Interview</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Candidate</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select candidate" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {applications.map((app) => (
+                          <SelectItem key={app.id} value={app.id}>
+                            {app.candidateName} - {jobPostings.find((j) => j.id === app.jobId)?.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Interview Type</Label>
+                      <Select>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="phone">Phone</SelectItem>
+                          <SelectItem value="video">Video Call</SelectItem>
+                          <SelectItem value="in-person">In-Person</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Interviewer</Label>
+                      <Select>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select interviewer" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="john">John Doe</SelectItem>
+                          <SelectItem value="jane">Jane Smith</SelectItem>
+                          <SelectItem value="mike">Mike Johnson</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Date</Label>
+                      <Input type="date" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Time</Label>
+                      <Input type="time" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Notes</Label>
+                    <Textarea placeholder="Add any notes or special instructions..." rows={3} />
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setShowInterviewDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button>Schedule Interview</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="grid gap-4">
+            {interviews.map((interview) => (
+              <Card key={interview.id}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                        <Calendar className="w-6 h-6 text-purple-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-lg">{interview.candidateName}</h3>
+                        <p className="text-gray-600">{interview.jobTitle}</p>
+                        <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                          <span>
+                            {interview.date} at {interview.time}
+                          </span>
+                          <span className="capitalize">{interview.type} interview</span>
+                          <span>with {interview.interviewer}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <Badge className={getStatusColor(interview.status)}>{interview.status}</Badge>
+                      {interview.rating && (
+                        <div className="flex items-center space-x-1">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-4 h-4 ${
+                                i < interview.rating! ? "text-yellow-400 fill-current" : "text-gray-300"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Interview
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <FileText className="w-4 h-4 mr-2" />
+                            Add Feedback
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <XCircle className="w-4 h-4 mr-2" />
+                            Cancel Interview
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                  {interview.feedback && (
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-700">{interview.feedback}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </TabsContent>
 
         <TabsContent value="offers" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Offer Letters ({offerLetters.length})</CardTitle>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Generate Offer
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {offerLetters.map((offer) => (
-                  <div key={offer.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                          <FileText className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{offer.candidateName}</h3>
-                          <p className="text-sm text-gray-600">{offer.jobTitle}</p>
-                          <div className="flex items-center space-x-4 mt-1">
-                            <div className="flex items-center text-xs text-gray-500">
-                              <DollarSign className="w-3 h-3 mr-1" />
-                              GHS {offer.salary.toLocaleString()}/month
-                            </div>
-                            <div className="flex items-center text-xs text-gray-500">
-                              <Calendar className="w-3 h-3 mr-1" />
-                              Start: {offer.startDate}
-                            </div>
-                            <div className="flex items-center text-xs text-gray-500">
-                              <Clock className="w-3 h-3 mr-1" />
-                              Deadline: {offer.acceptanceDeadline}
-                            </div>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Offer Management</h2>
+            <Button onClick={() => setShowOfferDialog(true)}>
+              <FileText className="w-4 h-4 mr-2" />
+              Generate Offer Letter
+            </Button>
+          </div>
+
+          <div className="grid gap-4">
+            {applications
+              .filter((app) => app.status === "offer")
+              .map((application) => {
+                const jobDetails = jobPostings.find((job) => job.id === application.jobId)
+                return (
+                  <Card key={application.id}>
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
+                            <UserCheck className="w-6 h-6 text-emerald-600" />
                           </div>
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {offer.benefits.slice(0, 2).map((benefit, index) => (
-                              <Badge key={index} variant="outline" className="text-xs">
-                                {benefit}
-                              </Badge>
-                            ))}
-                            {offer.benefits.length > 2 && (
-                              <Badge variant="outline" className="text-xs">
-                                +{offer.benefits.length - 2} more
-                              </Badge>
-                            )}
+                          <div>
+                            <h3 className="font-medium">{application.candidateName}</h3>
+                            <p className="text-sm text-gray-600">
+                              {jobDetails?.title} • {jobDetails?.department}
+                            </p>
+                            <p className="text-xs text-gray-500">Applied: {application.dateApplied}</p>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <div className="text-right">
-                          <Badge className={getStatusColor(offer.status)}>{offer.status}</Badge>
-                          <p className="text-xs text-gray-500 mt-1">Generated: {offer.generatedDate}</p>
-                        </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="w-4 h-4 mr-2" />
-                              Preview Offer
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit Offer
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Send className="w-4 h-4 mr-2" />
-                              Send to Candidate
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Download className="w-4 h-4 mr-2" />
-                              Download PDF
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                    <div className="mt-3 p-3 bg-gray-50 rounded text-sm text-gray-600">
-                      <strong>Terms:</strong> {offer.terms}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="onboarding" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Onboarding Checklists ({onboardingChecklists.length})</CardTitle>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Checklist
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {onboardingChecklists.map((checklist) => (
-                  <div key={checklist.id} className="border rounded-lg p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                          <UserPlus className="w-6 h-6 text-green-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{checklist.candidateName}</h3>
-                          <p className="text-sm text-gray-600">{checklist.jobTitle}</p>
-                          <p className="text-xs text-gray-500">Start Date: {checklist.startDate}</p>
+                        <div className="flex items-center space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => handleGenerateOffer(application)}>
+                            <FileText className="w-4 h-4 mr-2" />
+                            Generate Offer
+                          </Button>
+                          <Button size="sm" onClick={() => handleStartOnboarding(application)}>
+                            <UserPlus className="w-4 h-4 mr-2" />
+                            Start Onboarding
+                          </Button>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <Badge className={getStatusColor(checklist.status)}>{checklist.status}</Badge>
-                        <div className="flex items-center space-x-2 mt-2">
-                          <Progress value={checklist.progress} className="w-24" />
-                          <span className="text-sm font-medium">{checklist.progress}%</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-3">Tasks</h4>
-                        <div className="space-y-3">
-                          {checklist.tasks.map((task) => (
-                            <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                              <div className="flex items-center space-x-3">
-                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white">
-                                  {task.taskType === "system" && <Settings className="w-4 h-4 text-blue-600" />}
-                                  {task.taskType === "facility" && <Building className="w-4 h-4 text-green-600" />}
-                                  {task.taskType === "document" && <FileText className="w-4 h-4 text-purple-600" />}
-                                  {task.taskType === "training" && <BookOpen className="w-4 h-4 text-orange-600" />}
-                                  {task.taskType === "policy" && <Shield className="w-4 h-4 text-red-600" />}
-                                </div>
-                                <div>
-                                  <p className="font-medium text-sm">{task.title}</p>
-                                  <p className="text-xs text-gray-600">{task.assignedTo}</p>
-                                  <p className="text-xs text-gray-500">Due: {task.dueDate}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Badge className={getPriorityColor(task.priority)} variant="outline">
-                                  {task.priority}
-                                </Badge>
-                                <Select
-                                  value={task.status}
-                                  onValueChange={(value) => updateTaskStatus(checklist.id, task.id, value as any)}
-                                >
-                                  <SelectTrigger className="w-32">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="pending">Pending</SelectItem>
-                                    <SelectItem value="in-progress">In Progress</SelectItem>
-                                    <SelectItem value="completed">Completed</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-3">Document Collection</h4>
-                        <div className="space-y-3">
-                          {Object.entries(checklist.documents).map(([docType, completed]) => (
-                            <div key={docType} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                              <div className="flex items-center space-x-3">
-                                <Checkbox checked={completed} />
-                                <span className="text-sm capitalize">{docType.replace(/([A-Z])/g, " $1").trim()}</span>
-                              </div>
-                              {completed ? (
-                                <CheckCircle className="w-4 h-4 text-green-600" />
-                              ) : (
-                                <Clock className="w-4 h-4 text-gray-400" />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="mt-6">
-                          <h4 className="font-medium text-gray-900 mb-3">Quick Actions</h4>
-                          <div className="space-y-2">
-                            <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
-                              <Send className="w-4 h-4 mr-2" />
-                              Send Welcome Email
-                            </Button>
-                            <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
-                              <Calendar className="w-4 h-4 mr-2" />
-                              Schedule Orientation
-                            </Button>
-                            <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
-                              <Award className="w-4 h-4 mr-2" />
-                              Generate Certificate
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+          </div>
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
@@ -1498,15 +1370,276 @@ export default function RecruitmentPage() {
             <CardContent>
               <div className="h-64 flex items-center justify-center text-gray-500">
                 <div className="text-center">
-                  <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>Analytics dashboard coming soon</p>
-                  <p className="text-sm">Integration with advanced reporting tools</p>
+                  <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                  <p>Recruitment analytics chart would be displayed here</p>
+                  <p className="text-sm">Showing trends for applications, hires, and time-to-fill</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={showATSDialog} onOpenChange={setShowATSDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>ATS Workflow Configuration</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="grid gap-4">
+              <h3 className="font-medium">Automated Screening Criteria</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Minimum Experience (years)</Label>
+                  <Input type="number" placeholder="3" />
+                </div>
+                <div>
+                  <Label>Required Skills</Label>
+                  <Input placeholder="React, Node.js, TypeScript" />
+                </div>
+                <div>
+                  <Label>Education Level</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select minimum education" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="shs">SHS</SelectItem>
+                      <SelectItem value="diploma">Diploma</SelectItem>
+                      <SelectItem value="degree">Bachelor's Degree</SelectItem>
+                      <SelectItem value="masters">Master's Degree</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Location Preference</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="accra">Accra</SelectItem>
+                      <SelectItem value="kumasi">Kumasi</SelectItem>
+                      <SelectItem value="remote">Remote</SelectItem>
+                      <SelectItem value="any">Any Location</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              <h3 className="font-medium">Interview Scheduling</h3>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="auto-schedule" />
+                  <Label htmlFor="auto-schedule">Automatically schedule interviews</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="send-reminders" />
+                  <Label htmlFor="send-reminders">Send interview reminders</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="collect-feedback" />
+                  <Label htmlFor="collect-feedback">Collect interviewer feedback</Label>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowATSDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => setShowATSDialog(false)}>Save Configuration</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showOfferDialog} onOpenChange={setShowOfferDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Generate Offer Letter - Ghana Labour Act Compliant</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <Label>Candidate</Label>
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select candidate" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {applications
+                      .filter((app) => app.status === "offer")
+                      .map((app) => (
+                        <SelectItem key={app.id} value={app.id}>
+                          {app.candidateName}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Position</Label>
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select position" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {jobPostings.map((job) => (
+                      <SelectItem key={job.id} value={job.id}>
+                        {job.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Basic Salary (GHS)</Label>
+                <Input type="number" placeholder="6000" />
+              </div>
+              <div>
+                <Label>Start Date</Label>
+                <Input type="date" />
+              </div>
+              <div>
+                <Label>Probation Period (months)</Label>
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3">3 months</SelectItem>
+                    <SelectItem value="6">6 months</SelectItem>
+                    <SelectItem value="12">12 months</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Employment Type</Label>
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="permanent">Permanent</SelectItem>
+                    <SelectItem value="contract">Contract</SelectItem>
+                    <SelectItem value="temporary">Temporary</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="font-medium flex items-center">
+                <Shield className="w-4 h-4 mr-2" />
+                Ghana Labour Act 2003 Compliance
+              </h3>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span>SSNIT contributions (Tier 1 & 2) included</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span>PAYE tax deductions as per GRA requirements</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span>Statutory leave entitlements included</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span>Notice period as per Labour Act</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span>Workers' compensation coverage</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowOfferDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => setShowOfferDialog(false)}>
+                <FileText className="w-4 h-4 mr-2" />
+                Generate & Send Offer
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showOnboardingDialog} onOpenChange={setShowOnboardingDialog}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Digital Onboarding Checklist - {selectedCandidate?.candidateName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            {onboardingChecklist.map((category, categoryIndex) => (
+              <Card key={categoryIndex}>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center">
+                    <ClipboardList className="w-5 h-5 mr-2" />
+                    {category.category}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {category.tasks.map((task) => (
+                      <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <Checkbox
+                            checked={task.status === "completed"}
+                            className="data-[state=checked]:bg-emerald-600"
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{task.task}</p>
+                            <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
+                              <span className="flex items-center">
+                                <User className="w-3 h-3 mr-1" />
+                                {task.assignee}
+                              </span>
+                              <span className="flex items-center">
+                                <Clock className="w-3 h-3 mr-1" />
+                                {task.deadline}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <Badge
+                          className={
+                            task.status === "completed"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-yellow-100 text-yellow-700"
+                          }
+                        >
+                          {task.status === "completed" ? "Completed" : "Pending"}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowOnboardingDialog(false)}>
+                Close
+              </Button>
+              <Button onClick={() => setShowOnboardingDialog(false)}>
+                <Send className="w-4 h-4 mr-2" />
+                Send Onboarding Tasks
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
