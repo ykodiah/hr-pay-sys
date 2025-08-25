@@ -4,13 +4,13 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { toast } from "@/hooks/use-toast"
 import {
@@ -18,234 +18,233 @@ import {
   Plus,
   MoreHorizontal,
   AlertTriangle,
+  FileText,
   Calendar,
+  Clock,
+  User,
   Scale,
+  MessageSquare,
+  Download,
   Eye,
   Edit,
-  Download,
-  Filter,
   CheckCircle,
   AlertCircle,
-  MessageSquare,
-  Users,
+  Gavel,
   BookOpen,
 } from "lucide-react"
 
-// Mock data for disciplinary cases
-const mockDisciplinaryCases = [
+// Mock data for demonstration
+const mockCases = [
   {
     id: "DISC-001",
     employeeId: "EMP001",
     employeeName: "Kwame Asante",
     employeeAvatar: "/placeholder.svg?height=40&width=40",
-    department: "Technology",
-    caseType: "misconduct",
-    severity: "medium",
+    type: "disciplinary",
+    category: "attendance",
+    severity: "minor",
     status: "investigation",
-    title: "Unauthorized Absence",
-    description: "Employee was absent for 3 consecutive days without prior notice or approval",
+    title: "Repeated Late Arrivals",
+    description: "Employee has been consistently arriving late to work over the past two weeks",
     reportedBy: "John Manager",
     reportedDate: new Date("2024-02-15"),
-    incidentDate: new Date("2024-02-10"),
-    witnesses: ["Jane Doe", "Mike Smith"],
-    actionsTaken: [
+    dueDate: new Date("2024-02-29"),
+    actions: [
       {
-        date: new Date("2024-02-15"),
-        action: "Case reported",
-        takenBy: "John Manager",
-        notes: "Initial report filed",
-      },
-      {
+        id: 1,
+        type: "verbal_warning",
         date: new Date("2024-02-16"),
-        action: "Investigation started",
-        takenBy: "HR Team",
-        notes: "Gathering evidence and witness statements",
+        description: "Verbal warning issued regarding punctuality",
+        actionBy: "John Manager",
+        status: "completed",
       },
     ],
-    nextHearing: new Date("2024-02-25"),
-    documents: ["incident_report.pdf", "witness_statement_1.pdf"],
+    documents: ["warning_letter.pdf", "attendance_record.xlsx"],
+    notes: "Employee acknowledged the issue and committed to improvement",
   },
   {
-    id: "DISC-002",
+    id: "GRIEV-001",
     employeeId: "EMP002",
     employeeName: "Ama Osei",
     employeeAvatar: "/placeholder.svg?height=40&width=40",
-    department: "Human Resources",
-    caseType: "performance",
-    severity: "low",
-    status: "resolved",
-    title: "Poor Performance Review",
-    description: "Consistently missing targets and deadlines over the past quarter",
-    reportedBy: "Sarah Director",
-    reportedDate: new Date("2024-01-20"),
-    incidentDate: new Date("2024-01-15"),
-    witnesses: [],
-    actionsTaken: [
+    type: "grievance",
+    category: "workplace_harassment",
+    severity: "major",
+    status: "hearing_scheduled",
+    title: "Workplace Harassment Complaint",
+    description: "Employee filed complaint regarding inappropriate behavior from supervisor",
+    reportedBy: "Ama Osei",
+    reportedDate: new Date("2024-02-10"),
+    dueDate: new Date("2024-02-25"),
+    hearingDate: new Date("2024-02-22"),
+    actions: [
       {
-        date: new Date("2024-01-20"),
-        action: "Performance review meeting",
-        takenBy: "Sarah Director",
-        notes: "Discussed performance issues and improvement plan",
-      },
-      {
-        date: new Date("2024-01-25"),
-        action: "Verbal warning issued",
-        takenBy: "HR Team",
-        notes: "Formal verbal warning with 30-day improvement period",
-      },
-      {
-        date: new Date("2024-02-20"),
-        action: "Case closed",
-        takenBy: "HR Team",
-        notes: "Performance improved significantly, case resolved",
+        id: 1,
+        type: "investigation",
+        date: new Date("2024-02-11"),
+        description: "Formal investigation initiated",
+        actionBy: "HR Department",
+        status: "in_progress",
       },
     ],
-    resolution: "Employee showed significant improvement after verbal warning",
-    documents: ["performance_review.pdf", "improvement_plan.pdf"],
+    documents: ["complaint_form.pdf", "witness_statements.pdf"],
+    notes: "Urgent case requiring immediate attention",
   },
-]
-
-// Mock grievance data
-const mockGrievances = [
   {
-    id: "GRIEV-001",
+    id: "DISC-002",
     employeeId: "EMP003",
     employeeName: "Kofi Mensah",
     employeeAvatar: "/placeholder.svg?height=40&width=40",
-    department: "Finance",
-    grievanceType: "workplace_harassment",
-    priority: "high",
-    status: "under_review",
-    title: "Workplace Harassment Complaint",
-    description: "Reporting inappropriate behavior and harassment from supervisor",
-    submittedDate: new Date("2024-02-18"),
-    assignedTo: "HR Investigation Team",
-    expectedResolution: new Date("2024-03-05"),
-    documents: ["complaint_form.pdf", "evidence_photos.zip"],
+    type: "disciplinary",
+    category: "misconduct",
+    severity: "major",
+    status: "resolved",
+    title: "Violation of Company Policy",
+    description: "Unauthorized use of company resources for personal business",
+    reportedBy: "IT Department",
+    reportedDate: new Date("2024-01-20"),
+    dueDate: new Date("2024-02-05"),
+    actions: [
+      {
+        id: 1,
+        type: "written_warning",
+        date: new Date("2024-01-25"),
+        description: "Written warning issued for policy violation",
+        actionBy: "HR Manager",
+        status: "completed",
+      },
+      {
+        id: 2,
+        type: "training",
+        date: new Date("2024-02-01"),
+        description: "Mandatory policy training completed",
+        actionBy: "Training Department",
+        status: "completed",
+      },
+    ],
+    documents: ["policy_violation_report.pdf", "training_certificate.pdf"],
+    notes: "Case resolved. Employee completed required training.",
   },
 ]
 
-const caseTypeLabels = {
+const categoryLabels = {
+  attendance: "Attendance Issues",
   misconduct: "Misconduct",
-  performance: "Performance Issue",
-  attendance: "Attendance Issue",
+  performance: "Performance Issues",
+  workplace_harassment: "Workplace Harassment",
+  discrimination: "Discrimination",
   policy_violation: "Policy Violation",
-  harassment: "Harassment",
-  insubordination: "Insubordination",
+  safety_violation: "Safety Violation",
+  other: "Other",
 }
 
 const severityColors = {
-  low: "bg-green-100 text-green-800",
-  medium: "bg-yellow-100 text-yellow-800",
-  high: "bg-red-100 text-red-800",
+  minor: "bg-yellow-100 text-yellow-800",
+  major: "bg-orange-100 text-orange-800",
+  critical: "bg-red-100 text-red-800",
 }
 
 const statusColors = {
-  investigation: "bg-blue-100 text-blue-800",
-  hearing_scheduled: "bg-purple-100 text-purple-800",
+  reported: "bg-blue-100 text-blue-800",
+  investigation: "bg-purple-100 text-purple-800",
+  hearing_scheduled: "bg-orange-100 text-orange-800",
   resolved: "bg-green-100 text-green-800",
-  dismissed: "bg-gray-100 text-gray-800",
-  under_review: "bg-yellow-100 text-yellow-800",
-  escalated: "bg-red-100 text-red-800",
+  closed: "bg-gray-100 text-gray-800",
 }
 
-export default function DisciplinaryPage() {
-  const [disciplinaryCases, setDisciplinaryCases] = useState(mockDisciplinaryCases)
-  const [grievances, setGrievances] = useState(mockGrievances)
+export default function DisciplinaryGrievancePage() {
+  const [cases, setCases] = useState(mockCases)
   const [searchTerm, setSearchTerm] = useState("")
+  const [selectedType, setSelectedType] = useState("all")
+  const [selectedStatus, setSelectedStatus] = useState("all")
   const [selectedCase, setSelectedCase] = useState<any>(null)
   const [isNewCaseOpen, setIsNewCaseOpen] = useState(false)
-  const [isNewGrievanceOpen, setIsNewGrievanceOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState("disciplinary")
+  const [activeTab, setActiveTab] = useState("all")
 
-  const [newCaseForm, setNewCaseForm] = useState({
+  const [newCase, setNewCase] = useState({
     employeeId: "",
-    caseType: "",
-    severity: "",
+    type: "disciplinary",
+    category: "",
+    severity: "minor",
     title: "",
     description: "",
-    incidentDate: "",
-    witnesses: "",
+    reportedBy: "",
   })
 
-  const filteredCases = disciplinaryCases.filter(
-    (case_) =>
-      case_.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      case_.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      case_.id.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const filteredCases = cases.filter((caseItem) => {
+    const matchesSearch =
+      caseItem.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      caseItem.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      caseItem.id.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesType = selectedType === "all" || caseItem.type === selectedType
+    const matchesStatus = selectedStatus === "all" || caseItem.status === selectedStatus
+    const matchesTab = activeTab === "all" || caseItem.type === activeTab
 
-  const filteredGrievances = grievances.filter(
-    (grievance) =>
-      grievance.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      grievance.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      grievance.id.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
-
-  const handleNewCase = () => {
-    const newCase = {
-      id: `DISC-${String(disciplinaryCases.length + 1).padStart(3, "0")}`,
-      employeeId: newCaseForm.employeeId,
-      employeeName: "Selected Employee", // Would fetch from employee data
-      employeeAvatar: "/placeholder.svg?height=40&width=40",
-      department: "Department", // Would fetch from employee data
-      caseType: newCaseForm.caseType,
-      severity: newCaseForm.severity,
-      status: "investigation",
-      title: newCaseForm.title,
-      description: newCaseForm.description,
-      reportedBy: "Current User",
-      reportedDate: new Date(),
-      incidentDate: new Date(newCaseForm.incidentDate),
-      witnesses: newCaseForm.witnesses
-        .split(",")
-        .map((w) => w.trim())
-        .filter((w) => w),
-      actionsTaken: [
-        {
-          date: new Date(),
-          action: "Case created",
-          takenBy: "Current User",
-          notes: "Initial case creation",
-        },
-      ],
-      documents: [],
-    }
-
-    setDisciplinaryCases([...disciplinaryCases, newCase])
-    setIsNewCaseOpen(false)
-    setNewCaseForm({
-      employeeId: "",
-      caseType: "",
-      severity: "",
-      title: "",
-      description: "",
-      incidentDate: "",
-      witnesses: "",
-    })
-    toast({
-      title: "Disciplinary Case Created",
-      description: `Case ${newCase.id} has been created successfully.`,
-    })
-  }
+    return matchesSearch && matchesType && matchesStatus && matchesTab
+  })
 
   const getCaseStats = () => {
-    const total = disciplinaryCases.length
-    const investigation = disciplinaryCases.filter((c) => c.status === "investigation").length
-    const resolved = disciplinaryCases.filter((c) => c.status === "resolved").length
-    const highSeverity = disciplinaryCases.filter((c) => c.severity === "high").length
-    return { total, investigation, resolved, highSeverity }
+    const total = cases.length
+    const disciplinary = cases.filter((c) => c.type === "disciplinary").length
+    const grievance = cases.filter((c) => c.type === "grievance").length
+    const pending = cases.filter((c) => !["resolved", "closed"].includes(c.status)).length
+    return { total, disciplinary, grievance, pending }
   }
 
-  const getGrievanceStats = () => {
-    const total = grievances.length
-    const underReview = grievances.filter((g) => g.status === "under_review").length
-    const highPriority = grievances.filter((g) => g.priority === "high").length
-    return { total, underReview, highPriority }
+  const stats = getCaseStats()
+
+  const handleCreateCase = () => {
+    const caseId = `${newCase.type.toUpperCase().slice(0, 4)}-${String(cases.length + 1).padStart(3, "0")}`
+    const newCaseData = {
+      ...newCase,
+      id: caseId,
+      employeeName: "Selected Employee", // In real app, would fetch from employee ID
+      employeeAvatar: "/placeholder.svg?height=40&width=40",
+      status: "reported",
+      reportedDate: new Date(),
+      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+      actions: [],
+      documents: [],
+      notes: "",
+    }
+
+    setCases([newCaseData, ...cases])
+    setNewCase({
+      employeeId: "",
+      type: "disciplinary",
+      category: "",
+      severity: "minor",
+      title: "",
+      description: "",
+      reportedBy: "",
+    })
+    setIsNewCaseOpen(false)
+    toast({
+      title: "Case Created",
+      description: `${newCase.type === "disciplinary" ? "Disciplinary" : "Grievance"} case ${caseId} has been created.`,
+    })
   }
 
-  const disciplinaryStats = getCaseStats()
-  const grievanceStats = getGrievanceStats()
+  const handleStatusUpdate = (caseId: string, newStatus: string) => {
+    setCases((prev) => prev.map((c) => (c.id === caseId ? { ...c, status: newStatus } : c)))
+    toast({
+      title: "Status Updated",
+      description: `Case status changed to ${newStatus.replace("_", " ")}.`,
+    })
+  }
+
+  const getSeverityIcon = (severity: string) => {
+    switch (severity) {
+      case "critical":
+        return <AlertTriangle className="w-4 h-4 text-red-600" />
+      case "major":
+        return <AlertCircle className="w-4 h-4 text-orange-600" />
+      case "minor":
+        return <Clock className="w-4 h-4 text-yellow-600" />
+      default:
+        return <Clock className="w-4 h-4 text-gray-400" />
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -254,50 +253,72 @@ export default function DisciplinaryPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Disciplinary & Grievance Management</h1>
           <p className="text-gray-600">
-            Manage disciplinary actions and grievances in compliance with Ghana Labour Act
+            Manage disciplinary actions and grievance procedures in compliance with Ghana Labour Act
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline">
+            <BookOpen className="w-4 h-4 mr-2" />
+            Labour Act Guide
+          </Button>
+          <Button variant="outline">
+            <Download className="w-4 h-4 mr-2" />
+            Export Report
+          </Button>
           <Dialog open={isNewCaseOpen} onOpenChange={setIsNewCaseOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="w-4 h-4 mr-2" />
-                New Disciplinary Case
+                New Case
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Create New Disciplinary Case</DialogTitle>
+                <DialogTitle>Create New Case</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="employee">Employee</Label>
                     <Select
-                      value={newCaseForm.employeeId}
-                      onValueChange={(value) => setNewCaseForm({ ...newCaseForm, employeeId: value })}
+                      value={newCase.employeeId}
+                      onValueChange={(value) => setNewCase({ ...newCase, employeeId: value })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select employee" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="EMP001">Kwame Asante</SelectItem>
-                        <SelectItem value="EMP002">Ama Osei</SelectItem>
-                        <SelectItem value="EMP003">Kofi Mensah</SelectItem>
+                        <SelectItem value="EMP001">Kwame Asante (EMP001)</SelectItem>
+                        <SelectItem value="EMP002">Ama Osei (EMP002)</SelectItem>
+                        <SelectItem value="EMP003">Kofi Mensah (EMP003)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="caseType">Case Type</Label>
-                    <Select
-                      value={newCaseForm.caseType}
-                      onValueChange={(value) => setNewCaseForm({ ...newCaseForm, caseType: value })}
-                    >
+                    <Label htmlFor="type">Case Type</Label>
+                    <Select value={newCase.type} onValueChange={(value) => setNewCase({ ...newCase, type: value })}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select case type" />
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.entries(caseTypeLabels).map(([key, label]) => (
+                        <SelectItem value="disciplinary">Disciplinary Action</SelectItem>
+                        <SelectItem value="grievance">Grievance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="category">Category</Label>
+                    <Select
+                      value={newCase.category}
+                      onValueChange={(value) => setNewCase({ ...newCase, category: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(categoryLabels).map(([key, label]) => (
                           <SelectItem key={key} value={key}>
                             {label}
                           </SelectItem>
@@ -305,71 +326,57 @@ export default function DisciplinaryPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="severity">Severity</Label>
                     <Select
-                      value={newCaseForm.severity}
-                      onValueChange={(value) => setNewCaseForm({ ...newCaseForm, severity: value })}
+                      value={newCase.severity}
+                      onValueChange={(value) => setNewCase({ ...newCase, severity: value })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select severity" />
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="minor">Minor</SelectItem>
+                        <SelectItem value="major">Major</SelectItem>
+                        <SelectItem value="critical">Critical</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="incidentDate">Incident Date</Label>
-                    <Input
-                      type="date"
-                      value={newCaseForm.incidentDate}
-                      onChange={(e) => setNewCaseForm({ ...newCaseForm, incidentDate: e.target.value })}
-                    />
                   </div>
                 </div>
                 <div>
                   <Label htmlFor="title">Case Title</Label>
                   <Input
+                    value={newCase.title}
+                    onChange={(e) => setNewCase({ ...newCase, title: e.target.value })}
                     placeholder="Brief description of the case"
-                    value={newCaseForm.title}
-                    onChange={(e) => setNewCaseForm({ ...newCaseForm, title: e.target.value })}
                   />
                 </div>
                 <div>
                   <Label htmlFor="description">Detailed Description</Label>
                   <Textarea
-                    placeholder="Provide detailed description of the incident..."
-                    value={newCaseForm.description}
-                    onChange={(e) => setNewCaseForm({ ...newCaseForm, description: e.target.value })}
+                    value={newCase.description}
+                    onChange={(e) => setNewCase({ ...newCase, description: e.target.value })}
+                    placeholder="Provide detailed information about the incident or grievance"
                     rows={4}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="witnesses">Witnesses (comma-separated)</Label>
+                  <Label htmlFor="reportedBy">Reported By</Label>
                   <Input
-                    placeholder="John Doe, Jane Smith"
-                    value={newCaseForm.witnesses}
-                    onChange={(e) => setNewCaseForm({ ...newCaseForm, witnesses: e.target.value })}
+                    value={newCase.reportedBy}
+                    onChange={(e) => setNewCase({ ...newCase, reportedBy: e.target.value })}
+                    placeholder="Name of person reporting the case"
                   />
                 </div>
                 <div className="flex justify-end space-x-2">
                   <Button variant="outline" onClick={() => setIsNewCaseOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleNewCase}>Create Case</Button>
+                  <Button onClick={handleCreateCase}>Create Case</Button>
                 </div>
               </div>
             </DialogContent>
           </Dialog>
-          <Button variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Export Report
-          </Button>
         </div>
       </div>
 
@@ -379,7 +386,7 @@ export default function DisciplinaryPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold text-gray-900">{disciplinaryStats.total}</div>
+                <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
                 <p className="text-sm text-gray-600">Total Cases</p>
               </div>
               <Scale className="w-8 h-8 text-gray-400" />
@@ -390,10 +397,10 @@ export default function DisciplinaryPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold text-blue-600">{disciplinaryStats.investigation}</div>
-                <p className="text-sm text-gray-600">Under Investigation</p>
+                <div className="text-2xl font-bold text-red-600">{stats.disciplinary}</div>
+                <p className="text-sm text-gray-600">Disciplinary</p>
               </div>
-              <AlertCircle className="w-8 h-8 text-blue-400" />
+              <Gavel className="w-8 h-8 text-red-400" />
             </div>
           </CardContent>
         </Card>
@@ -401,10 +408,10 @@ export default function DisciplinaryPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold text-green-600">{disciplinaryStats.resolved}</div>
-                <p className="text-sm text-gray-600">Resolved</p>
+                <div className="text-2xl font-bold text-blue-600">{stats.grievance}</div>
+                <p className="text-sm text-gray-600">Grievances</p>
               </div>
-              <CheckCircle className="w-8 h-8 text-green-400" />
+              <MessageSquare className="w-8 h-8 text-blue-400" />
             </div>
           </CardContent>
         </Card>
@@ -412,317 +419,182 @@ export default function DisciplinaryPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold text-red-600">{grievanceStats.total}</div>
-                <p className="text-sm text-gray-600">Active Grievances</p>
+                <div className="text-2xl font-bold text-orange-600">{stats.pending}</div>
+                <p className="text-sm text-gray-600">Pending</p>
               </div>
-              <MessageSquare className="w-8 h-8 text-red-400" />
+              <Clock className="w-8 h-8 text-orange-400" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search and Filters */}
+      {/* Filters */}
       <Card>
         <CardContent className="p-6">
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <Input
-                placeholder="Search cases, employees, or case IDs..."
+                placeholder="Search by employee name, case title, or case ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <Button variant="outline">
-              <Filter className="w-4 h-4 mr-2" />
-              Filters
-            </Button>
+            <Select value={selectedType} onValueChange={setSelectedType}>
+              <SelectTrigger className="w-full lg:w-48">
+                <SelectValue placeholder="Case type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="disciplinary">Disciplinary</SelectItem>
+                <SelectItem value="grievance">Grievance</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger className="w-full lg:w-48">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="reported">Reported</SelectItem>
+                <SelectItem value="investigation">Investigation</SelectItem>
+                <SelectItem value="hearing_scheduled">Hearing Scheduled</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Main Content Tabs */}
+      {/* Cases Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="disciplinary">Disciplinary Cases ({disciplinaryStats.total})</TabsTrigger>
-          <TabsTrigger value="grievances">Grievances ({grievanceStats.total})</TabsTrigger>
-          <TabsTrigger value="compliance">Compliance Guide</TabsTrigger>
+          <TabsTrigger value="all">All Cases ({stats.total})</TabsTrigger>
+          <TabsTrigger value="disciplinary">Disciplinary ({stats.disciplinary})</TabsTrigger>
+          <TabsTrigger value="grievance">Grievances ({stats.grievance})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="disciplinary" className="space-y-4">
+        <TabsContent value={activeTab} className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Disciplinary Cases</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {filteredCases.map((case_) => (
-                  <div
-                    key={case_.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <Avatar className="w-12 h-12">
-                        <AvatarImage src={case_.employeeAvatar || "/placeholder.svg"} />
-                        <AvatarFallback>
-                          {case_.employeeName
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <h3 className="font-semibold text-gray-900">{case_.title}</h3>
-                          <Badge className={severityColors[case_.severity as keyof typeof severityColors]}>
-                            {case_.severity.toUpperCase()}
-                          </Badge>
-                          <Badge className={statusColors[case_.status as keyof typeof statusColors]}>
-                            {case_.status.replace("_", " ").toUpperCase()}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center space-x-4 mt-1">
-                          <span className="text-sm text-gray-600">
-                            {case_.employeeName} ({case_.id})
-                          </span>
-                          <span className="text-sm text-gray-500">{case_.department}</span>
-                          <span className="text-sm text-gray-500">
-                            {caseTypeLabels[case_.caseType as keyof typeof caseTypeLabels]}
-                          </span>
-                          <span className="text-sm text-gray-500">
-                            Reported: {case_.reportedDate.toLocaleDateString()}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">{case_.description}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setSelectedCase(case_)}>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit Case
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Calendar className="w-4 h-4 mr-2" />
-                            Schedule Hearing
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Download className="w-4 h-4 mr-2" />
-                            Download Report
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="grievances" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Employee Grievances</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {filteredGrievances.map((grievance) => (
-                  <div
-                    key={grievance.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <Avatar className="w-12 h-12">
-                        <AvatarImage src={grievance.employeeAvatar || "/placeholder.svg"} />
-                        <AvatarFallback>
-                          {grievance.employeeName
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <h3 className="font-semibold text-gray-900">{grievance.title}</h3>
-                          <Badge className={severityColors[grievance.priority as keyof typeof severityColors]}>
-                            {grievance.priority.toUpperCase()} PRIORITY
-                          </Badge>
-                          <Badge className={statusColors[grievance.status as keyof typeof statusColors]}>
-                            {grievance.status.replace("_", " ").toUpperCase()}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center space-x-4 mt-1">
-                          <span className="text-sm text-gray-600">
-                            {grievance.employeeName} ({grievance.id})
-                          </span>
-                          <span className="text-sm text-gray-500">{grievance.department}</span>
-                          <span className="text-sm text-gray-500">
-                            Submitted: {grievance.submittedDate.toLocaleDateString()}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">{grievance.description}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <MessageSquare className="w-4 h-4 mr-2" />
-                            Respond
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Users className="w-4 h-4 mr-2" />
-                            Assign Investigator
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Download className="w-4 h-4 mr-2" />
-                            Download Report
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="compliance" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5" />
-                Ghana Labour Act Compliance Guide
+              <CardTitle>
+                {activeTab === "all"
+                  ? "All Cases"
+                  : activeTab === "disciplinary"
+                    ? "Disciplinary Cases"
+                    : "Grievance Cases"}{" "}
+                ({filteredCases.length})
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-gray-900">Disciplinary Procedures</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
-                        1
+            <CardContent>
+              <div className="space-y-4">
+                {filteredCases.length > 0 ? (
+                  filteredCases.map((caseItem) => (
+                    <div
+                      key={caseItem.id}
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-lg">
+                          {caseItem.type === "disciplinary" ? (
+                            <Gavel className="w-6 h-6 text-red-600" />
+                          ) : (
+                            <MessageSquare className="w-6 h-6 text-blue-600" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <h3 className="font-semibold text-gray-900">{caseItem.title}</h3>
+                            <Badge className={statusColors[caseItem.status as keyof typeof statusColors]}>
+                              {caseItem.status.replace("_", " ").toUpperCase()}
+                            </Badge>
+                            <Badge className={severityColors[caseItem.severity as keyof typeof severityColors]}>
+                              {caseItem.severity.toUpperCase()}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center space-x-4 mt-1">
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Avatar className="w-5 h-5 mr-2">
+                                <AvatarImage src={caseItem.employeeAvatar || "/placeholder.svg"} />
+                                <AvatarFallback>
+                                  {caseItem.employeeName
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")}
+                                </AvatarFallback>
+                              </Avatar>
+                              {caseItem.employeeName} ({caseItem.employeeId})
+                            </div>
+                            <div className="flex items-center text-sm text-gray-500">
+                              <FileText className="w-4 h-4 mr-1" />
+                              {categoryLabels[caseItem.category as keyof typeof categoryLabels]}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-500">
+                              <Calendar className="w-4 h-4 mr-1" />
+                              {caseItem.reportedDate.toLocaleDateString()}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-500">
+                              <User className="w-4 h-4 mr-1" />
+                              {caseItem.reportedBy}
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">{caseItem.description}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">Investigation</p>
-                        <p className="text-sm text-gray-600">Conduct thorough investigation before taking action</p>
+                      <div className="flex items-center space-x-2">
+                        {getSeverityIcon(caseItem.severity)}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setSelectedCase(caseItem)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Case
+                            </DropdownMenuItem>
+                            {caseItem.status === "investigation" && (
+                              <DropdownMenuItem onClick={() => handleStatusUpdate(caseItem.id, "hearing_scheduled")}>
+                                <Gavel className="w-4 h-4 mr-2" />
+                                Schedule Hearing
+                              </DropdownMenuItem>
+                            )}
+                            {!["resolved", "closed"].includes(caseItem.status) && (
+                              <DropdownMenuItem onClick={() => handleStatusUpdate(caseItem.id, "resolved")}>
+                                <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                                Mark Resolved
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem>
+                              <Download className="w-4 h-4 mr-2" />
+                              Export Case
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
-                    <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
-                        2
-                      </div>
-                      <div>
-                        <p className="font-medium">Right to be Heard</p>
-                        <p className="text-sm text-gray-600">Employee must be given opportunity to respond</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
-                        3
-                      </div>
-                      <div>
-                        <p className="font-medium">Progressive Discipline</p>
-                        <p className="text-sm text-gray-600">
-                          Follow progressive steps: verbal → written → suspension → termination
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
-                        4
-                      </div>
-                      <div>
-                        <p className="font-medium">Documentation</p>
-                        <p className="text-sm text-gray-600">Maintain detailed records of all proceedings</p>
-                      </div>
-                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12">
+                    <Scale className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No cases found</h3>
+                    <p className="text-gray-500">Try adjusting your search criteria or create a new case.</p>
                   </div>
-                </div>
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-gray-900">Grievance Handling</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm font-medium">
-                        1
-                      </div>
-                      <div>
-                        <p className="font-medium">Immediate Acknowledgment</p>
-                        <p className="text-sm text-gray-600">Acknowledge receipt within 48 hours</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm font-medium">
-                        2
-                      </div>
-                      <div>
-                        <p className="font-medium">Fair Investigation</p>
-                        <p className="text-sm text-gray-600">Conduct impartial investigation within 14 days</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm font-medium">
-                        3
-                      </div>
-                      <div>
-                        <p className="font-medium">Resolution Timeline</p>
-                        <p className="text-sm text-gray-600">Resolve within 30 days or provide status update</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm font-medium">
-                        4
-                      </div>
-                      <div>
-                        <p className="font-medium">Appeal Rights</p>
-                        <p className="text-sm text-gray-600">Inform employee of appeal process</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <div className="flex items-start space-x-3">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
-                  <div>
-                    <h4 className="font-medium text-yellow-800">Important Compliance Note</h4>
-                    <p className="text-sm text-yellow-700 mt-1">
-                      All disciplinary and grievance procedures must comply with Ghana Labour Act, 2003 (Act 651) and
-                      Labour Regulations, 2007 (L.I. 1833). Failure to follow proper procedures may result in unfair
-                      dismissal claims or legal challenges.
-                    </p>
-                  </div>
-                </div>
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Case Details Modal */}
+      {/* Case Details Dialog */}
       <Dialog open={!!selectedCase} onOpenChange={() => setSelectedCase(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -735,12 +607,12 @@ export default function DisciplinaryPage() {
                   <h4 className="font-medium text-gray-900 mb-3">Case Information</h4>
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Case ID:</span>
-                      <span>{selectedCase.id}</span>
+                      <span className="text-gray-600">Type:</span>
+                      <span className="capitalize">{selectedCase.type}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Type:</span>
-                      <span>{caseTypeLabels[selectedCase.caseType as keyof typeof caseTypeLabels]}</span>
+                      <span className="text-gray-600">Category:</span>
+                      <span>{categoryLabels[selectedCase.category as keyof typeof categoryLabels]}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Severity:</span>
@@ -770,37 +642,66 @@ export default function DisciplinaryPage() {
                     </Avatar>
                     <div>
                       <p className="font-medium">{selectedCase.employeeName}</p>
-                      <p className="text-sm text-gray-600">
-                        {selectedCase.employeeId} • {selectedCase.department}
-                      </p>
+                      <p className="text-sm text-gray-600">{selectedCase.employeeId}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h4 className="font-medium text-gray-900 mb-2">Case Description</h4>
+                <h4 className="font-medium text-gray-900 mb-2">Description</h4>
                 <p className="text-gray-600 bg-gray-50 p-3 rounded-lg">{selectedCase.description}</p>
               </div>
 
-              <div>
-                <h4 className="font-medium text-gray-900 mb-3">Actions Taken</h4>
-                <div className="space-y-3">
-                  {selectedCase.actionsTaken?.map((action: any, index: number) => (
-                    <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                      <div className="flex-1">
+              {selectedCase.actions && selectedCase.actions.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">Actions Taken</h4>
+                  <div className="space-y-3">
+                    {selectedCase.actions.map((action: any) => (
+                      <div key={action.id} className="border border-gray-200 rounded-lg p-3">
                         <div className="flex items-center justify-between">
-                          <p className="font-medium">{action.action}</p>
-                          <span className="text-sm text-gray-500">{action.date.toLocaleDateString()}</span>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant="outline">{action.type.replace("_", " ").toUpperCase()}</Badge>
+                            <span className="text-sm text-gray-600">{action.date.toLocaleDateString()}</span>
+                          </div>
+                          <Badge
+                            className={
+                              action.status === "completed"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-yellow-100 text-yellow-800"
+                            }
+                          >
+                            {action.status.toUpperCase()}
+                          </Badge>
                         </div>
-                        <p className="text-sm text-gray-600">By: {action.takenBy}</p>
-                        {action.notes && <p className="text-sm text-gray-600 mt-1">{action.notes}</p>}
+                        <p className="text-sm text-gray-600 mt-2">{action.description}</p>
+                        <p className="text-xs text-gray-500 mt-1">By: {action.actionBy}</p>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {selectedCase.documents && selectedCase.documents.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">Documents</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCase.documents.map((doc: string, index: number) => (
+                      <Badge key={index} variant="outline" className="cursor-pointer hover:bg-gray-100">
+                        <FileText className="w-3 h-3 mr-1" />
+                        {doc}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedCase.notes && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Notes</h4>
+                  <p className="text-gray-600 bg-gray-50 p-3 rounded-lg">{selectedCase.notes}</p>
+                </div>
+              )}
 
               <div className="flex justify-end space-x-3 pt-4 border-t">
                 <Button variant="outline" onClick={() => setSelectedCase(null)}>
@@ -808,11 +709,11 @@ export default function DisciplinaryPage() {
                 </Button>
                 <Button variant="outline">
                   <Download className="w-4 h-4 mr-2" />
-                  Download Report
+                  Export Case
                 </Button>
                 <Button>
                   <Edit className="w-4 h-4 mr-2" />
-                  Update Case
+                  Edit Case
                 </Button>
               </div>
             </div>

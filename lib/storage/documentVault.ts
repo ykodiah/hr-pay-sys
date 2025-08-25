@@ -1,217 +1,90 @@
-// Document Vault Storage Utilities
-export interface DocumentMetadata {
+export interface EmployeeDocument {
   id: string
-  name: string
-  type: string
-  size: number
+  employeeId: string
+  employeeName: string
+  documentType: "academic" | "passport-picture" | "resume" | "passport" | "national-id" | "medical" | "police" | "other"
+  fileName: string
+  fileSize: number
+  fileType: string
+  uploadDate: Date
   uploadedBy: string
-  uploadedAt: Date
-  category: string
-  tags: string[]
-  isConfidential: boolean
-  accessLevel: "public" | "internal" | "confidential" | "restricted"
-  employeeId?: string
-  department?: string
-  expiryDate?: Date
-  version: number
-  checksum: string
+  fileUrl: string
+  status: "pending" | "approved" | "rejected"
+  notes?: string
 }
 
-export interface DocumentCategory {
-  id: string
-  name: string
-  description: string
-  allowedFileTypes: string[]
-  maxFileSize: number
-  retentionPeriod?: number // in days
-  isActive: boolean
-}
+export class DocumentVaultService {
+  private static instance: DocumentVaultService
+  private documents: Map<string, EmployeeDocument[]> = new Map()
 
-export class DocumentVaultStorage {
-  private static instance: DocumentVaultStorage
-  private documents: Map<string, DocumentMetadata> = new Map()
-  private categories: Map<string, DocumentCategory> = new Map()
-
-  private constructor() {
-    this.initializeDefaultCategories()
-  }
-
-  public static getInstance(): DocumentVaultStorage {
-    if (!DocumentVaultStorage.instance) {
-      DocumentVaultStorage.instance = new DocumentVaultStorage()
+  static getInstance(): DocumentVaultService {
+    if (!DocumentVaultService.instance) {
+      DocumentVaultService.instance = new DocumentVaultService()
     }
-    return DocumentVaultStorage.instance
+    return DocumentVaultService.instance
   }
 
-  private initializeDefaultCategories() {
-    const defaultCategories: DocumentCategory[] = [
-      {
-        id: "contracts",
-        name: "Employment Contracts",
-        description: "Employee contracts and agreements",
-        allowedFileTypes: ["pdf", "doc", "docx"],
-        maxFileSize: 10 * 1024 * 1024, // 10MB
-        retentionPeriod: 2555, // 7 years
-        isActive: true,
-      },
-      {
-        id: "policies",
-        name: "HR Policies",
-        description: "Company policies and procedures",
-        allowedFileTypes: ["pdf", "doc", "docx"],
-        maxFileSize: 5 * 1024 * 1024, // 5MB
-        isActive: true,
-      },
-      {
-        id: "certificates",
-        name: "Certificates & Licenses",
-        description: "Professional certificates and licenses",
-        allowedFileTypes: ["pdf", "jpg", "jpeg", "png"],
-        maxFileSize: 5 * 1024 * 1024, // 5MB
-        retentionPeriod: 1825, // 5 years
-        isActive: true,
-      },
-      {
-        id: "payroll",
-        name: "Payroll Documents",
-        description: "Payslips, tax documents, and payroll records",
-        allowedFileTypes: ["pdf", "xlsx", "csv"],
-        maxFileSize: 10 * 1024 * 1024, // 10MB
-        retentionPeriod: 2555, // 7 years
-        isActive: true,
-      },
-    ]
+  async uploadDocument(employeeId: string, employeeName: string, file: File, documentType: string): Promise<string> {
+    // In a real implementation, this would upload to cloud storage (Vercel Blob, AWS S3, etc.)
+    const documentId = `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-    defaultCategories.forEach((category) => {
-      this.categories.set(category.id, category)
-    })
+    // Simulate file upload and get URL
+    const fileUrl = await this.simulateFileUpload(file)
+
+    const document: EmployeeDocument = {
+      id: documentId,
+      employeeId,
+      employeeName,
+      documentType: documentType as any,
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      uploadDate: new Date(),
+      uploadedBy: "current-user", // Would get from auth context
+      fileUrl,
+      status: "pending",
+    }
+
+    if (!this.documents.has(employeeId)) {
+      this.documents.set(employeeId, [])
+    }
+
+    this.documents.get(employeeId)!.push(document)
+
+    console.log(`[v0] Document uploaded for employee ${employeeName}:`, document)
+    return documentId
   }
 
-  public uploadDocument(file: File, metadata: Partial<DocumentMetadata>): Promise<DocumentMetadata> {
-    return new Promise((resolve, reject) => {
-      try {
-        const documentId = `DOC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  private async simulateFileUpload(file: File): Promise<string> {
+    // In production, this would upload to actual storage service
+    return `https://storage.akwaabahrpay.com/documents/${file.name}`
+  }
 
-        const document: DocumentMetadata = {
-          id: documentId,
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          uploadedBy: metadata.uploadedBy || "Unknown",
-          uploadedAt: new Date(),
-          category: metadata.category || "general",
-          tags: metadata.tags || [],
-          isConfidential: metadata.isConfidential || false,
-          accessLevel: metadata.accessLevel || "internal",
-          employeeId: metadata.employeeId,
-          department: metadata.department,
-          expiryDate: metadata.expiryDate,
-          version: 1,
-          checksum: this.generateChecksum(file.name + file.size + Date.now()),
-        }
+  getEmployeeDocuments(employeeId: string): EmployeeDocument[] {
+    return this.documents.get(employeeId) || []
+  }
 
-        // Validate file against category rules
-        const category = this.categories.get(document.category)
-        if (category) {
-          const fileExtension = file.name.split(".").pop()?.toLowerCase()
-          if (fileExtension && !category.allowedFileTypes.includes(fileExtension)) {
-            reject(new Error(`File type .${fileExtension} not allowed for category ${category.name}`))
-            return
-          }
-          if (file.size > category.maxFileSize) {
-            reject(new Error(`File size exceeds maximum allowed size for category ${category.name}`))
-            return
-          }
-        }
+  getAllDocuments(): EmployeeDocument[] {
+    const allDocs: EmployeeDocument[] = []
+    this.documents.forEach((docs) => allDocs.push(...docs))
+    return allDocs
+  }
 
-        this.documents.set(documentId, document)
-        resolve(document)
-      } catch (error) {
-        reject(error)
+  async downloadDocument(documentId: string): Promise<Blob | null> {
+    // In production, this would fetch from storage service
+    console.log(`[v0] Downloading document: ${documentId}`)
+    return null
+  }
+
+  updateDocumentStatus(documentId: string, status: "approved" | "rejected", notes?: string): boolean {
+    for (const docs of this.documents.values()) {
+      const doc = docs.find((d) => d.id === documentId)
+      if (doc) {
+        doc.status = status
+        if (notes) doc.notes = notes
+        return true
       }
-    })
-  }
-
-  public getDocument(documentId: string): DocumentMetadata | undefined {
-    return this.documents.get(documentId)
-  }
-
-  public getDocumentsByEmployee(employeeId: string): DocumentMetadata[] {
-    return Array.from(this.documents.values()).filter((doc) => doc.employeeId === employeeId)
-  }
-
-  public getDocumentsByCategory(categoryId: string): DocumentMetadata[] {
-    return Array.from(this.documents.values()).filter((doc) => doc.category === categoryId)
-  }
-
-  public searchDocuments(query: string): DocumentMetadata[] {
-    const searchTerm = query.toLowerCase()
-    return Array.from(this.documents.values()).filter(
-      (doc) =>
-        doc.name.toLowerCase().includes(searchTerm) ||
-        doc.tags.some((tag) => tag.toLowerCase().includes(searchTerm)) ||
-        doc.category.toLowerCase().includes(searchTerm),
-    )
-  }
-
-  public deleteDocument(documentId: string): boolean {
-    return this.documents.delete(documentId)
-  }
-
-  public getCategories(): DocumentCategory[] {
-    return Array.from(this.categories.values())
-  }
-
-  public addCategory(category: DocumentCategory): void {
-    this.categories.set(category.id, category)
-  }
-
-  public updateCategory(categoryId: string, updates: Partial<DocumentCategory>): boolean {
-    const category = this.categories.get(categoryId)
-    if (category) {
-      this.categories.set(categoryId, { ...category, ...updates })
-      return true
     }
     return false
   }
-
-  private generateChecksum(input: string): string {
-    let hash = 0
-    for (let i = 0; i < input.length; i++) {
-      const char = input.charCodeAt(i)
-      hash = (hash << 5) - hash + char
-      hash = hash & hash // Convert to 32-bit integer
-    }
-    return Math.abs(hash).toString(16)
-  }
-
-  public getDocumentStats() {
-    const totalDocuments = this.documents.size
-    const documentsByCategory = new Map<string, number>()
-    const documentsByAccessLevel = new Map<string, number>()
-    let totalSize = 0
-
-    this.documents.forEach((doc) => {
-      // Count by category
-      const categoryCount = documentsByCategory.get(doc.category) || 0
-      documentsByCategory.set(doc.category, categoryCount + 1)
-
-      // Count by access level
-      const accessCount = documentsByAccessLevel.get(doc.accessLevel) || 0
-      documentsByAccessLevel.set(doc.accessLevel, accessCount + 1)
-
-      // Sum total size
-      totalSize += doc.size
-    })
-
-    return {
-      totalDocuments,
-      totalSize,
-      documentsByCategory: Object.fromEntries(documentsByCategory),
-      documentsByAccessLevel: Object.fromEntries(documentsByAccessLevel),
-    }
-  }
 }
-
-// Export singleton instance
-export const documentVault = DocumentVaultStorage.getInstance()

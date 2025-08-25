@@ -494,7 +494,7 @@ export default function ClientAppLayout({
                     e.currentTarget.style.color = ""
                   }}
                 >
-                  <UserPlus className="w-5 h-5" />
+                  <User className="w-5 h-5" />
                   <span>Employee Offboarding</span>
                 </a>
                 <a
