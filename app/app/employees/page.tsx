@@ -1103,7 +1103,11 @@ interface AddEmployeeFormProps {
   onClose: () => void
 }
 
-function AddEmployeeForm({ employee, onSubmit, onClose }: AddEmployeeFormProps) {
+function AddEmployeeForm({
+  employee,
+  onSubmit,
+  onClose,
+}: AddEmployeeFormProps) {
   const [formData, setFormData] = useState({
     prefix: employee?.prefix || "",
     firstName: employee?.firstName || "",
@@ -1849,13 +1853,18 @@ function AddEmployeeForm({ employee, onSubmit, onClose }: AddEmployeeFormProps) 
 }
 
 interface FormRowProps {
-  label: string
-  children: React.ReactNode
-  full?: boolean
-  error?: string\
+  label: string;
+  children: React.ReactNode;
+  full?: boolean;\
+  error?: string;
 }
 
-function FormRow({ label, children, full = false, error }: FormRowProps) {
+function FormRow({
+  label,
+  children,
+  full = false,
+  error,
+}: FormRowProps) {
   return (
     <div className={full ? "lg:col-span-2" : ""}>\
       <div className="grid items-center gap-3 sm:grid-cols-[200px_1fr]">
@@ -1870,10 +1879,10 @@ function FormRow({ label, children, full = false, error }: FormRowProps) {
 }
 
 interface EmployeeProfileProps {
-  employee: any
+  employee: any;
 }
 \
-function EmployeeProfile({ employee }: EmployeeProfileProps) {\
+function EmployeeProfile({ employee }: EmployeeProfileProps) {
   return (
     <Tabs defaultValue="overview" className="w-full">\
       <TabsList className="grid w-full grid-cols-5">
@@ -2056,7 +2065,7 @@ function EmployeeProfile({ employee }: EmployeeProfileProps) {\
           <CardContent>
             <div className="space-y-2">
               {employee.documents?.length > 0 ? (
-                employee.documents.map((doc: string, index: number) => (
+                employee.documents.map((doc: any, index: number) => (
                   <div key={index} className="flex items-center justify-between p-2 border rounded">
                     <div className="flex items-center">
                       <FileText className="w-4 h-4 mr-2" />

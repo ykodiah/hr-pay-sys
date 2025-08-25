@@ -4,274 +4,306 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { toast } from "@/hooks/use-toast"
 import {
-  LogOut,
-  Laptop,
-  Key,
-  CreditCard,
-  MessageSquare,
+  Search,
+  Plus,
+  MoreHorizontal,
+  UserMinus,
+  FileText,
+  Calendar,
+  Clock,
+  User,
   CheckCircle,
   AlertCircle,
-  Clock,
-  Download,
-  Plus,
-  Search,
   Eye,
   Edit,
+  Download,
+  Briefcase,
+  Key,
+  CreditCard,
+  BookOpen,
+  MessageSquare,
   Shield,
-  Building,
-  Phone,
+  Archive,
+  TrendingDown,
 } from "lucide-react"
 
-interface OffboardingCase {
-  id: string
-  employeeId: string
-  employeeName: string
-  department: string
-  position: string
-  manager: string
-  terminationType: "resignation" | "termination" | "retirement" | "contract-end" | "redundancy"
-  terminationReason: string
-  lastWorkingDay: string
-  noticeDate: string
-  noticePeriod: number
-  status: "initiated" | "in-progress" | "pending-clearance" | "completed"
-  progress: number
-  exitInterviewCompleted: boolean
-  assetsReturned: boolean
-  finalPayCalculated: boolean
-  clearanceCertificateIssued: boolean
-  accessRevoked: boolean
-  knowledgeTransferCompleted: boolean
+// Mock data for demonstration
+const mockOffboardingCases = [
+  {
+    id: "OFF001",
+    employeeId: "EMP001",
+    employeeName: "Kwame Asante",
+    employeeAvatar: "/placeholder.svg?height=40&width=40",
+    department: "Technology",
+    position: "Senior Software Engineer",
+    terminationType: "resignation",
+    terminationReason: "Career advancement",
+    lastWorkingDay: new Date("2024-03-15"),
+    initiatedBy: "Employee",
+    initiatedDate: new Date("2024-02-15"),
+    status: "in-progress",
+    progress: 65,
+    exitInterviewCompleted: true,
+    assetsReturned: false,
+    accessRevoked: false,
+    finalPayCalculated: true,
+    documentsHandedOver: false,
+    knowledgeTransferCompleted: false,
+    manager: "John Manager",
+    hrContact: "Sarah HR",
+    assets: [
+      { type: "Laptop", model: "MacBook Pro 16", serialNumber: "ABC123", returned: false },
+      { type: "Phone", model: "iPhone 13", serialNumber: "XYZ789", returned: false },
+      { type: "Access Card", number: "AC001", returned: true },
+    ],
+    finalPay: {
+      basicSalary: 8500,
+      allowances: 1200,
+      overtime: 450,
+      bonus: 2000,
+      leaveEncashment: 3200,
+      severancePay: 0,
+      deductions: 850,
+      netPay: 14500,
+    },
+  },
+  {
+    id: "OFF002",
+    employeeId: "EMP002",
+    employeeName: "Ama Osei",
+    employeeAvatar: "/placeholder.svg?height=40&width=40",
+    department: "Human Resources",
+    position: "HR Manager",
+    terminationType: "termination",
+    terminationReason: "Redundancy",
+    lastWorkingDay: new Date("2024-03-01"),
+    initiatedBy: "Company",
+    initiatedDate: new Date("2024-02-01"),
+    status: "completed",
+    progress: 100,
+    exitInterviewCompleted: true,
+    assetsReturned: true,
+    accessRevoked: true,
+    finalPayCalculated: true,
+    documentsHandedOver: true,
+    knowledgeTransferCompleted: true,
+    manager: "CEO",
+    hrContact: "Sarah HR",
+    assets: [
+      { type: "Laptop", model: "Dell Latitude", serialNumber: "DEF456", returned: true },
+      { type: "Access Card", number: "AC002", returned: true },
+    ],
+    finalPay: {
+      basicSalary: 7200,
+      allowances: 800,
+      overtime: 0,
+      bonus: 0,
+      leaveEncashment: 2400,
+      severancePay: 14400,
+      deductions: 720,
+      netPay: 24080,
+    },
+  },
+]
+
+const terminationTypes = {
+  resignation: { label: "Resignation", color: "bg-blue-100 text-blue-800", icon: UserMinus },
+  termination: { label: "Termination", color: "bg-red-100 text-red-800", icon: AlertCircle },
+  retirement: { label: "Retirement", color: "bg-green-100 text-green-800", icon: Clock },
+  "end-of-contract": { label: "End of Contract", color: "bg-yellow-100 text-yellow-800", icon: FileText },
+  redundancy: { label: "Redundancy", color: "bg-purple-100 text-purple-800", icon: TrendingDown },
 }
 
-interface Asset {
-  id: string
-  name: string
-  type: "laptop" | "phone" | "id-card" | "keys" | "equipment" | "other"
-  serialNumber?: string
-  condition: "good" | "fair" | "poor" | "damaged"
-  returned: boolean
-  returnDate?: string
-  notes?: string
+const statusTypes = {
+  initiated: { label: "Initiated", color: "bg-gray-100 text-gray-800" },
+  "in-progress": { label: "In Progress", color: "bg-yellow-100 text-yellow-800" },
+  "pending-approval": { label: "Pending Approval", color: "bg-blue-100 text-blue-800" },
+  completed: { label: "Completed", color: "bg-green-100 text-green-800" },
+  cancelled: { label: "Cancelled", color: "bg-red-100 text-red-800" },
 }
 
-interface ExitInterview {
-  id: string
-  employeeId: string
-  interviewDate: string
-  interviewer: string
-  overallSatisfaction: number
-  reasonForLeaving: string
-  workEnvironmentRating: number
-  managementRating: number
-  compensationRating: number
-  careerDevelopmentRating: number
-  workLifeBalanceRating: number
-  wouldRecommendCompany: boolean
-  suggestions: string
-  feedback: string
-}
+const offboardingChecklist = [
+  { id: "exit-interview", label: "Exit Interview", icon: MessageSquare, required: true },
+  { id: "asset-return", label: "Asset Return", icon: Briefcase, required: true },
+  { id: "access-revocation", label: "Access Revocation", icon: Key, required: true },
+  { id: "final-pay", label: "Final Pay Calculation", icon: CreditCard, required: true },
+  { id: "document-handover", label: "Document Handover", icon: FileText, required: true },
+  { id: "knowledge-transfer", label: "Knowledge Transfer", icon: BookOpen, required: false },
+  { id: "clearance-certificate", label: "Clearance Certificate", icon: Shield, required: true },
+]
 
 export default function OffboardingPage() {
+  const [offboardingCases, setOffboardingCases] = useState(mockOffboardingCases)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedTerminationType, setSelectedTerminationType] = useState("all")
+  const [selectedStatus, setSelectedStatus] = useState("all")
+  const [selectedCase, setSelectedCase] = useState<any>(null)
+  const [isNewOffboardingOpen, setIsNewOffboardingOpen] = useState(false)
+  const [isExitInterviewOpen, setIsExitInterviewOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("cases")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [filterStatus, setFilterStatus] = useState("all")
-  const [isNewCaseOpen, setIsNewCaseOpen] = useState(false)
-  const [selectedCase, setSelectedCase] = useState<OffboardingCase | null>(null)
 
-  // Sample data
-  const [offboardingCases, setOffboardingCases] = useState<OffboardingCase[]>([
-    {
-      id: "OFF001",
-      employeeId: "EMP001",
-      employeeName: "John Doe",
-      department: "Sales",
-      position: "Sales Manager",
-      manager: "Jane Smith",
-      terminationType: "resignation",
-      terminationReason: "Career advancement opportunity",
-      lastWorkingDay: "2024-04-15",
-      noticeDate: "2024-03-15",
-      noticePeriod: 30,
-      status: "in-progress",
-      progress: 65,
-      exitInterviewCompleted: true,
-      assetsReturned: false,
-      finalPayCalculated: true,
-      clearanceCertificateIssued: false,
-      accessRevoked: false,
-      knowledgeTransferCompleted: true,
-    },
-    {
-      id: "OFF002",
-      employeeId: "EMP002",
-      employeeName: "Mary Johnson",
-      department: "Finance",
-      position: "Accountant",
-      manager: "Robert Brown",
-      terminationType: "retirement",
-      terminationReason: "Reached retirement age",
-      lastWorkingDay: "2024-03-30",
-      noticeDate: "2024-01-30",
-      noticePeriod: 60,
-      status: "completed",
-      progress: 100,
-      exitInterviewCompleted: true,
-      assetsReturned: true,
-      finalPayCalculated: true,
-      clearanceCertificateIssued: true,
-      accessRevoked: true,
-      knowledgeTransferCompleted: true,
-    },
-  ])
-
-  const [assets, setAssets] = useState<Asset[]>([
-    {
-      id: "AST001",
-      name: "MacBook Pro",
-      type: "laptop",
-      serialNumber: "MBP2023001",
-      condition: "good",
-      returned: false,
-    },
-    {
-      id: "AST002",
-      name: "iPhone 14",
-      type: "phone",
-      serialNumber: "IP14001",
-      condition: "good",
-      returned: false,
-    },
-    {
-      id: "AST003",
-      name: "Employee ID Card",
-      type: "id-card",
-      condition: "good",
-      returned: false,
-    },
-    {
-      id: "AST004",
-      name: "Office Keys",
-      type: "keys",
-      condition: "good",
-      returned: false,
-    },
-  ])
-
-  const [exitInterviews, setExitInterviews] = useState<ExitInterview[]>([
-    {
-      id: "EI001",
-      employeeId: "EMP001",
-      interviewDate: "2024-03-20",
-      interviewer: "HR Manager",
-      overallSatisfaction: 4,
-      reasonForLeaving: "Career advancement opportunity",
-      workEnvironmentRating: 4,
-      managementRating: 4,
-      compensationRating: 3,
-      careerDevelopmentRating: 3,
-      workLifeBalanceRating: 4,
-      wouldRecommendCompany: true,
-      suggestions: "Improve career development programs",
-      feedback: "Great company culture and supportive team environment",
-    },
-  ])
-
-  const [newCase, setNewCase] = useState({
+  const [newOffboarding, setNewOffboarding] = useState({
     employeeId: "",
-    employeeName: "",
-    department: "",
-    position: "",
-    manager: "",
     terminationType: "",
     terminationReason: "",
     lastWorkingDay: "",
-    noticeDate: "",
-    noticePeriod: 30,
+    noticePeriod: "",
+    notes: "",
   })
 
-  const handleCreateCase = () => {
-    const caseId = `OFF${String(offboardingCases.length + 1).padStart(3, "0")}`
-    const newOffboardingCase: OffboardingCase = {
-      id: caseId,
-      ...newCase,
+  const [exitInterview, setExitInterview] = useState({
+    overallExperience: "",
+    reasonForLeaving: "",
+    managerFeedback: "",
+    workEnvironment: "",
+    careerDevelopment: "",
+    compensation: "",
+    recommendations: "",
+    wouldRecommend: "",
+    wouldRehire: "",
+  })
+
+  const filteredCases = offboardingCases.filter((offboardingCase) => {
+    const matchesSearch =
+      offboardingCase.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      offboardingCase.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      offboardingCase.id.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesType = selectedTerminationType === "all" || offboardingCase.terminationType === selectedTerminationType
+    const matchesStatus = selectedStatus === "all" || offboardingCase.status === selectedStatus
+
+    return matchesSearch && matchesType && matchesStatus
+  })
+
+  const getOffboardingStats = () => {
+    const total = offboardingCases.length
+    const active = offboardingCases.filter((c) =>
+      ["initiated", "in-progress", "pending-approval"].includes(c.status),
+    ).length
+    const completed = offboardingCases.filter((c) => c.status === "completed").length
+    const thisMonth = offboardingCases.filter((c) => {
+      const lastWorkingDay = new Date(c.lastWorkingDay)
+      const now = new Date()
+      return lastWorkingDay.getMonth() === now.getMonth() && lastWorkingDay.getFullYear() === now.getFullYear()
+    }).length
+    return { total, active, completed, thisMonth }
+  }
+
+  const stats = getOffboardingStats()
+
+  const handleCreateOffboarding = () => {
+    if (!newOffboarding.employeeId || !newOffboarding.terminationType || !newOffboarding.lastWorkingDay) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const offboardingCase = {
+      id: `OFF${String(offboardingCases.length + 1).padStart(3, "0")}`,
+      employeeId: newOffboarding.employeeId,
+      employeeName: "Employee Name", // Would fetch from employee data
+      employeeAvatar: "/placeholder.svg?height=40&width=40",
+      department: "Department",
+      position: "Position",
+      terminationType: newOffboarding.terminationType,
+      terminationReason: newOffboarding.terminationReason,
+      lastWorkingDay: new Date(newOffboarding.lastWorkingDay),
+      initiatedBy: "HR",
+      initiatedDate: new Date(),
       status: "initiated",
       progress: 0,
       exitInterviewCompleted: false,
       assetsReturned: false,
-      finalPayCalculated: false,
-      clearanceCertificateIssued: false,
       accessRevoked: false,
+      finalPayCalculated: false,
+      documentsHandedOver: false,
       knowledgeTransferCompleted: false,
-    } as OffboardingCase
+      manager: "Manager Name",
+      hrContact: "Current User",
+      assets: [],
+      finalPay: {
+        basicSalary: 0,
+        allowances: 0,
+        overtime: 0,
+        bonus: 0,
+        leaveEncashment: 0,
+        severancePay: 0,
+        deductions: 0,
+        netPay: 0,
+      },
+    }
 
-    setOffboardingCases([...offboardingCases, newOffboardingCase])
-    setIsNewCaseOpen(false)
-    setNewCase({
+    setOffboardingCases([...offboardingCases, offboardingCase])
+    setNewOffboarding({
       employeeId: "",
-      employeeName: "",
-      department: "",
-      position: "",
-      manager: "",
       terminationType: "",
       terminationReason: "",
       lastWorkingDay: "",
-      noticeDate: "",
-      noticePeriod: 30,
+      noticePeriod: "",
+      notes: "",
     })
+    setIsNewOffboardingOpen(false)
+
     toast({
-      title: "Offboarding Case Created",
-      description: `Case ${caseId} has been created successfully.`,
+      title: "Offboarding Initiated",
+      description: `Offboarding process ${offboardingCase.id} has been created successfully.`,
     })
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "initiated":
-        return "bg-blue-100 text-blue-800"
-      case "in-progress":
-        return "bg-yellow-100 text-yellow-800"
-      case "pending-clearance":
-        return "bg-orange-100 text-orange-800"
-      case "completed":
-        return "bg-green-100 text-green-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
+  const handleStatusUpdate = (caseId: string, newStatus: string) => {
+    setOffboardingCases((prev) => prev.map((c) => (c.id === caseId ? { ...c, status: newStatus } : c)))
+
+    toast({
+      title: "Status Updated",
+      description: `Offboarding status changed to ${statusTypes[newStatus as keyof typeof statusTypes].label}.`,
+    })
   }
 
-  const getTerminationTypeColor = (type: string) => {
-    switch (type) {
-      case "resignation":
-        return "bg-blue-100 text-blue-800"
-      case "termination":
-        return "bg-red-100 text-red-800"
-      case "retirement":
-        return "bg-purple-100 text-purple-800"
-      case "contract-end":
-        return "bg-gray-100 text-gray-800"
-      case "redundancy":
-        return "bg-orange-100 text-orange-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
+  const calculateProgress = (offboardingCase: any) => {
+    const checklist = [
+      offboardingCase.exitInterviewCompleted,
+      offboardingCase.assetsReturned,
+      offboardingCase.accessRevoked,
+      offboardingCase.finalPayCalculated,
+      offboardingCase.documentsHandedOver,
+      offboardingCase.knowledgeTransferCompleted,
+    ]
+    const completed = checklist.filter(Boolean).length
+    return Math.round((completed / checklist.length) * 100)
   }
 
-  const calculateDaysRemaining = (lastWorkingDay: string) => {
-    const today = new Date()
-    const lastDay = new Date(lastWorkingDay)
-    const diffTime = lastDay.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
+  const handleExitInterviewSubmit = () => {
+    if (selectedCase) {
+      setOffboardingCases((prev) =>
+        prev.map((c) =>
+          c.id === selectedCase.id
+            ? {
+                ...c,
+                exitInterviewCompleted: true,
+                progress: calculateProgress({ ...c, exitInterviewCompleted: true }),
+              }
+            : c,
+        ),
+      )
+      setIsExitInterviewOpen(false)
+      toast({
+        title: "Exit Interview Completed",
+        description: "Exit interview has been recorded successfully.",
+      })
+    }
   }
 
   return (
@@ -280,14 +312,18 @@ export default function OffboardingPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Employee Offboarding</h1>
-          <p className="text-gray-600">Manage employee departures with comprehensive offboarding workflows</p>
+          <p className="text-gray-600">Manage employee departures and ensure smooth transitions</p>
         </div>
-        <div className="flex space-x-3">
-          <Dialog open={isNewCaseOpen} onOpenChange={setIsNewCaseOpen}>
+        <div className="flex gap-2">
+          <Button variant="outline">
+            <Download className="w-4 h-4 mr-2" />
+            Export Report
+          </Button>
+          <Dialog open={isNewOffboardingOpen} onOpenChange={setIsNewOffboardingOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="w-4 h-4 mr-2" />
-                New Offboarding
+                Initiate Offboarding
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
@@ -297,120 +333,85 @@ export default function OffboardingPage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="employee-id">Employee ID</Label>
-                    <Input
-                      id="employee-id"
-                      value={newCase.employeeId}
-                      onChange={(e) => setNewCase({ ...newCase, employeeId: e.target.value })}
-                      placeholder="EMP001"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="employee-name">Employee Name</Label>
-                    <Input
-                      id="employee-name"
-                      value={newCase.employeeName}
-                      onChange={(e) => setNewCase({ ...newCase, employeeName: e.target.value })}
-                      placeholder="John Doe"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="department">Department</Label>
-                    <Input
-                      id="department"
-                      value={newCase.department}
-                      onChange={(e) => setNewCase({ ...newCase, department: e.target.value })}
-                      placeholder="Sales"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="position">Position</Label>
-                    <Input
-                      id="position"
-                      value={newCase.position}
-                      onChange={(e) => setNewCase({ ...newCase, position: e.target.value })}
-                      placeholder="Sales Manager"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="manager">Manager</Label>
-                    <Input
-                      id="manager"
-                      value={newCase.manager}
-                      onChange={(e) => setNewCase({ ...newCase, manager: e.target.value })}
-                      placeholder="Jane Smith"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="termination-type">Termination Type</Label>
+                    <Label htmlFor="employee">Employee *</Label>
                     <Select
-                      value={newCase.terminationType}
-                      onValueChange={(value) => setNewCase({ ...newCase, terminationType: value })}
+                      value={newOffboarding.employeeId}
+                      onValueChange={(value) => setNewOffboarding({ ...newOffboarding, employeeId: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select employee" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EMP001">Kwame Asante</SelectItem>
+                        <SelectItem value="EMP002">Ama Osei</SelectItem>
+                        <SelectItem value="EMP003">Kofi Mensah</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="terminationType">Termination Type *</Label>
+                    <Select
+                      value={newOffboarding.terminationType}
+                      onValueChange={(value) => setNewOffboarding({ ...newOffboarding, terminationType: value })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="resignation">Resignation</SelectItem>
-                        <SelectItem value="termination">Termination</SelectItem>
-                        <SelectItem value="retirement">Retirement</SelectItem>
-                        <SelectItem value="contract-end">Contract End</SelectItem>
-                        <SelectItem value="redundancy">Redundancy</SelectItem>
+                        {Object.entries(terminationTypes).map(([key, type]) => (
+                          <SelectItem key={key} value={key}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="notice-date">Notice Date</Label>
+                    <Label htmlFor="lastWorkingDay">Last Working Day *</Label>
                     <Input
-                      id="notice-date"
+                      id="lastWorkingDay"
                       type="date"
-                      value={newCase.noticeDate}
-                      onChange={(e) => setNewCase({ ...newCase, noticeDate: e.target.value })}
+                      value={newOffboarding.lastWorkingDay}
+                      onChange={(e) => setNewOffboarding({ ...newOffboarding, lastWorkingDay: e.target.value })}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="last-working-day">Last Working Day</Label>
+                    <Label htmlFor="noticePeriod">Notice Period (days)</Label>
                     <Input
-                      id="last-working-day"
-                      type="date"
-                      value={newCase.lastWorkingDay}
-                      onChange={(e) => setNewCase({ ...newCase, lastWorkingDay: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="notice-period">Notice Period (Days)</Label>
-                    <Input
-                      id="notice-period"
+                      id="noticePeriod"
                       type="number"
-                      value={newCase.noticePeriod}
-                      onChange={(e) => setNewCase({ ...newCase, noticePeriod: Number.parseInt(e.target.value) })}
+                      value={newOffboarding.noticePeriod}
+                      onChange={(e) => setNewOffboarding({ ...newOffboarding, noticePeriod: e.target.value })}
                       placeholder="30"
                     />
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="termination-reason">Reason for Leaving</Label>
+                  <Label htmlFor="terminationReason">Reason for Termination</Label>
+                  <Input
+                    id="terminationReason"
+                    value={newOffboarding.terminationReason}
+                    onChange={(e) => setNewOffboarding({ ...newOffboarding, terminationReason: e.target.value })}
+                    placeholder="Brief reason for departure"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="notes">Additional Notes</Label>
                   <Textarea
-                    id="termination-reason"
-                    value={newCase.terminationReason}
-                    onChange={(e) => setNewCase({ ...newCase, terminationReason: e.target.value })}
-                    placeholder="Describe the reason for leaving..."
+                    id="notes"
+                    value={newOffboarding.notes}
+                    onChange={(e) => setNewOffboarding({ ...newOffboarding, notes: e.target.value })}
+                    placeholder="Any additional information..."
                     rows={3}
                   />
                 </div>
                 <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setIsNewCaseOpen(false)}>
+                  <Button variant="outline" onClick={() => setIsNewOffboardingOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleCreateCase}>Create Offboarding Case</Button>
+                  <Button onClick={handleCreateOffboarding}>Initiate Offboarding</Button>
                 </div>
               </div>
             </DialogContent>
@@ -418,423 +419,461 @@ export default function OffboardingPage() {
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active Cases</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {offboardingCases.filter((c) => c.status !== "completed").length}
-                </p>
+                <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+                <p className="text-sm text-gray-600">Total Cases</p>
               </div>
-              <LogOut className="w-8 h-8 text-blue-600" />
+              <Archive className="w-8 h-8 text-gray-400" />
             </div>
           </CardContent>
         </Card>
-
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pending Clearances</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {offboardingCases.filter((c) => c.status === "pending-clearance").length}
-                </p>
+                <div className="text-2xl font-bold text-yellow-600">{stats.active}</div>
+                <p className="text-sm text-gray-600">Active Cases</p>
               </div>
-              <AlertCircle className="w-8 h-8 text-orange-600" />
+              <Clock className="w-8 h-8 text-yellow-400" />
             </div>
           </CardContent>
         </Card>
-
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Completed This Month</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {offboardingCases.filter((c) => c.status === "completed").length}
-                </p>
+                <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
+                <p className="text-sm text-gray-600">Completed</p>
               </div>
-              <CheckCircle className="w-8 h-8 text-green-600" />
+              <CheckCircle className="w-8 h-8 text-green-400" />
             </div>
           </CardContent>
         </Card>
-
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Assets Pending Return</p>
-                <p className="text-2xl font-bold text-gray-900">{assets.filter((a) => !a.returned).length}</p>
+                <div className="text-2xl font-bold text-blue-600">{stats.thisMonth}</div>
+                <p className="text-sm text-gray-600">This Month</p>
               </div>
-              <Laptop className="w-8 h-8 text-purple-600" />
+              <Calendar className="w-8 h-8 text-blue-400" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Content */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="cases">Offboarding Cases</TabsTrigger>
-          <TabsTrigger value="exit-interviews">Exit Interviews</TabsTrigger>
-          <TabsTrigger value="assets">Asset Management</TabsTrigger>
-          <TabsTrigger value="compliance">Compliance</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="cases" className="space-y-6">
-          {/* Search and Filter */}
-          <div className="flex items-center space-x-4">
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex flex-col lg:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <Input
-                placeholder="Search cases by employee name, ID, or department..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by employee name, ID, or case number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filter by status" />
+            <Select value={selectedTerminationType} onValueChange={setSelectedTerminationType}>
+              <SelectTrigger className="w-full lg:w-48">
+                <SelectValue placeholder="Termination type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {Object.entries(terminationTypes).map(([key, type]) => (
+                  <SelectItem key={key} value={key}>
+                    {type.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger className="w-full lg:w-48">
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="initiated">Initiated</SelectItem>
-                <SelectItem value="in-progress">In Progress</SelectItem>
-                <SelectItem value="pending-clearance">Pending Clearance</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                {Object.entries(statusTypes).map(([key, status]) => (
+                  <SelectItem key={key} value={key}>
+                    {status.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
-            <Button variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
           </div>
+        </CardContent>
+      </Card>
 
-          {/* Cases List */}
-          <div className="space-y-4">
-            {offboardingCases.map((case_) => (
-              <Card key={case_.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">{case_.id}</h3>
-                        <Badge className={getStatusColor(case_.status)}>{case_.status.replace("-", " ")}</Badge>
-                        <Badge className={getTerminationTypeColor(case_.terminationType)}>
-                          {case_.terminationType.replace("-", " ")}
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
-                        <div>
-                          <span className="font-medium">Employee:</span> {case_.employeeName}
-                        </div>
-                        <div>
-                          <span className="font-medium">Department:</span> {case_.department}
-                        </div>
-                        <div>
-                          <span className="font-medium">Position:</span> {case_.position}
-                        </div>
-                        <div>
-                          <span className="font-medium">Manager:</span> {case_.manager}
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-gray-600 mb-4">
-                        <div>
-                          <span className="font-medium">Last Working Day:</span>{" "}
-                          {new Date(case_.lastWorkingDay).toLocaleDateString()}
-                        </div>
-                        <div>
-                          <span className="font-medium">Days Remaining:</span>{" "}
-                          <span
-                            className={
-                              calculateDaysRemaining(case_.lastWorkingDay) <= 7
-                                ? "text-red-600 font-medium"
-                                : "text-gray-900"
-                            }
-                          >
-                            {calculateDaysRemaining(case_.lastWorkingDay)} days
-                          </span>
-                        </div>
-                        <div>
-                          <span className="font-medium">Notice Period:</span> {case_.noticePeriod} days
-                        </div>
-                      </div>
-                      <p className="text-gray-700 mb-4">{case_.terminationReason}</p>
+      {/* Main Content */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="cases">Offboarding Cases ({filteredCases.length})</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics & Reports</TabsTrigger>
+          <TabsTrigger value="compliance">Ghana Labour Act Compliance</TabsTrigger>
+        </TabsList>
 
-                      {/* Progress Bar */}
-                      <div className="mb-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm font-medium text-gray-700">Offboarding Progress</span>
-                          <span className="text-sm text-gray-500">{case_.progress}%</span>
-                        </div>
-                        <Progress value={case_.progress} className="w-full" />
-                      </div>
-
-                      {/* Checklist */}
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                        <div className="flex items-center space-x-2">
-                          {case_.exitInterviewCompleted ? (
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <Clock className="w-4 h-4 text-gray-400" />
-                          )}
-                          <span className={case_.exitInterviewCompleted ? "text-green-700" : "text-gray-600"}>
-                            Exit Interview
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {case_.assetsReturned ? (
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <Clock className="w-4 h-4 text-gray-400" />
-                          )}
-                          <span className={case_.assetsReturned ? "text-green-700" : "text-gray-600"}>
-                            Assets Returned
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {case_.finalPayCalculated ? (
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <Clock className="w-4 h-4 text-gray-400" />
-                          )}
-                          <span className={case_.finalPayCalculated ? "text-green-700" : "text-gray-600"}>
-                            Final Pay Calculated
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {case_.accessRevoked ? (
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <Clock className="w-4 h-4 text-gray-400" />
-                          )}
-                          <span className={case_.accessRevoked ? "text-green-700" : "text-gray-600"}>
-                            Access Revoked
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {case_.knowledgeTransferCompleted ? (
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <Clock className="w-4 h-4 text-gray-400" />
-                          )}
-                          <span className={case_.knowledgeTransferCompleted ? "text-green-700" : "text-gray-600"}>
-                            Knowledge Transfer
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {case_.clearanceCertificateIssued ? (
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <Clock className="w-4 h-4 text-gray-400" />
-                          )}
-                          <span className={case_.clearanceCertificateIssued ? "text-green-700" : "text-gray-600"}>
-                            Clearance Certificate
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
-                        <Eye className="w-4 h-4 mr-1" />
-                        View
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-4 h-4 mr-1" />
-                        Update
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="exit-interviews" className="space-y-6">
+        <TabsContent value="cases" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <MessageSquare className="w-5 h-5" />
-                <span>Exit Interviews</span>
-              </CardTitle>
+              <CardTitle>Active Offboarding Cases</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {exitInterviews.map((interview) => (
-                  <div key={interview.id} className="border rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h4 className="font-semibold text-gray-900">Employee: {interview.employeeId}</h4>
-                        <p className="text-sm text-gray-600">
-                          Interview Date: {new Date(interview.interviewDate).toLocaleDateString()}
-                        </p>
-                        <p className="text-sm text-gray-600">Interviewer: {interview.interviewer}</p>
+                {filteredCases.length > 0 ? (
+                  filteredCases.map((offboardingCase) => {
+                    const TerminationIcon =
+                      terminationTypes[offboardingCase.terminationType as keyof typeof terminationTypes].icon
+                    const progress = calculateProgress(offboardingCase)
+                    return (
+                      <div
+                        key={offboardingCase.id}
+                        className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-lg">
+                            <TerminationIcon className="w-6 h-6 text-gray-600" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="font-semibold text-gray-900">{offboardingCase.employeeName}</h3>
+                              <Badge
+                                className={
+                                  terminationTypes[offboardingCase.terminationType as keyof typeof terminationTypes]
+                                    .color
+                                }
+                              >
+                                {
+                                  terminationTypes[offboardingCase.terminationType as keyof typeof terminationTypes]
+                                    .label
+                                }
+                              </Badge>
+                              <Badge className={statusTypes[offboardingCase.status as keyof typeof statusTypes].color}>
+                                {statusTypes[offboardingCase.status as keyof typeof statusTypes].label}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
+                              <div className="flex items-center">
+                                <Avatar className="w-5 h-5 mr-2">
+                                  <AvatarImage src={offboardingCase.employeeAvatar || "/placeholder.svg"} />
+                                  <AvatarFallback>
+                                    {offboardingCase.employeeName
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                {offboardingCase.employeeId} • {offboardingCase.department}
+                              </div>
+                              <div className="flex items-center">
+                                <Calendar className="w-4 h-4 mr-1" />
+                                Last day: {offboardingCase.lastWorkingDay.toLocaleDateString()}
+                              </div>
+                              <div className="flex items-center">
+                                <User className="w-4 h-4 mr-1" />
+                                {offboardingCase.manager}
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Progress value={progress} className="flex-1 max-w-xs" />
+                              <span className="text-sm text-gray-600">{progress}% complete</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setSelectedCase(offboardingCase)}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedCase(offboardingCase)
+                                  setIsExitInterviewOpen(true)
+                                }}
+                              >
+                                <MessageSquare className="w-4 h-4 mr-2" />
+                                Exit Interview
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Case
+                              </DropdownMenuItem>
+                              {offboardingCase.status !== "completed" && (
+                                <DropdownMenuItem onClick={() => handleStatusUpdate(offboardingCase.id, "completed")}>
+                                  <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                                  Mark Complete
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem>
+                                <Download className="w-4 h-4 mr-2" />
+                                Export Case File
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm text-gray-600">Overall Satisfaction</div>
-                        <div className="text-2xl font-bold text-gray-900">{interview.overallSatisfaction}/5</div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-4">
-                      <div>
-                        <span className="font-medium">Work Environment:</span> {interview.workEnvironmentRating}/5
-                      </div>
-                      <div>
-                        <span className="font-medium">Management:</span> {interview.managementRating}/5
-                      </div>
-                      <div>
-                        <span className="font-medium">Compensation:</span> {interview.compensationRating}/5
-                      </div>
-                      <div>
-                        <span className="font-medium">Career Development:</span> {interview.careerDevelopmentRating}/5
-                      </div>
-                      <div>
-                        <span className="font-medium">Work-Life Balance:</span> {interview.workLifeBalanceRating}/5
-                      </div>
-                      <div>
-                        <span className="font-medium">Would Recommend:</span>{" "}
-                        {interview.wouldRecommendCompany ? "Yes" : "No"}
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div>
-                        <span className="font-medium text-sm">Reason for Leaving:</span>
-                        <p className="text-sm text-gray-700">{interview.reasonForLeaving}</p>
-                      </div>
-                      <div>
-                        <span className="font-medium text-sm">Suggestions:</span>
-                        <p className="text-sm text-gray-700">{interview.suggestions}</p>
-                      </div>
-                      <div>
-                        <span className="font-medium text-sm">Additional Feedback:</span>
-                        <p className="text-sm text-gray-700">{interview.feedback}</p>
-                      </div>
-                    </div>
+                    )
+                  })
+                ) : (
+                  <div className="text-center py-12">
+                    <Archive className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No offboarding cases found</h3>
+                    <p className="text-gray-500">Try adjusting your search criteria or filters.</p>
                   </div>
-                ))}
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="assets" className="space-y-6">
+        <TabsContent value="analytics" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Termination Reasons</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Resignation</span>
+                    <span className="font-semibold">60%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Termination</span>
+                    <span className="font-semibold">25%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Retirement</span>
+                    <span className="font-semibold">10%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">End of Contract</span>
+                    <span className="font-semibold">5%</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Average Offboarding Time</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Average Completion Time</span>
+                    <span className="font-semibold">8 days</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Fastest Completion</span>
+                    <span className="font-semibold">3 days</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Longest Completion</span>
+                    <span className="font-semibold">21 days</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="compliance" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Laptop className="w-5 h-5" />
-                <span>Asset Return Tracking</span>
+              <CardTitle className="flex items-center">
+                <Shield className="w-5 h-5 mr-2" />
+                Ghana Labour Act 2003 (Act 651) Compliance
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {assets.map((asset) => (
-                  <div key={asset.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                        {asset.type === "laptop" && <Laptop className="w-5 h-5 text-gray-600" />}
-                        {asset.type === "phone" && <Phone className="w-5 h-5 text-gray-600" />}
-                        {asset.type === "id-card" && <CreditCard className="w-5 h-5 text-gray-600" />}
-                        {asset.type === "keys" && <Key className="w-5 h-5 text-gray-600" />}
-                        {asset.type === "equipment" && <Building className="w-5 h-5 text-gray-600" />}
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-gray-900">{asset.name}</h4>
-                        {asset.serialNumber && <p className="text-sm text-gray-600">Serial: {asset.serialNumber}</p>}
-                        <p className="text-sm text-gray-600">Condition: {asset.condition}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <Badge className={asset.returned ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                        {asset.returned ? "Returned" : "Pending"}
-                      </Badge>
-                      {!asset.returned && (
-                        <Button size="sm" variant="outline">
-                          Mark Returned
-                        </Button>
-                      )}
-                    </div>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-3">Termination Procedures</h4>
+                    <ul className="space-y-2 text-sm text-gray-600">
+                      <li className="flex items-center">
+                        <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                        Notice period requirements met
+                      </li>
+                      <li className="flex items-center">
+                        <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                        Severance pay calculations accurate
+                      </li>
+                      <li className="flex items-center">
+                        <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                        Final pay includes all entitlements
+                      </li>
+                      <li className="flex items-center">
+                        <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                        Proper documentation maintained
+                      </li>
+                    </ul>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="compliance" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Shield className="w-5 h-5" />
-                <span>Ghana Labour Act Compliance</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h4 className="font-semibold text-gray-900">Termination Procedures</h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="text-sm">Notice period requirements met</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="text-sm">Final pay calculations compliant</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="text-sm">Severance pay calculated (if applicable)</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="text-sm">Proper documentation maintained</span>
-                    </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-3">Employee Rights</h4>
+                    <ul className="space-y-2 text-sm text-gray-600">
+                      <li className="flex items-center">
+                        <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                        Right to appeal termination
+                      </li>
+                      <li className="flex items-center">
+                        <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                        Access to employment records
+                      </li>
+                      <li className="flex items-center">
+                        <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                        Timely payment of final dues
+                      </li>
+                      <li className="flex items-center">
+                        <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                        Certificate of service provided
+                      </li>
+                    </ul>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <h4 className="font-semibold text-gray-900">Employee Rights</h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="text-sm">Outstanding leave days calculated</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="text-sm">Provident fund contributions settled</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="text-sm">SSNIT contributions up to date</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="text-sm">Clearance certificate issued</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t pt-6">
-                <h4 className="font-semibold text-gray-900 mb-4">Key Compliance Requirements</h4>
                 <div className="bg-blue-50 p-4 rounded-lg">
-                  <ul className="space-y-2 text-sm text-blue-800">
-                    <li>• Section 20: Minimum notice periods (1 week to 1 month based on service length)</li>
-                    <li>• Section 21: Payment in lieu of notice permitted</li>
-                    <li>• Section 22: Final pay must include all outstanding entitlements</li>
-                    <li>• Section 23: Severance pay for redundancy situations</li>
-                    <li>• Section 24: Proper documentation and clearance procedures</li>
-                  </ul>
+                  <h4 className="font-semibold text-blue-900 mb-2">Legal Requirements Checklist</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div className="space-y-1">
+                      <div className="flex items-center text-blue-800">
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Section 65: Notice of termination
+                      </div>
+                      <div className="flex items-center text-blue-800">
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Section 66: Payment in lieu of notice
+                      </div>
+                      <div className="flex items-center text-blue-800">
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Section 67: Severance pay entitlement
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center text-blue-800">
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Section 68: Final payment timeline
+                      </div>
+                      <div className="flex items-center text-blue-800">
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Section 69: Certificate of service
+                      </div>
+                      <div className="flex items-center text-blue-800">
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Section 70: Record retention requirements
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Exit Interview Dialog */}
+      <Dialog open={isExitInterviewOpen} onOpenChange={setIsExitInterviewOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Exit Interview - {selectedCase?.employeeName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <Label htmlFor="overallExperience">Overall Experience (1-10)</Label>
+                <Select
+                  value={exitInterview.overallExperience}
+                  onValueChange={(value) => setExitInterview({ ...exitInterview, overallExperience: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Rate overall experience" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[...Array(10)].map((_, i) => (
+                      <SelectItem key={i + 1} value={String(i + 1)}>
+                        {i + 1} - {i < 3 ? "Poor" : i < 6 ? "Average" : i < 8 ? "Good" : "Excellent"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="wouldRecommend">Would Recommend Company</Label>
+                <Select
+                  value={exitInterview.wouldRecommend}
+                  onValueChange={(value) => setExitInterview({ ...exitInterview, wouldRecommend: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Would you recommend?" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="yes">Yes</SelectItem>
+                    <SelectItem value="no">No</SelectItem>
+                    <SelectItem value="maybe">Maybe</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="reasonForLeaving">Primary Reason for Leaving</Label>
+              <Textarea
+                id="reasonForLeaving"
+                value={exitInterview.reasonForLeaving}
+                onChange={(e) => setExitInterview({ ...exitInterview, reasonForLeaving: e.target.value })}
+                placeholder="Please describe your primary reason for leaving..."
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="managerFeedback">Manager/Supervisor Feedback</Label>
+              <Textarea
+                id="managerFeedback"
+                value={exitInterview.managerFeedback}
+                onChange={(e) => setExitInterview({ ...exitInterview, managerFeedback: e.target.value })}
+                placeholder="How would you rate your relationship with your manager?"
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="workEnvironment">Work Environment & Culture</Label>
+              <Textarea
+                id="workEnvironment"
+                value={exitInterview.workEnvironment}
+                onChange={(e) => setExitInterview({ ...exitInterview, workEnvironment: e.target.value })}
+                placeholder="How would you describe the work environment and company culture?"
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="recommendations">Recommendations for Improvement</Label>
+              <Textarea
+                id="recommendations"
+                value={exitInterview.recommendations}
+                onChange={(e) => setExitInterview({ ...exitInterview, recommendations: e.target.value })}
+                placeholder="What recommendations do you have for improving the company?"
+                rows={4}
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setIsExitInterviewOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleExitInterviewSubmit}>Complete Interview</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
