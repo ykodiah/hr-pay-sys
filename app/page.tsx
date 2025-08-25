@@ -27,7 +27,7 @@ export default function HomePage() {
             </nav>
             <div className="flex items-center space-x-4">
               <Link href="/auth/login">
-                <Button variant="ghost" className="text-gray-600 hover:text-emerald-600">
+                <Button variant="ghost" className="text-gray-600">
                   Sign In
                 </Button>
               </Link>
@@ -103,7 +103,7 @@ export default function HomePage() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
+              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
                 <CardContent className="p-0">
                   <img
                     src="/ghana-payroll-engine-dashboard.png"
@@ -132,7 +132,7 @@ export default function HomePage() {
             </div>
 
             <div className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
+              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
                 <CardContent className="p-0">
                   <img
                     src="/employee-management-dashboard.png"
@@ -161,7 +161,7 @@ export default function HomePage() {
             </div>
 
             <div className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
+              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
                 <CardContent className="p-0">
                   <img
                     src="/hr-analytics-dashboard.png"
@@ -190,7 +190,7 @@ export default function HomePage() {
             </div>
 
             <div className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
+              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
                 <CardContent className="p-0">
                   <img
                     src="/ghana-office-dashboard-multi-location.png"
@@ -219,7 +219,7 @@ export default function HomePage() {
             </div>
 
             <div className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
+              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
                 <CardContent className="p-0">
                   <img
                     src="/employee-self-service-mobile-app.png"
@@ -248,7 +248,7 @@ export default function HomePage() {
             </div>
 
             <div className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
+              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
                 <CardContent className="p-0">
                   <img
                     src="/security-dashboard-with-encryption-and-access-cont.png"
@@ -321,9 +321,7 @@ export default function HomePage() {
                     <span>24/7 support</span>
                   </li>
                 </ul>
-                <Link href="/auth/login">
-                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
-                </Link>
+                <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
               </CardContent>
             </Card>
 
@@ -363,9 +361,7 @@ export default function HomePage() {
                     <span>Dedicated account manager</span>
                   </li>
                 </ul>
-                <Link href="/auth/login">
-                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
-                </Link>
+                <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
               </CardContent>
             </Card>
           </div>

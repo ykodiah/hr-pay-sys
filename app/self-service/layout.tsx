@@ -29,9 +29,6 @@ import {
   Award,
   ChevronDown,
   X,
-  MessageSquare,
-  Scale,
-  ExternalLink,
 } from "lucide-react"
 import { Logo } from "@/components/logo"
 
@@ -81,7 +78,7 @@ export default function SelfServiceLayout({
   const handleSignOut = () => {
     localStorage.removeItem("authToken")
     sessionStorage.clear()
-    window.location.href = "/auth/login"
+    window.location.href = "/login"
   }
 
   return (
@@ -296,31 +293,6 @@ export default function SelfServiceLayout({
               >
                 <CreditCard className="w-5 h-5" />
                 <span>Loan Requests</span>
-              </a>
-            </div>
-
-            <div className="pt-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Employee Services</p>
-              <a
-                href="/self-service/grievances"
-                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <MessageSquare className="w-5 h-5" />
-                <span>My Grievances</span>
-              </a>
-              <a
-                href="/self-service/disciplinary"
-                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <Scale className="w-5 h-5" />
-                <span>Disciplinary Cases</span>
-              </a>
-              <a
-                href="/self-service/exit-process"
-                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <ExternalLink className="w-5 h-5" />
-                <span>Exit Process</span>
               </a>
             </div>
 

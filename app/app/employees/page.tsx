@@ -179,28 +179,15 @@ export default function EmployeesPage() {
       ...employeeData,
       id: employees.length + 1,
       employeeId: `EMP${String(employees.length + 1).padStart(3, "0")}`,
-      name: `${employeeData.firstName} ${employeeData.lastName}`,
       leaveBalance: { annual: 21, sick: 10, casual: 5 },
-      documents: employeeData.documents || [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      documents: [],
     }
-
-    // Save to localStorage for persistence
-    const updatedEmployees = [...employees, newEmployee]
-    setEmployees(updatedEmployees)
-    localStorage.setItem("akwaaba-employees", JSON.stringify(updatedEmployees))
-
+    setEmployees([...employees, newEmployee])
     setIsAddDialogOpen(false)
-
-    // Enhanced success message
     toast({
-      title: "Employee Data Successfully Saved",
-      description: `${newEmployee.name} (${newEmployee.employeeId}) has been successfully added to the system with all documents and information.`,
-      duration: 5000,
+      title: "Employee Added",
+      description: `${employeeData.name} has been successfully added to the system.`,
     })
-
-    console.log("[v0] Employee saved successfully:", newEmployee)
   }
 
   const handleEditEmployee = (employeeData: any) => {
@@ -1192,26 +1179,8 @@ function AddEmployeeForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("[v0] Form submission started with data:", formData)
-
     if (validateForm()) {
-      // Create complete employee object with all required fields
-      const completeEmployeeData = {
-        ...formData,
-        name: `${formData.firstName} ${formData.lastName}`,
-        fullName: `${formData.prefix} ${formData.firstName} ${formData.otherNames} ${formData.lastName}`.trim(),
-        submittedAt: new Date().toISOString(),
-      }
-
-      console.log("[v0] Validated employee data:", completeEmployeeData)
-      onSubmit(completeEmployeeData)
-    } else {
-      console.log("[v0] Form validation failed:", errors)
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields correctly.",
-        variant: "destructive",
-      })
+      onSubmit(formData)
     }
   }
 
@@ -1226,11 +1195,9 @@ function AddEmployeeForm({
     const documentService = CentralDocumentService.getInstance()
 
     try {
-      console.log("[v0] Starting document upload:", { fileName: file.name, type: documentType })
-
       const documentId = await documentService.uploadDocument({
         file,
-        employeeId: employeeData?.employeeId || formData.employeeId || "TEMP",
+        employeeId: employeeData?.employeeId || formData.employeeId,
         employeeName: employeeData?.name || `${formData.firstName} ${formData.lastName}`,
         documentType,
         source: "employee-onboarding",
@@ -1238,7 +1205,7 @@ function AddEmployeeForm({
         notes: `Employee document: ${documentType}`,
       })
 
-      // Update form data with document reference
+      // Update form data
       setFormData((prev) => ({
         ...prev,
         documents: [
@@ -1248,25 +1215,14 @@ function AddEmployeeForm({
             type: documentType,
             file,
             name: file.name,
-            status: "uploaded",
-            uploadedAt: new Date().toISOString(),
+            status: "pending",
           },
         ],
       }))
 
-      toast({
-        title: "Document Uploaded",
-        description: `${documentType} has been successfully uploaded and saved to the document vault.`,
-      })
-
-      console.log("[v0] Document uploaded successfully:", documentId)
+      console.log("[v0] Document uploaded to vault:", documentId)
     } catch (error) {
       console.error("[v0] Document upload failed:", error)
-      toast({
-        title: "Upload Failed",
-        description: `Failed to upload ${documentType}. Please try again.`,
-        variant: "destructive",
-      })
     }
   }
 
@@ -1894,15 +1850,11 @@ function AddEmployeeForm({
           </div>
         </TabsContent>
 
-        <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-          <Button type="button" variant="outline" onClick={onClose}>
+        <div className="flex justify-end gap-4 pt-6 border-t">
+          <Button type="button" variant="outline" onClick={onClose} className="px-6 bg-transparent">
             Cancel
           </Button>
-          <Button
-            type="submit"
-            className="px-6 bg-emerald-600 hover:bg-emerald-700 text-white"
-            disabled={Object.keys(errors).length > 0}
-          >
+          <Button type="submit" className="px-6 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSubmit}>
             {employee ? "Update Employee" : "Add Employee"}
           </Button>
         </div>
