@@ -27,11 +27,11 @@ export default function HomePage() {
             </nav>
             <div className="flex items-center space-x-4">
               <Link href="/auth/login">
-                <Button variant="ghost" className="text-gray-600">
+                <Button variant="ghost" className="text-gray-600 hover:text-emerald-600">
                   Sign In
                 </Button>
               </Link>
-              <Link href="/setup">
+              <Link href="/auth/login">
                 <Button className="bg-emerald-600 hover:bg-emerald-700">Get Started</Button>
               </Link>
             </div>
@@ -102,7 +102,7 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <Link href="/features/payroll" className="block">
+            <div className="block">
               <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
                 <CardContent className="p-0">
                   <img
@@ -129,9 +129,9 @@ export default function HomePage() {
                   </ul>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
 
-            <Link href="/features/hr" className="block">
+            <div className="block">
               <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
                 <CardContent className="p-0">
                   <img
@@ -158,9 +158,9 @@ export default function HomePage() {
                   </ul>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
 
-            <Link href="/features/analytics" className="block">
+            <div className="block">
               <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
                 <CardContent className="p-0">
                   <img
@@ -187,9 +187,9 @@ export default function HomePage() {
                   </ul>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
 
-            <Link href="/features/multi-location" className="block">
+            <div className="block">
               <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
                 <CardContent className="p-0">
                   <img
@@ -216,9 +216,9 @@ export default function HomePage() {
                   </ul>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
 
-            <Link href="/features/mobile" className="block">
+            <div className="block">
               <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
                 <CardContent className="p-0">
                   <img
@@ -245,9 +245,9 @@ export default function HomePage() {
                   </ul>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
 
-            <Link href="/features/security" className="block">
+            <div className="block">
               <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
                 <CardContent className="p-0">
                   <img
@@ -274,7 +274,7 @@ export default function HomePage() {
                   </ul>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -321,7 +321,9 @@ export default function HomePage() {
                     <span>24/7 support</span>
                   </li>
                 </ul>
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
+                <Link href="/auth/login">
+                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
+                </Link>
               </CardContent>
             </Card>
 
@@ -361,7 +363,9 @@ export default function HomePage() {
                     <span>Dedicated account manager</span>
                   </li>
                 </ul>
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
+                <Link href="/auth/login">
+                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
+                </Link>
               </CardContent>
             </Card>
           </div>
@@ -550,16 +554,20 @@ export default function HomePage() {
             Join hundreds of Ghanaian businesses already saving time and ensuring compliance with AkwaabaHRPay.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-white text-emerald-600 hover:bg-gray-100 text-lg px-8 py-4">
-              Start Free Trial
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="border-white text-white hover:bg-white hover:text-emerald-600 text-lg px-8 py-4 bg-transparent"
-            >
-              Schedule Demo
-            </Button>
+            <Link href="/auth/login">
+              <Button size="lg" className="bg-white text-emerald-600 hover:bg-gray-100 text-lg px-8 py-4">
+                Start Free Trial
+              </Button>
+            </Link>
+            <Link href="/contact">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white text-white hover:bg-white hover:text-emerald-600 text-lg px-8 py-4 bg-transparent"
+              >
+                Schedule Demo
+              </Button>
+            </Link>
           </div>
           <p className="text-emerald-200 text-sm mt-4">
             30-day free trial • No credit card required • Setup in minutes
