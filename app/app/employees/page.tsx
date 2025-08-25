@@ -1568,25 +1568,10 @@ function AddEmployeeForm({
                   <span className="font-medium text-gray-900">1. Academic Certificate(s)</span>
                   <p className="text-sm text-gray-500">Educational certificates and transcripts</p>
                 </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="academic-cert"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        console.log("[v0] Academic Certificate uploaded:", file.name)
-                        // Handle file upload logic here
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
               </div>
 
               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -1594,25 +1579,10 @@ function AddEmployeeForm({
                   <span className="font-medium text-gray-900">2. Passport Picture</span>
                   <p className="text-sm text-gray-500">Professional passport-sized photograph</p>
                 </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="passport-picture"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        console.log("[v0] Passport Picture uploaded:", file.name)
-                        // Handle file upload logic here
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
               </div>
 
               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -1620,25 +1590,10 @@ function AddEmployeeForm({
                   <span className="font-medium text-gray-900">3. Resume & Application Letter</span>
                   <p className="text-sm text-gray-500">Current CV and cover letter</p>
                 </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="resume-letter"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        console.log("[v0] Resume & Application Letter uploaded:", file.name)
-                        // Handle file upload logic here
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
               </div>
 
               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -1646,25 +1601,10 @@ function AddEmployeeForm({
                   <span className="font-medium text-gray-900">4. Passport</span>
                   <p className="text-sm text-gray-500">Valid passport copy</p>
                 </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="passport"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        console.log("[v0] Passport uploaded:", file.name)
-                        // Handle file upload logic here
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
               </div>
 
               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -1672,25 +1612,10 @@ function AddEmployeeForm({
                   <span className="font-medium text-gray-900">5. National ID</span>
                   <p className="text-sm text-gray-500">Ghana Card or Voter's ID</p>
                 </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="national-id"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        console.log("[v0] National ID uploaded:", file.name)
-                        // Handle file upload logic here
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
               </div>
 
               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -1707,7 +1632,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        console.log("[v0] Medical Report uploaded:", file.name)
+                        console.log("[v0] Medical Report file selected:", file.name)
                         // Handle file upload logic here
                       }
                     }}
@@ -1724,25 +1649,10 @@ function AddEmployeeForm({
                   <span className="font-medium text-gray-900">7. Police Report</span>
                   <p className="text-sm text-gray-500">Criminal background check</p>
                 </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="police-report"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        console.log("[v0] Police Report uploaded:", file.name)
-                        // Handle file upload logic here
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
               </div>
 
               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -1750,25 +1660,10 @@ function AddEmployeeForm({
                   <span className="font-medium text-gray-900">8. Other Uploads</span>
                   <p className="text-sm text-gray-500">Additional supporting documents</p>
                 </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="other-uploads"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        console.log("[v0] Other document uploaded:", file.name)
-                        // Handle file upload logic here
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
+                <Button type="button" variant="outline" className="bg-transparent">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
               </div>
             </div>
 
@@ -1786,7 +1681,7 @@ function AddEmployeeForm({
         <Button type="button" variant="outline" onClick={onClose} className="px-6 bg-transparent">
           Cancel
         </Button>
-        <Button type="submit" className="px-6 bg-emerald-600 hover:bg-emerald-700 text-white">
+        <Button type="submit" className="px-6 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSubmit}>
           {employee ? "Update Employee" : "Add Employee"}
         </Button>
       </div>
