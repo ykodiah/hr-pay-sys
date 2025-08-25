@@ -102,179 +102,167 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
-                <CardContent className="p-0">
-                  <img
-                    src="/ghana-payroll-engine-dashboard.png"
-                    alt="Ghana Payroll Engine"
-                    className="w-full h-32 object-cover rounded-lg mb-4"
-                  />
-                  <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-4">
-                    <Calculator className="w-6 h-6 text-emerald-600" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Ghana Payroll Engine</h3>
-                  <p className="text-gray-600 mb-4">
-                    Automated PAYE, SSNIT calculations with effective-dated rules. No prior-year drift.
-                  </p>
-                  <ul className="space-y-2 text-sm text-gray-500">
-                    <li className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span>2025 tax rules included</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span>Minimum wage compliance</span>
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
+            <Card className="p-6 hover:shadow-lg transition-all hover:scale-105">
+              <CardContent className="p-0">
+                <img
+                  src="/ghana-payroll-engine-dashboard.png"
+                  alt="Ghana Payroll Engine"
+                  className="w-full h-32 object-cover rounded-lg mb-4"
+                />
+                <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-4">
+                  <Calculator className="w-6 h-6 text-emerald-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Ghana Payroll Engine</h3>
+                <p className="text-gray-600 mb-4">
+                  Automated PAYE, SSNIT calculations with effective-dated rules. No prior-year drift.
+                </p>
+                <ul className="space-y-2 text-sm text-gray-500">
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <span>2025 tax rules included</span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <span>Minimum wage compliance</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
 
-            <div className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
-                <CardContent className="p-0">
-                  <img
-                    src="/employee-management-dashboard.png"
-                    alt="Employee Management"
-                    className="w-full h-32 object-cover rounded-lg mb-4"
-                  />
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                    <Users className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Employee Management</h3>
-                  <p className="text-gray-600 mb-4">
-                    Complete HR suite with leave management, loans & advances, and self-service portal.
-                  </p>
-                  <ul className="space-y-2 text-sm text-gray-500">
-                    <li className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span>Leave tracking & approval</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span>Loan schedules</span>
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
+            <Card className="p-6 hover:shadow-lg transition-all hover:scale-105">
+              <CardContent className="p-0">
+                <img
+                  src="/employee-management-dashboard.png"
+                  alt="Employee Management"
+                  className="w-full h-32 object-cover rounded-lg mb-4"
+                />
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+                  <Users className="w-6 h-6 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Employee Management</h3>
+                <p className="text-gray-600 mb-4">
+                  Complete HR suite with leave management, loans & advances, and self-service portal.
+                </p>
+                <ul className="space-y-2 text-sm text-gray-500">
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <span>Leave tracking & approval</span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <span>Loan schedules</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
 
-            <div className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
-                <CardContent className="p-0">
-                  <img
-                    src="/hr-analytics-dashboard.png"
-                    alt="HR Analytics"
-                    className="w-full h-32 object-cover rounded-lg mb-4"
-                  />
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                    <TrendingUp className="w-6 h-6 text-purple-600" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">HR Analytics</h3>
-                  <p className="text-gray-600 mb-4">
-                    Real-time dashboards with payroll insights, cost analysis, and compliance reporting.
-                  </p>
-                  <ul className="space-y-2 text-sm text-gray-500">
-                    <li className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span>Cost center reporting</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span>Compliance tracking</span>
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
+            <Card className="p-6 hover:shadow-lg transition-all hover:scale-105">
+              <CardContent className="p-0">
+                <img
+                  src="/hr-analytics-dashboard.png"
+                  alt="HR Analytics"
+                  className="w-full h-32 object-cover rounded-lg mb-4"
+                />
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+                  <TrendingUp className="w-6 h-6 text-purple-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">HR Analytics</h3>
+                <p className="text-gray-600 mb-4">
+                  Real-time dashboards with payroll insights, cost analysis, and compliance reporting.
+                </p>
+                <ul className="space-y-2 text-sm text-gray-500">
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <span>Cost center reporting</span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <span>Compliance tracking</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
 
-            <div className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
-                <CardContent className="p-0">
-                  <img
-                    src="/ghana-office-dashboard-multi-location.png"
-                    alt="Multi-Location Management"
-                    className="w-full h-32 object-cover rounded-lg mb-4"
-                  />
-                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
-                    <Globe className="w-6 h-6 text-orange-600" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Multi-Location</h3>
-                  <p className="text-gray-600 mb-4">
-                    Manage multiple subsidiaries and locations from a single dashboard with consolidated reporting.
-                  </p>
-                  <ul className="space-y-2 text-sm text-gray-500">
-                    <li className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span>Group company support</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span>Consolidated reports</span>
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
+            <Card className="p-6 hover:shadow-lg transition-all hover:scale-105">
+              <CardContent className="p-0">
+                <img
+                  src="/ghana-office-dashboard-multi-location.png"
+                  alt="Multi-Location Management"
+                  className="w-full h-32 object-cover rounded-lg mb-4"
+                />
+                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
+                  <Globe className="w-6 h-6 text-orange-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Multi-Location</h3>
+                <p className="text-gray-600 mb-4">
+                  Manage multiple subsidiaries and locations from a single dashboard with consolidated reporting.
+                </p>
+                <ul className="space-y-2 text-sm text-gray-500">
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <span>Group company support</span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <span>Consolidated reports</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
 
-            <div className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
-                <CardContent className="p-0">
-                  <img
-                    src="/employee-self-service-mobile-app.png"
-                    alt="Mobile App"
-                    className="w-full h-32 object-cover rounded-lg mb-4"
-                  />
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                    <Zap className="w-6 h-6 text-green-600" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Mobile App</h3>
-                  <p className="text-gray-600 mb-4">
-                    Employee self-service mobile app for leave requests, payslips, and profile management.
-                  </p>
-                  <ul className="space-y-2 text-sm text-gray-500">
-                    <li className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span>iOS & Android</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span>Offline capability</span>
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
+            <Card className="p-6 hover:shadow-lg transition-all hover:scale-105">
+              <CardContent className="p-0">
+                <img
+                  src="/employee-self-service-mobile-app.png"
+                  alt="Mobile App"
+                  className="w-full h-32 object-cover rounded-lg mb-4"
+                />
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
+                  <Zap className="w-6 h-6 text-green-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Mobile App</h3>
+                <p className="text-gray-600 mb-4">
+                  Employee self-service mobile app for leave requests, payslips, and profile management.
+                </p>
+                <ul className="space-y-2 text-sm text-gray-500">
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <span>iOS & Android</span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <span>Offline capability</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
 
-            <div className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
-                <CardContent className="p-0">
-                  <img
-                    src="/security-dashboard-with-encryption-and-access-cont.png"
-                    alt="Enterprise Security"
-                    className="w-full h-32 object-cover rounded-lg mb-4"
-                  />
-                  <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mb-4">
-                    <Shield className="w-6 h-6 text-red-600" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Enterprise Security</h3>
-                  <p className="text-gray-600 mb-4">
-                    Bank-grade security with role-based access, audit trails, and data encryption.
-                  </p>
-                  <ul className="space-y-2 text-sm text-gray-500">
-                    <li className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span>256-bit encryption</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span>Audit logging</span>
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
+            <Card className="p-6 hover:shadow-lg transition-all hover:scale-105">
+              <CardContent className="p-0">
+                <img
+                  src="/security-dashboard-with-encryption-and-access-cont.png"
+                  alt="Enterprise Security"
+                  className="w-full h-32 object-cover rounded-lg mb-4"
+                />
+                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mb-4">
+                  <Shield className="w-6 h-6 text-red-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Enterprise Security</h3>
+                <p className="text-gray-600 mb-4">
+                  Bank-grade security with role-based access, audit trails, and data encryption.
+                </p>
+                <ul className="space-y-2 text-sm text-gray-500">
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <span>256-bit encryption</span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <span>Audit logging</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
@@ -321,7 +309,9 @@ export default function HomePage() {
                     <span>24/7 support</span>
                   </li>
                 </ul>
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
+                <Link href="/auth/login">
+                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
+                </Link>
               </CardContent>
             </Card>
 
@@ -361,7 +351,9 @@ export default function HomePage() {
                     <span>Dedicated account manager</span>
                   </li>
                 </ul>
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
+                <Link href="/auth/login">
+                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
+                </Link>
               </CardContent>
             </Card>
           </div>
