@@ -46,9 +46,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-
-const supabase = createClientComponentClient()
 
 interface Company {
   id: string
@@ -176,27 +173,17 @@ export default function SettingsPage() {
         {
           id: "1",
           name: "Akwaaba Tech Solutions",
-          taxId: "T0012345678",
-          ssnitNumber: "S1234567890",
-          address: "456 Independence Ave, Ridge, Accra",
-          phone: "+233 30 234 5678",
-          email: "tech@akwaabatech.com",
-          divisions: ["IT", "Support"],
-          departments: ["Development", "Customer Service"],
-          locations: ["Accra", "Tema"],
+          location: "Accra",
+          costCenter: "CC001",
+          manager: "John Doe",
           status: "active",
         },
         {
           id: "2",
           name: "Akwaaba Consulting",
-          taxId: "T0087654321",
-          ssnitNumber: "S0987654321",
-          address: "789 Airport Road, Kumasi",
-          phone: "+233 32 245 6789",
-          email: "consulting@akwaabatech.com",
-          divisions: ["Consulting", "Training"],
-          departments: ["Management", "Sales"],
-          locations: ["Kumasi", "Sunyani"],
+          location: "Kumasi",
+          costCenter: "CC002",
+          manager: "Jane Smith",
           status: "active",
         },
       ],
@@ -319,8 +306,37 @@ export default function SettingsPage() {
     smsNotifications: false,
   })
 
-  const [subsidiaryFunctionActive, setSubsidiaryFunctionActive] = useState(false)
+  const [subsidiaryEnabled, setSubsidiaryEnabled] = useState(false)
   const [showSubsidiaryDialog, setShowSubsidiaryDialog] = useState(false)
+  const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([
+    {
+      id: "1",
+      name: "Akwaaba Tech Solutions",
+      taxId: "C0012345679",
+      ssnitNumber: "1234567891",
+      address: "45 Oxford Street, Osu, Accra, Ghana",
+      phone: "+233 30 234 5678",
+      email: "solutions@akwaabatech.com",
+      divisions: ["Software Development", "IT Consulting"],
+      departments: ["Engineering", "Sales", "Support"],
+      locations: ["Accra Main", "Accra Branch"],
+      status: "active",
+    },
+    {
+      id: "2",
+      name: "Akwaaba Consulting",
+      taxId: "C0012345680",
+      ssnitNumber: "1234567892",
+      address: "12 Prempeh II Street, Kumasi, Ghana",
+      phone: "+233 32 345 6789",
+      email: "consulting@akwaabatech.com",
+      divisions: ["Business Consulting", "HR Consulting"],
+      departments: ["Consulting", "Research", "Training"],
+      locations: ["Kumasi Main", "Kumasi North"],
+      status: "active",
+    },
+  ])
+
   const [subsidiaryForm, setSubsidiaryForm] = useState({
     name: "",
     taxId: "",
@@ -334,94 +350,18 @@ export default function SettingsPage() {
     logo: null as File | null,
   })
 
-  const addDivision = () => {
-    setSubsidiaryForm((prev) => ({
-      ...prev,
-      divisions: [...prev.divisions, ""],
-    }))
-  }
-
-  const removeDivision = (index: number) => {
-    setSubsidiaryForm((prev) => ({
-      ...prev,
-      divisions: prev.divisions.filter((_, i) => i !== index),
-    }))
-  }
-
-  const updateDivision = (index: number, value: string) => {
-    setSubsidiaryForm((prev) => ({
-      ...prev,
-      divisions: prev.divisions.map((div, i) => (i === index ? value : div)),
-    }))
-  }
-
-  const addDepartment = () => {
-    setSubsidiaryForm((prev) => ({
-      ...prev,
-      departments: [...prev.departments, ""],
-    }))
-  }
-
-  const removeDepartment = (index: number) => {
-    setSubsidiaryForm((prev) => ({
-      ...prev,
-      departments: prev.departments.filter((_, i) => i !== index),
-    }))
-  }
-
-  const updateDepartment = (index: number, value: string) => {
-    setSubsidiaryForm((prev) => ({
-      ...prev,
-      departments: prev.departments.map((dept, i) => (i === index ? value : dept)),
-    }))
-  }
-
-  const addLocation = () => {
-    setSubsidiaryForm((prev) => ({
-      ...prev,
-      locations: [...prev.locations, ""],
-    }))
-  }
-
-  const removeLocation = (index: number) => {
-    setSubsidiaryForm((prev) => ({
-      ...prev,
-      locations: prev.locations.filter((_, i) => i !== index),
-    }))
-  }
-
-  const updateLocation = (index: number, value: string) => {
-    setSubsidiaryForm((prev) => ({
-      ...prev,
-      locations: prev.locations.map((loc, i) => (i === index ? value : loc)),
-    }))
-  }
-
-  const handleSubsidiarySubmit = async () => {
+  const handleAddSubsidiary = async () => {
     try {
-      const { data, error } = await supabase.from("subsidiaries").insert([
-        {
-          name: subsidiaryForm.name,
-          tax_id: subsidiaryForm.taxId,
-          ssnit_number: subsidiaryForm.ssnitNumber,
-          address: subsidiaryForm.address,
-          phone: subsidiaryForm.phone,
-          email: subsidiaryForm.email,
-          divisions: subsidiaryForm.divisions.filter((d) => d.trim()),
-          departments: subsidiaryForm.departments.filter((d) => d.trim()),
-          locations: subsidiaryForm.locations.filter((l) => l.trim()),
-          logo: subsidiaryForm.logo ? await uploadLogo(subsidiaryForm.logo) : null,
-          status: "active",
-        },
-      ])
+      const newSubsidiary: Subsidiary = {
+        id: Date.now().toString(),
+        ...subsidiaryForm,
+        divisions: subsidiaryForm.divisions.filter((d) => d.trim()),
+        departments: subsidiaryForm.departments.filter((d) => d.trim()),
+        locations: subsidiaryForm.locations.filter((l) => l.trim()),
+        status: "active",
+      }
 
-      if (error) throw error
-
-      toast({
-        title: "Success",
-        description: "Subsidiary added successfully!",
-      })
-
+      setSubsidiaries([...subsidiaries, newSubsidiary])
       setShowSubsidiaryDialog(false)
       setSubsidiaryForm({
         name: "",
@@ -435,6 +375,11 @@ export default function SettingsPage() {
         locations: [""],
         logo: null,
       })
+
+      toast({
+        title: "Success",
+        description: "Subsidiary added successfully!",
+      })
     } catch (error) {
       toast({
         title: "Error",
@@ -444,18 +389,25 @@ export default function SettingsPage() {
     }
   }
 
-  const uploadLogo = async (file: File): Promise<string> => {
-    const fileExt = file.name.split(".").pop()
-    const fileName = `${Math.random()}.${fileExt}`
-    const filePath = `subsidiary-logos/${fileName}`
+  const addArrayField = (field: "divisions" | "departments" | "locations") => {
+    setSubsidiaryForm((prev) => ({
+      ...prev,
+      [field]: [...prev[field], ""],
+    }))
+  }
 
-    const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, file)
+  const updateArrayField = (field: "divisions" | "departments" | "locations", index: number, value: string) => {
+    setSubsidiaryForm((prev) => ({
+      ...prev,
+      [field]: prev[field].map((item, i) => (i === index ? value : item)),
+    }))
+  }
 
-    if (uploadError) throw uploadError
-
-    const { data } = supabase.storage.from("documents").getPublicUrl(filePath)
-
-    return data.publicUrl
+  const removeArrayField = (field: "divisions" | "departments" | "locations", index: number) => {
+    setSubsidiaryForm((prev) => ({
+      ...prev,
+      [field]: prev[field].filter((_, i) => i !== index),
+    }))
   }
 
   const handleSaveSettings = async () => {
@@ -574,283 +526,309 @@ export default function SettingsPage() {
               <h2 className="text-xl font-semibold">Multi-Company Management</h2>
               <p className="text-gray-600">Manage multiple companies and subsidiaries</p>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="subsidiary-function"
-                  checked={subsidiaryFunctionActive}
-                  onCheckedChange={setSubsidiaryFunctionActive}
-                />
-                <Label htmlFor="subsidiary-function" className="text-sm font-medium">
-                  Activate Subsidiary Function
-                </Label>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Building className="w-5 h-5 text-emerald-600" />
+                  <div>
+                    <CardTitle>Akwaaba Technologies Ltd</CardTitle>
+                    <p className="text-sm text-gray-600">info@akwaabatech.com</p>
+                  </div>
+                </div>
+                <Badge variant="default">active</Badge>
               </div>
-              {subsidiaryFunctionActive && (
-                <Dialog open={showSubsidiaryDialog} onOpenChange={setShowSubsidiaryDialog}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-emerald-600 hover:bg-emerald-700">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Subsidiary
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Add New Subsidiary</DialogTitle>
-                      <p className="text-sm text-gray-600">Create a new subsidiary with comprehensive details</p>
-                    </DialogHeader>
-                    <div className="space-y-6">
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Name of Subsidiary *</Label>
-                            <Input
-                              placeholder="Enter subsidiary name"
-                              value={subsidiaryForm.name}
-                              onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, name: e.target.value }))}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Tax ID / TIN *</Label>
-                            <Input
-                              placeholder="Enter tax ID"
-                              value={subsidiaryForm.taxId}
-                              onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, taxId: e.target.value }))}
-                            />
-                          </div>
-                        </div>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>SSNIT Employer Number *</Label>
-                            <Input
-                              placeholder="Enter SSNIT number"
-                              value={subsidiaryForm.ssnitNumber}
-                              onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, ssnitNumber: e.target.value }))}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Phone Number *</Label>
-                            <Input
-                              placeholder="+233 XX XXX XXXX"
-                              value={subsidiaryForm.phone}
-                              onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, phone: e.target.value }))}
-                            />
-                          </div>
-                        </div>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Email Address *</Label>
-                            <Input
-                              type="email"
-                              placeholder="subsidiary@company.com"
-                              value={subsidiaryForm.email}
-                              onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, email: e.target.value }))}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Address *</Label>
-                            <Input
-                              placeholder="Full address"
-                              value={subsidiaryForm.address}
-                              onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, address: e.target.value }))}
-                            />
-                          </div>
-                        </div>
-                      </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-3 gap-4 mb-6">
+                <div>
+                  <Label className="text-sm font-medium">Tax ID</Label>
+                  <p className="text-sm text-gray-600">C0012345678</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">SSNIT Number</Label>
+                  <p className="text-sm text-gray-600">1234567890</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Industry</Label>
+                  <p className="text-sm text-gray-600">Technology</p>
+                </div>
+              </div>
 
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-900">Organizational Structure</h3>
+              <Separator className="my-6" />
 
-                        {/* Divisions/Branches */}
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <Label>Division / Branch</Label>
-                            <Button type="button" variant="outline" size="sm" onClick={addDivision}>
-                              <Plus className="w-3 h-3 mr-1" />
-                              Add Division
-                            </Button>
-                          </div>
-                          {subsidiaryForm.divisions.map((division, index) => (
-                            <div key={index} className="flex items-center space-x-2">
-                              <Input
-                                placeholder="Enter division/branch name"
-                                value={division}
-                                onChange={(e) => updateDivision(index, e.target.value)}
-                              />
-                              {subsidiaryForm.divisions.length > 1 && (
-                                <Button type="button" variant="outline" size="sm" onClick={() => removeDivision(index)}>
-                                  <X className="w-3 h-3" />
-                                </Button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    id="subsidiary-enabled"
+                    checked={subsidiaryEnabled}
+                    onChange={(e) => setSubsidiaryEnabled(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                  />
+                  <Label htmlFor="subsidiary-enabled" className="text-sm font-medium">
+                    Activate Subsidiary Function
+                  </Label>
+                </div>
 
-                        {/* Departments */}
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <Label>Department</Label>
-                            <Button type="button" variant="outline" size="sm" onClick={addDepartment}>
-                              <Plus className="w-3 h-3 mr-1" />
-                              Add Department
-                            </Button>
-                          </div>
-                          {subsidiaryForm.departments.map((department, index) => (
-                            <div key={index} className="flex items-center space-x-2">
-                              <Input
-                                placeholder="Enter department name"
-                                value={department}
-                                onChange={(e) => updateDepartment(index, e.target.value)}
-                              />
-                              {subsidiaryForm.departments.length > 1 && (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => removeDepartment(index)}
-                                >
-                                  <X className="w-3 h-3" />
-                                </Button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Locations */}
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <Label>Location</Label>
-                            <Button type="button" variant="outline" size="sm" onClick={addLocation}>
-                              <Plus className="w-3 h-3 mr-1" />
-                              Add Location
-                            </Button>
-                          </div>
-                          {subsidiaryForm.locations.map((location, index) => (
-                            <div key={index} className="flex items-center space-x-2">
-                              <Input
-                                placeholder="Enter location"
-                                value={location}
-                                onChange={(e) => updateLocation(index, e.target.value)}
-                              />
-                              {subsidiaryForm.locations.length > 1 && (
-                                <Button type="button" variant="outline" size="sm" onClick={() => removeLocation(index)}>
-                                  <X className="w-3 h-3" />
-                                </Button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-900">Branding</h3>
-                        <div className="space-y-2">
-                          <Label>Subsidiary Logo</Label>
-                          <div className="flex items-center space-x-4">
-                            <Input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) =>
-                                setSubsidiaryForm((prev) => ({
-                                  ...prev,
-                                  logo: e.target.files?.[0] || null,
-                                }))
-                              }
-                              className="flex-1"
-                            />
-                            {subsidiaryForm.logo && (
-                              <div className="flex items-center space-x-2 text-sm text-emerald-600">
-                                <CheckCircle className="w-4 h-4" />
-                                <span>Logo selected</span>
+                {subsidiaryEnabled && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Subsidiaries ({subsidiaries.length})</Label>
+                      <Dialog open={showSubsidiaryDialog} onOpenChange={setShowSubsidiaryDialog}>
+                        <DialogTrigger asChild>
+                          <Button>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Subsidiary
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add New Subsidiary</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-6">
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Name of Subsidiary *</Label>
+                                <Input
+                                  placeholder="Enter subsidiary name"
+                                  value={subsidiaryForm.name}
+                                  onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, name: e.target.value }))}
+                                />
                               </div>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500">
-                            Upload a logo for this subsidiary (PNG, JPG, or SVG format)
-                          </p>
-                        </div>
-                      </div>
+                              <div className="space-y-2">
+                                <Label>Tax ID / TIN *</Label>
+                                <Input
+                                  placeholder="Enter tax ID"
+                                  value={subsidiaryForm.taxId}
+                                  onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, taxId: e.target.value }))}
+                                />
+                              </div>
+                            </div>
 
-                      <div className="flex justify-end space-x-3 pt-4 border-t">
-                        <Button variant="outline" onClick={() => setShowSubsidiaryDialog(false)}>
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={handleSubsidiarySubmit}
-                          className="bg-emerald-600 hover:bg-emerald-700"
-                          disabled={!subsidiaryForm.name || !subsidiaryForm.taxId || !subsidiaryForm.ssnitNumber}
-                        >
-                          <Save className="w-4 h-4 mr-2" />
-                          Save Subsidiary
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              )}
-            </div>
-          </div>
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>SSNIT Employer Number *</Label>
+                                <Input
+                                  placeholder="Enter SSNIT number"
+                                  value={subsidiaryForm.ssnitNumber}
+                                  onChange={(e) =>
+                                    setSubsidiaryForm((prev) => ({ ...prev, ssnitNumber: e.target.value }))
+                                  }
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Phone Number *</Label>
+                                <Input
+                                  placeholder="Enter phone number"
+                                  value={subsidiaryForm.phone}
+                                  onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, phone: e.target.value }))}
+                                />
+                              </div>
+                            </div>
 
-          <div className="grid gap-6">
-            {companies.map((company) => (
-              <Card key={company.id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <Building className="w-5 h-5 text-emerald-600" />
-                      <div>
-                        <CardTitle>{company.name}</CardTitle>
-                        <p className="text-sm text-gray-600">{company.email}</p>
-                      </div>
-                    </div>
-                    <Badge variant={company.status === "active" ? "default" : "secondary"}>{company.status}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid md:grid-cols-3 gap-4 mb-4">
-                    <div>
-                      <Label className="text-sm font-medium">Tax ID</Label>
-                      <p className="text-sm text-gray-600">{company.taxId}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium">SSNIT Number</Label>
-                      <p className="text-sm text-gray-600">{company.ssnitNumber}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium">Industry</Label>
-                      <p className="text-sm text-gray-600 capitalize">{company.industry}</p>
-                    </div>
-                  </div>
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Email Address *</Label>
+                                <Input
+                                  type="email"
+                                  placeholder="Enter email address"
+                                  value={subsidiaryForm.email}
+                                  onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, email: e.target.value }))}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Subsidiary Logo</Label>
+                                <Input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) =>
+                                    setSubsidiaryForm((prev) => ({ ...prev, logo: e.target.files?.[0] || null }))
+                                  }
+                                />
+                              </div>
+                            </div>
 
-                  {subsidiaryFunctionActive && (
-                    <>
-                      <Separator className="my-4" />
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <Label className="text-sm font-medium">Subsidiaries ({company.subsidiaries.length})</Label>
-                        </div>
-                        <div className="grid md:grid-cols-2 gap-3">
-                          {company.subsidiaries.map((subsidiary) => (
-                            <div key={subsidiary.id} className="p-3 border rounded-lg">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="font-medium text-sm">{subsidiary.name}</p>
-                                  <p className="text-xs text-gray-600">{subsidiary.locations.join(", ")}</p>
+                            <div className="space-y-2">
+                              <Label>Address *</Label>
+                              <textarea
+                                className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                rows={3}
+                                placeholder="Enter full address"
+                                value={subsidiaryForm.address}
+                                onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, address: e.target.value }))}
+                              />
+                            </div>
+
+                            <div className="space-y-4">
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <Label>Division / Branch</Label>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => addArrayField("divisions")}
+                                  >
+                                    <Plus className="w-3 h-3 mr-1" />
+                                    Add Division
+                                  </Button>
                                 </div>
-                                <Badge variant="outline" className="text-xs">
-                                  {subsidiary.status}
-                                </Badge>
+                                <div className="space-y-2">
+                                  {subsidiaryForm.divisions.map((division, index) => (
+                                    <div key={index} className="flex gap-2">
+                                      <Input
+                                        placeholder="Enter division/branch name"
+                                        value={division}
+                                        onChange={(e) => updateArrayField("divisions", index, e.target.value)}
+                                      />
+                                      {subsidiaryForm.divisions.length > 1 && (
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => removeArrayField("divisions", index)}
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <Label>Department</Label>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => addArrayField("departments")}
+                                  >
+                                    <Plus className="w-3 h-3 mr-1" />
+                                    Add Department
+                                  </Button>
+                                </div>
+                                <div className="space-y-2">
+                                  {subsidiaryForm.departments.map((department, index) => (
+                                    <div key={index} className="flex gap-2">
+                                      <Input
+                                        placeholder="Enter department name"
+                                        value={department}
+                                        onChange={(e) => updateArrayField("departments", index, e.target.value)}
+                                      />
+                                      {subsidiaryForm.departments.length > 1 && (
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => removeArrayField("departments", index)}
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <Label>Location</Label>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => addArrayField("locations")}
+                                  >
+                                    <Plus className="w-3 h-3 mr-1" />
+                                    Add Location
+                                  </Button>
+                                </div>
+                                <div className="space-y-2">
+                                  {subsidiaryForm.locations.map((location, index) => (
+                                    <div key={index} className="flex gap-2">
+                                      <Input
+                                        placeholder="Enter location name"
+                                        value={location}
+                                        onChange={(e) => updateArrayField("locations", index, e.target.value)}
+                                      />
+                                      {subsidiaryForm.locations.length > 1 && (
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => removeArrayField("locations", index)}
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+
+                            <div className="flex justify-end space-x-2 pt-4">
+                              <Button variant="outline" onClick={() => setShowSubsidiaryDialog(false)}>
+                                Cancel
+                              </Button>
+                              <Button onClick={handleAddSubsidiary}>Save Subsidiary</Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {subsidiaries.map((subsidiary) => (
+                        <Card key={subsidiary.id} className="border-l-4 border-l-emerald-500">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <CardTitle className="text-base">{subsidiary.name}</CardTitle>
+                                <p className="text-xs text-gray-600">{subsidiary.email}</p>
+                              </div>
+                              <Badge variant="outline" className="text-xs">
+                                {subsidiary.status}
+                              </Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="space-y-2 text-xs">
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Tax ID:</span>
+                                <span>{subsidiary.taxId}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">SSNIT:</span>
+                                <span>{subsidiary.ssnitNumber}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Divisions:</span>
+                                <span>{subsidiary.divisions.length}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Departments:</span>
+                                <span>{subsidiary.departments.length}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Locations:</span>
+                                <span>{subsidiary.locations.length}</span>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="rbac" className="space-y-6">
