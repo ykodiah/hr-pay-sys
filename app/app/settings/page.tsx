@@ -38,6 +38,7 @@ import {
   RefreshCw,
   Globe,
   CreditCard,
+  X,
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -45,6 +46,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+
+const supabase = createClientComponentClient()
 
 interface Company {
   id: string
@@ -63,9 +67,15 @@ interface Company {
 interface Subsidiary {
   id: string
   name: string
-  location: string
-  costCenter: string
-  manager: string
+  taxId: string
+  ssnitNumber: string
+  address: string
+  phone: string
+  email: string
+  divisions: string[]
+  departments: string[]
+  locations: string[]
+  logo?: string
   status: "active" | "inactive"
 }
 
@@ -166,17 +176,27 @@ export default function SettingsPage() {
         {
           id: "1",
           name: "Akwaaba Tech Solutions",
-          location: "Accra",
-          costCenter: "CC001",
-          manager: "John Doe",
+          taxId: "T0012345678",
+          ssnitNumber: "S1234567890",
+          address: "456 Independence Ave, Ridge, Accra",
+          phone: "+233 30 234 5678",
+          email: "tech@akwaabatech.com",
+          divisions: ["IT", "Support"],
+          departments: ["Development", "Customer Service"],
+          locations: ["Accra", "Tema"],
           status: "active",
         },
         {
           id: "2",
           name: "Akwaaba Consulting",
-          location: "Kumasi",
-          costCenter: "CC002",
-          manager: "Jane Smith",
+          taxId: "T0087654321",
+          ssnitNumber: "S0987654321",
+          address: "789 Airport Road, Kumasi",
+          phone: "+233 32 245 6789",
+          email: "consulting@akwaabatech.com",
+          divisions: ["Consulting", "Training"],
+          departments: ["Management", "Sales"],
+          locations: ["Kumasi", "Sunyani"],
           status: "active",
         },
       ],
@@ -299,6 +319,145 @@ export default function SettingsPage() {
     smsNotifications: false,
   })
 
+  const [subsidiaryFunctionActive, setSubsidiaryFunctionActive] = useState(false)
+  const [showSubsidiaryDialog, setShowSubsidiaryDialog] = useState(false)
+  const [subsidiaryForm, setSubsidiaryForm] = useState({
+    name: "",
+    taxId: "",
+    ssnitNumber: "",
+    address: "",
+    phone: "",
+    email: "",
+    divisions: [""],
+    departments: [""],
+    locations: [""],
+    logo: null as File | null,
+  })
+
+  const addDivision = () => {
+    setSubsidiaryForm((prev) => ({
+      ...prev,
+      divisions: [...prev.divisions, ""],
+    }))
+  }
+
+  const removeDivision = (index: number) => {
+    setSubsidiaryForm((prev) => ({
+      ...prev,
+      divisions: prev.divisions.filter((_, i) => i !== index),
+    }))
+  }
+
+  const updateDivision = (index: number, value: string) => {
+    setSubsidiaryForm((prev) => ({
+      ...prev,
+      divisions: prev.divisions.map((div, i) => (i === index ? value : div)),
+    }))
+  }
+
+  const addDepartment = () => {
+    setSubsidiaryForm((prev) => ({
+      ...prev,
+      departments: [...prev.departments, ""],
+    }))
+  }
+
+  const removeDepartment = (index: number) => {
+    setSubsidiaryForm((prev) => ({
+      ...prev,
+      departments: prev.departments.filter((_, i) => i !== index),
+    }))
+  }
+
+  const updateDepartment = (index: number, value: string) => {
+    setSubsidiaryForm((prev) => ({
+      ...prev,
+      departments: prev.departments.map((dept, i) => (i === index ? value : dept)),
+    }))
+  }
+
+  const addLocation = () => {
+    setSubsidiaryForm((prev) => ({
+      ...prev,
+      locations: [...prev.locations, ""],
+    }))
+  }
+
+  const removeLocation = (index: number) => {
+    setSubsidiaryForm((prev) => ({
+      ...prev,
+      locations: prev.locations.filter((_, i) => i !== index),
+    }))
+  }
+
+  const updateLocation = (index: number, value: string) => {
+    setSubsidiaryForm((prev) => ({
+      ...prev,
+      locations: prev.locations.map((loc, i) => (i === index ? value : loc)),
+    }))
+  }
+
+  const handleSubsidiarySubmit = async () => {
+    try {
+      const { data, error } = await supabase.from("subsidiaries").insert([
+        {
+          name: subsidiaryForm.name,
+          tax_id: subsidiaryForm.taxId,
+          ssnit_number: subsidiaryForm.ssnitNumber,
+          address: subsidiaryForm.address,
+          phone: subsidiaryForm.phone,
+          email: subsidiaryForm.email,
+          divisions: subsidiaryForm.divisions.filter((d) => d.trim()),
+          departments: subsidiaryForm.departments.filter((d) => d.trim()),
+          locations: subsidiaryForm.locations.filter((l) => l.trim()),
+          logo: subsidiaryForm.logo ? await uploadLogo(subsidiaryForm.logo) : null,
+          status: "active",
+        },
+      ])
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Subsidiary added successfully!",
+      })
+
+      setShowSubsidiaryDialog(false)
+      setSubsidiaryForm({
+        name: "",
+        taxId: "",
+        ssnitNumber: "",
+        address: "",
+        phone: "",
+        email: "",
+        divisions: [""],
+        departments: [""],
+        locations: [""],
+        logo: null,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add subsidiary. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const uploadLogo = async (file: File): Promise<string> => {
+    const fileExt = file.name.split(".").pop()
+    const fileName = `${Math.random()}.${fileExt}`
+    const filePath = `subsidiary-logos/${fileName}`
+
+    const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, file)
+
+    if (uploadError) throw uploadError
+
+    const { data } = supabase.storage.from("documents").getPublicUrl(filePath)
+
+    return data.publicUrl
+  }
+
   const handleSaveSettings = async () => {
     setIsLoading(true)
     try {
@@ -415,57 +574,221 @@ export default function SettingsPage() {
               <h2 className="text-xl font-semibold">Multi-Company Management</h2>
               <p className="text-gray-600">Manage multiple companies and subsidiaries</p>
             </div>
-            <Dialog open={showCompanyDialog} onOpenChange={setShowCompanyDialog}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Company
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Add New Company</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Company Name *</Label>
-                      <Input placeholder="Enter company name" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Tax ID / TIN *</Label>
-                      <Input placeholder="Enter tax ID" />
-                    </div>
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>SSNIT Number *</Label>
-                      <Input placeholder="Enter SSNIT number" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Industry</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select industry" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="technology">Technology</SelectItem>
-                          <SelectItem value="finance">Finance</SelectItem>
-                          <SelectItem value="healthcare">Healthcare</SelectItem>
-                          <SelectItem value="manufacturing">Manufacturing</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button variant="outline" onClick={() => setShowCompanyDialog(false)}>
-                      Cancel
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="subsidiary-function"
+                  checked={subsidiaryFunctionActive}
+                  onCheckedChange={setSubsidiaryFunctionActive}
+                />
+                <Label htmlFor="subsidiary-function" className="text-sm font-medium">
+                  Activate Subsidiary Function
+                </Label>
+              </div>
+              {subsidiaryFunctionActive && (
+                <Dialog open={showSubsidiaryDialog} onOpenChange={setShowSubsidiaryDialog}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-emerald-600 hover:bg-emerald-700">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Subsidiary
                     </Button>
-                    <Button>Create Company</Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Add New Subsidiary</DialogTitle>
+                      <p className="text-sm text-gray-600">Create a new subsidiary with comprehensive details</p>
+                    </DialogHeader>
+                    <div className="space-y-6">
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Name of Subsidiary *</Label>
+                            <Input
+                              placeholder="Enter subsidiary name"
+                              value={subsidiaryForm.name}
+                              onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, name: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Tax ID / TIN *</Label>
+                            <Input
+                              placeholder="Enter tax ID"
+                              value={subsidiaryForm.taxId}
+                              onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, taxId: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>SSNIT Employer Number *</Label>
+                            <Input
+                              placeholder="Enter SSNIT number"
+                              value={subsidiaryForm.ssnitNumber}
+                              onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, ssnitNumber: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Phone Number *</Label>
+                            <Input
+                              placeholder="+233 XX XXX XXXX"
+                              value={subsidiaryForm.phone}
+                              onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, phone: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Email Address *</Label>
+                            <Input
+                              type="email"
+                              placeholder="subsidiary@company.com"
+                              value={subsidiaryForm.email}
+                              onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, email: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Address *</Label>
+                            <Input
+                              placeholder="Full address"
+                              value={subsidiaryForm.address}
+                              onChange={(e) => setSubsidiaryForm((prev) => ({ ...prev, address: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold text-gray-900">Organizational Structure</h3>
+
+                        {/* Divisions/Branches */}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Label>Division / Branch</Label>
+                            <Button type="button" variant="outline" size="sm" onClick={addDivision}>
+                              <Plus className="w-3 h-3 mr-1" />
+                              Add Division
+                            </Button>
+                          </div>
+                          {subsidiaryForm.divisions.map((division, index) => (
+                            <div key={index} className="flex items-center space-x-2">
+                              <Input
+                                placeholder="Enter division/branch name"
+                                value={division}
+                                onChange={(e) => updateDivision(index, e.target.value)}
+                              />
+                              {subsidiaryForm.divisions.length > 1 && (
+                                <Button type="button" variant="outline" size="sm" onClick={() => removeDivision(index)}>
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Departments */}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Label>Department</Label>
+                            <Button type="button" variant="outline" size="sm" onClick={addDepartment}>
+                              <Plus className="w-3 h-3 mr-1" />
+                              Add Department
+                            </Button>
+                          </div>
+                          {subsidiaryForm.departments.map((department, index) => (
+                            <div key={index} className="flex items-center space-x-2">
+                              <Input
+                                placeholder="Enter department name"
+                                value={department}
+                                onChange={(e) => updateDepartment(index, e.target.value)}
+                              />
+                              {subsidiaryForm.departments.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeDepartment(index)}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Locations */}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Label>Location</Label>
+                            <Button type="button" variant="outline" size="sm" onClick={addLocation}>
+                              <Plus className="w-3 h-3 mr-1" />
+                              Add Location
+                            </Button>
+                          </div>
+                          {subsidiaryForm.locations.map((location, index) => (
+                            <div key={index} className="flex items-center space-x-2">
+                              <Input
+                                placeholder="Enter location"
+                                value={location}
+                                onChange={(e) => updateLocation(index, e.target.value)}
+                              />
+                              {subsidiaryForm.locations.length > 1 && (
+                                <Button type="button" variant="outline" size="sm" onClick={() => removeLocation(index)}>
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold text-gray-900">Branding</h3>
+                        <div className="space-y-2">
+                          <Label>Subsidiary Logo</Label>
+                          <div className="flex items-center space-x-4">
+                            <Input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) =>
+                                setSubsidiaryForm((prev) => ({
+                                  ...prev,
+                                  logo: e.target.files?.[0] || null,
+                                }))
+                              }
+                              className="flex-1"
+                            />
+                            {subsidiaryForm.logo && (
+                              <div className="flex items-center space-x-2 text-sm text-emerald-600">
+                                <CheckCircle className="w-4 h-4" />
+                                <span>Logo selected</span>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            Upload a logo for this subsidiary (PNG, JPG, or SVG format)
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end space-x-3 pt-4 border-t">
+                        <Button variant="outline" onClick={() => setShowSubsidiaryDialog(false)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleSubsidiarySubmit}
+                          className="bg-emerald-600 hover:bg-emerald-700"
+                          disabled={!subsidiaryForm.name || !subsidiaryForm.taxId || !subsidiaryForm.ssnitNumber}
+                        >
+                          <Save className="w-4 h-4 mr-2" />
+                          Save Subsidiary
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           </div>
 
           <div className="grid gap-6">
@@ -480,26 +803,7 @@ export default function SettingsPage() {
                         <p className="text-sm text-gray-600">{company.email}</p>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={company.status === "active" ? "default" : "secondary"}>{company.status}</Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit Company
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Building2 className="w-4 h-4 mr-2" />
-                            Manage Subsidiaries
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                    <Badge variant={company.status === "active" ? "default" : "secondary"}>{company.status}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -518,34 +822,31 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <Separator className="my-4" />
-
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <Label className="text-sm font-medium">Subsidiaries ({company.subsidiaries.length})</Label>
-                      <Button variant="outline" size="sm">
-                        <Plus className="w-3 h-3 mr-1" />
-                        Add Subsidiary
-                      </Button>
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-3">
-                      {company.subsidiaries.map((subsidiary) => (
-                        <div key={subsidiary.id} className="p-3 border rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium text-sm">{subsidiary.name}</p>
-                              <p className="text-xs text-gray-600">
-                                {subsidiary.location} • {subsidiary.costCenter}
-                              </p>
-                            </div>
-                            <Badge variant="outline" className="text-xs">
-                              {subsidiary.status}
-                            </Badge>
-                          </div>
+                  {subsidiaryFunctionActive && (
+                    <>
+                      <Separator className="my-4" />
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <Label className="text-sm font-medium">Subsidiaries ({company.subsidiaries.length})</Label>
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                        <div className="grid md:grid-cols-2 gap-3">
+                          {company.subsidiaries.map((subsidiary) => (
+                            <div key={subsidiary.id} className="p-3 border rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-medium text-sm">{subsidiary.name}</p>
+                                  <p className="text-xs text-gray-600">{subsidiary.locations.join(", ")}</p>
+                                </div>
+                                <Badge variant="outline" className="text-xs">
+                                  {subsidiary.status}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             ))}
