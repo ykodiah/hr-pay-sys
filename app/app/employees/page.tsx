@@ -1207,6 +1207,8 @@ function AddEmployeeForm({
     ghanaCard: employee?.ghanaCard || "",
     status: employee?.status || "Active",
     documents: employee?.documents || [],
+    profilePicture: employee?.profilePicture || "",
+    profilePictureFile: null,
   })
 
   const [errors, setErrors] = useState<any>({})
@@ -1291,6 +1293,8 @@ function AddEmployeeForm({
         ghanaCard: "",
         status: "Active",
         documents: [],
+        profilePicture: "",
+        profilePictureFile: null,
       })
       setErrors({})
     }
@@ -1303,38 +1307,65 @@ function AddEmployeeForm({
     }
   }
 
-  const handleDocumentUpload = async (file: File, documentType: string, employeeData?: any) => {
-    const documentService = CentralDocumentService.getInstance()
-
+  const handleDocumentUpload = async (documentType: string, file: File) => {
     try {
-      const documentId = await documentService.uploadDocument({
-        file,
-        employeeId: employeeData?.employeeId || formData.employeeId,
-        employeeName: employeeData?.name || `${formData.firstName} ${formData.lastName}`,
-        documentType,
-        source: "employee-onboarding",
-        uploadedBy: "HR Admin",
-        notes: `Employee document: ${documentType}`,
+      console.log(`[v0] Uploading ${documentType}:`, file.name)
+
+      // Store the file in form data
+      const updatedDocuments = [...formData.documents]
+      const existingIndex = updatedDocuments.findIndex((doc) => doc.type === documentType)
+
+      const documentData = {
+        type: documentType,
+        name: file.name,
+        size: file.size,
+        uploadDate: new Date().toISOString(),
+        file: file,
+      }
+
+      if (existingIndex >= 0) {
+        updatedDocuments[existingIndex] = documentData
+      } else {
+        updatedDocuments.push(documentData)
+      }
+
+      if (documentType === "Passport Picture") {
+        const imageUrl = URL.createObjectURL(file)
+        setFormData((prev) => ({
+          ...prev,
+          documents: updatedDocuments,
+          profilePicture: imageUrl,
+          profilePictureFile: file,
+        }))
+      } else {
+        setFormData((prev) => ({ ...prev, documents: updatedDocuments }))
+      }
+
+      // Track document in central system
+      await CentralDocumentService.trackUpload({
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        uploadSource: "employee-onboarding",
+        category: documentType,
+        employeeId: formData.firstName ? `${formData.firstName} ${formData.lastName}` : "New Employee",
+        metadata: {
+          documentType: documentType,
+          uploadDate: new Date().toISOString(),
+        },
       })
 
-      // Update form data
-      setFormData((prev) => ({
-        ...prev,
-        documents: [
-          ...(prev.documents || []),
-          {
-            id: documentId,
-            type: documentType,
-            file,
-            name: file.name,
-            status: "pending",
-          },
-        ],
-      }))
-
-      console.log("[v0] Document uploaded to vault:", documentId)
+      toast({
+        title: "Document Uploaded",
+        description: `${documentType} has been uploaded successfully.`,
+      })
     } catch (error) {
-      console.error("[v0] Document upload failed:", error)
+      console.error(`Error uploading ${documentType}:`, error)
+      toast({
+        title: "Upload Error",
+        description: `Failed to upload ${documentType}. Please try again.`,
+        variant: "destructive",
+      })
     }
   }
 
@@ -1729,7 +1760,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        handleDocumentUpload(file, "academic")
+                        handleDocumentUpload("Academic Certificate(s)", file)
                       }
                     }}
                   />
@@ -1754,7 +1785,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        handleDocumentUpload(file, "passport-picture")
+                        handleDocumentUpload("Passport Picture", file)
                       }
                     }}
                   />
@@ -1779,7 +1810,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        handleDocumentUpload(file, "resume")
+                        handleDocumentUpload("Resume & Application Letter", file)
                       }
                     }}
                   />
@@ -1804,7 +1835,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        handleDocumentUpload(file, "passport")
+                        handleDocumentUpload("Passport", file)
                       }
                     }}
                   />
@@ -1829,7 +1860,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        handleDocumentUpload(file, "national-id")
+                        handleDocumentUpload("National ID", file)
                       }
                     }}
                   />
@@ -1854,7 +1885,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        handleDocumentUpload(file, "medical")
+                        handleDocumentUpload("Medical Report", file)
                       }
                     }}
                   />
@@ -1879,7 +1910,7 @@ function AddEmployeeForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) {
-                        handleDocumentUpload(file, "police")
+                        handleDocumentUpload("Police Report", file)
                       }
                     }}
                   />
@@ -1910,7 +1941,7 @@ function AddEmployeeForm({
                           files.map((f) => f.name),
                         )
                         files.forEach((file) => {
-                          handleDocumentUpload(file, "other")
+                          handleDocumentUpload("Other Uploads", file)
                         })
                       }
                     }}
