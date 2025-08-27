@@ -148,6 +148,8 @@ const departments = ["Technology", "Human Resources", "Finance", "Marketing", "S
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<any[]>([])
+  const [showAddEmployee, setShowAddEmployee] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null)
@@ -163,7 +165,44 @@ export default function EmployeesPage() {
   const [departmentsList, setDepartments] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
   const [currentTab, setCurrentTab] = useState("personal")
-  const [formData, setFormData] = useState<any>({})
+  const [formData, setFormData] = useState<any>({
+    employeeId: "",
+    prefix: "",
+    firstName: "",
+    otherNames: "",
+    lastName: "",
+    maritalStatus: "",
+    corporateEmail: "",
+    personalEmail: "",
+    phone: "",
+    position: "",
+    subsidiary: "",
+    division: "",
+    department: "",
+    location: "",
+    contractType: "Permanent",
+    dateOfJoining: "",
+    dateOfExit: "",
+    status: "Active",
+    probationPeriod: "6",
+    confirmationDate: "",
+    noticePeriod: "",
+    salary: "",
+    startDate: "",
+    dateOfBirth: "",
+    address: "",
+    emergencyContactName: "",
+    emergencyContactTel: "",
+    educationalLevel: "",
+    gender: "",
+    bankName: "",
+    bankAccount: "",
+    ssnit: "",
+    ghanaCard: "",
+    documents: [],
+    profilePicture: "",
+    profilePictureFile: null,
+  })
 
   useEffect(() => {
     loadEmployees()
@@ -1661,7 +1700,7 @@ function AddEmployeeForm({
               <Label className="text-sm font-medium text-gray-700 w-48">2. First Name *</Label>
               <div className="flex-1">
                 <Input
-                  value={formData.firstName}
+                  value={formData.firstName ?? ""}
                   onChange={(e) => handleInputChange("firstName", e.target.value)}
                   placeholder="Enter first name"
                   className={`form-input ${errors.firstName ? "border-red-500" : ""}`}
@@ -1673,7 +1712,7 @@ function AddEmployeeForm({
             <div className="flex items-center gap-4">
               <Label className="text-sm font-medium text-gray-700 w-48">3. Other Name(s)</Label>
               <Input
-                value={formData.otherNames}
+                value={formData.otherNames ?? ""}
                 onChange={(e) => handleInputChange("otherNames", e.target.value)}
                 placeholder="Middle names"
                 className="form-input flex-1"
@@ -1684,7 +1723,7 @@ function AddEmployeeForm({
               <Label className="text-sm font-medium text-gray-700 w-48">4. Last Name *</Label>
               <div className="flex-1">
                 <Input
-                  value={formData.lastName}
+                  value={formData.lastName ?? ""}
                   onChange={(e) => handleInputChange("lastName", e.target.value)}
                   placeholder="Enter last name"
                   className={`form-input ${errors.lastName ? "border-red-500" : ""}`}
@@ -1696,7 +1735,7 @@ function AddEmployeeForm({
             <div className="flex items-center gap-4">
               <Label className="text-sm font-medium text-gray-700 w-48">5. Marital Status</Label>
               <Select
-                value={formData.maritalStatus}
+                value={formData.maritalStatus ?? ""}
                 onValueChange={(value) => handleInputChange("maritalStatus", value)}
               >
                 <SelectTrigger className="form-input flex-1">
