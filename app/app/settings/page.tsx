@@ -317,6 +317,7 @@ export default function SettingsPage() {
   })
 
   const [subsidiaryEnabled, setSubsidiaryEnabled] = useState(false)
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false)
   const [showSubsidiaryDialog, setShowSubsidiaryDialog] = useState(false)
 
   const [editingSubsidiary, setEditingSubsidiary] = useState<string | null>(null)
@@ -681,13 +682,54 @@ export default function SettingsPage() {
                     type="checkbox"
                     id="subsidiary-enabled"
                     checked={subsidiaryEnabled}
-                    onChange={(e) => setSubsidiaryEnabled(e.target.checked)}
+                    onChange={(e) => {
+                      if (subsidiaryEnabled && !e.target.checked) {
+                        setShowDeactivateConfirm(true)
+                        e.target.checked = true // Keep it checked
+                      } else {
+                        setSubsidiaryEnabled(e.target.checked)
+                      }
+                    }}
                     className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
                   />
                   <Label htmlFor="subsidiary-enabled" className="text-sm font-medium">
                     Activate Subsidiary Function
                   </Label>
                 </div>
+
+                {showDeactivateConfirm && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-start space-x-3">
+                      <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-yellow-800">Deactivate Subsidiary Function?</h4>
+                        <p className="text-sm text-yellow-700 mt-1">
+                          This will disable subsidiary management and may affect existing subsidiary data. Are you sure
+                          you want to proceed?
+                        </p>
+                        <div className="flex space-x-3 mt-3">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSubsidiaryEnabled(false)
+                              setShowDeactivateConfirm(false)
+                              toast({
+                                title: "Subsidiary Function Deactivated",
+                                description: "Subsidiary management has been disabled.",
+                              })
+                            }}
+                          >
+                            Yes, Deactivate
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setShowDeactivateConfirm(false)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {subsidiaryEnabled && (
                   <div className="space-y-4">
