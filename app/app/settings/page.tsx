@@ -767,26 +767,6 @@ export default function SettingsPage() {
     try {
       const supabase = createClient()
 
-      console.log("[v0] Loading subsidiaries with company_id:", MAIN_COMPANY_ID)
-      console.log(
-        "[v0] About to execute query: subsidiaries.select(*).eq(company_id, MAIN_COMPANY_ID).eq(status, active)",
-      )
-
-      // First, let's check if the table exists and what columns it has
-      const { data: tableInfo, error: schemaError } = await supabase
-        .from("information_schema.columns")
-        .select("column_name")
-        .eq("table_name", "subsidiaries")
-
-      if (schemaError) {
-        console.error("[v0] Error checking table schema:", schemaError)
-      } else {
-        console.log(
-          "[v0] Subsidiaries table columns:",
-          tableInfo?.map((col) => col.column_name),
-        )
-      }
-
       const { data, error } = await supabase
         .from("subsidiaries")
         .select("*")
@@ -795,35 +775,13 @@ export default function SettingsPage() {
 
       if (error) {
         console.error("[v0] Error loading subsidiaries:", error)
-        console.error("[v0] Error details:", JSON.stringify(error, null, 2))
-        console.error("[v0] Error code:", error.code)
-        console.error("[v0] Error message:", error.message)
-        console.error("[v0] Error hint:", error.hint)
-
-        // If the error is about is_active column, let's try a different approach
-        if (error.message?.includes("is_active")) {
-          console.log("[v0] Detected is_active column error, attempting alternative query...")
-
-          // Try querying without the status filter to see what columns exist
-          const { data: allData, error: altError } = await supabase
-            .from("subsidiaries")
-            .select("*")
-            .eq("company_id", MAIN_COMPANY_ID)
-            .limit(1)
-
-          if (altError) {
-            console.error("[v0] Alternative query also failed:", altError)
-          } else {
-            console.log("[v0] Alternative query succeeded, sample data:", allData?.[0])
-          }
-        }
         return
       }
 
-      setSubsidiaries(data || [])
       console.log("[v0] Loaded subsidiaries from database:", data?.length || 0)
+      setSubsidiaries(data || [])
     } catch (error) {
-      console.error("[v0] Error loading subsidiaries:", error)
+      console.error("[v0] Error in loadSubsidiaries:", error)
     }
   }
 
