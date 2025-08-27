@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -57,6 +57,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
+import { createClient } from "@/lib/supabase/client"
 
 interface Company {
   id: string
@@ -337,34 +338,7 @@ export default function SettingsPage() {
   const [editingSubsidiary, setEditingSubsidiary] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Subsidiary | null>(null)
 
-  const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([
-    {
-      id: "1",
-      name: "Akwaaba Tech Solutions",
-      taxId: "C0012345679",
-      ssnitNumber: "1234567891",
-      address: "45 Oxford Street, Osu, Accra, Ghana",
-      phone: "+233 30 234 5678",
-      email: "solutions@akwaabatech.com",
-      divisions: ["Software Development", "IT Consulting"],
-      departments: ["Engineering", "Sales", "Support"],
-      locations: ["Accra Main", "Accra Branch"],
-      status: "active",
-    },
-    {
-      id: "2",
-      name: "Akwaaba Consulting",
-      taxId: "C0012345680",
-      ssnitNumber: "1234567892",
-      address: "12 Prempeh II Street, Kumasi, Ghana",
-      phone: "+233 32 345 6789",
-      email: "consulting@akwaabatech.com",
-      divisions: ["Business Consulting", "HR Consulting"],
-      departments: ["Consulting", "Research", "Training"],
-      locations: ["Kumasi Main", "Kumasi North"],
-      status: "active",
-    },
-  ])
+  const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([])
 
   const [subsidiaryForm, setSubsidiaryForm] = useState({
     name: "",
@@ -532,8 +506,71 @@ export default function SettingsPage() {
   const handleSaveSettings = async () => {
     setIsLoading(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      const supabase = createClient()
+
+      // Save company settings to database
+      const { error: companyError } = await supabase.from("companies").upsert({
+        id: 1, // Main company ID
+        name: companySettings.name,
+        tax_id: companySettings.taxId,
+        ssnit_number: companySettings.ssnitNumber,
+        industry: companySettings.industry,
+        address: companySettings.address,
+        phone: companySettings.phone,
+        email: companySettings.email,
+        logo: companySettings.logo,
+        divisions: companySettings.divisions,
+        departments: companySettings.departments,
+        locations: companySettings.locations,
+        updated_at: new Date().toISOString(),
+      })
+
+      if (companyError) {
+        console.error("[v0] Error saving company settings:", companyError)
+        throw companyError
+      }
+
+      // Save other settings to company_settings table
+      const { error: settingsError } = await supabase.from("company_settings").upsert({
+        company_id: 1,
+        payroll_frequency: payrollSettings.frequency,
+        currency: payrollSettings.currency,
+        min_wage: payrollSettings.minWage,
+        overtime_rate: payrollSettings.overtimeRate,
+        auto_paye: payrollSettings.autoPaye,
+        auto_ssnit: payrollSettings.autoSsnit,
+        auto_provident: payrollSettings.autoProvident,
+        payroll_cutoff_day: payrollSettings.payrollCutoffDay,
+        payroll_processing_day: payrollSettings.payrollProcessingDay,
+        leave_year_start: hrSettings.leaveYearStart,
+        annual_leave_days: hrSettings.annualLeaveDays,
+        sick_leave_days: hrSettings.sickLeaveDays,
+        probation_period: hrSettings.probationPeriod,
+        auto_approve_leave: hrSettings.autoApproveLeave,
+        email_notifications: hrSettings.emailNotifications,
+        working_hours_per_day: hrSettings.workingHoursPerDay,
+        working_days_per_week: hrSettings.workingDaysPerWeek,
+        two_factor: securitySettings.twoFactor,
+        session_timeout: securitySettings.sessionTimeout,
+        timeout_duration: securitySettings.timeoutDuration,
+        audit_log: securitySettings.auditLog,
+        password_policy: securitySettings.passwordPolicy,
+        payroll_alerts: notificationSettings.payrollAlerts,
+        leave_alerts: notificationSettings.leaveAlerts,
+        employee_alerts: notificationSettings.employeeAlerts,
+        system_alerts: notificationSettings.systemAlerts,
+        notification_email: notificationSettings.notificationEmail,
+        sms_notifications: notificationSettings.smsNotifications,
+        webhook_url: notificationSettings.webhookUrl,
+        updated_at: new Date().toISOString(),
+      })
+
+      if (settingsError) {
+        console.error("[v0] Error saving company settings:", settingsError)
+        throw settingsError
+      }
+
+      console.log("[v0] Company settings saved successfully to database")
 
       toast({
         title: "Settings Saved",
@@ -541,6 +578,7 @@ export default function SettingsPage() {
       })
       setHasUnsavedChanges(false)
     } catch (error) {
+      console.error("[v0] Error saving settings:", error)
       toast({
         title: "Error",
         description: "Failed to save settings. Please try again.",
@@ -642,6 +680,108 @@ export default function SettingsPage() {
     setNotificationSettings((prev) => ({ ...prev, [field]: value }))
     setHasUnsavedChanges(true)
   }
+
+  const handleSaveSubsidiary = async (subsidiaryData: any) => {
+    try {
+      const supabase = createClient()
+
+      const { error } = await supabase.from("subsidiaries").insert({
+        company_id: 1,
+        name: subsidiaryData.name,
+        tax_id: subsidiaryData.taxId,
+        ssnit_number: subsidiaryData.ssnitNumber,
+        address: subsidiaryData.address,
+        phone: subsidiaryData.phone,
+        email: subsidiaryData.email,
+        divisions: subsidiaryData.divisions,
+        departments: subsidiaryData.departments,
+        locations: subsidiaryData.locations,
+        logo: subsidiaryData.logo,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      })
+
+      if (error) {
+        console.error("[v0] Error saving subsidiary:", error)
+        throw error
+      }
+
+      console.log("[v0] Subsidiary saved successfully to database")
+
+      // Refresh subsidiaries list
+      await loadSubsidiaries()
+
+      toast({
+        title: "Subsidiary Added",
+        description: "Subsidiary has been added successfully.",
+      })
+    } catch (error) {
+      console.error("[v0] Error saving subsidiary:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save subsidiary. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const loadSubsidiaries = async () => {
+    try {
+      const supabase = createClient()
+
+      const { data, error } = await supabase.from("subsidiaries").select("*").eq("company_id", 1).eq("is_active", true)
+
+      if (error) {
+        console.error("[v0] Error loading subsidiaries:", error)
+        return
+      }
+
+      setSubsidiaries(data || [])
+      console.log("[v0] Loaded subsidiaries from database:", data?.length || 0)
+    } catch (error) {
+      console.error("[v0] Error loading subsidiaries:", error)
+    }
+  }
+
+  useEffect(() => {
+    const loadSettingsFromDatabase = async () => {
+      try {
+        const supabase = createClient()
+
+        // Load company settings
+        const { data: companyData, error: companyError } = await supabase
+          .from("companies")
+          .select("*")
+          .eq("id", 1)
+          .maybeSingle()
+
+        if (companyData && !companyError) {
+          setCompanySettings({
+            name: companyData.name || "",
+            taxId: companyData.tax_id || "",
+            ssnitNumber: companyData.ssnit_number || "",
+            industry: companyData.industry || "",
+            address: companyData.address || "",
+            phone: companyData.phone || "",
+            email: companyData.email || "",
+            logo: companyData.logo || "",
+            divisions: companyData.divisions || [],
+            departments: companyData.departments || [],
+            locations: companyData.locations || [],
+          })
+        }
+
+        // Load subsidiaries
+        await loadSubsidiaries()
+
+        console.log("[v0] Settings loaded from database")
+      } catch (error) {
+        console.error("[v0] Error loading settings from database:", error)
+      }
+    }
+
+    loadSettingsFromDatabase()
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -2192,10 +2332,6 @@ export default function SettingsPage() {
                         })
                       }
                     />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="require-numbers">Require Numbers</Label>
-                    <Switch id="require-numbers" />
                   </div>
                   <div className="flex items-center justify-between">
                     <Label htmlFor="require-numbers">Require Numbers</Label>
