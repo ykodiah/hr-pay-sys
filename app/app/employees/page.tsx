@@ -156,7 +156,14 @@ export default function EmployeesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+
+  const [companySettings, setCompanySettings] = useState<any>(null)
   const [subsidiaries, setSubsidiaries] = useState<any[]>([])
+  const [divisions, setDivisions] = useState<string[]>([])
+  const [departmentsList, setDepartments] = useState<string[]>([])
+  const [locations, setLocations] = useState<string[]>([])
+  const [currentTab, setCurrentTab] = useState("personal")
+  const [formData, setFormData] = useState<any>({})
 
   useEffect(() => {
     loadEmployees()
@@ -178,6 +185,66 @@ export default function EmployeesPage() {
       subscription.unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    const loadCompanyData = () => {
+      const companyData = localStorage.getItem("companySettings")
+      const subsidiaryData = localStorage.getItem("subsidiaries")
+
+      if (companyData) {
+        const company = JSON.parse(companyData)
+        setCompanySettings(company)
+        // Set default data from main company
+        setDivisions(company.divisions || ["Head Office", "Regional Office"])
+        setDepartments(
+          company.departments || ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"],
+        )
+        setLocations(company.locations || ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+      }
+
+      if (subsidiaryData) {
+        const subs = JSON.parse(subsidiaryData)
+        setSubsidiaries(subs)
+      } else {
+        // Default subsidiaries if none exist
+        setSubsidiaries([
+          {
+            id: "1",
+            name: "Akwaaba Tech Solutions",
+            divisions: ["Software Development", "IT Consulting"],
+            departments: ["Engineering", "Sales", "Support"],
+            locations: ["Accra Main", "Accra Branch"],
+          },
+          {
+            id: "2",
+            name: "Akwaaba Consulting",
+            divisions: ["Business Consulting", "HR Consulting"],
+            departments: ["Consulting", "Research", "Training"],
+            locations: ["Kumasi Main", "Kumasi North"],
+          },
+        ])
+      }
+    }
+
+    loadCompanyData()
+  }, [])
+
+  useEffect(() => {
+    if (formData.subsidiary) {
+      const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
+      if (selectedSubsidiary) {
+        setDivisions(selectedSubsidiary.divisions || [])
+        setDepartments(selectedSubsidiary.departments || [])
+        setLocations(selectedSubsidiary.locations || [])
+      }
+    } else if (companySettings) {
+      setDivisions(companySettings.divisions || ["Head Office", "Regional Office"])
+      setDepartments(
+        companySettings.departments || ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"],
+      )
+      setLocations(companySettings.locations || ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+    }
+  }, [formData.subsidiary, subsidiaries, companySettings])
 
   const loadSubsidiaries = async () => {
     try {
@@ -615,6 +682,20 @@ export default function EmployeesPage() {
     return matchesSearch && matchesDepartment
   })
 
+  const handleNext = () => {
+    if (currentTab === "personal") {
+      setCurrentTab("employment")
+    } else if (currentTab === "employment") {
+      setCurrentTab("financial")
+    } else if (currentTab === "financial") {
+      setCurrentTab("documents")
+    }
+  }
+
+  const handleTabChange = (value: string) => {
+    setCurrentTab(value)
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -649,6 +730,8 @@ export default function EmployeesPage() {
               onSubmit={handleAddEmployee}
               onClose={() => setIsAddDialogOpen(false)}
               subsidiaries={subsidiaries}
+              setFormData={setFormData}
+              formData={formData}
             />
           </DialogContent>
         </Dialog>
@@ -674,7 +757,7 @@ export default function EmployeesPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((dept) => (
+                {departmentsList.map((dept) => (
                   <SelectItem key={dept} value={dept}>
                     {dept}
                   </SelectItem>
@@ -711,7 +794,7 @@ export default function EmployeesPage() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-gray-900">{departments.length}</div>
+            <div className="text-2xl font-bold text-gray-900">{departmentsList.length}</div>
             <p className="text-sm text-gray-600">Departments</p>
           </CardContent>
         </Card>
@@ -792,6 +875,8 @@ export default function EmployeesPage() {
                 setSelectedEmployee(null)
               }}
               subsidiaries={subsidiaries}
+              setFormData={setFormData}
+              formData={formData}
             />
           )}
         </DialogContent>
@@ -1266,54 +1351,74 @@ function AddEmployeeForm({
   onSubmit,
   onClose,
   subsidiaries,
+  setFormData,
+  formData,
 }: {
   employee?: any
   onSubmit: (data: any) => void
   onClose: () => void
   subsidiaries: any[]
+  setFormData: (data: any) => void
+  formData: any
 }) {
   const [divisions, setDivisions] = useState<string[]>([])
   const [departments, setDepartments] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
+  const [currentTab, setCurrentTab] = useState("personal")
+  const [errors, setErrors] = useState<any>({})
 
-  const [formData, setFormData] = useState({
-    employeeId: "",
-    prefix: employee?.prefix || "",
-    firstName: employee?.firstName || "",
-    otherNames: employee?.otherNames || "",
-    lastName: employee?.lastName || "",
-    maritalStatus: employee?.maritalStatus || "",
-    corporateEmail: employee?.corporateEmail || "",
-    personalEmail: employee?.personalEmail || "",
-    phone: employee?.phone || "",
-    position: employee?.position || "",
-    subsidiary: employee?.subsidiary || "",
-    division: employee?.division || "",
-    department: employee?.department || "",
-    location: employee?.location || "",
-    contractType: employee?.contractType || "Permanent",
-    dateOfJoining: employee?.dateOfJoining || "",
-    dateOfExit: employee?.dateOfExit || "",
-    status: employee?.status || "Active",
-    probationPeriod: employee?.probationPeriod || "6",
-    confirmationDate: employee?.confirmationDate || "",
-    noticePeriod: employee?.noticePeriod || "",
-    salary: employee?.salary || "",
-    startDate: employee?.startDate || "",
-    dateOfBirth: employee?.dateOfBirth || "",
-    address: employee?.address || "",
-    emergencyContactName: employee?.emergencyContactName || "",
-    emergencyContactTel: employee?.emergencyContactTel || "",
-    educationalLevel: employee?.educationalLevel || "",
-    gender: employee?.gender || "",
-    bankName: employee?.bankName || "",
-    bankAccount: employee?.bankAccount || "",
-    ssnit: employee?.ssnit || "",
-    ghanaCard: employee?.ghanaCard || "",
-    documents: employee?.documents || [],
-    profilePicture: employee?.profilePicture || "",
-    profilePictureFile: null,
-  })
+  const handleNext = () => {
+    if (currentTab === "personal") {
+      setCurrentTab("employment")
+    } else if (currentTab === "employment") {
+      setCurrentTab("financial")
+    } else if (currentTab === "financial") {
+      setCurrentTab("documents")
+    }
+  }
+
+  const handleTabChange = (value: string) => {
+    setCurrentTab(value)
+  }
+
+  // const [formData, setFormData] = useState({
+  //   employeeId: "",
+  //   prefix: employee?.prefix || "",
+  //   firstName: employee?.firstName || "",
+  //   otherNames: employee?.otherNames || "",
+  //   lastName: employee?.lastName || "",
+  //   maritalStatus: employee?.maritalStatus || "",
+  //   corporateEmail: employee?.corporateEmail || "",
+  //   personalEmail: employee?.personalEmail || "",
+  //   phone: employee?.phone || "",
+  //   position: employee?.position || "",
+  //   subsidiary: employee?.subsidiary || "",
+  //   division: employee?.division || "",
+  //   department: employee?.department || "",
+  //   location: employee?.location || "",
+  //   contractType: employee?.contractType || "Permanent",
+  //   dateOfJoining: employee?.dateOfJoining || "",
+  //   dateOfExit: employee?.dateOfExit || "",
+  //   status: employee?.status || "Active",
+  //   probationPeriod: employee?.probationPeriod || "6",
+  //   confirmationDate: employee?.confirmationDate || "",
+  //   noticePeriod: employee?.noticePeriod || "",
+  //   salary: employee?.salary || "",
+  //   startDate: employee?.startDate || "",
+  //   dateOfBirth: employee?.dateOfBirth || "",
+  //   address: employee?.address || "",
+  //   emergencyContactName: employee?.emergencyContactName || "",
+  //   emergencyContactTel: employee?.emergencyContactTel || "",
+  //   educationalLevel: employee?.educationalLevel || "",
+  //   gender: employee?.gender || "",
+  //   bankName: employee?.bankName || "",
+  //   bankAccount: employee?.bankAccount || "",
+  //   ssnit: employee?.ssnit || "",
+  //   ghanaCard: employee?.ghanaCard || "",
+  //   documents: employee?.documents || [],
+  //   profilePicture: employee?.profilePicture || "",
+  //   profilePictureFile: null,
+  // })
 
   useEffect(() => {
     if (formData.subsidiary) {
@@ -1357,8 +1462,6 @@ function AddEmployeeForm({
 
     setFormData((prev) => ({ ...prev, employeeId: generateId() }))
   }, [formData.subsidiary, subsidiaries])
-
-  const [errors, setErrors] = useState<any>({})
 
   const validateForm = () => {
     const newErrors: any = {}
@@ -1527,7 +1630,7 @@ function AddEmployeeForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      <Tabs defaultValue="personal" className="w-full">
+      <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-4 mb-8">
           <TabsTrigger value="personal">Personal Info</TabsTrigger>
           <TabsTrigger value="employment">Employment</TabsTrigger>
@@ -1746,7 +1849,7 @@ function AddEmployeeForm({
                 value={formData.position}
                 onChange={(e) => handleInputChange("position", e.target.value)}
                 placeholder="Enter position/job title"
-                className={`form-input flex-1 ${errors.position ? "border-red-500" : ""}`}
+                className={`form-input ${errors.position ? "border-red-500" : ""}`}
               />
             </div>
 
@@ -2257,9 +2360,19 @@ function AddEmployeeForm({
           <Button type="button" variant="outline" onClick={onClose} className="px-6 bg-transparent">
             Cancel
           </Button>
-          <Button type="submit" className="px-6 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSubmit}>
-            {employee ? "Update Employee" : "Add Employee"}
-          </Button>
+          {currentTab === "documents" ? (
+            <Button
+              type="submit"
+              className="px-6 bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={handleSubmit}
+            >
+              Save Employee
+            </Button>
+          ) : (
+            <Button type="button" className="px-6 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleNext}>
+              Next
+            </Button>
+          )}
         </div>
       </Tabs>
     </form>
