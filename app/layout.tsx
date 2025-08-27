@@ -6,8 +6,7 @@ export const metadata: Metadata = {
   title: "AkwaabaHRPay - HR & Payroll for Ghana",
   description:
     "Professional HR & Payroll software built specifically for Ghanaian businesses with PAYE, SSNIT compliance and more.",
-  generator: "v0.app",
-  viewport: "width=device-width, initial-scale=1",
+    generator: 'v0.app'
 }
 
 export default function RootLayout({
@@ -15,15 +14,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  console.log("[v0] RootLayout is rendering")
-
   return (
-    <html lang="en" className="antialiased">
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-      </head>
-      <body className="font-sans bg-background text-foreground min-h-screen">{children}</body>
+    <html lang="en">
+      <body className="font-sans antialiased">{children}</body>
     </html>
   )
 }
