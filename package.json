@@ -1,7 +1,17 @@
 {
-  "name": "my-v0-project",
+  "name": "akwaaba-hr-payroll",
   "version": "0.1.0",
   "private": true,
+  "description": "AkwaabaHRPay - Comprehensive HR & Payroll Management System for Ghana",
+  "keywords": [
+    "nextjs",
+    "hr",
+    "payroll",
+    "ghana",
+    "web-app"
+  ],
+  "type": "module",
+  "main": "next.config.mjs",
   "scripts": {
     "build": "next build",
     "dev": "next dev",
@@ -41,7 +51,6 @@
     "@react-native-async-storage/async-storage": "latest",
     "@react-navigation/bottom-tabs": "latest",
     "@react-navigation/native": "latest",
-    "@react-navigation/stack": "latest",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
     "autoprefixer": "^10.4.20",
@@ -53,7 +62,6 @@
     "expo": "latest",
     "expo-font": "latest",
     "expo-notifications": "latest",
-    "expo-splash-screen": "latest",
     "expo-status-bar": "latest",
     "geist": "latest",
     "input-otp": "1.4.1",
@@ -65,7 +73,6 @@
     "react-dom": "^19",
     "react-hook-form": "^7.60.0",
     "react-native": "latest",
-    "react-native-gesture-handler": "latest",
     "react-native-safe-area-context": "latest",
     "react-native-screens": "latest",
     "react-resizable-panels": "^2.1.7",
@@ -86,5 +93,8 @@
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
