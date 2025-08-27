@@ -167,6 +167,8 @@ interface NotificationSettings {
   webhookUrl?: string
 }
 
+const MAIN_COMPANY_ID = "00000000-0000-0000-0000-000000000001" // Fixed UUID for main company
+
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("company")
   const [isLoading, setIsLoading] = useState(false)
@@ -504,13 +506,13 @@ export default function SettingsPage() {
   }
 
   const handleSaveSettings = async () => {
-    setIsLoading(true)
     try {
+      setIsLoading(true)
       const supabase = createClient()
 
       // Save company settings to database
       const { error: companyError } = await supabase.from("companies").upsert({
-        id: 1, // Main company ID
+        id: MAIN_COMPANY_ID, // Use UUID instead of integer
         name: companySettings.name,
         tax_id: companySettings.taxId,
         ssnit_number: companySettings.ssnitNumber,
@@ -532,7 +534,7 @@ export default function SettingsPage() {
 
       // Save other settings to company_settings table
       const { error: settingsError } = await supabase.from("company_settings").upsert({
-        company_id: 1,
+        company_id: MAIN_COMPANY_ID, // Use UUID instead of integer
         payroll_frequency: payrollSettings.frequency,
         currency: payrollSettings.currency,
         min_wage: payrollSettings.minWage,
@@ -686,7 +688,7 @@ export default function SettingsPage() {
       const supabase = createClient()
 
       const { error } = await supabase.from("subsidiaries").insert({
-        company_id: 1,
+        company_id: MAIN_COMPANY_ID, // Use UUID instead of integer
         name: subsidiaryData.name,
         tax_id: subsidiaryData.taxId,
         ssnit_number: subsidiaryData.ssnitNumber,
@@ -729,7 +731,11 @@ export default function SettingsPage() {
     try {
       const supabase = createClient()
 
-      const { data, error } = await supabase.from("subsidiaries").select("*").eq("company_id", 1).eq("status", "active")
+      const { data, error } = await supabase
+        .from("subsidiaries")
+        .select("*")
+        .eq("company_id", MAIN_COMPANY_ID)
+        .eq("status", "active") // Use UUID instead of integer
 
       if (error) {
         console.error("[v0] Error loading subsidiaries:", error)
@@ -752,7 +758,7 @@ export default function SettingsPage() {
         const { data: companyData, error: companyError } = await supabase
           .from("companies")
           .select("*")
-          .eq("id", 1)
+          .eq("id", MAIN_COMPANY_ID) // Use UUID instead of integer
           .maybeSingle()
 
         if (companyData && !companyError) {
