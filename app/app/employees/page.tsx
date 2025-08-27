@@ -1,5 +1,7 @@
 "use client"
 
+import { DialogTrigger } from "@/components/ui/dialog"
+
 import { useState, useEffect } from "react"
 import type React from "react"
 
@@ -8,14 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -204,6 +199,32 @@ export default function EmployeesPage() {
     profilePictureFile: null,
   })
 
+  const loadSubsidiaries = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.from("subsidiaries").select("*").eq("status", "active")
+
+      if (error) {
+        console.error("Error loading subsidiaries:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load subsidiaries from database.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setSubsidiaries(data || [])
+    } catch (error) {
+      console.error("Error loading subsidiaries:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load subsidiaries. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   useEffect(() => {
     loadEmployees()
     loadSubsidiaries()
@@ -226,42 +247,46 @@ export default function EmployeesPage() {
   }, [])
 
   useEffect(() => {
-    const loadCompanyData = () => {
-      const companyData = localStorage.getItem("companySettings")
-      const subsidiaryData = localStorage.getItem("subsidiaries")
+    const loadCompanyData = async () => {
+      try {
+        const supabase = createClient()
 
-      if (companyData) {
-        const company = JSON.parse(companyData)
-        setCompanySettings(company)
-        // Set default data from main company
-        setDivisions(company.divisions || ["Head Office", "Regional Office"])
-        setDepartments(
-          company.departments || ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"],
-        )
-        setLocations(company.locations || ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-      }
+        // Load company data from database
+        const { data: companyData, error: companyError } = await supabase
+          .from("companies")
+          .select("*")
+          .limit(1)
+          .single()
 
-      if (subsidiaryData) {
-        const subs = JSON.parse(subsidiaryData)
-        setSubsidiaries(subs)
-      } else {
-        // Default subsidiaries if none exist
-        setSubsidiaries([
-          {
-            id: "1",
-            name: "Akwaaba Tech Solutions",
-            divisions: ["Software Development", "IT Consulting"],
-            departments: ["Engineering", "Sales", "Support"],
-            locations: ["Accra Main", "Accra Branch"],
-          },
-          {
-            id: "2",
-            name: "Akwaaba Consulting",
-            divisions: ["Business Consulting", "HR Consulting"],
-            departments: ["Consulting", "Research", "Training"],
-            locations: ["Kumasi Main", "Kumasi North"],
-          },
-        ])
+        if (companyError) {
+          console.error("Error loading company data:", companyError)
+        } else if (companyData) {
+          setCompanySettings(companyData)
+          // Set default data from main company
+          setDivisions(companyData.divisions || ["Head Office", "Regional Office"])
+          setDepartments(
+            companyData.departments || ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"],
+          )
+          setLocations(companyData.locations || ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+        }
+
+        // Load subsidiaries from database
+        const { data: subsidiaryData, error: subsidiaryError } = await supabase
+          .from("subsidiaries")
+          .select("*")
+          .eq("status", "active")
+
+        if (subsidiaryError) {
+          console.error("Error loading subsidiaries:", subsidiaryError)
+        } else {
+          setSubsidiaries(subsidiaryData || [])
+        }
+      } catch (error) {
+        console.error("Error loading company data:", error)
+        // Fallback to default data
+        setDivisions(["Head Office", "Regional Office"])
+        setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
+        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
       }
     }
 
@@ -272,43 +297,40 @@ export default function EmployeesPage() {
     if (formData.subsidiary) {
       const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
       if (selectedSubsidiary) {
-        setDivisions(selectedSubsidiary.divisions || [])
-        setDepartments(selectedSubsidiary.departments || [])
-        setLocations(selectedSubsidiary.locations || [])
+        setDivisions(
+          Array.isArray(selectedSubsidiary.divisions)
+            ? selectedSubsidiary.divisions
+            : JSON.parse(selectedSubsidiary.divisions || "[]"),
+        )
+        setDepartments(
+          Array.isArray(selectedSubsidiary.departments)
+            ? selectedSubsidiary.departments
+            : JSON.parse(selectedSubsidiary.departments || "[]"),
+        )
+        setLocations(
+          Array.isArray(selectedSubsidiary.locations)
+            ? selectedSubsidiary.locations
+            : JSON.parse(selectedSubsidiary.locations || "[]"),
+        )
       }
     } else if (companySettings) {
-      setDivisions(companySettings.divisions || ["Head Office", "Regional Office"])
-      setDepartments(
-        companySettings.departments || ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"],
+      setDivisions(
+        Array.isArray(companySettings.divisions)
+          ? companySettings.divisions
+          : JSON.parse(companySettings.divisions || "[]"),
       )
-      setLocations(companySettings.locations || ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+      setDepartments(
+        Array.isArray(companySettings.departments)
+          ? companySettings.departments
+          : JSON.parse(companySettings.departments || "[]"),
+      )
+      setLocations(
+        Array.isArray(companySettings.locations)
+          ? companySettings.locations
+          : JSON.parse(companySettings.locations || "[]"),
+      )
     }
   }, [formData.subsidiary, subsidiaries, companySettings])
-
-  const loadSubsidiaries = async () => {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("subsidiaries").select("*")
-
-      if (error) {
-        console.error("Error loading subsidiaries:", error)
-        // Fallback to localStorage
-        const savedSubsidiaries = localStorage.getItem("subsidiaries")
-        if (savedSubsidiaries) {
-          setSubsidiaries(JSON.parse(savedSubsidiaries))
-        }
-      } else {
-        setSubsidiaries(data || [])
-      }
-    } catch (error) {
-      console.error("Error loading subsidiaries:", error)
-      // Fallback to localStorage
-      const savedSubsidiaries = localStorage.getItem("subsidiaries")
-      if (savedSubsidiaries) {
-        setSubsidiaries(JSON.parse(savedSubsidiaries))
-      }
-    }
-  }
 
   const loadEmployees = async () => {
     try {
