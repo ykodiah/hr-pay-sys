@@ -106,7 +106,10 @@ interface CompanySettings {
   address: string
   phone: string
   email: string
-  logo?: string
+  logo: string
+  divisions: string[]
+  departments: string[]
+  locations: string[]
 }
 
 interface PayrollSettings {
@@ -258,10 +261,14 @@ export default function SettingsPage() {
     name: "Akwaaba Technologies Ltd",
     taxId: "C0012345678",
     ssnitNumber: "1234567890",
-    industry: "technology",
+    industry: "Technology",
     address: "123 Liberation Road, Labone, Accra, Ghana",
     phone: "+233 30 123 4567",
     email: "info@akwaabatech.com",
+    logo: "",
+    divisions: ["Head Office", "Regional Office"],
+    departments: ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"],
+    locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
   })
 
   const [payrollSettings, setPayrollSettings] = useState<PayrollSettings>({
@@ -544,6 +551,37 @@ export default function SettingsPage() {
         console.error("[v0] Logo upload failed:", error)
       }
     }
+  }
+
+  const addCompanyArrayField = (field: keyof Pick<CompanySettings, "divisions" | "departments" | "locations">) => {
+    setCompanySettings((prev) => ({
+      ...prev,
+      [field]: [...prev[field], ""],
+    }))
+    setHasUnsavedChanges(true)
+  }
+
+  const updateCompanyArrayField = (
+    field: keyof Pick<CompanySettings, "divisions" | "departments" | "locations">,
+    index: number,
+    value: string,
+  ) => {
+    setCompanySettings((prev) => ({
+      ...prev,
+      [field]: prev[field].map((item, i) => (i === index ? value : item)),
+    }))
+    setHasUnsavedChanges(true)
+  }
+
+  const removeCompanyArrayField = (
+    field: keyof Pick<CompanySettings, "divisions" | "departments" | "locations">,
+    index: number,
+  ) => {
+    setCompanySettings((prev) => ({
+      ...prev,
+      [field]: prev[field].filter((_, i) => i !== index),
+    }))
+    setHasUnsavedChanges(true)
   }
 
   const updateCompanySettings = (field: keyof CompanySettings, value: string) => {
@@ -1487,6 +1525,116 @@ export default function SettingsPage() {
                       value={companySettings.email}
                       onChange={(e) => updateCompanySettings("email", e.target.value)}
                     />
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>Division / Branch</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addCompanyArrayField("divisions")}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add Division
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {companySettings.divisions.map((division, index) => (
+                        <div key={index} className="flex gap-2">
+                          <Input
+                            placeholder="Enter division/branch name"
+                            value={division}
+                            onChange={(e) => updateCompanyArrayField("divisions", index, e.target.value)}
+                          />
+                          {companySettings.divisions.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeCompanyArrayField("divisions", index)}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>Department</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addCompanyArrayField("departments")}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add Department
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {companySettings.departments.map((department, index) => (
+                        <div key={index} className="flex gap-2">
+                          <Input
+                            placeholder="Enter department name"
+                            value={department}
+                            onChange={(e) => updateCompanyArrayField("departments", index, e.target.value)}
+                          />
+                          {companySettings.departments.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeCompanyArrayField("departments", index)}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>Location</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addCompanyArrayField("locations")}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add Location
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {companySettings.locations.map((location, index) => (
+                        <div key={index} className="flex gap-2">
+                          <Input
+                            placeholder="Enter location name"
+                            value={location}
+                            onChange={(e) => updateCompanyArrayField("locations", index, e.target.value)}
+                          />
+                          {companySettings.locations.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeCompanyArrayField("locations", index)}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </CardContent>

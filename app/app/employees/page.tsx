@@ -156,10 +156,19 @@ export default function EmployeesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+  const [subsidiaries, setSubsidiaries] = useState<any[]>([])
 
   useEffect(() => {
     loadEmployees()
+    loadSubsidiaries()
   }, [])
+
+  const loadSubsidiaries = () => {
+    const savedSubsidiaries = localStorage.getItem("subsidiaries")
+    if (savedSubsidiaries) {
+      setSubsidiaries(JSON.parse(savedSubsidiaries))
+    }
+  }
 
   const loadEmployees = async () => {
     try {
@@ -189,13 +198,28 @@ export default function EmployeesPage() {
     }
   }
 
+  const generateEmployeeId = (subsidiaryId?: string) => {
+    const companyInitials = "AKWA" // First 4 initials of main company
+    let prefix = companyInitials
+
+    if (subsidiaryId && subsidiaries.length > 0) {
+      const subsidiary = subsidiaries.find((s) => s.id === subsidiaryId)
+      if (subsidiary) {
+        const companyFirst2 = companyInitials.substring(0, 2)
+        const subsidiaryFirst2 = subsidiary.name.substring(0, 2).toUpperCase()
+        prefix = companyFirst2 + subsidiaryFirst2
+      }
+    }
+
+    const nextNumber = employees.length + 1
+    return `${prefix}${String(nextNumber).padStart(4, "0")}`
+  }
+
   const handleAddEmployee = async (employeeData: any) => {
     try {
       const supabase = createClient()
 
-      // Generate employee ID
-      const employeeCount = employees.length
-      const employeeId = `EMP${String(employeeCount + 1).padStart(3, "0")}`
+      const employeeId = generateEmployeeId(employeeData.subsidiary)
 
       const newEmployee = {
         employee_id: employeeId,
@@ -214,12 +238,21 @@ export default function EmployeesPage() {
         educational_level: employeeData.educationalLevel,
         emergency_contact_name: employeeData.emergencyContactName,
         emergency_contact_tel: employeeData.emergencyContactTel,
-        department: employeeData.department,
         position: employeeData.position,
-        hire_date: employeeData.startDate || new Date().toISOString().split("T")[0],
-        employment_type: "Full-time",
+        subsidiary_id: employeeData.subsidiary || null,
+        division: employeeData.division,
+        department: employeeData.department,
+        location: employeeData.location,
+        contract_type: employeeData.contractType,
+        date_of_joining: employeeData.dateOfJoining,
+        date_of_exit: employeeData.dateOfExit || null,
+        status: employeeData.status,
+        probation_period: employeeData.probationPeriod,
+        confirmation_date: employeeData.confirmationDate || null,
+        notice_period: employeeData.noticePeriod,
+        hire_date: employeeData.dateOfJoining || new Date().toISOString().split("T")[0],
+        employment_type: employeeData.contractType || "Permanent",
         salary: Number.parseFloat(employeeData.salary) || 0,
-        status: employeeData.status || "Active",
       }
 
       const { data, error } = await supabase.from("employees").insert([newEmployee]).select()
@@ -561,7 +594,11 @@ export default function EmployeesPage() {
               <DialogTitle>Add New Employee</DialogTitle>
               <DialogDescription>Enter the employee's information below.</DialogDescription>
             </DialogHeader>
-            <AddEmployeeForm onSubmit={handleAddEmployee} onClose={() => setIsAddDialogOpen(false)} />
+            <AddEmployeeForm
+              onSubmit={handleAddEmployee}
+              onClose={() => setIsAddDialogOpen(false)}
+              subsidiaries={subsidiaries}
+            />
           </DialogContent>
         </Dialog>
       </div>
@@ -703,6 +740,7 @@ export default function EmployeesPage() {
                 setIsEditDialogOpen(false)
                 setSelectedEmployee(null)
               }}
+              subsidiaries={subsidiaries}
             />
           )}
         </DialogContent>
@@ -1176,12 +1214,19 @@ function AddEmployeeForm({
   employee,
   onSubmit,
   onClose,
+  subsidiaries,
 }: {
   employee?: any
   onSubmit: (data: any) => void
   onClose: () => void
+  subsidiaries: any[]
 }) {
+  const [divisions, setDivisions] = useState<string[]>([])
+  const [departments, setDepartments] = useState<string[]>([])
+  const [locations, setLocations] = useState<string[]>([])
+
   const [formData, setFormData] = useState({
+    employeeId: "",
     prefix: employee?.prefix || "",
     firstName: employee?.firstName || "",
     otherNames: employee?.otherNames || "",
@@ -1191,9 +1236,18 @@ function AddEmployeeForm({
     personalEmail: employee?.personalEmail || "",
     phone: employee?.phone || "",
     position: employee?.position || "",
+    subsidiary: employee?.subsidiary || "",
+    division: employee?.division || "",
     department: employee?.department || "",
-    salary: employee?.salary || "",
     location: employee?.location || "",
+    contractType: employee?.contractType || "Permanent",
+    dateOfJoining: employee?.dateOfJoining || "",
+    dateOfExit: employee?.dateOfExit || "",
+    status: employee?.status || "Active",
+    probationPeriod: employee?.probationPeriod || "6",
+    confirmationDate: employee?.confirmationDate || "",
+    noticePeriod: employee?.noticePeriod || "",
+    salary: employee?.salary || "",
     startDate: employee?.startDate || "",
     dateOfBirth: employee?.dateOfBirth || "",
     address: employee?.address || "",
@@ -1205,11 +1259,53 @@ function AddEmployeeForm({
     bankAccount: employee?.bankAccount || "",
     ssnit: employee?.ssnit || "",
     ghanaCard: employee?.ghanaCard || "",
-    status: employee?.status || "Active",
     documents: employee?.documents || [],
     profilePicture: employee?.profilePicture || "",
     profilePictureFile: null,
   })
+
+  useEffect(() => {
+    if (formData.subsidiary) {
+      const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
+      if (selectedSubsidiary) {
+        setDivisions(selectedSubsidiary.divisions || [])
+        setDepartments(selectedSubsidiary.departments || [])
+        setLocations(selectedSubsidiary.locations || [])
+      }
+    } else {
+      // Load main company divisions, departments, locations
+      const companyData = localStorage.getItem("companySettings")
+      if (companyData) {
+        const company = JSON.parse(companyData)
+        setDivisions(company.divisions || ["Head Office", "Regional Office"])
+        setDepartments(
+          company.departments || ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"],
+        )
+        setLocations(company.locations || ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+      }
+    }
+  }, [formData.subsidiary, subsidiaries])
+
+  useEffect(() => {
+    const generateId = () => {
+      const companyInitials = "AKWA"
+      let prefix = companyInitials
+
+      if (formData.subsidiary && subsidiaries.length > 0) {
+        const subsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
+        if (subsidiary) {
+          const companyFirst2 = companyInitials.substring(0, 2)
+          const subsidiaryFirst2 = subsidiary.name.substring(0, 2).toUpperCase()
+          prefix = companyFirst2 + subsidiaryFirst2
+        }
+      }
+
+      const nextNumber = Math.floor(Math.random() * 9999) + 1
+      return `${prefix}${String(nextNumber).padStart(4, "0")}`
+    }
+
+    setFormData((prev) => ({ ...prev, employeeId: generateId() }))
+  }, [formData.subsidiary, subsidiaries])
 
   const [errors, setErrors] = useState<any>({})
 
@@ -1268,6 +1364,7 @@ function AddEmployeeForm({
       onSubmit(employeeData)
 
       setFormData({
+        employeeId: "",
         prefix: "",
         firstName: "",
         otherNames: "",
@@ -1277,9 +1374,18 @@ function AddEmployeeForm({
         personalEmail: "",
         phone: "",
         position: "",
+        subsidiary: "",
+        division: "",
         department: "",
-        salary: "",
         location: "",
+        contractType: "Permanent",
+        dateOfJoining: "",
+        dateOfExit: "",
+        status: "Active",
+        probationPeriod: "6",
+        confirmationDate: "",
+        noticePeriod: "",
+        salary: "",
         startDate: "",
         dateOfBirth: "",
         address: "",
@@ -1291,7 +1397,6 @@ function AddEmployeeForm({
         bankAccount: "",
         ssnit: "",
         ghanaCard: "",
-        status: "Active",
         documents: [],
         profilePicture: "",
         profilePictureFile: null,
@@ -1573,90 +1678,194 @@ function AddEmployeeForm({
         </TabsContent>
 
         <TabsContent value="employment" className="space-y-6">
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <Label htmlFor="position" className="text-base font-medium mb-2 block">
-                Position *
-              </Label>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">Employee ID</Label>
               <Input
-                id="position"
+                value={formData.employeeId}
+                readOnly
+                className="form-input flex-1 bg-gray-50"
+                placeholder="Auto-generated"
+              />
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">1. Position *</Label>
+              <Input
                 value={formData.position}
                 onChange={(e) => handleInputChange("position", e.target.value)}
-                placeholder="Job title"
-                className={`h-12 ${errors.position ? "border-red-500" : ""}`}
+                placeholder="Enter position/job title"
+                className={`form-input flex-1 ${errors.position ? "border-red-500" : ""}`}
               />
-              {errors.position && <p className="text-red-500 text-sm mt-1">{errors.position}</p>}
             </div>
-            <div>
-              <Label htmlFor="department" className="text-base font-medium mb-2 block">
-                Department *
-              </Label>
+
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">2. Subsidiary</Label>
+              <Select value={formData.subsidiary} onValueChange={(value) => handleInputChange("subsidiary", value)}>
+                <SelectTrigger className="form-input flex-1">
+                  <SelectValue placeholder="Select subsidiary (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subsidiaries.map((subsidiary) => (
+                    <SelectItem key={subsidiary.id} value={subsidiary.id}>
+                      {subsidiary.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">3. Division / Branch</Label>
+              <Select value={formData.division} onValueChange={(value) => handleInputChange("division", value)}>
+                <SelectTrigger className="form-input flex-1">
+                  <SelectValue placeholder="Select division/branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {divisions.map((division) => (
+                    <SelectItem key={division} value={division}>
+                      {division}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">4. Department *</Label>
               <Select value={formData.department} onValueChange={(value) => handleInputChange("department", value)}>
-                <SelectTrigger className={`h-12 ${errors.department ? "border-red-500" : ""}`}>
+                <SelectTrigger className={`form-input flex-1 ${errors.department ? "border-red-500" : ""}`}>
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Technology">Technology</SelectItem>
-                  <SelectItem value="Human Resources">Human Resources</SelectItem>
-                  <SelectItem value="Finance">Finance</SelectItem>
-                  <SelectItem value="Marketing">Marketing</SelectItem>
-                  <SelectItem value="Sales">Sales</SelectItem>
-                  <SelectItem value="Operations">Operations</SelectItem>
+                  {departments.map((department) => (
+                    <SelectItem key={department} value={department}>
+                      {department}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              {errors.department && <p className="text-red-500 text-sm mt-1">{errors.department}</p>}
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <Label htmlFor="location" className="text-base font-medium mb-2 block">
-                Location *
-              </Label>
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">5. Location *</Label>
               <Select value={formData.location} onValueChange={(value) => handleInputChange("location", value)}>
-                <SelectTrigger className={`h-12 ${errors.location ? "border-red-500" : ""}`}>
+                <SelectTrigger className={`form-input flex-1 ${errors.location ? "border-red-500" : ""}`}>
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Accra">Accra</SelectItem>
-                  <SelectItem value="Kumasi">Kumasi</SelectItem>
-                  <SelectItem value="Takoradi">Takoradi</SelectItem>
-                  <SelectItem value="Tamale">Tamale</SelectItem>
-                  <SelectItem value="Cape Coast">Cape Coast</SelectItem>
+                  {locations.map((location) => (
+                    <SelectItem key={location} value={location}>
+                      {location}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              {errors.location && <p className="text-red-500 text-sm mt-1">{errors.location}</p>}
             </div>
-            <div>
-              <Label htmlFor="startDate" className="text-base font-medium mb-2 block">
-                Start Date *
-              </Label>
-              <Input
-                id="startDate"
-                type="date"
-                value={formData.startDate}
-                onChange={(e) => handleInputChange("startDate", e.target.value)}
-                className={`h-12 ${errors.startDate ? "border-red-500" : ""}`}
-              />
-              {errors.startDate && <p className="text-red-500 text-sm mt-1">{errors.startDate}</p>}
-            </div>
-          </div>
 
-          <div>
-            <Label htmlFor="status" className="text-base font-medium mb-2 block">
-              Employment Status
-            </Label>
-            <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
-              <SelectTrigger className="h-12">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="On Leave">On Leave</SelectItem>
-                <SelectItem value="Suspended">Suspended</SelectItem>
-                <SelectItem value="Terminated">Terminated</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">6. Contract Type *</Label>
+              <Select value={formData.contractType} onValueChange={(value) => handleInputChange("contractType", value)}>
+                <SelectTrigger className="form-input flex-1">
+                  <SelectValue placeholder="Select contract type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Permanent">Permanent</SelectItem>
+                  <SelectItem value="Temporary">Temporary</SelectItem>
+                  <SelectItem value="Contract">Contract</SelectItem>
+                  <SelectItem value="Outsourced">Outsourced</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">7. Date of Joining *</Label>
+              <Input
+                type="date"
+                value={formData.dateOfJoining}
+                onChange={(e) => handleInputChange("dateOfJoining", e.target.value)}
+                className="form-input flex-1"
+              />
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">8. Date of Exit</Label>
+              <Input
+                type="date"
+                value={formData.dateOfExit}
+                onChange={(e) => handleInputChange("dateOfExit", e.target.value)}
+                className="form-input flex-1"
+              />
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">9. Status *</Label>
+              <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
+                <SelectTrigger className="form-input flex-1">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.status === "Inactive" && (
+              <div className="flex items-center gap-4">
+                <Label className="text-sm font-medium text-gray-700 w-48">Reason for Inactive Status</Label>
+                <Select onValueChange={(value) => handleInputChange("inactiveReason", value)}>
+                  <SelectTrigger className="form-input flex-1">
+                    <SelectValue placeholder="Select reason" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Resignation">Resignation</SelectItem>
+                    <SelectItem value="Termination">Termination</SelectItem>
+                    <SelectItem value="Death">Death</SelectItem>
+                    <SelectItem value="Suspended">Suspended</SelectItem>
+                    <SelectItem value="Leave without pay">Leave without pay</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">10. Probation Period (months)</Label>
+              <Select
+                value={formData.probationPeriod}
+                onValueChange={(value) => handleInputChange("probationPeriod", value)}
+              >
+                <SelectTrigger className="form-input flex-1">
+                  <SelectValue placeholder="Select probation period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="3">3 months</SelectItem>
+                  <SelectItem value="6">6 months</SelectItem>
+                  <SelectItem value="9">9 months</SelectItem>
+                  <SelectItem value="12">12 months</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">11. Confirmation Date</Label>
+              <Input
+                type="date"
+                value={formData.confirmationDate}
+                onChange={(e) => handleInputChange("confirmationDate", e.target.value)}
+                className="form-input flex-1"
+              />
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium text-gray-700 w-48">12. Notice Period</Label>
+              <Input
+                value={formData.noticePeriod}
+                onChange={(e) => handleInputChange("noticePeriod", e.target.value)}
+                placeholder="e.g., 1 month, 3 months"
+                className="form-input flex-1"
+              />
+            </div>
           </div>
         </TabsContent>
 
