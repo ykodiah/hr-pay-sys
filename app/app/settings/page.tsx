@@ -190,17 +190,29 @@ export default function SettingsPage() {
         {
           id: "1",
           name: "Akwaaba Tech Solutions",
-          location: "Accra",
-          costCenter: "CC001",
-          manager: "John Doe",
+          taxId: "C0012345678",
+          ssnitNumber: "1234567890",
+          address: "123 Liberation Road, Labone, Accra, Ghana",
+          phone: "+233 30 123 4567",
+          email: "info@akwaabatech.com",
+          divisions: [""],
+          departments: [""],
+          locations: [""],
+          logo: "",
           status: "active",
         },
         {
           id: "2",
           name: "Akwaaba Consulting",
-          location: "Kumasi",
-          costCenter: "CC002",
-          manager: "Jane Smith",
+          taxId: "C0012345678",
+          ssnitNumber: "1234567890",
+          address: "123 Liberation Road, Labone, Accra, Ghana",
+          phone: "+233 30 123 4567",
+          email: "info@akwaabatech.com",
+          divisions: [""],
+          departments: [""],
+          locations: [""],
+          logo: "",
           status: "active",
         },
       ],
@@ -360,84 +372,25 @@ export default function SettingsPage() {
     setEditForm({ ...subsidiary })
   }
 
-  const handleSaveEdit = async () => {
-    if (!editForm) return
-
-    try {
-      setSubsidiaries(subsidiaries.map((sub) => (sub.id === editForm.id ? editForm : sub)))
-      setEditingSubsidiary(null)
-      setEditForm(null)
-
-      toast({
-        title: "Success",
-        description: "Subsidiary updated successfully!",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update subsidiary. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleDeactivateSubsidiary = async (subsidiaryId: string) => {
-    try {
-      setSubsidiaries(
-        subsidiaries.map((sub) =>
-          sub.id === subsidiaryId ? { ...sub, status: sub.status === "active" ? "inactive" : "active" } : sub,
-        ),
-      )
-
-      toast({
-        title: "Success",
-        description: "Subsidiary status updated successfully!",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update subsidiary status. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const updateEditArrayField = (field: "divisions" | "departments" | "locations", index: number, value: string) => {
-    if (!editForm) return
-    setEditForm({
-      ...editForm,
-      [field]: editForm[field].map((item, i) => (i === index ? value : item)),
-    })
-  }
-
-  const addEditArrayField = (field: "divisions" | "departments" | "locations") => {
-    if (!editForm) return
-    setEditForm({
-      ...editForm,
-      [field]: [...editForm[field], ""],
-    })
-  }
-
-  const removeEditArrayField = (field: "divisions" | "departments" | "locations", index: number) => {
-    if (!editForm) return
-    setEditForm({
-      ...editForm,
-      [field]: editForm[field].filter((_, i) => i !== index),
-    })
-  }
-
   const handleAddSubsidiary = async () => {
     try {
-      const newSubsidiary: Subsidiary = {
-        id: Date.now().toString(),
-        ...subsidiaryForm,
+      const subsidiaryData = {
+        name: subsidiaryForm.name,
+        taxId: subsidiaryForm.taxId,
+        ssnitNumber: subsidiaryForm.ssnitNumber,
+        address: subsidiaryForm.address,
+        phone: subsidiaryForm.phone,
+        email: subsidiaryForm.email,
         divisions: subsidiaryForm.divisions.filter((d) => d.trim()),
         departments: subsidiaryForm.departments.filter((d) => d.trim()),
         locations: subsidiaryForm.locations.filter((l) => l.trim()),
-        status: "active",
+        logo: subsidiaryForm.logo,
       }
 
-      setSubsidiaries([...subsidiaries, newSubsidiary])
+      // Save to database
+      await handleSaveSubsidiary(subsidiaryData)
+
+      // Reset form
       setShowSubsidiaryDialog(false)
       setSubsidiaryForm({
         name: "",
@@ -451,12 +404,8 @@ export default function SettingsPage() {
         locations: [""],
         logo: null,
       })
-
-      toast({
-        title: "Success",
-        description: "Subsidiary added successfully!",
-      })
     } catch (error) {
+      console.error("[v0] Error in handleAddSubsidiary:", error)
       toast({
         title: "Error",
         description: "Failed to add subsidiary. Please try again.",
@@ -727,6 +676,93 @@ export default function SettingsPage() {
     }
   }
 
+  const handleSaveEdit = async () => {
+    if (!editForm) return
+
+    try {
+      const supabase = createClient()
+
+      const { error } = await supabase
+        .from("subsidiaries")
+        .update({
+          name: editForm.name,
+          tax_id: editForm.taxId,
+          ssnit_number: editForm.ssnitNumber,
+          address: editForm.address,
+          phone_number: editForm.phone,
+          email_address: editForm.email,
+          divisions: editForm.divisions,
+          departments: editForm.departments,
+          locations: editForm.locations,
+          logo_url: editForm.logo,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editForm.id)
+
+      if (error) {
+        console.error("[v0] Error updating subsidiary:", error)
+        throw error
+      }
+
+      // Refresh subsidiaries list
+      await loadSubsidiaries()
+
+      setEditingSubsidiary(null)
+      setEditForm(null)
+
+      toast({
+        title: "Success",
+        description: "Subsidiary updated successfully!",
+      })
+    } catch (error) {
+      console.error("[v0] Error updating subsidiary:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update subsidiary. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeactivateSubsidiary = async (subsidiaryId: string) => {
+    try {
+      const supabase = createClient()
+      const subsidiary = subsidiaries.find((sub) => sub.id === subsidiaryId)
+
+      if (!subsidiary) return
+
+      const newStatus = subsidiary.status === "active" ? "inactive" : "active"
+
+      const { error } = await supabase
+        .from("subsidiaries")
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", subsidiaryId)
+
+      if (error) {
+        console.error("[v0] Error updating subsidiary status:", error)
+        throw error
+      }
+
+      // Refresh subsidiaries list
+      await loadSubsidiaries()
+
+      toast({
+        title: "Success",
+        description: "Subsidiary status updated successfully!",
+      })
+    } catch (error) {
+      console.error("[v0] Error updating subsidiary status:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update subsidiary status. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const loadSubsidiaries = async () => {
     try {
       const supabase = createClient()
@@ -753,6 +789,36 @@ export default function SettingsPage() {
     } catch (error) {
       console.error("[v0] Error loading subsidiaries:", error)
     }
+  }
+
+  const addEditArrayField = (field: "divisions" | "departments" | "locations") => {
+    setEditForm((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        [field]: [...prev[field], ""],
+      }
+    })
+  }
+
+  const updateEditArrayField = (field: "divisions" | "departments" | "locations", index: number, value: string) => {
+    setEditForm((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        [field]: prev[field].map((item, i) => (i === index ? value : item)),
+      }
+    })
+  }
+
+  const removeEditArrayField = (field: "divisions" | "departments" | "locations", index: number) => {
+    setEditForm((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        [field]: prev[field].filter((_, i) => i !== index),
+      }
+    })
   }
 
   useEffect(() => {
