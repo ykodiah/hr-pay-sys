@@ -39,6 +39,9 @@ import {
   Globe,
   CreditCard,
   X,
+  MoreVertical,
+  Eye,
+  Power,
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -308,6 +311,10 @@ export default function SettingsPage() {
 
   const [subsidiaryEnabled, setSubsidiaryEnabled] = useState(false)
   const [showSubsidiaryDialog, setShowSubsidiaryDialog] = useState(false)
+
+  const [editingSubsidiary, setEditingSubsidiary] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<Subsidiary | null>(null)
+
   const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([
     {
       id: "1",
@@ -349,6 +356,77 @@ export default function SettingsPage() {
     locations: [""],
     logo: null as File | null,
   })
+
+  const handleEditSubsidiary = (subsidiary: Subsidiary) => {
+    setEditingSubsidiary(subsidiary.id)
+    setEditForm({ ...subsidiary })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editForm) return
+
+    try {
+      setSubsidiaries(subsidiaries.map((sub) => (sub.id === editForm.id ? editForm : sub)))
+      setEditingSubsidiary(null)
+      setEditForm(null)
+
+      toast({
+        title: "Success",
+        description: "Subsidiary updated successfully!",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update subsidiary. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeactivateSubsidiary = async (subsidiaryId: string) => {
+    try {
+      setSubsidiaries(
+        subsidiaries.map((sub) =>
+          sub.id === subsidiaryId ? { ...sub, status: sub.status === "active" ? "inactive" : "active" } : sub,
+        ),
+      )
+
+      toast({
+        title: "Success",
+        description: "Subsidiary status updated successfully!",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update subsidiary status. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const updateEditArrayField = (field: "divisions" | "departments" | "locations", index: number, value: string) => {
+    if (!editForm) return
+    setEditForm({
+      ...editForm,
+      [field]: editForm[field].map((item, i) => (i === index ? value : item)),
+    })
+  }
+
+  const addEditArrayField = (field: "divisions" | "departments" | "locations") => {
+    if (!editForm) return
+    setEditForm({
+      ...editForm,
+      [field]: [...editForm[field], ""],
+    })
+  }
+
+  const removeEditArrayField = (field: "divisions" | "departments" | "locations", index: number) => {
+    if (!editForm) return
+    setEditForm({
+      ...editForm,
+      [field]: editForm[field].filter((_, i) => i !== index),
+    })
+  }
 
   const handleAddSubsidiary = async () => {
     try {
@@ -792,9 +870,32 @@ export default function SettingsPage() {
                                 <CardTitle className="text-base">{subsidiary.name}</CardTitle>
                                 <p className="text-xs text-gray-600">{subsidiary.email}</p>
                               </div>
-                              <Badge variant="outline" className="text-xs">
-                                {subsidiary.status}
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {subsidiary.status}
+                                </Badge>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleEditSubsidiary(subsidiary)}>
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      View
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleEditSubsidiary(subsidiary)}>
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDeactivateSubsidiary(subsidiary.id)}>
+                                      <Power className="mr-2 h-4 w-4" />
+                                      {subsidiary.status === "active" ? "Deactivate" : "Activate"}
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             </div>
                           </CardHeader>
                           <CardContent className="pt-0">
@@ -824,6 +925,211 @@ export default function SettingsPage() {
                         </Card>
                       ))}
                     </div>
+
+                    <Dialog
+                      open={editingSubsidiary !== null}
+                      onOpenChange={() => {
+                        setEditingSubsidiary(null)
+                        setEditForm(null)
+                      }}
+                    >
+                      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Edit Subsidiary</DialogTitle>
+                        </DialogHeader>
+                        {editForm && (
+                          <div className="space-y-6">
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Name of Subsidiary *</Label>
+                                <Input
+                                  placeholder="Enter subsidiary name"
+                                  value={editForm.name}
+                                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Tax ID / TIN *</Label>
+                                <Input
+                                  placeholder="Enter tax ID"
+                                  value={editForm.taxId}
+                                  onChange={(e) => setEditForm({ ...editForm, taxId: e.target.value })}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>SSNIT Employer Number *</Label>
+                                <Input
+                                  placeholder="Enter SSNIT number"
+                                  value={editForm.ssnitNumber}
+                                  onChange={(e) => setEditForm({ ...editForm, ssnitNumber: e.target.value })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Phone Number *</Label>
+                                <Input
+                                  placeholder="Enter phone number"
+                                  value={editForm.phone}
+                                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Email Address *</Label>
+                                <Input
+                                  type="email"
+                                  placeholder="Enter email address"
+                                  value={editForm.email}
+                                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Subsidiary Logo</Label>
+                                <Input type="file" accept="image/*" />
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Address *</Label>
+                              <textarea
+                                className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                rows={3}
+                                placeholder="Enter full address"
+                                value={editForm.address}
+                                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                              />
+                            </div>
+
+                            <div className="space-y-4">
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <Label>Division / Branch</Label>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => addEditArrayField("divisions")}
+                                  >
+                                    <Plus className="w-3 h-3 mr-1" />
+                                    Add Division
+                                  </Button>
+                                </div>
+                                <div className="space-y-2">
+                                  {editForm.divisions.map((division, index) => (
+                                    <div key={index} className="flex gap-2">
+                                      <Input
+                                        placeholder="Enter division/branch name"
+                                        value={division}
+                                        onChange={(e) => updateEditArrayField("divisions", index, e.target.value)}
+                                      />
+                                      {editForm.divisions.length > 1 && (
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => removeEditArrayField("divisions", index)}
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <Label>Department</Label>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => addEditArrayField("departments")}
+                                  >
+                                    <Plus className="w-3 h-3 mr-1" />
+                                    Add Department
+                                  </Button>
+                                </div>
+                                <div className="space-y-2">
+                                  {editForm.departments.map((department, index) => (
+                                    <div key={index} className="flex gap-2">
+                                      <Input
+                                        placeholder="Enter department name"
+                                        value={department}
+                                        onChange={(e) => updateEditArrayField("departments", index, e.target.value)}
+                                      />
+                                      {editForm.departments.length > 1 && (
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => removeEditArrayField("departments", index)}
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <Label>Location</Label>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => addEditArrayField("locations")}
+                                  >
+                                    <Plus className="w-3 h-3 mr-1" />
+                                    Add Location
+                                  </Button>
+                                </div>
+                                <div className="space-y-2">
+                                  {editForm.locations.map((location, index) => (
+                                    <div key={index} className="flex gap-2">
+                                      <Input
+                                        placeholder="Enter location name"
+                                        value={location}
+                                        onChange={(e) => updateEditArrayField("locations", index, e.target.value)}
+                                      />
+                                      {editForm.locations.length > 1 && (
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => removeEditArrayField("locations", index)}
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end space-x-2 pt-4">
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingSubsidiary(null)
+                                  setEditForm(null)
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                              <Button onClick={handleSaveEdit}>Save Changes</Button>
+                            </div>
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 )}
               </div>
