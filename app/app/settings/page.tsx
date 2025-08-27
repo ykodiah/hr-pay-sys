@@ -691,13 +691,13 @@ export default function SettingsPage() {
         tax_id: subsidiaryData.taxId,
         ssnit_number: subsidiaryData.ssnitNumber,
         address: subsidiaryData.address,
-        phone: subsidiaryData.phone,
-        email: subsidiaryData.email,
+        phone_number: subsidiaryData.phone,
+        email_address: subsidiaryData.email,
         divisions: subsidiaryData.divisions,
         departments: subsidiaryData.departments,
         locations: subsidiaryData.locations,
-        logo: subsidiaryData.logo,
-        is_active: true,
+        logo_url: subsidiaryData.logo,
+        status: "active",
         created_at: new Date().toISOString(),
       })
 
@@ -729,7 +729,7 @@ export default function SettingsPage() {
     try {
       const supabase = createClient()
 
-      const { data, error } = await supabase.from("subsidiaries").select("*").eq("company_id", 1).eq("is_active", true)
+      const { data, error } = await supabase.from("subsidiaries").select("*").eq("company_id", 1).eq("status", "active")
 
       if (error) {
         console.error("[v0] Error loading subsidiaries:", error)
