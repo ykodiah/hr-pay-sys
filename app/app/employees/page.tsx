@@ -163,17 +163,61 @@ export default function EmployeesPage() {
     loadSubsidiaries()
   }, [])
 
-  const loadSubsidiaries = () => {
-    const savedSubsidiaries = localStorage.getItem("subsidiaries")
-    if (savedSubsidiaries) {
-      setSubsidiaries(JSON.parse(savedSubsidiaries))
+  useEffect(() => {
+    const supabase = createClient()
+
+    const subscription = supabase
+      .channel("employees_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "employees" }, (payload) => {
+        console.log("[v0] Employee data changed:", payload)
+        loadEmployees() // Reload employees when data changes
+      })
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  const loadSubsidiaries = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.from("subsidiaries").select("*")
+
+      if (error) {
+        console.error("Error loading subsidiaries:", error)
+        // Fallback to localStorage
+        const savedSubsidiaries = localStorage.getItem("subsidiaries")
+        if (savedSubsidiaries) {
+          setSubsidiaries(JSON.parse(savedSubsidiaries))
+        }
+      } else {
+        setSubsidiaries(data || [])
+      }
+    } catch (error) {
+      console.error("Error loading subsidiaries:", error)
+      // Fallback to localStorage
+      const savedSubsidiaries = localStorage.getItem("subsidiaries")
+      if (savedSubsidiaries) {
+        setSubsidiaries(JSON.parse(savedSubsidiaries))
+      }
     }
   }
 
   const loadEmployees = async () => {
     try {
+      console.log("[v0] Loading employees from database...")
       const supabase = createClient()
-      const { data, error } = await supabase.from("employees").select("*").order("created_at", { ascending: false })
+      const { data, error } = await supabase
+        .from("employees")
+        .select(`
+          *,
+          subsidiaries (
+            name,
+            id
+          )
+        `)
+        .order("created_at", { ascending: false })
 
       if (error) {
         console.error("Error loading employees:", error)
@@ -185,6 +229,7 @@ export default function EmployeesPage() {
         return
       }
 
+      console.log("[v0] Loaded employees:", data?.length || 0)
       setEmployees(data || [])
     } catch (error) {
       console.error("Error loading employees:", error)
@@ -217,56 +262,54 @@ export default function EmployeesPage() {
 
   const handleAddEmployee = async (employeeData: any) => {
     try {
-      console.log("[v0] Adding employee with data:", employeeData)
+      console.log("[v0] Adding employee:", employeeData)
       const supabase = createClient()
 
-      const employeeId = generateEmployeeId(employeeData.subsidiary)
+      // Generate employee ID
+      const companyName = "Akwaaba Technologies Ltd" // This should come from company settings
+      const subsidiary = subsidiaries.find((s) => s.id === employeeData.subsidiary_id)
+
+      let employeeId = ""
+      if (subsidiary) {
+        const companyInitials = companyName
+          .split(" ")
+          .slice(0, 2)
+          .map((word) => word.substring(0, 2))
+          .join("")
+          .toUpperCase()
+        const subsidiaryInitials = subsidiary.name
+          .split(" ")
+          .slice(0, 2)
+          .map((word) => word.substring(0, 2))
+          .join("")
+          .toUpperCase()
+        const sequence = String(employees.length + 1).padStart(4, "0")
+        employeeId = `${companyInitials}${subsidiaryInitials}${sequence}`
+      } else {
+        const companyInitials = companyName
+          .split(" ")
+          .slice(0, 4)
+          .map((word) => word.substring(0, 1))
+          .join("")
+          .toUpperCase()
+        const sequence = String(employees.length + 1).padStart(4, "0")
+        employeeId = `${companyInitials}${sequence}`
+      }
 
       const newEmployee = {
+        ...employeeData,
         employee_id: employeeId,
-        prefix: employeeData.prefix,
-        first_name: employeeData.firstName,
-        other_names: employeeData.otherNames,
-        last_name: employeeData.lastName,
-        display_name: employeeData.displayName,
-        personal_email: employeeData.personalEmail,
-        corporate_email: employeeData.corporateEmail,
-        phone_number: employeeData.phone,
-        address: employeeData.address,
-        date_of_birth: employeeData.dateOfBirth || null,
-        gender: employeeData.gender,
-        marital_status: employeeData.maritalStatus,
-        educational_level: employeeData.educationalLevel,
-        emergency_contact_name: employeeData.emergencyContactName,
-        emergency_contact_tel: employeeData.emergencyContactTel,
-        position: employeeData.position,
-        subsidiary_id: employeeData.subsidiary || null,
-        division: employeeData.division,
-        department: employeeData.department,
-        location: employeeData.location,
-        contract_type: employeeData.contractType,
-        date_of_joining: employeeData.dateOfJoining,
-        date_of_exit: employeeData.dateOfExit || null,
-        status: employeeData.status || "Active",
-        probation_period: employeeData.probationPeriod,
-        confirmation_date: employeeData.confirmationDate || null,
-        notice_period: employeeData.noticePeriod,
-        hire_date: employeeData.dateOfJoining || new Date().toISOString().split("T")[0],
-        employment_type: employeeData.contractType || "Permanent",
-        salary: Number.parseFloat(employeeData.salary) || 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
 
-      console.log("[v0] Inserting employee:", newEmployee)
-
-      const { data, error } = await supabase.from("employees").insert([newEmployee]).select()
+      const { data, error } = await supabase.from("employees").insert([newEmployee]).select().single()
 
       if (error) {
-        console.error("[v0] Database error:", error)
+        console.error("Error adding employee:", error)
         toast({
           title: "Error",
-          description: `Failed to add employee: ${error.message}`,
+          description: "Failed to add employee to database.",
           variant: "destructive",
         })
         return
@@ -274,22 +317,20 @@ export default function EmployeesPage() {
 
       console.log("[v0] Employee added successfully:", data)
 
-      // Force reload employees from database
-      await loadEmployees()
+      // Immediately update local state
+      setEmployees((prev) => [data, ...prev])
 
-      // Force re-render by updating state
-      setEmployees((prev) => [...prev])
+      toast({
+        title: "Success",
+        description: `Employee ${employeeData.display_name} has been added successfully!`,
+      })
 
       setIsAddDialogOpen(false)
-      toast({
-        title: "Employee Added Successfully",
-        description: `${employeeData.displayName} has been successfully added to the system.`,
-      })
     } catch (error) {
-      console.error("[v0] Error adding employee:", error)
+      console.error("Error adding employee:", error)
       toast({
         title: "Error",
-        description: "Failed to add employee to database.",
+        description: "Failed to add employee. Please try again.",
         variant: "destructive",
       })
     }
@@ -1646,7 +1687,7 @@ function AddEmployeeForm({
               <Label className="text-sm font-medium text-gray-700 w-48">12. Educational Level</Label>
               <Select
                 value={formData.educationalLevel}
-                onValueChange={(value) => handleInputChange("educationalLevel", value)}
+                onChange={(value) => handleInputChange("educationalLevel", value)}
               >
                 <SelectTrigger className="form-input flex-1">
                   <SelectValue placeholder="Select education level" />
