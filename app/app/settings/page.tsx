@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -317,8 +317,48 @@ export default function SettingsPage() {
   })
 
   const [subsidiaryEnabled, setSubsidiaryEnabled] = useState(false)
-  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false)
+  const [subsidiaryPermanentlyEnabled, setSubsidiaryPermanentlyEnabled] = useState(false)
   const [showSubsidiaryDialog, setShowSubsidiaryDialog] = useState(false)
+
+  useEffect(() => {
+    const savedSubsidiaryState = localStorage.getItem("subsidiaryEnabled")
+    const savedPermanentState = localStorage.getItem("subsidiaryPermanentlyEnabled")
+
+    if (savedSubsidiaryState === "true") {
+      setSubsidiaryEnabled(true)
+    }
+    if (savedPermanentState === "true") {
+      setSubsidiaryPermanentlyEnabled(true)
+      setSubsidiaryEnabled(true)
+    }
+  }, [])
+
+  const handleSubsidiaryActivation = (checked: boolean) => {
+    setSubsidiaryEnabled(checked)
+    localStorage.setItem("subsidiaryEnabled", checked.toString())
+
+    if (checked && !subsidiaryPermanentlyEnabled) {
+      setSubsidiaryPermanentlyEnabled(true)
+      localStorage.setItem("subsidiaryPermanentlyEnabled", "true")
+      toast({
+        title: "Subsidiary Function Activated",
+        description: "Subsidiary management is now permanently enabled for your organization.",
+      })
+    }
+  }
+
+  const handleSubsidiaryDeactivation = (deactivate: boolean) => {
+    if (deactivate) {
+      setSubsidiaryEnabled(false)
+      setSubsidiaryPermanentlyEnabled(false)
+      localStorage.setItem("subsidiaryEnabled", "false")
+      localStorage.setItem("subsidiaryPermanentlyEnabled", "false")
+      toast({
+        title: "Subsidiary Function Deactivated",
+        description: "Subsidiary management has been deactivated.",
+      })
+    }
+  }
 
   const [editingSubsidiary, setEditingSubsidiary] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Subsidiary | null>(null)
@@ -677,59 +717,43 @@ export default function SettingsPage() {
               <Separator className="my-6" />
 
               <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="subsidiary-enabled"
-                    checked={subsidiaryEnabled}
-                    onChange={(e) => {
-                      if (subsidiaryEnabled && !e.target.checked) {
-                        setShowDeactivateConfirm(true)
-                        e.target.checked = true // Keep it checked
-                      } else {
-                        setSubsidiaryEnabled(e.target.checked)
-                      }
-                    }}
-                    className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                  />
-                  <Label htmlFor="subsidiary-enabled" className="text-sm font-medium">
-                    Activate Subsidiary Function
-                  </Label>
-                </div>
-
-                {showDeactivateConfirm && (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <div className="flex items-start space-x-3">
-                      <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
-                      <div className="flex-1">
-                        <h4 className="text-sm font-medium text-yellow-800">Deactivate Subsidiary Function?</h4>
-                        <p className="text-sm text-yellow-700 mt-1">
-                          This will disable subsidiary management and may affect existing subsidiary data. Are you sure
-                          you want to proceed?
-                        </p>
-                        <div className="flex space-x-3 mt-3">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSubsidiaryEnabled(false)
-                              setShowDeactivateConfirm(false)
-                              toast({
-                                title: "Subsidiary Function Deactivated",
-                                description: "Subsidiary management has been disabled.",
-                              })
-                            }}
-                          >
-                            Yes, Deactivate
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setShowDeactivateConfirm(false)}>
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="subsidiary-enabled"
+                      checked={subsidiaryEnabled}
+                      onChange={(e) => handleSubsidiaryActivation(e.target.checked)}
+                      disabled={subsidiaryPermanentlyEnabled}
+                      className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 disabled:opacity-50"
+                    />
+                    <Label htmlFor="subsidiary-enabled" className="text-sm font-medium">
+                      Activate Subsidiary Function
+                      {subsidiaryPermanentlyEnabled && (
+                        <span className="ml-2 text-xs text-emerald-600 font-semibold">(Activated)</span>
+                      )}
+                    </Label>
                   </div>
-                )}
+
+                  {subsidiaryPermanentlyEnabled && (
+                    <div className="ml-7 space-y-2">
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="checkbox"
+                          id="deactivate-subsidiary"
+                          onChange={(e) => handleSubsidiaryDeactivation(e.target.checked)}
+                          className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                        />
+                        <Label htmlFor="deactivate-subsidiary" className="text-sm text-red-600">
+                          Deactivate Subsidiary Function
+                        </Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground ml-7">
+                        Check this box to deactivate subsidiary management for your organization.
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 {subsidiaryEnabled && (
                   <div className="space-y-4">

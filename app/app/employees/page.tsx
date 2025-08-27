@@ -172,12 +172,11 @@ export default function EmployeesPage() {
 
   const loadEmployees = async () => {
     try {
-      console.log("[v0] Loading employees from database...")
       const supabase = createClient()
       const { data, error } = await supabase.from("employees").select("*").order("created_at", { ascending: false })
 
       if (error) {
-        console.error("[v0] Error loading employees:", error)
+        console.error("Error loading employees:", error)
         toast({
           title: "Error",
           description: "Failed to load employees from database.",
@@ -186,10 +185,9 @@ export default function EmployeesPage() {
         return
       }
 
-      console.log("[v0] Loaded employees from database:", data?.length || 0, "employees")
       setEmployees(data || [])
     } catch (error) {
-      console.error("[v0] Error loading employees:", error)
+      console.error("Error loading employees:", error)
       toast({
         title: "Error",
         description: "Failed to load employees from database.",
@@ -219,7 +217,7 @@ export default function EmployeesPage() {
 
   const handleAddEmployee = async (employeeData: any) => {
     try {
-      console.log("[v0] Starting employee addition process:", employeeData)
+      console.log("[v0] Adding employee with data:", employeeData)
       const supabase = createClient()
 
       const employeeId = generateEmployeeId(employeeData.subsidiary)
@@ -247,23 +245,25 @@ export default function EmployeesPage() {
         department: employeeData.department,
         location: employeeData.location,
         contract_type: employeeData.contractType,
-        date_of_joining: employeeData.dateOfJoining || employeeData.startDate,
+        date_of_joining: employeeData.dateOfJoining,
         date_of_exit: employeeData.dateOfExit || null,
-        status: employeeData.status,
+        status: employeeData.status || "Active",
         probation_period: employeeData.probationPeriod,
         confirmation_date: employeeData.confirmationDate || null,
         notice_period: employeeData.noticePeriod,
-        hire_date: employeeData.dateOfJoining || employeeData.startDate || new Date().toISOString().split("T")[0],
+        hire_date: employeeData.dateOfJoining || new Date().toISOString().split("T")[0],
         employment_type: employeeData.contractType || "Permanent",
         salary: Number.parseFloat(employeeData.salary) || 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       }
 
-      console.log("[v0] Prepared employee data for database:", newEmployee)
+      console.log("[v0] Inserting employee:", newEmployee)
 
       const { data, error } = await supabase.from("employees").insert([newEmployee]).select()
 
       if (error) {
-        console.error("[v0] Database error adding employee:", error)
+        console.error("[v0] Database error:", error)
         toast({
           title: "Error",
           description: `Failed to add employee: ${error.message}`,
@@ -272,10 +272,13 @@ export default function EmployeesPage() {
         return
       }
 
-      console.log("[v0] Employee successfully added to database:", data)
+      console.log("[v0] Employee added successfully:", data)
 
-      // Reload employees from database
+      // Force reload employees from database
       await loadEmployees()
+
+      // Force re-render by updating state
+      setEmployees((prev) => [...prev])
 
       setIsAddDialogOpen(false)
       toast({
@@ -1361,9 +1364,10 @@ function AddEmployeeForm({
 
       const employeeData = {
         ...formData,
+        name: fullName,
+        fullName: fullName,
         displayName: `${formData.firstName} ${formData.lastName}`,
-        dateOfJoining: formData.startDate, // Map startDate to dateOfJoining
-        salary: formData.salary,
+        email: formData.personalEmail, // Primary email for system use
       }
 
       console.log("[v0] Submitting employee data:", employeeData)
@@ -1839,7 +1843,7 @@ function AddEmployeeForm({
               <Label className="text-sm font-medium text-gray-700 w-48">10. Probation Period (months)</Label>
               <Select
                 value={formData.probationPeriod}
-                onChange={(e) => handleInputChange("probationPeriod", e.target.value)}
+                onValueChange={(value) => handleInputChange("probationPeriod", value)}
               >
                 <SelectTrigger className="form-input flex-1">
                   <SelectValue placeholder="Select probation period" />
