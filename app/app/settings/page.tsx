@@ -731,14 +731,20 @@ export default function SettingsPage() {
     try {
       const supabase = createClient()
 
+      console.log("[v0] Loading subsidiaries with company_id:", MAIN_COMPANY_ID)
+      console.log(
+        "[v0] About to execute query: subsidiaries.select(*).eq(company_id, MAIN_COMPANY_ID).eq(status, active)",
+      )
+
       const { data, error } = await supabase
         .from("subsidiaries")
         .select("*")
         .eq("company_id", MAIN_COMPANY_ID)
-        .eq("status", "active") // Use UUID instead of integer
+        .eq("status", "active")
 
       if (error) {
         console.error("[v0] Error loading subsidiaries:", error)
+        console.error("[v0] Error details:", JSON.stringify(error, null, 2))
         return
       }
 
