@@ -246,52 +246,50 @@ export default function EmployeesPage() {
     }
   }, [])
 
-  useEffect(() => {
-    const loadCompanyData = async () => {
-      try {
-        const supabase = createClient()
+  const loadCompanyData = async () => {
+    try {
+      const supabase = createClient()
 
-        // Load company data from database
-        const { data: companyData, error: companyError } = await supabase
-          .from("companies")
-          .select("*")
-          .limit(1)
-          .single()
+      // Load company data from database
+      const { data: companyData, error: companyError } = await supabase.from("companies").select("*").limit(1)
 
-        if (companyError) {
-          console.error("Error loading company data:", companyError)
-        } else if (companyData) {
-          setCompanySettings(companyData)
-          // Set default data from main company
-          setDivisions(companyData.divisions || ["Head Office", "Regional Office"])
-          setDepartments(
-            companyData.departments || ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"],
-          )
-          setLocations(companyData.locations || ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-        }
-
-        // Load subsidiaries from database
-        const { data: subsidiaryData, error: subsidiaryError } = await supabase
-          .from("subsidiaries")
-          .select("*")
-          .eq("status", "active")
-
-        if (subsidiaryError) {
-          console.error("Error loading subsidiaries:", subsidiaryError)
-        } else {
-          setSubsidiaries(subsidiaryData || [])
-        }
-      } catch (error) {
-        console.error("Error loading company data:", error)
-        // Fallback to default data
+      if (companyError) {
+        console.error("Error loading company data:", companyError)
+      } else if (companyData && companyData.length > 0) {
+        const company = companyData[0]
+        setCompanySettings(company)
+        // Set default data from main company
+        setDivisions(company.divisions || ["Head Office", "Regional Office"])
+        setDepartments(
+          company.departments || ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"],
+        )
+        setLocations(company.locations || ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+      } else {
+        console.log("[v0] No company data found, using default values")
         setDivisions(["Head Office", "Regional Office"])
         setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
         setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
       }
-    }
 
-    loadCompanyData()
-  }, [])
+      // Load subsidiaries from database
+      const { data: subsidiaryData, error: subsidiaryError } = await supabase
+        .from("subsidiaries")
+        .select("*")
+        .eq("status", "active")
+
+      if (subsidiaryError) {
+        console.error("Error loading subsidiaries:", subsidiaryError)
+      } else {
+        setSubsidiaries(subsidiaryData || [])
+      }
+    } catch (error) {
+      console.error("Error loading company data:", error)
+      // Fallback to default data
+      setDivisions(["Head Office", "Regional Office"])
+      setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
+      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+    }
+  }
 
   useEffect(() => {
     if (formData.subsidiary) {
