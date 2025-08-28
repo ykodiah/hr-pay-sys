@@ -2023,6 +2023,19 @@ function AddEmployeeForm({
                 {errors.position && <p className="text-red-500 text-sm mt-1">{errors.position}</p>}
               </div>
               <div>
+                <Label htmlFor="specialRole">1a. Special Role</Label>
+                <Select value={formData.specialRole} onValueChange={(value) => handleInputChange("specialRole", value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="No Special Role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="No Special Role">No Special Role</SelectItem>
+                    <SelectItem value="Supervisor">Supervisor</SelectItem>
+                    <SelectItem value="Head of Department">Head of Department</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label htmlFor="subsidiary">2. Subsidiary</Label>
                 <Select value={formData.subsidiary} onValueChange={(value) => handleInputChange("subsidiary", value)}>
                   <SelectTrigger className="w-full">
