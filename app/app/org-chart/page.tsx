@@ -255,39 +255,158 @@ export default function OrganizationalChartPage() {
   const getNodeStyle = (style: string, nodeType: string) => {
     const baseStyles = {
       modern: {
-        head: { backgroundColor: "#1e40af", color: "white", borderRadius: "12px", padding: "16px" },
-        supervisor: { backgroundColor: "#3b82f6", color: "white", borderRadius: "8px", padding: "12px" },
-        employee: { backgroundColor: "#e5e7eb", color: "#374151", borderRadius: "6px", padding: "8px" },
+        head: {
+          backgroundColor: "#1e40af",
+          color: "#ffffff",
+          borderRadius: "12px",
+          padding: "16px",
+          border: "none",
+          minWidth: "120px",
+          textAlign: "center" as const,
+        },
+        supervisor: {
+          backgroundColor: "#3b82f6",
+          color: "#ffffff",
+          borderRadius: "8px",
+          padding: "12px",
+          border: "none",
+          minWidth: "100px",
+          textAlign: "center" as const,
+        },
+        employee: {
+          backgroundColor: "#e5e7eb",
+          color: "#374151",
+          borderRadius: "6px",
+          padding: "8px",
+          border: "1px solid #d1d5db",
+          minWidth: "80px",
+          textAlign: "center" as const,
+        },
       },
       classic: {
-        head: { backgroundColor: "#7c2d12", color: "white", borderRadius: "4px", padding: "16px" },
-        supervisor: { backgroundColor: "#a16207", color: "white", borderRadius: "4px", padding: "12px" },
-        employee: { backgroundColor: "#f3f4f6", color: "#1f2937", borderRadius: "4px", padding: "8px" },
+        head: {
+          backgroundColor: "#7c2d12",
+          color: "#ffffff",
+          borderRadius: "4px",
+          padding: "16px",
+          border: "none",
+          minWidth: "120px",
+          textAlign: "center" as const,
+        },
+        supervisor: {
+          backgroundColor: "#a16207",
+          color: "#ffffff",
+          borderRadius: "4px",
+          padding: "12px",
+          border: "none",
+          minWidth: "100px",
+          textAlign: "center" as const,
+        },
+        employee: {
+          backgroundColor: "#f3f4f6",
+          color: "#1f2937",
+          borderRadius: "4px",
+          padding: "8px",
+          border: "1px solid #d1d5db",
+          minWidth: "80px",
+          textAlign: "center" as const,
+        },
       },
       minimal: {
-        head: { backgroundColor: "transparent", color: "#111827", border: "2px solid #111827", padding: "16px" },
-        supervisor: { backgroundColor: "transparent", color: "#374151", border: "1px solid #374151", padding: "12px" },
-        employee: { backgroundColor: "transparent", color: "#6b7280", border: "1px solid #d1d5db", padding: "8px" },
+        head: {
+          backgroundColor: "#ffffff",
+          color: "#111827",
+          border: "2px solid #111827",
+          padding: "16px",
+          borderRadius: "4px",
+          minWidth: "120px",
+          textAlign: "center" as const,
+        },
+        supervisor: {
+          backgroundColor: "#ffffff",
+          color: "#374151",
+          border: "1px solid #374151",
+          padding: "12px",
+          borderRadius: "4px",
+          minWidth: "100px",
+          textAlign: "center" as const,
+        },
+        employee: {
+          backgroundColor: "#ffffff",
+          color: "#6b7280",
+          border: "1px solid #d1d5db",
+          padding: "8px",
+          borderRadius: "4px",
+          minWidth: "80px",
+          textAlign: "center" as const,
+        },
       },
       corporate: {
-        head: { backgroundColor: "#059669", color: "white", borderRadius: "8px", padding: "16px" },
-        supervisor: { backgroundColor: "#10b981", color: "white", borderRadius: "6px", padding: "12px" },
-        employee: { backgroundColor: "#ecfdf5", color: "#065f46", borderRadius: "4px", padding: "8px" },
+        head: {
+          backgroundColor: "#059669",
+          color: "#ffffff",
+          borderRadius: "8px",
+          padding: "16px",
+          border: "none",
+          minWidth: "120px",
+          textAlign: "center" as const,
+        },
+        supervisor: {
+          backgroundColor: "#10b981",
+          color: "#ffffff",
+          borderRadius: "6px",
+          padding: "12px",
+          border: "none",
+          minWidth: "100px",
+          textAlign: "center" as const,
+        },
+        employee: {
+          backgroundColor: "#ecfdf5",
+          color: "#065f46",
+          borderRadius: "4px",
+          padding: "8px",
+          border: "1px solid #a7f3d0",
+          minWidth: "80px",
+          textAlign: "center" as const,
+        },
       },
     }
 
-    return (
-      baseStyles[style as keyof typeof baseStyles]?.[nodeType as keyof typeof baseStyles.modern] ||
-      baseStyles.modern.employee
-    )
+    const styleGroup = baseStyles[style as keyof typeof baseStyles] || baseStyles.modern
+    const nodeStyle = styleGroup[nodeType as keyof typeof styleGroup] || styleGroup.employee
+
+    return {
+      ...nodeStyle,
+      fontSize: "14px",
+      fontFamily: "Arial, sans-serif",
+      display: "block",
+      boxSizing: "border-box" as const,
+    }
   }
 
   const getEdgeStyle = (style: string) => {
     const edgeStyles = {
-      modern: { stroke: "#3b82f6", strokeWidth: 2 },
-      classic: { stroke: "#a16207", strokeWidth: 1 },
-      minimal: { stroke: "#6b7280", strokeWidth: 1, strokeDasharray: "5,5" },
-      corporate: { stroke: "#10b981", strokeWidth: 2 },
+      modern: {
+        stroke: "#3b82f6",
+        strokeWidth: "2px",
+        fill: "none",
+      },
+      classic: {
+        stroke: "#a16207",
+        strokeWidth: "1px",
+        fill: "none",
+      },
+      minimal: {
+        stroke: "#6b7280",
+        strokeWidth: "1px",
+        strokeDasharray: "5,5",
+        fill: "none",
+      },
+      corporate: {
+        stroke: "#10b981",
+        strokeWidth: "2px",
+        fill: "none",
+      },
     }
 
     return edgeStyles[style as keyof typeof edgeStyles] || edgeStyles.modern
@@ -311,15 +430,22 @@ export default function OrganizationalChartPage() {
   }
 
   const generatePreviewImage = (chartData: any, style: string) => {
-    // Generate a simple SVG preview - in a real implementation, you'd render the actual chart
-    return `data:image/svg+xml;base64,${btoa(`
+    const nodeCount = chartData?.nodes?.length || 0
+    const styleText = style || "modern"
+
+    const svgContent = `
       <svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
-        <rect width="400" height="300" fill="#f8fafc"/>
-        <text x="200" y="150" textAnchor="middle" fontFamily="Arial" fontSize="16" fill="#374151">
-          ${chartData.nodes.length} Employees • ${style} Style
+        <rect width="400" height="300" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1"/>
+        <text x="200" y="140" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="16" fill="#374151">
+          ${nodeCount} Employees
+        </text>
+        <text x="200" y="160" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="14" fill="#6b7280">
+          ${styleText.charAt(0).toUpperCase() + styleText.slice(1)} Style
         </text>
       </svg>
-    `)}`
+    `
+
+    return `data:image/svg+xml;base64,${btoa(svgContent)}`
   }
 
   const saveChart = async () => {
