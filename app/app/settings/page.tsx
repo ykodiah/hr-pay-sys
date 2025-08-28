@@ -106,6 +106,34 @@ interface User {
   lastLogin: string
 }
 
+interface AllowanceSettings {
+  transportAllowance: number
+  housingAllowance: number
+  medicalAllowance: number
+  mealAllowance: number
+  uniformAllowance: number
+  communicationAllowance: number
+  otherAllowances: number
+}
+
+interface DeductionSettings {
+  taxDeduction: number
+  ssnitDeduction: number
+  tier3Deduction: number
+  loanDeduction: number
+  advanceDeduction: number
+  otherDeductions: number
+}
+
+interface LoanSettings {
+  maxLoanAmount: number
+  interestRate: number
+  maxRepaymentPeriod: number
+  autoDeductFromSalary: boolean
+  requireGuarantor: boolean
+  minimumServicePeriod: number
+}
+
 interface CompanySettings {
   name: string
   taxId: string
@@ -118,6 +146,9 @@ interface CompanySettings {
   divisions: string[]
   departments: string[]
   locations: string[]
+  allowances: AllowanceSettings
+  deductions: DeductionSettings
+  loans: LoanSettings
 }
 
 interface PayrollSettings {
@@ -291,6 +322,31 @@ export default function SettingsPage() {
     divisions: ["Head Office", "Regional Office"],
     departments: ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"],
     locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
+    allowances: {
+      transportAllowance: 0,
+      housingAllowance: 0,
+      medicalAllowance: 0,
+      mealAllowance: 0,
+      uniformAllowance: 0,
+      communicationAllowance: 0,
+      otherAllowances: 0,
+    },
+    deductions: {
+      taxDeduction: 0,
+      ssnitDeduction: 0,
+      tier3Deduction: 0,
+      loanDeduction: 0,
+      advanceDeduction: 0,
+      otherDeductions: 0,
+    },
+    loans: {
+      maxLoanAmount: 0,
+      interestRate: 0,
+      maxRepaymentPeriod: 0,
+      autoDeductFromSalary: false,
+      requireGuarantor: false,
+      minimumServicePeriod: 0,
+    },
   })
 
   const [payrollSettings, setPayrollSettings] = useState<PayrollSettings>({
@@ -812,11 +868,7 @@ export default function SettingsPage() {
       const supabase = createClient()
       console.log("[v0] Loading subsidiaries with company_id:", MAIN_COMPANY_ID)
 
-      const { data, error } = await supabase
-        .from("subsidiaries")
-        .select("*")
-        .eq("company_id", MAIN_COMPANY_ID)
-        .eq("status", "active")
+      const { data, error } = await supabase.from("subsidiaries").select("*").eq("company_id", MAIN_COMPANY_ID)
 
       if (error) {
         console.error("[v0] Error loading subsidiaries:", error.message)
@@ -828,8 +880,8 @@ export default function SettingsPage() {
       const mappedSubsidiaries = (data || []).map((sub: any) => ({
         id: sub.id,
         name: sub.name,
-        taxId: sub.tax_id || "", // Ensure this maps correctly
-        ssnitNumber: sub.ssnit_number || "", // Ensure this maps correctly
+        taxId: sub.tax_id || "",
+        ssnitNumber: sub.ssnit_number || "",
         address: sub.address || "",
         phone: sub.phone_number || "",
         email: sub.email_address || "",
@@ -901,6 +953,31 @@ export default function SettingsPage() {
             divisions: companyData.divisions || [],
             departments: companyData.departments || [],
             locations: companyData.locations || [],
+            allowances: companyData.allowances || {
+              transportAllowance: 0,
+              housingAllowance: 0,
+              medicalAllowance: 0,
+              mealAllowance: 0,
+              uniformAllowance: 0,
+              communicationAllowance: 0,
+              otherAllowances: 0,
+            },
+            deductions: companyData.deductions || {
+              taxDeduction: 0,
+              ssnitDeduction: 0,
+              tier3Deduction: 0,
+              loanDeduction: 0,
+              advanceDeduction: 0,
+              otherDeductions: 0,
+            },
+            loans: companyData.loans || {
+              maxLoanAmount: 0,
+              interestRate: 0,
+              maxRepaymentPeriod: 0,
+              autoDeductFromSalary: false,
+              requireGuarantor: false,
+              minimumServicePeriod: 0,
+            },
           })
         }
 
@@ -1211,7 +1288,12 @@ export default function SettingsPage() {
 
                     <div className="grid md:grid-cols-2 gap-4">
                       {subsidiaries.map((subsidiary) => (
-                        <Card key={subsidiary.id} className="border-l-4 border-l-emerald-500">
+                        <Card
+                          key={subsidiary.id}
+                          className={`border-l-4 ${
+                            subsidiary.status === "active" ? "border-l-emerald-500" : "border-l-gray-400 opacity-60"
+                          }`}
+                        >
                           <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
                               <div>
@@ -1219,7 +1301,14 @@ export default function SettingsPage() {
                                 <p className="text-xs text-gray-600">{subsidiary.email}</p>
                               </div>
                               <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="text-xs">
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs ${
+                                    subsidiary.status === "active"
+                                      ? "bg-emerald-50 text-emerald-700"
+                                      : "bg-gray-50 text-gray-600"
+                                  }`}
+                                >
                                   {subsidiary.status}
                                 </Badge>
                                 <DropdownMenu>
@@ -1233,13 +1322,15 @@ export default function SettingsPage() {
                                       <Eye className="mr-2 h-4 w-4" />
                                       View
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleEditSubsidiary(subsidiary)}>
-                                      <Edit className="mr-2 h-4 w-4" />
-                                      Edit
-                                    </DropdownMenuItem>
+                                    {subsidiary.status === "active" && (
+                                      <DropdownMenuItem onClick={() => handleEditSubsidiary(subsidiary)}>
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        Edit
+                                      </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem onClick={() => handleDeactivateSubsidiary(subsidiary.id)}>
                                       <Power className="mr-2 h-4 w-4" />
-                                      {subsidiary.status === "active" ? "Deactivate" : "Activate"}
+                                      {subsidiary.status === "active" ? "Deactivate" : "Reactivate"}
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
@@ -2007,186 +2098,429 @@ export default function SettingsPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="payroll" className="space-y-6">
-          <div className="grid lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Calculator className="w-5 h-5 text-emerald-600" />
-                  <span>Payroll Configuration</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="pay-frequency">Pay Frequency</Label>
-                    <Select
-                      value={payrollSettings.frequency}
-                      onValueChange={(value) => updatePayrollSettings("frequency", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="currency">Currency</Label>
-                    <Select
-                      value={payrollSettings.currency}
-                      onValueChange={(value) => updatePayrollSettings("currency", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ghs">Ghana Cedis (GHS)</SelectItem>
-                        <SelectItem value="usd">US Dollar (USD)</SelectItem>
-                        <SelectItem value="eur">Euro (EUR)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="min-wage">Minimum Wage (GHS)</Label>
-                    <Input
-                      id="min-wage"
-                      type="number"
-                      value={payrollSettings.minWage}
-                      onChange={(e) => updatePayrollSettings("minWage", Number.parseFloat(e.target.value) || 0)}
-                      step="0.01"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="overtime-rate">Overtime Rate Multiplier</Label>
-                    <Input
-                      id="overtime-rate"
-                      type="number"
-                      value={payrollSettings.overtimeRate}
-                      onChange={(e) => updatePayrollSettings("overtimeRate", Number.parseFloat(e.target.value) || 0)}
-                      step="0.1"
-                    />
-                  </div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="cutoff-day">Payroll Cutoff Day</Label>
-                    <Input
-                      id="cutoff-day"
-                      type="number"
-                      value={payrollSettings.payrollCutoffDay}
-                      onChange={(e) => updatePayrollSettings("payrollCutoffDay", Number.parseInt(e.target.value) || 1)}
-                      min="1"
-                      max="31"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="processing-day">Processing Day</Label>
-                    <Input
-                      id="processing-day"
-                      type="number"
-                      value={payrollSettings.payrollProcessingDay}
-                      onChange={(e) =>
-                        updatePayrollSettings("payrollProcessingDay", Number.parseInt(e.target.value) || 1)
-                      }
-                      min="1"
-                      max="31"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="auto-paye">Auto-calculate PAYE</Label>
-                    <Switch
-                      id="auto-paye"
-                      checked={payrollSettings.autoPaye}
-                      onCheckedChange={(checked) => updatePayrollSettings("autoPaye", checked)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="auto-ssnit">Auto-calculate SSNIT</Label>
-                    <Switch
-                      id="auto-ssnit"
-                      checked={payrollSettings.autoSsnit}
-                      onCheckedChange={(checked) => updatePayrollSettings("autoSsnit", checked)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="auto-provident">Auto-calculate Provident Fund (Tier 3)</Label>
-                    <Switch
-                      id="auto-provident"
-                      checked={payrollSettings.autoProvident}
-                      onCheckedChange={(checked) => updatePayrollSettings("autoProvident", checked)}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        {activeTab === "payroll" && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium mb-4">Payroll Settings</h3>
+              <div className="grid lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Calculator className="w-5 h-5 text-emerald-600" />
+                      <span>Payroll Configuration</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="pay-frequency">Pay Frequency</Label>
+                        <Select
+                          value={payrollSettings.frequency}
+                          onValueChange={(value) => updatePayrollSettings("frequency", value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="weekly">Weekly</SelectItem>
+                            <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="currency">Currency</Label>
+                        <Select
+                          value={payrollSettings.currency}
+                          onValueChange={(value) => updatePayrollSettings("currency", value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ghs">Ghana Cedis (GHS)</SelectItem>
+                            <SelectItem value="usd">US Dollar (USD)</SelectItem>
+                            <SelectItem value="eur">Euro (EUR)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="min-wage">Minimum Wage (GHS)</Label>
+                        <Input
+                          id="min-wage"
+                          type="number"
+                          value={payrollSettings.minWage}
+                          onChange={(e) => updatePayrollSettings("minWage", Number.parseFloat(e.target.value) || 0)}
+                          step="0.01"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="overtime-rate">Overtime Rate Multiplier</Label>
+                        <Input
+                          id="overtime-rate"
+                          type="number"
+                          value={payrollSettings.overtimeRate}
+                          onChange={(e) =>
+                            updatePayrollSettings("overtimeRate", Number.parseFloat(e.target.value) || 0)
+                          }
+                          step="0.1"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="cutoff-day">Payroll Cutoff Day</Label>
+                        <Input
+                          id="cutoff-day"
+                          type="number"
+                          value={payrollSettings.payrollCutoffDay}
+                          onChange={(e) =>
+                            updatePayrollSettings("payrollCutoffDay", Number.parseInt(e.target.value) || 1)
+                          }
+                          min="1"
+                          max="31"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="processing-day">Processing Day</Label>
+                        <Input
+                          id="processing-day"
+                          type="number"
+                          value={payrollSettings.payrollProcessingDay}
+                          onChange={(e) =>
+                            updatePayrollSettings("payrollProcessingDay", Number.parseInt(e.target.value) || 1)
+                          }
+                          min="1"
+                          max="31"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="auto-paye">Auto-calculate PAYE</Label>
+                        <Switch
+                          id="auto-paye"
+                          checked={payrollSettings.autoPaye}
+                          onCheckedChange={(checked) => updatePayrollSettings("autoPaye", checked)}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="auto-ssnit">Auto-calculate SSNIT</Label>
+                        <Switch
+                          id="auto-ssnit"
+                          checked={payrollSettings.autoSsnit}
+                          onCheckedChange={(checked) => updatePayrollSettings("autoSsnit", checked)}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="auto-provident">Auto-calculate Provident Fund (Tier 3)</Label>
+                        <Switch
+                          id="auto-provident"
+                          checked={payrollSettings.autoProvident}
+                          onCheckedChange={(checked) => updatePayrollSettings("autoProvident", checked)}
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <FileText className="w-5 h-5 text-emerald-600" />
-                  <span>Tax Configuration</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="p-3 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="font-medium">PAYE Tax Bands</Label>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-3 h-3 mr-1" />
-                        Edit
-                      </Button>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <FileText className="w-5 h-5 text-emerald-600" />
+                      <span>Tax Configuration</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="p-3 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="font-medium">PAYE Tax Bands</Label>
+                          <Button variant="outline" size="sm">
+                            <Edit className="w-3 h-3 mr-1" />
+                            Edit
+                          </Button>
+                        </div>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <div>0% on first GHS 4,380</div>
+                          <div>5% on next GHS 1,000</div>
+                          <div>10% on next GHS 2,000</div>
+                          <div>17.5% on next GHS 20,000</div>
+                          <div>25% on next GHS 20,000</div>
+                          <div>30% on remaining amount</div>
+                        </div>
+                      </div>
+                      <div className="p-3 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="font-medium">SSNIT Rates</Label>
+                          <Button variant="outline" size="sm">
+                            <Edit className="w-3 h-3 mr-1" />
+                            Edit
+                          </Button>
+                        </div>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <div>Employee: 5.5%</div>
+                          <div>Employer: 13%</div>
+                          <div>Total: 18.5%</div>
+                        </div>
+                      </div>
+                      <div className="p-3 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="font-medium">Tier 3 Rates</Label>
+                          <Button variant="outline" size="sm">
+                            <Edit className="w-3 h-3 mr-1" />
+                            Edit
+                          </Button>
+                        </div>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <div>Employee: 5%</div>
+                          <div>Employer: 5%</div>
+                          <div>Total: 10%</div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <div>0% on first GHS 4,380</div>
-                      <div>5% on next GHS 1,000</div>
-                      <div>10% on next GHS 2,000</div>
-                      <div>17.5% on next GHS 20,000</div>
-                      <div>25% on next GHS 20,000</div>
-                      <div>30% on remaining amount</div>
-                    </div>
-                  </div>
-                  <div className="p-3 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="font-medium">SSNIT Rates</Label>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-3 h-3 mr-1" />
-                        Edit
-                      </Button>
-                    </div>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <div>Employee: 5.5%</div>
-                      <div>Employer: 13%</div>
-                      <div>Total: 18.5%</div>
-                    </div>
-                  </div>
-                  <div className="p-3 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="font-medium">Tier 3 Rates</Label>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-3 h-3 mr-1" />
-                        Edit
-                      </Button>
-                    </div>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <div>Employee: 5%</div>
-                      <div>Employer: 5%</div>
-                      <div>Total: 10%</div>
-                    </div>
-                  </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-medium mb-4">Allowances</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="transport-allowance">Transport Allowance (GHS)</Label>
+                  <Input
+                    id="transport-allowance"
+                    type="number"
+                    value={companySettings.allowances?.transportAllowance || 0}
+                    onChange={(e) =>
+                      setCompanySettings((prev) => ({
+                        ...prev,
+                        allowances: {
+                          ...prev.allowances,
+                          transportAllowance: Number.parseFloat(e.target.value) || 0,
+                        },
+                      }))
+                    }
+                    placeholder="0.00"
+                  />
                 </div>
-              </CardContent>
-            </Card>
+                <div>
+                  <Label htmlFor="housing-allowance">Housing Allowance (GHS)</Label>
+                  <Input
+                    id="housing-allowance"
+                    type="number"
+                    value={companySettings.allowances?.housingAllowance || 0}
+                    onChange={(e) =>
+                      setCompanySettings((prev) => ({
+                        ...prev,
+                        allowances: {
+                          ...prev.allowances,
+                          housingAllowance: Number.parseFloat(e.target.value) || 0,
+                        },
+                      }))
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="medical-allowance">Medical Allowance (GHS)</Label>
+                  <Input
+                    id="medical-allowance"
+                    type="number"
+                    value={companySettings.allowances?.medicalAllowance || 0}
+                    onChange={(e) =>
+                      setCompanySettings((prev) => ({
+                        ...prev,
+                        allowances: {
+                          ...prev.allowances,
+                          medicalAllowance: Number.parseFloat(e.target.value) || 0,
+                        },
+                      }))
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="other-allowances">Other Allowances (GHS)</Label>
+                  <Input
+                    id="other-allowances"
+                    type="number"
+                    value={companySettings.allowances?.otherAllowances || 0}
+                    onChange={(e) =>
+                      setCompanySettings((prev) => ({
+                        ...prev,
+                        allowances: {
+                          ...prev.allowances,
+                          otherAllowances: Number.parseFloat(e.target.value) || 0,
+                        },
+                      }))
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-medium mb-4">Deductions</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="tax-deduction">Tax Deduction (%)</Label>
+                  <Input
+                    id="tax-deduction"
+                    type="number"
+                    value={companySettings.deductions?.taxDeduction || 0}
+                    onChange={(e) =>
+                      setCompanySettings((prev) => ({
+                        ...prev,
+                        deductions: {
+                          ...prev.deductions,
+                          taxDeduction: Number.parseFloat(e.target.value) || 0,
+                        },
+                      }))
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="ssnit-deduction">SSNIT Deduction (%)</Label>
+                  <Input
+                    id="ssnit-deduction"
+                    type="number"
+                    value={companySettings.deductions?.ssnitDeduction || 0}
+                    onChange={(e) =>
+                      setCompanySettings((prev) => ({
+                        ...prev,
+                        deductions: {
+                          ...prev.deductions,
+                          ssnitDeduction: Number.parseFloat(e.target.value) || 0,
+                        },
+                      }))
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="loan-deduction">Loan Deduction (GHS)</Label>
+                  <Input
+                    id="loan-deduction"
+                    type="number"
+                    value={companySettings.deductions?.loanDeduction || 0}
+                    onChange={(e) =>
+                      setCompanySettings((prev) => ({
+                        ...prev,
+                        deductions: {
+                          ...prev.deductions,
+                          loanDeduction: Number.parseFloat(e.target.value) || 0,
+                        },
+                      }))
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="other-deductions">Other Deductions (GHS)</Label>
+                  <Input
+                    id="other-deductions"
+                    type="number"
+                    value={companySettings.deductions?.otherDeductions || 0}
+                    onChange={(e) =>
+                      setCompanySettings((prev) => ({
+                        ...prev,
+                        deductions: {
+                          ...prev.deductions,
+                          otherDeductions: Number.parseFloat(e.target.value) || 0,
+                        },
+                      }))
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-medium mb-4">Loan Settings</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="max-loan-amount">Maximum Loan Amount (GHS)</Label>
+                  <Input
+                    id="max-loan-amount"
+                    type="number"
+                    value={companySettings.loans?.maxLoanAmount || 0}
+                    onChange={(e) =>
+                      setCompanySettings((prev) => ({
+                        ...prev,
+                        loans: {
+                          ...prev.loans,
+                          maxLoanAmount: Number.parseFloat(e.target.value) || 0,
+                        },
+                      }))
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="interest-rate">Interest Rate (%)</Label>
+                  <Input
+                    id="interest-rate"
+                    type="number"
+                    value={companySettings.loans?.interestRate || 0}
+                    onChange={(e) =>
+                      setCompanySettings((prev) => ({
+                        ...prev,
+                        loans: {
+                          ...prev.loans,
+                          interestRate: Number.parseFloat(e.target.value) || 0,
+                        },
+                      }))
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="max-repayment-period">Max Repayment Period (months)</Label>
+                  <Input
+                    id="max-repayment-period"
+                    type="number"
+                    value={companySettings.loans?.maxRepaymentPeriod || 0}
+                    onChange={(e) =>
+                      setCompanySettings((prev) => ({
+                        ...prev,
+                        loans: {
+                          ...prev.loans,
+                          maxRepaymentPeriod: Number.parseInt(e.target.value) || 0,
+                        },
+                      }))
+                    }
+                    placeholder="12"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="auto-deduct"
+                    checked={companySettings.loans?.autoDeductFromSalary || false}
+                    onChange={(e) =>
+                      setCompanySettings((prev) => ({
+                        ...prev,
+                        loans: {
+                          ...prev.loans,
+                          autoDeductFromSalary: e.target.checked,
+                        },
+                      }))
+                    }
+                    className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                  />
+                  <Label htmlFor="auto-deduct">Auto-deduct from salary</Label>
+                </div>
+              </div>
+            </div>
           </div>
-        </TabsContent>
+        )}
 
         <TabsContent value="hr" className="space-y-6">
           <div className="grid lg:grid-cols-2 gap-6">
