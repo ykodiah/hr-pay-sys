@@ -1527,65 +1527,82 @@ function AddEmployeeForm({
     setCurrentTab(value)
   }
 
-  // const [formData, setFormData] = useState({
-  //   employeeId: "",
-  //   prefix: employee?.prefix || "",
-  //   firstName: employee?.firstName || "",
-  //   otherNames: employee?.otherNames || "",
-  //   lastName: employee?.lastName || "",
-  //   maritalStatus: employee?.maritalStatus || "",
-  //   corporateEmail: employee?.corporateEmail || "",
-  //   personalEmail: employee?.personalEmail || "",
-  //   phone: employee?.phone || "",
-  //   position: employee?.position || "",
-  //   subsidiary: employee?.subsidiary || "",
-  //   division: employee?.division || "",
-  //   department: employee?.department || "",
-  //   location: employee?.location || "",
-  //   contractType: employee?.contractType || "Permanent",
-  //   dateOfJoining: employee?.dateOfJoining || "",
-  //   dateOfExit: employee?.dateOfExit || "",
-  //   status: employee?.status || "Active",
-  //   probationPeriod: employee?.probationPeriod || "6",
-  //   confirmationDate: employee?.confirmationDate || "",
-  //   noticePeriod: employee?.noticePeriod || "",
-  //   salary: employee?.salary || "",
-  //   startDate: employee?.startDate || "",
-  //   dateOfBirth: employee?.dateOfBirth || "",
-  //   address: employee?.address || "",
-  //   emergencyContactName: employee?.emergencyContactName || "",
-  //   emergencyContactTel: employee?.emergencyContactTel || "",
-  //   educationalLevel: employee?.educationalLevel || "",
-  //   gender: employee?.gender || "",
-  //   bankName: employee?.bankName || "",
-  //   bankAccount: employee?.bankAccount || "",
-  //   ssnit: employee?.ssnit || "",
-  //   ghanaCard: employee?.ghanaCard || "",
-  //   documents: employee?.documents || [],
-  //   profilePicture: employee?.profilePicture || "",
-  //   profilePictureFile: null,
-  // })
-
   useEffect(() => {
-    if (formData.subsidiary) {
-      const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
-      if (selectedSubsidiary) {
-        setDivisions(selectedSubsidiary.divisions || [])
-        setDepartments(selectedSubsidiary.departments || [])
-        setLocations(selectedSubsidiary.locations || [])
-      }
-    } else {
-      // Load main company divisions, departments, locations
-      const companyData = localStorage.getItem("companySettings")
-      if (companyData) {
-        const company = JSON.parse(companyData)
-        setDivisions(company.divisions || ["Head Office", "Regional Office"])
-        setDepartments(
-          company.departments || ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"],
-        )
-        setLocations(company.locations || ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+    const loadCompanyData = async () => {
+      try {
+        console.log("[v0] Loading company data for dropdowns...")
+        const supabase = createClient()
+
+        if (formData.subsidiary) {
+          const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
+          if (selectedSubsidiary) {
+            console.log("[v0] Loading subsidiary data:", selectedSubsidiary.name)
+            const parseDivisions = (data: any) =>
+              Array.isArray(data) ? data : typeof data === "string" ? JSON.parse(data) : []
+            const parseDepartments = (data: any) =>
+              Array.isArray(data) ? data : typeof data === "string" ? JSON.parse(data) : []
+            const parseLocations = (data: any) =>
+              Array.isArray(data) ? data : typeof data === "string" ? JSON.parse(data) : []
+
+            setDivisions(parseDivisions(selectedSubsidiary.divisions) || [])
+            setDepartments(parseDepartments(selectedSubsidiary.departments) || [])
+            setLocations(parseLocations(selectedSubsidiary.locations) || [])
+          }
+        } else {
+          // Load main company data from database
+          const MAIN_COMPANY_ID = "00000000-0000-0000-0000-000000000001"
+          const { data: companyData, error: companyError } = await supabase
+            .from("companies")
+            .select("*")
+            .eq("id", MAIN_COMPANY_ID)
+            .maybeSingle()
+
+          if (companyError) {
+            console.error("[v0] Error loading company data:", companyError)
+          }
+
+          if (companyData) {
+            console.log("[v0] Loaded company data from database:", companyData)
+            const parseDivisions = (data: any) =>
+              Array.isArray(data)
+                ? data
+                : typeof data === "string"
+                  ? JSON.parse(data)
+                  : ["Head Office", "Regional Office"]
+            const parseDepartments = (data: any) =>
+              Array.isArray(data)
+                ? data
+                : typeof data === "string"
+                  ? JSON.parse(data)
+                  : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+            const parseLocations = (data: any) =>
+              Array.isArray(data)
+                ? data
+                : typeof data === "string"
+                  ? JSON.parse(data)
+                  : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
+
+            setDivisions(parseDivisions(companyData.divisions))
+            setDepartments(parseDepartments(companyData.departments))
+            setLocations(parseLocations(companyData.locations))
+          } else {
+            // Fallback to default values
+            console.log("[v0] No company data found, using defaults")
+            setDivisions(["Head Office", "Regional Office"])
+            setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
+            setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+          }
+        }
+      } catch (error) {
+        console.error("[v0] Error loading company data:", error)
+        // Fallback to default values
+        setDivisions(["Head Office", "Regional Office"])
+        setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
+        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
       }
     }
+
+    loadCompanyData()
   }, [formData.subsidiary, subsidiaries])
 
   useEffect(() => {
@@ -1629,7 +1646,7 @@ function AddEmployeeForm({
     if (!formData.department) newErrors.department = "Department is required"
     if (!formData.salary) newErrors.salary = "Salary is required"
     if (!formData.location) newErrors.location = "Location is required"
-    if (!formData.startDate) newErrors.startDate = "Start date is required"
+    if (!formData.dateOfJoining) newErrors.dateOfJoining = "Date of joining is required"
     if (!formData.bankName) newErrors.bankName = "Bank Name is required"
     if (!formData.bankAccount) newErrors.bankAccount = "Bank Account Number is required"
     if (!formData.ssnit) newErrors.ssnit = "SSNIT Number is required"
@@ -1672,6 +1689,7 @@ function AddEmployeeForm({
       console.log("[v0] Submitting employee data:", employeeData)
       onSubmit(employeeData)
 
+      // Reset form after successful submission
       setFormData({
         employeeId: "",
         prefix: "",
@@ -1679,10 +1697,18 @@ function AddEmployeeForm({
         otherNames: "",
         lastName: "",
         maritalStatus: "",
+        gender: "",
         corporateEmail: "",
         personalEmail: "",
         phone: "",
+        dateOfBirth: "",
+        address: "",
+        educationalLevel: "",
+        emergencyContactName: "",
+        emergencyContactTel: "",
         position: "",
+        directSupervisor: "",
+        headOfDepartment: "",
         subsidiary: "",
         division: "",
         department: "",
@@ -1694,8 +1720,6 @@ function AddEmployeeForm({
         probationPeriod: "6",
         confirmationDate: "",
         noticePeriod: "",
-        directSupervisor: "",
-        headOfDepartment: "",
         salary: "",
         transportAllowance: "",
         housingAllowance: "",
@@ -1705,7 +1729,6 @@ function AddEmployeeForm({
         communicationAllowance: "",
         otherAllowances: "",
         taxDeduction: "",
-        ssnit: "",
         tier3: "",
         loanDeduction: "",
         advanceDeduction: "",
@@ -1715,13 +1738,6 @@ function AddEmployeeForm({
         loanInstallment: "",
         loanStartDate: "",
         loanEndDate: "",
-        startDate: "",
-        dateOfBirth: "",
-        address: "",
-        emergencyContactName: "",
-        emergencyContactTel: "",
-        educationalLevel: "",
-        gender: "",
         bankName: "",
         bankAccount: "",
         ghanaCard: "",
@@ -1794,429 +1810,903 @@ function AddEmployeeForm({
     <form onSubmit={handleFormSubmit} className="space-y-4">
       <Tabs value={currentTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="personal">Personal</TabsTrigger>
+          <TabsTrigger value="personal">Personal Info</TabsTrigger>
           <TabsTrigger value="employment">Employment</TabsTrigger>
           <TabsTrigger value="financial">Financial</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
         </TabsList>
+
         <TabsContent value="personal">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="prefix">Prefix</Label>
-              <Input
-                type="text"
-                id="prefix"
-                value={formData.prefix}
-                onChange={(e) => handleInputChange("prefix", e.target.value)}
-              />
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="prefix">1. Prefix</Label>
+                <Select value={formData.prefix} onValueChange={(value) => handleInputChange("prefix", value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select prefix" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Mr">Mr</SelectItem>
+                    <SelectItem value="Mrs">Mrs</SelectItem>
+                    <SelectItem value="Ms">Ms</SelectItem>
+                    <SelectItem value="Dr">Dr</SelectItem>
+                    <SelectItem value="Prof">Prof</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="firstName">2. First Name *</Label>
+                <Input
+                  type="text"
+                  id="firstName"
+                  placeholder="Enter first name"
+                  value={formData.firstName}
+                  onChange={(e) => handleInputChange("firstName", e.target.value)}
+                />
+                {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
+              </div>
+              <div>
+                <Label htmlFor="otherNames">3. Other Name(s)</Label>
+                <Input
+                  type="text"
+                  id="otherNames"
+                  placeholder="Middle names"
+                  value={formData.otherNames}
+                  onChange={(e) => handleInputChange("otherNames", e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="lastName">4. Last Name *</Label>
+                <Input
+                  type="text"
+                  id="lastName"
+                  placeholder="Enter last name"
+                  value={formData.lastName}
+                  onChange={(e) => handleInputChange("lastName", e.target.value)}
+                />
+                {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
+              </div>
+              <div>
+                <Label htmlFor="maritalStatus">5. Marital Status</Label>
+                <Select
+                  value={formData.maritalStatus}
+                  onValueChange={(value) => handleInputChange("maritalStatus", value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select marital status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Single">Single</SelectItem>
+                    <SelectItem value="Married">Married</SelectItem>
+                    <SelectItem value="Divorced">Divorced</SelectItem>
+                    <SelectItem value="Widowed">Widowed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="gender">6. Gender</Label>
+                <Select value={formData.gender} onValueChange={(value) => handleInputChange("gender", value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="corporateEmail">7. Corporate Email Address</Label>
+                <Input
+                  type="email"
+                  id="corporateEmail"
+                  placeholder="employee@company.com"
+                  value={formData.corporateEmail}
+                  onChange={(e) => handleInputChange("corporateEmail", e.target.value)}
+                />
+                {errors.corporateEmail && <p className="text-red-500 text-sm mt-1">{errors.corporateEmail}</p>}
+              </div>
+              <div>
+                <Label htmlFor="personalEmail">8. Personal Email Address *</Label>
+                <Input
+                  type="email"
+                  id="personalEmail"
+                  placeholder="personal@email.com"
+                  value={formData.personalEmail}
+                  onChange={(e) => handleInputChange("personalEmail", e.target.value)}
+                />
+                {errors.personalEmail && <p className="text-red-500 text-sm mt-1">{errors.personalEmail}</p>}
+              </div>
+              <div>
+                <Label htmlFor="phone">9. Phone Number *</Label>
+                <Input
+                  type="tel"
+                  id="phone"
+                  placeholder="+233 XX XXX XXXX"
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange("phone", e.target.value)}
+                />
+                {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
+              </div>
+              <div>
+                <Label htmlFor="dateOfBirth">10. Date of Birth</Label>
+                <Input
+                  type="date"
+                  id="dateOfBirth"
+                  placeholder="mm/dd/yyyy"
+                  value={formData.dateOfBirth}
+                  onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
+                />
+              </div>
             </div>
             <div>
-              <Label htmlFor="firstName">First Name</Label>
-              <Input
-                type="text"
-                id="firstName"
-                value={formData.firstName}
-                onChange={(e) => handleInputChange("firstName", e.target.value)}
-              />
-              {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
-            </div>
-            <div>
-              <Label htmlFor="otherNames">Other Names</Label>
-              <Input
-                type="text"
-                id="otherNames"
-                value={formData.otherNames}
-                onChange={(e) => handleInputChange("otherNames", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input
-                type="text"
-                id="lastName"
-                value={formData.lastName}
-                onChange={(e) => handleInputChange("lastName", e.target.value)}
-              />
-              {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
-            </div>
-            <div>
-              <Label htmlFor="maritalStatus">Marital Status</Label>
-              <Select
-                value={formData.maritalStatus}
-                onValueChange={(value) => handleInputChange("maritalStatus", value)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select marital status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Single">Single</SelectItem>
-                  <SelectItem value="Married">Married</SelectItem>
-                  <SelectItem value="Divorced">Divorced</SelectItem>
-                  <SelectItem value="Widowed">Widowed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="gender">Gender</Label>
-              <Select value={formData.gender} onValueChange={(value) => handleInputChange("gender", value)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select gender" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Male">Male</SelectItem>
-                  <SelectItem value="Female">Female</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="personalEmail">Personal Email</Label>
-              <Input
-                type="email"
-                id="personalEmail"
-                value={formData.personalEmail}
-                onChange={(e) => handleInputChange("personalEmail", e.target.value)}
-              />
-              {errors.personalEmail && <p className="text-red-500 text-sm mt-1">{errors.personalEmail}</p>}
-            </div>
-            <div>
-              <Label htmlFor="corporateEmail">Corporate Email</Label>
-              <Input
-                type="email"
-                id="corporateEmail"
-                value={formData.corporateEmail}
-                onChange={(e) => handleInputChange("corporateEmail", e.target.value)}
-              />
-              {errors.corporateEmail && <p className="text-red-500 text-sm mt-1">{errors.corporateEmail}</p>}
-            </div>
-            <div>
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                type="tel"
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => handleInputChange("phone", e.target.value)}
-              />
-              {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
-            </div>
-            <div>
-              <Label htmlFor="dateOfBirth">Date of Birth</Label>
-              <Input
-                type="date"
-                id="dateOfBirth"
-                value={formData.dateOfBirth}
-                onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="address">Address</Label>
-              <Input
-                type="text"
+              <Label htmlFor="address">11. Address</Label>
+              <textarea
                 id="address"
+                placeholder="Full address"
                 value={formData.address}
                 onChange={(e) => handleInputChange("address", e.target.value)}
+                className="w-full min-h-[80px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <div>
-              <Label htmlFor="educationalLevel">Educational Level</Label>
-              <Input
-                type="text"
-                id="educationalLevel"
-                value={formData.educationalLevel}
-                onChange={(e) => handleInputChange("educationalLevel", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="emergencyContactName">Emergency Contact Name</Label>
-              <Input
-                type="text"
-                id="emergencyContactName"
-                value={formData.emergencyContactName}
-                onChange={(e) => handleInputChange("emergencyContactName", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="emergencyContactTel">Emergency Contact Tel</Label>
-              <Input
-                type="tel"
-                id="emergencyContactTel"
-                value={formData.emergencyContactTel}
-                onChange={(e) => handleInputChange("emergencyContactTel", e.target.value)}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="educationalLevel">12. Educational Level</Label>
+                <Select
+                  value={formData.educationalLevel}
+                  onValueChange={(value) => handleInputChange("educationalLevel", value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select education level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="High School">High School</SelectItem>
+                    <SelectItem value="Diploma">Diploma</SelectItem>
+                    <SelectItem value="Bachelor's Degree">Bachelor's Degree</SelectItem>
+                    <SelectItem value="Master's Degree">Master's Degree</SelectItem>
+                    <SelectItem value="PhD">PhD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="emergencyContactName">13. Emergency Contact Name</Label>
+                <Input
+                  type="text"
+                  id="emergencyContactName"
+                  placeholder="Contact person name"
+                  value={formData.emergencyContactName}
+                  onChange={(e) => handleInputChange("emergencyContactName", e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="emergencyContactTel">14. Emergency Contact Tel</Label>
+                <Input
+                  type="tel"
+                  id="emergencyContactTel"
+                  placeholder="+233 XX XXX XXXX"
+                  value={formData.emergencyContactTel}
+                  onChange={(e) => handleInputChange("emergencyContactTel", e.target.value)}
+                />
+              </div>
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="employment">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="employeeId">Employee ID</Label>
-              <Input
-                type="text"
-                id="employeeId"
-                value={formData.employeeId}
-                onChange={(e) => handleInputChange("employeeId", e.target.value)}
-                disabled
-              />
-            </div>
-            <div>
-              <Label htmlFor="position">1. Position *</Label>
-              <Input
-                type="text"
-                id="position"
-                placeholder="Enter position/job title"
-                value={formData.position}
-                onChange={(e) => handleInputChange("position", e.target.value)}
-              />
-              {errors.position && <p className="text-red-500 text-sm mt-1">{errors.position}</p>}
-            </div>
-            <div>
-              <Label htmlFor="subsidiary">2. Subsidiary</Label>
-              <Select value={formData.subsidiary} onValueChange={(value) => handleInputChange("subsidiary", value)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select subsidiary (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {subsidiaries.map((subsidiary) => (
-                    <SelectItem key={subsidiary.id} value={subsidiary.id}>
-                      {subsidiary.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="division">3. Division / Branch</Label>
-              <Select value={formData.division} onValueChange={(value) => handleInputChange("division", value)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select division/branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {divisions.map((division) => (
-                    <SelectItem key={division} value={division}>
-                      {division}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="department">4. Department *</Label>
-              <Select value={formData.department} onValueChange={(value) => handleInputChange("department", value)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((department) => (
-                    <SelectItem key={department} value={department}>
-                      {department}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.department && <p className="text-red-500 text-sm mt-1">{errors.department}</p>}
-            </div>
-            <div>
-              <Label htmlFor="location">5. Location *</Label>
-              <Select value={formData.location} onValueChange={(value) => handleInputChange("location", value)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((location) => (
-                    <SelectItem key={location} value={location}>
-                      {location}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.location && <p className="text-red-500 text-sm mt-1">{errors.location}</p>}
-            </div>
-            <div>
-              <Label htmlFor="contractType">6. Contract Type</Label>
-              <Select value={formData.contractType} onValueChange={(value) => handleInputChange("contractType", value)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select contract type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Permanent">Permanent</SelectItem>
-                  <SelectItem value="Contract">Contract</SelectItem>
-                  <SelectItem value="Intern">Intern</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="dateOfJoining">7. Date of Joining</Label>
-              <Input
-                type="date"
-                id="dateOfJoining"
-                value={formData.dateOfJoining}
-                onChange={(e) => handleInputChange("dateOfJoining", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="status">8. Status</Label>
-              <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Inactive">Inactive</SelectItem>
-                  <SelectItem value="On Leave">On Leave</SelectItem>
-                  <SelectItem value="Suspended">Suspended</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="probationPeriod">9. Probation Period (Months)</Label>
-              <Input
-                type="number"
-                id="probationPeriod"
-                value={formData.probationPeriod}
-                onChange={(e) => handleInputChange("probationPeriod", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="confirmationDate">10. Confirmation Date</Label>
-              <Input
-                type="date"
-                id="confirmationDate"
-                value={formData.confirmationDate}
-                onChange={(e) => handleInputChange("confirmationDate", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="noticePeriod">11. Notice Period (Days)</Label>
-              <Input
-                type="number"
-                id="noticePeriod"
-                value={formData.noticePeriod}
-                onChange={(e) => handleInputChange("noticePeriod", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="startDate">12. Start Date</Label>
-              <Input
-                type="date"
-                id="startDate"
-                value={formData.startDate}
-                onChange={(e) => handleInputChange("startDate", e.target.value)}
-              />
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="employeeId">Employee ID</Label>
+                <Input
+                  type="text"
+                  id="employeeId"
+                  value={formData.employeeId}
+                  onChange={(e) => handleInputChange("employeeId", e.target.value)}
+                  disabled
+                  className="bg-gray-100"
+                />
+              </div>
+              <div>
+                <Label htmlFor="position">1. Position *</Label>
+                <Input
+                  type="text"
+                  id="position"
+                  placeholder="Enter position/job title"
+                  value={formData.position}
+                  onChange={(e) => handleInputChange("position", e.target.value)}
+                />
+                {errors.position && <p className="text-red-500 text-sm mt-1">{errors.position}</p>}
+              </div>
+              <div>
+                <Label htmlFor="directSupervisor">1a. Direct Supervisor *</Label>
+                <Select
+                  value={formData.directSupervisor}
+                  onValueChange={(value) => handleInputChange("directSupervisor", value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select direct supervisor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees
+                      .filter((emp) => emp.id !== selectedEmployee?.id)
+                      .map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.name || `${employee.firstName} ${employee.lastName}`}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="headOfDepartment">1b. Head of Department *</Label>
+                <Select
+                  value={formData.headOfDepartment}
+                  onValueChange={(value) => handleInputChange("headOfDepartment", value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select head of department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees
+                      .filter((emp) => emp.id !== selectedEmployee?.id)
+                      .map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.name || `${employee.firstName} ${employee.lastName}`}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="subsidiary">2. Subsidiary</Label>
+                <Select value={formData.subsidiary} onValueChange={(value) => handleInputChange("subsidiary", value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select subsidiary (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subsidiaries.map((subsidiary) => (
+                      <SelectItem key={subsidiary.id} value={subsidiary.id}>
+                        {subsidiary.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="division">3. Division / Branch</Label>
+                <Select value={formData.division} onValueChange={(value) => handleInputChange("division", value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select division/branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {divisions.map((division) => (
+                      <SelectItem key={division} value={division}>
+                        {division}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="department">4. Department *</Label>
+                <Select value={formData.department} onValueChange={(value) => handleInputChange("department", value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map((department) => (
+                      <SelectItem key={department} value={department}>
+                        {department}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.department && <p className="text-red-500 text-sm mt-1">{errors.department}</p>}
+              </div>
+              <div>
+                <Label htmlFor="location">5. Location *</Label>
+                <Select value={formData.location} onValueChange={(value) => handleInputChange("location", value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((location) => (
+                      <SelectItem key={location} value={location}>
+                        {location}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.location && <p className="text-red-500 text-sm mt-1">{errors.location}</p>}
+              </div>
+              <div>
+                <Label htmlFor="contractType">6. Contract Type *</Label>
+                <Select
+                  value={formData.contractType}
+                  onValueChange={(value) => handleInputChange("contractType", value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Permanent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Permanent">Permanent</SelectItem>
+                    <SelectItem value="Contract">Contract</SelectItem>
+                    <SelectItem value="Intern">Intern</SelectItem>
+                    <SelectItem value="Temporary">Temporary</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="dateOfJoining">7. Date of Joining *</Label>
+                <Input
+                  type="date"
+                  id="dateOfJoining"
+                  placeholder="mm/dd/yyyy"
+                  value={formData.dateOfJoining}
+                  onChange={(e) => handleInputChange("dateOfJoining", e.target.value)}
+                />
+                {errors.dateOfJoining && <p className="text-red-500 text-sm mt-1">{errors.dateOfJoining}</p>}
+              </div>
+              <div>
+                <Label htmlFor="dateOfExit">8. Date of Exit</Label>
+                <Input
+                  type="date"
+                  id="dateOfExit"
+                  placeholder="mm/dd/yyyy"
+                  value={formData.dateOfExit}
+                  onChange={(e) => handleInputChange("dateOfExit", e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="status">9. Status *</Label>
+                <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Active" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                    <SelectItem value="On Leave">On Leave</SelectItem>
+                    <SelectItem value="Suspended">Suspended</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="probationPeriod">10. Probation Period (months)</Label>
+                <Select
+                  value={formData.probationPeriod}
+                  onValueChange={(value) => handleInputChange("probationPeriod", value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="6 months" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3">3 months</SelectItem>
+                    <SelectItem value="6">6 months</SelectItem>
+                    <SelectItem value="12">12 months</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="confirmationDate">11. Confirmation Date</Label>
+                <Input
+                  type="date"
+                  id="confirmationDate"
+                  placeholder="mm/dd/yyyy"
+                  value={formData.confirmationDate}
+                  onChange={(e) => handleInputChange("confirmationDate", e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="noticePeriod">12. Notice Period</Label>
+                <Input
+                  type="text"
+                  id="noticePeriod"
+                  placeholder="e.g. 1 month, 3 months"
+                  value={formData.noticePeriod}
+                  onChange={(e) => handleInputChange("noticePeriod", e.target.value)}
+                />
+              </div>
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="financial">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="salary">Monthly Salary</Label>
-              <Input
-                type="number"
-                id="salary"
-                value={formData.salary}
-                onChange={(e) => handleInputChange("salary", e.target.value)}
-              />
-              {errors.salary && <p className="text-red-500 text-sm mt-1">{errors.salary}</p>}
+          <div className="space-y-6">
+            {/* Basic Financial Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="salary">Monthly Salary (GHS) *</Label>
+                <Input
+                  type="number"
+                  id="salary"
+                  placeholder="5000"
+                  value={formData.salary}
+                  onChange={(e) => handleInputChange("salary", e.target.value)}
+                />
+                {errors.salary && <p className="text-red-500 text-sm mt-1">{errors.salary}</p>}
+              </div>
+              <div>
+                <Label htmlFor="bankName">Bank Name</Label>
+                <Select value={formData.bankName} onValueChange={(value) => handleInputChange("bankName", value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select bank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="GCB Bank">GCB Bank</SelectItem>
+                    <SelectItem value="Ecobank">Ecobank</SelectItem>
+                    <SelectItem value="Standard Chartered">Standard Chartered</SelectItem>
+                    <SelectItem value="Absa Bank">Absa Bank</SelectItem>
+                    <SelectItem value="Fidelity Bank">Fidelity Bank</SelectItem>
+                    <SelectItem value="Zenith Bank">Zenith Bank</SelectItem>
+                    <SelectItem value="Stanbic Bank">Stanbic Bank</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.bankName && <p className="text-red-500 text-sm mt-1">{errors.bankName}</p>}
+              </div>
+              <div>
+                <Label htmlFor="bankAccount">Bank Account Number</Label>
+                <Input
+                  type="text"
+                  id="bankAccount"
+                  placeholder="Account number"
+                  value={formData.bankAccount}
+                  onChange={(e) => handleInputChange("bankAccount", e.target.value)}
+                />
+                {errors.bankAccount && <p className="text-red-500 text-sm mt-1">{errors.bankAccount}</p>}
+              </div>
+              <div>
+                <Label htmlFor="ssnit">SSNIT Number</Label>
+                <Input
+                  type="text"
+                  id="ssnit"
+                  placeholder="GHA-123456789-0"
+                  value={formData.ssnit}
+                  onChange={(e) => handleInputChange("ssnit", e.target.value)}
+                />
+                {errors.ssnit && <p className="text-red-500 text-sm mt-1">{errors.ssnit}</p>}
+              </div>
+              <div>
+                <Label htmlFor="ghanaCard">Ghana Card Number</Label>
+                <Input
+                  type="text"
+                  id="ghanaCard"
+                  placeholder="GHA-123456789-0"
+                  value={formData.ghanaCard}
+                  onChange={(e) => handleInputChange("ghanaCard", e.target.value)}
+                />
+                {errors.ghanaCard && <p className="text-red-500 text-sm mt-1">{errors.ghanaCard}</p>}
+              </div>
             </div>
+
+            {/* Allowances Section */}
             <div>
-              <Label htmlFor="bankName">Bank Name</Label>
-              <Input
-                type="text"
-                id="bankName"
-                value={formData.bankName}
-                onChange={(e) => handleInputChange("bankName", e.target.value)}
-              />
-              {errors.bankName && <p className="text-red-500 text-sm mt-1">{errors.bankName}</p>}
+              <h3 className="text-lg font-semibold mb-3">Allowances</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="transportAllowance">Transport Allowance (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="transportAllowance"
+                    placeholder="0"
+                    value={formData.transportAllowance}
+                    onChange={(e) => handleInputChange("transportAllowance", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="housingAllowance">Housing Allowance (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="housingAllowance"
+                    placeholder="0"
+                    value={formData.housingAllowance}
+                    onChange={(e) => handleInputChange("housingAllowance", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="medicalAllowance">Medical Allowance (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="medicalAllowance"
+                    placeholder="0"
+                    value={formData.medicalAllowance}
+                    onChange={(e) => handleInputChange("medicalAllowance", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="mealAllowance">Meal Allowance (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="mealAllowance"
+                    placeholder="0"
+                    value={formData.mealAllowance}
+                    onChange={(e) => handleInputChange("mealAllowance", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="uniformAllowance">Uniform Allowance (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="uniformAllowance"
+                    placeholder="0"
+                    value={formData.uniformAllowance}
+                    onChange={(e) => handleInputChange("uniformAllowance", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="communicationAllowance">Communication Allowance (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="communicationAllowance"
+                    placeholder="0"
+                    value={formData.communicationAllowance}
+                    onChange={(e) => handleInputChange("communicationAllowance", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="otherAllowances">Other Allowances (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="otherAllowances"
+                    placeholder="0"
+                    value={formData.otherAllowances}
+                    onChange={(e) => handleInputChange("otherAllowances", e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
+
+            {/* Deductions Section */}
             <div>
-              <Label htmlFor="bankAccount">Bank Account Number</Label>
-              <Input
-                type="text"
-                id="bankAccount"
-                value={formData.bankAccount}
-                onChange={(e) => handleInputChange("bankAccount", e.target.value)}
-              />
-              {errors.bankAccount && <p className="text-red-500 text-sm mt-1">{errors.bankAccount}</p>}
+              <h3 className="text-lg font-semibold mb-3">Deductions</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="taxDeduction">Tax Deduction (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="taxDeduction"
+                    placeholder="0"
+                    value={formData.taxDeduction}
+                    onChange={(e) => handleInputChange("taxDeduction", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="tier3">Tier 3 Contribution (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="tier3"
+                    placeholder="0"
+                    value={formData.tier3}
+                    onChange={(e) => handleInputChange("tier3", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="loanDeduction">Loan Deduction (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="loanDeduction"
+                    placeholder="0"
+                    value={formData.loanDeduction}
+                    onChange={(e) => handleInputChange("loanDeduction", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="advanceDeduction">Advance Deduction (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="advanceDeduction"
+                    placeholder="0"
+                    value={formData.advanceDeduction}
+                    onChange={(e) => handleInputChange("advanceDeduction", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="otherDeductions">Other Deductions (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="otherDeductions"
+                    placeholder="0"
+                    value={formData.otherDeductions}
+                    onChange={(e) => handleInputChange("otherDeductions", e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
+
+            {/* Loan Details Section */}
             <div>
-              <Label htmlFor="ssnit">SSNIT Number</Label>
-              <Input
-                type="text"
-                id="ssnit"
-                value={formData.ssnit}
-                onChange={(e) => handleInputChange("ssnit", e.target.value)}
-              />
-              {errors.ssnit && <p className="text-red-500 text-sm mt-1">{errors.ssnit}</p>}
+              <h3 className="text-lg font-semibold mb-3">Loan Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="loanAmount">Loan Amount (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="loanAmount"
+                    placeholder="0"
+                    value={formData.loanAmount}
+                    onChange={(e) => handleInputChange("loanAmount", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="loanBalance">Loan Balance (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="loanBalance"
+                    placeholder="0"
+                    value={formData.loanBalance}
+                    onChange={(e) => handleInputChange("loanBalance", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="loanInstallment">Monthly Installment (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="loanInstallment"
+                    placeholder="0"
+                    value={formData.loanInstallment}
+                    onChange={(e) => handleInputChange("loanInstallment", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="loanStartDate">Loan Start Date</Label>
+                  <Input
+                    type="date"
+                    id="loanStartDate"
+                    value={formData.loanStartDate}
+                    onChange={(e) => handleInputChange("loanStartDate", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="loanEndDate">Loan End Date</Label>
+                  <Input
+                    type="date"
+                    id="loanEndDate"
+                    value={formData.loanEndDate}
+                    onChange={(e) => handleInputChange("loanEndDate", e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="documents">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="profilePicture">Passport Picture</Label>
-              <Input
-                type="file"
-                id="profilePicture"
-                accept="image/*"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    handleDocumentUpload("Passport Picture", e.target.files[0])
-                  }
-                }}
-              />
-              {formData.profilePicture && (
-                <div className="mt-2">
-                  <img
-                    src={formData.profilePicture || "/placeholder.svg"}
-                    alt="Profile"
-                    className="max-h-32 rounded-md"
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold mb-4">Required Documents</h3>
+
+            <div className="space-y-4">
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">1. Academic Certificate(s)</h4>
+                    <p className="text-sm text-gray-600">Educational certificates and transcripts</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("academic-cert")?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                  <input
+                    id="academic-cert"
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleDocumentUpload("Academic Certificate(s)", e.target.files[0])
+                      }
+                    }}
                   />
                 </div>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="contractDocument">Contract Document</Label>
-              <Input
-                type="file"
-                id="contractDocument"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    handleDocumentUpload("Contract", e.target.files[0])
-                  }
-                }}
-              />
-            </div>
-            <div>
-              <Label htmlFor="idCopyDocument">ID Copy Document</Label>
-              <Input
-                type="file"
-                id="idCopyDocument"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    handleDocumentUpload("ID Copy", e.target.files[0])
-                  }
-                }}
-              />
-            </div>
-            <div>
-              <Label htmlFor="cvDocument">CV Document</Label>
-              <Input
-                type="file"
-                id="cvDocument"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    handleDocumentUpload("CV", e.target.files[0])
-                  }
-                }}
-              />
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">2. Passport Picture</h4>
+                    <p className="text-sm text-gray-600">Professional passport-sized photograph</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("passport-picture")?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                  <input
+                    id="passport-picture"
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleDocumentUpload("Passport Picture", e.target.files[0])
+                      }
+                    }}
+                  />
+                </div>
+                {formData.profilePicture && (
+                  <div className="mt-2">
+                    <img
+                      src={formData.profilePicture || "/placeholder.svg"}
+                      alt="Profile"
+                      className="w-20 h-20 object-cover rounded-md"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">3. Resume & Application Letter</h4>
+                    <p className="text-sm text-gray-600">Current CV and cover letter</p>
+                  </div>
+                  <Button type="button" variant="outline" onClick={() => document.getElementById("resume-cv")?.click()}>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                  <input
+                    id="resume-cv"
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleDocumentUpload("Resume & Application Letter", e.target.files[0])
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">4. Passport</h4>
+                    <p className="text-sm text-gray-600">Valid passport copy</p>
+                  </div>
+                  <Button type="button" variant="outline" onClick={() => document.getElementById("passport")?.click()}>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                  <input
+                    id="passport"
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleDocumentUpload("Passport", e.target.files[0])
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">5. National ID</h4>
+                    <p className="text-sm text-gray-600">Ghana Card or Voter's ID</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("national-id")?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                  <input
+                    id="national-id"
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleDocumentUpload("National ID", e.target.files[0])
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">6. Medical Report</h4>
+                    <p className="text-sm text-gray-600">Health clearance certificate</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("medical-report")?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                  <input
+                    id="medical-report"
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleDocumentUpload("Medical Report", e.target.files[0])
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">7. Police Report</h4>
+                    <p className="text-sm text-gray-600">Criminal background check</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("police-report")?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                  <input
+                    id="police-report"
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleDocumentUpload("Police Report", e.target.files[0])
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">8. Other Uploads</h4>
+                    <p className="text-sm text-gray-600">Additional supporting documents</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("other-uploads")?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                  <input
+                    id="other-uploads"
+                    type="file"
+                    className="hidden"
+                    multiple
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleDocumentUpload("Other Uploads", e.target.files[0])
+                      }
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </TabsContent>
       </Tabs>
 
-      <div className="flex justify-end space-x-2">
+      <div className="flex justify-end space-x-2 pt-4 border-t">
         <Button type="button" variant="outline" onClick={onClose}>
           Cancel
         </Button>
@@ -2234,11 +2724,11 @@ function AddEmployeeForm({
           </Button>
         )}
         {currentTab !== "documents" ? (
-          <Button type="button" onClick={handleNext}>
+          <Button type="button" onClick={handleNext} className="bg-teal-600 hover:bg-teal-700">
             Next
           </Button>
         ) : (
-          <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">
+          <Button type="submit" className="bg-teal-600 hover:bg-teal-700">
             Submit
           </Button>
         )}
