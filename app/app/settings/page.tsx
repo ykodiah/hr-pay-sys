@@ -1248,21 +1248,22 @@ export default function SettingsPage() {
                         </DialogHeader>
                         {editForm && (
                           <div className="space-y-6">
+                            {/* Fix controlled/uncontrolled input error by ensuring all input values are always strings */}
                             <div className="grid md:grid-cols-2 gap-4">
                               <div className="space-y-2">
                                 <Label>Name of Subsidiary *</Label>
                                 <Input
                                   placeholder="Enter subsidiary name"
-                                  value={editForm.name}
-                                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                  value={editForm?.name ?? ""}
+                                  onChange={(e) => setEditForm({ ...editForm!, name: e.target.value })}
                                 />
                               </div>
                               <div className="space-y-2">
                                 <Label>Tax ID / TIN *</Label>
                                 <Input
                                   placeholder="Enter tax ID"
-                                  value={editForm.taxId}
-                                  onChange={(e) => setEditForm({ ...editForm, taxId: e.target.value })}
+                                  value={editForm?.taxId ?? ""}
+                                  onChange={(e) => setEditForm({ ...editForm!, taxId: e.target.value })}
                                 />
                               </div>
                             </div>
@@ -1272,16 +1273,16 @@ export default function SettingsPage() {
                                 <Label>SSNIT Employer Number *</Label>
                                 <Input
                                   placeholder="Enter SSNIT number"
-                                  value={editForm.ssnitNumber}
-                                  onChange={(e) => setEditForm({ ...editForm, ssnitNumber: e.target.value })}
+                                  value={editForm?.ssnitNumber ?? ""}
+                                  onChange={(e) => setEditForm({ ...editForm!, ssnitNumber: e.target.value })}
                                 />
                               </div>
                               <div className="space-y-2">
                                 <Label>Phone Number *</Label>
                                 <Input
                                   placeholder="Enter phone number"
-                                  value={editForm.phone}
-                                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                                  value={editForm?.phone ?? ""}
+                                  onChange={(e) => setEditForm({ ...editForm!, phone: e.target.value })}
                                 />
                               </div>
                             </div>
