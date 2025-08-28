@@ -636,6 +636,27 @@ export default function SettingsPage() {
     try {
       const supabase = createClient()
 
+      const { error: companyError } = await supabase.from("companies").upsert({
+        id: MAIN_COMPANY_ID,
+        name: companySettings.name || "Default Company",
+        tax_id: companySettings.taxId || "",
+        ssnit_number: companySettings.ssnitNumber || "",
+        industry: companySettings.industry || "",
+        address: companySettings.address || "",
+        phone: companySettings.phone || "",
+        email: companySettings.email || "",
+        logo: companySettings.logo || null,
+        divisions: companySettings.divisions || [],
+        departments: companySettings.departments || [],
+        locations: companySettings.locations || [],
+        updated_at: new Date().toISOString(),
+      })
+
+      if (companyError) {
+        console.error("[v0] Error ensuring company exists:", companyError)
+        throw companyError
+      }
+
       const { error } = await supabase.from("subsidiaries").insert({
         company_id: MAIN_COMPANY_ID, // Use UUID instead of integer
         name: subsidiaryData.name,
