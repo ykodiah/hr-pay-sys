@@ -487,12 +487,12 @@ export default function SettingsPage() {
         ssnit_number: companySettings.ssnitNumber,
         industry: companySettings.industry,
         address: companySettings.address,
-        phone_number: companySettings.phone,
-        email_address: companySettings.email,
-        logo_url: companySettings.logo,
-        divisions: companySettings.divisions,
-        departments: companySettings.departments,
-        locations: companySettings.locations,
+        phone: companySettings.phone, // Use 'phone' not 'phone_number'
+        email: companySettings.email, // Use 'email' not 'email_address'
+        logo: companySettings.logo, // Use 'logo' not 'logo_url'
+        divisions: companySettings.divisions, // ARRAY type in company_settings
+        departments: companySettings.departments, // ARRAY type in company_settings
+        locations: companySettings.locations, // ARRAY type in company_settings
         updated_at: new Date().toISOString(),
       })
 
