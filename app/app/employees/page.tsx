@@ -321,6 +321,34 @@ export default function EmployeesPage() {
       } else {
         setCompanySettings(companyData)
         console.log("[v0] Company data loaded:", companyData)
+
+        if (companyData) {
+          const companyDivisions = Array.isArray(companyData.divisions)
+            ? companyData.divisions
+            : companyData.divisions
+              ? JSON.parse(companyData.divisions)
+              : ["Head Office", "Regional Office"]
+
+          const companyDepartments = Array.isArray(companyData.departments)
+            ? companyData.departments
+            : companyData.departments
+              ? JSON.parse(companyData.departments)
+              : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+
+          const companyLocations = Array.isArray(companyData.locations)
+            ? companyData.locations
+            : companyData.locations
+              ? JSON.parse(companyData.locations)
+              : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
+
+          setDivisions(companyDivisions)
+          setDepartments(companyDepartments)
+          setLocations(companyLocations)
+
+          console.log("[v0] Set company divisions:", companyDivisions)
+          console.log("[v0] Set company departments:", companyDepartments)
+          console.log("[v0] Set company locations:", companyLocations)
+        }
       }
 
       // Load subsidiaries
@@ -336,13 +364,6 @@ export default function EmployeesPage() {
         setSubsidiaries(subsidiaryData || [])
         console.log("[v0] Subsidiaries loaded:", subsidiaryData?.length || 0)
       }
-
-      // Set default company data when no subsidiary is selected
-      if (companyData) {
-        setDivisions(companyData.divisions || [])
-        setDepartments(companyData.departments || [])
-        setLocations(companyData.locations || [])
-      }
     } catch (error) {
       console.error("[v0] Error in loadCompanyData:", error)
     }
@@ -352,38 +373,62 @@ export default function EmployeesPage() {
     if (formData.subsidiary) {
       const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
       if (selectedSubsidiary) {
-        setDivisions(
-          Array.isArray(selectedSubsidiary.divisions)
-            ? selectedSubsidiary.divisions
-            : JSON.parse(selectedSubsidiary.divisions || "[]"),
-        )
-        setDepartments(
-          Array.isArray(selectedSubsidiary.departments)
-            ? selectedSubsidiary.departments
-            : JSON.parse(selectedSubsidiary.departments || "[]"),
-        )
-        setLocations(
-          Array.isArray(selectedSubsidiary.locations)
-            ? selectedSubsidiary.locations
-            : JSON.parse(selectedSubsidiary.locations || "[]"),
-        )
+        console.log("[v0] Loading subsidiary data:", selectedSubsidiary.name)
+
+        const subDivisions = Array.isArray(selectedSubsidiary.divisions)
+          ? selectedSubsidiary.divisions
+          : selectedSubsidiary.divisions
+            ? JSON.parse(selectedSubsidiary.divisions)
+            : []
+
+        const subDepartments = Array.isArray(selectedSubsidiary.departments)
+          ? selectedSubsidiary.departments
+          : selectedSubsidiary.departments
+            ? JSON.parse(selectedSubsidiary.departments)
+            : []
+
+        const subLocations = Array.isArray(selectedSubsidiary.locations)
+          ? selectedSubsidiary.locations
+          : selectedSubsidiary.locations
+            ? JSON.parse(selectedSubsidiary.locations)
+            : []
+
+        setDivisions(subDivisions)
+        setDepartments(subDepartments)
+        setLocations(subLocations)
+
+        console.log("[v0] Set subsidiary divisions:", subDivisions)
+        console.log("[v0] Set subsidiary departments:", subDepartments)
+        console.log("[v0] Set subsidiary locations:", subLocations)
       }
     } else if (companySettings) {
-      setDivisions(
-        Array.isArray(companySettings.divisions)
-          ? companySettings.divisions
-          : JSON.parse(companySettings.divisions || "[]"),
-      )
-      setDepartments(
-        Array.isArray(companySettings.departments)
-          ? companySettings.departments
-          : JSON.parse(companySettings.departments || "[]"),
-      )
-      setLocations(
-        Array.isArray(companySettings.locations)
-          ? companySettings.locations
-          : JSON.parse(companySettings.locations || "[]"),
-      )
+      console.log("[v0] Loading company data (no subsidiary selected)")
+
+      const companyDivisions = Array.isArray(companySettings.divisions)
+        ? companySettings.divisions
+        : companySettings.divisions
+          ? JSON.parse(companySettings.divisions)
+          : ["Head Office", "Regional Office"]
+
+      const companyDepartments = Array.isArray(companySettings.departments)
+        ? companySettings.departments
+        : companySettings.departments
+          ? JSON.parse(companySettings.departments)
+          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+
+      const companyLocations = Array.isArray(companySettings.locations)
+        ? companySettings.locations
+        : companySettings.locations
+          ? JSON.parse(companySettings.locations)
+          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
+
+      setDivisions(companyDivisions)
+      setDepartments(companyDepartments)
+      setLocations(companyLocations)
+
+      console.log("[v0] Set company divisions:", companyDivisions)
+      console.log("[v0] Set company departments:", companyDepartments)
+      console.log("[v0] Set company locations:", companyLocations)
     }
   }, [formData.subsidiary, subsidiaries, companySettings])
 
@@ -2034,15 +2079,56 @@ function AddEmployeeForm({
                   if (value) {
                     const selectedSub = subsidiaries.find((s) => s.id === value)
                     if (selectedSub) {
-                      setDivisions(selectedSub.divisions || [])
-                      setDepartments(selectedSub.departments || [])
-                      setLocations(selectedSub.locations || [])
+                      console.log("[v0] Subsidiary selected:", selectedSub.name)
+
+                      const subDivisions = Array.isArray(selectedSub.divisions)
+                        ? selectedSub.divisions
+                        : selectedSub.divisions
+                          ? JSON.parse(selectedSub.divisions)
+                          : []
+
+                      const subDepartments = Array.isArray(selectedSub.departments)
+                        ? selectedSub.departments
+                        : selectedSub.departments
+                          ? JSON.parse(selectedSub.departments)
+                          : []
+
+                      const subLocations = Array.isArray(selectedSub.locations)
+                        ? selectedSub.locations
+                        : selectedSub.locations
+                          ? JSON.parse(selectedSub.locations)
+                          : []
+
+                      setDivisions(subDivisions)
+                      setDepartments(subDepartments)
+                      setLocations(subLocations)
                     }
                   } else {
+                    console.log("[v0] No subsidiary selected, using company data")
                     // Use company data when no subsidiary selected
-                    setDivisions(companySettings?.divisions || [])
-                    setDepartments(companySettings?.departments || [])
-                    setLocations(companySettings?.locations || [])
+                    if (companySettings) {
+                      const companyDivisions = Array.isArray(companySettings.divisions)
+                        ? companySettings.divisions
+                        : companySettings.divisions
+                          ? JSON.parse(companySettings.divisions)
+                          : ["Head Office", "Regional Office"]
+
+                      const companyDepartments = Array.isArray(companySettings.departments)
+                        ? companySettings.departments
+                        : companySettings.departments
+                          ? JSON.parse(companySettings.departments)
+                          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+
+                      const companyLocations = Array.isArray(companySettings.locations)
+                        ? companySettings.locations
+                        : companySettings.locations
+                          ? JSON.parse(companySettings.locations)
+                          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
+
+                      setDivisions(companyDivisions)
+                      setDepartments(companyDepartments)
+                      setLocations(companyLocations)
+                    }
                   }
                 }}
               >
