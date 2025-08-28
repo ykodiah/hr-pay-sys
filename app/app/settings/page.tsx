@@ -767,6 +767,7 @@ export default function SettingsPage() {
   const loadSubsidiaries = async () => {
     try {
       const supabase = createClient()
+      console.log("[v0] Loading subsidiaries with company_id:", MAIN_COMPANY_ID)
 
       const { data, error } = await supabase
         .from("subsidiaries")
@@ -775,25 +776,30 @@ export default function SettingsPage() {
         .eq("status", "active")
 
       if (error) {
-        console.error("[v0] Error loading subsidiaries:", error)
+        console.error("[v0] Error loading subsidiaries:", error.message)
         return
       }
 
       console.log("[v0] Loaded subsidiaries from database:", data?.length || 0)
 
-      const mappedSubsidiaries =
-        data?.map((sub) => ({
-          ...sub,
-          taxId: sub.tax_id,
-          ssnitNumber: sub.ssnit_number,
-          phoneNumber: sub.phone_number,
-          emailAddress: sub.email_address,
-          logoUrl: sub.logo_url,
-        })) || []
+      const mappedSubsidiaries = (data || []).map((sub: any) => ({
+        id: sub.id,
+        name: sub.name,
+        taxId: sub.tax_id || "", // Ensure this maps correctly
+        ssnitNumber: sub.ssnit_number || "", // Ensure this maps correctly
+        address: sub.address || "",
+        phone: sub.phone_number || "",
+        email: sub.email_address || "",
+        divisions: sub.divisions || [],
+        departments: sub.departments || [],
+        locations: sub.locations || [],
+        status: sub.status,
+        logo: sub.logo_url || "",
+      }))
 
       setSubsidiaries(mappedSubsidiaries)
     } catch (error) {
-      console.error("[v0] Error in loadSubsidiaries:", error)
+      console.error("[v0] Error loading subsidiaries:", error)
     }
   }
 
@@ -846,9 +852,9 @@ export default function SettingsPage() {
             ssnitNumber: companyData.ssnit_number || "",
             industry: companyData.industry || "",
             address: companyData.address || "",
-            phone: companyData.phone || "",
-            email: companyData.email || "",
-            logo: companyData.logo || "",
+            phone: companyData.phone_number || "", // Fixed: was companyData.phone
+            email: companyData.email_address || "", // Fixed: was companyData.email
+            logo: companyData.logo_url || "",
             divisions: companyData.divisions || [],
             departments: companyData.departments || [],
             locations: companyData.locations || [],
@@ -857,8 +863,6 @@ export default function SettingsPage() {
 
         // Load subsidiaries
         await loadSubsidiaries()
-
-        console.log("[v0] Settings loaded from database")
       } catch (error) {
         console.error("[v0] Error loading settings from database:", error)
       }
