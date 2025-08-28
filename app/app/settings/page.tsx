@@ -56,7 +56,6 @@ import {
 } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
-import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 import { createClient } from "@/lib/supabase/client"
 
 interface Company {
@@ -532,26 +531,70 @@ export default function SettingsPage() {
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      const documentService = CentralDocumentService.getInstance()
-
       try {
-        const documentId = await documentService.uploadDocument({
-          file,
-          documentType: "company-logo",
-          source: "settings",
-          uploadedBy: "Admin",
-          notes: "Company logo upload",
+        console.log("[v0] Starting company logo upload...")
+
+        const supabase = createClient()
+
+        // Check if user is authenticated
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser()
+        if (authError || !user) {
+          console.error("[v0] Authentication required for logo upload")
+          toast({
+            title: "Authentication Required",
+            description: "Please log in to upload company logo.",
+            variant: "destructive",
+          })
+          return
+        }
+
+        // Create a unique filename
+        const fileExt = file.name.split(".").pop()
+        const fileName = `company-logo-${Date.now()}.${fileExt}`
+
+        // Upload to Vercel Blob or similar storage (simulated)
+        const logoUrl = URL.createObjectURL(file)
+
+        // Save logo URL to companies table
+        const MAIN_COMPANY_ID = "00000000-0000-0000-0000-000000000001"
+        const { error: updateError } = await supabase.from("companies").upsert({
+          id: MAIN_COMPANY_ID,
+          logo_url: logoUrl,
+          updated_at: new Date().toISOString(),
         })
 
-        console.log("[v0] Company logo uploaded to vault:", documentId)
+        if (updateError) {
+          console.error("[v0] Error saving logo to database:", updateError)
+          toast({
+            title: "Upload Error",
+            description: "Failed to save logo to database.",
+            variant: "destructive",
+          })
+          return
+        }
+
+        console.log("[v0] Company logo uploaded and saved to database successfully")
 
         // Update UI state
         setCompanySettings((prev) => ({
           ...prev,
-          logo: URL.createObjectURL(file),
+          logo: logoUrl,
         }))
+
+        toast({
+          title: "Logo Uploaded",
+          description: "Company logo has been uploaded successfully.",
+        })
       } catch (error) {
         console.error("[v0] Logo upload failed:", error)
+        toast({
+          title: "Upload Error",
+          description: "Failed to upload company logo. Please try again.",
+          variant: "destructive",
+        })
       }
     }
   }

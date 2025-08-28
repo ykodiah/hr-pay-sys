@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
-import { Search, Filter, Plus, Edit, Download, Upload } from "lucide-react"
+import { Search, Filter, Plus, Edit, Download, Upload, CheckCircle } from "lucide-react"
 
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 import { useToast } from "@/hooks/use-toast"
@@ -2139,7 +2139,7 @@ function AddEmployeeForm({
                 {errors.department && <p className="text-red-500 text-sm mt-1">{errors.department}</p>}
               </div>
               <div>
-                <Label htmlFor="directSupervisor">4a. Direct Supervisor *</Label>
+                <Label htmlFor="directSupervisor">4a. Direct Supervisor</Label>
                 <Select
                   value={formData.directSupervisor}
                   onValueChange={(value) => handleInputChange("directSupervisor", value)}
@@ -2159,7 +2159,7 @@ function AddEmployeeForm({
                 </Select>
               </div>
               <div>
-                <Label htmlFor="headOfDepartment">4b. Head of Department *</Label>
+                <Label htmlFor="headOfDepartment">4b. Head of Department</Label>
                 <Select
                   value={formData.headOfDepartment}
                   onValueChange={(value) => handleInputChange("headOfDepartment", value)}
@@ -2576,6 +2576,13 @@ function AddEmployeeForm({
                     }}
                   />
                 </div>
+                {formData.documents.find((doc) => doc.type === "Academic Certificate(s)") && (
+                  <div className="mt-2 flex items-center text-green-600 text-sm">
+                    <CheckCircle className="w-4 h-4 mr-1" />
+                    {formData.documents.find((doc) => doc.type === "Academic Certificate(s)")?.name} uploaded
+                    successfully
+                  </div>
+                )}
               </div>
 
               <div className="border rounded-lg p-4">
@@ -2605,12 +2612,16 @@ function AddEmployeeForm({
                   />
                 </div>
                 {formData.profilePicture && (
-                  <div className="mt-2">
+                  <div className="mt-2 flex items-center space-x-2">
                     <img
                       src={formData.profilePicture || "/placeholder.svg"}
                       alt="Profile"
                       className="w-20 h-20 object-cover rounded-md"
                     />
+                    <div className="flex items-center text-green-600 text-sm">
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      Image uploaded successfully
+                    </div>
                   </div>
                 )}
               </div>
@@ -2637,6 +2648,13 @@ function AddEmployeeForm({
                     }}
                   />
                 </div>
+                {formData.documents.find((doc) => doc.type === "Resume & Application Letter") && (
+                  <div className="mt-2 flex items-center text-green-600 text-sm">
+                    <CheckCircle className="w-4 h-4 mr-1" />
+                    {formData.documents.find((doc) => doc.type === "Resume & Application Letter")?.name} uploaded
+                    successfully
+                  </div>
+                )}
               </div>
 
               <div className="border rounded-lg p-4">
@@ -2661,6 +2679,12 @@ function AddEmployeeForm({
                     }}
                   />
                 </div>
+                {formData.documents.find((doc) => doc.type === "Passport") && (
+                  <div className="mt-2 flex items-center text-green-600 text-sm">
+                    <CheckCircle className="w-4 h-4 mr-1" />
+                    {formData.documents.find((doc) => doc.type === "Passport")?.name} uploaded successfully
+                  </div>
+                )}
               </div>
 
               <div className="border rounded-lg p-4">
@@ -2689,6 +2713,12 @@ function AddEmployeeForm({
                     }}
                   />
                 </div>
+                {formData.documents.find((doc) => doc.type === "National ID") && (
+                  <div className="mt-2 flex items-center text-green-600 text-sm">
+                    <CheckCircle className="w-4 h-4 mr-1" />
+                    {formData.documents.find((doc) => doc.type === "National ID")?.name} uploaded successfully
+                  </div>
+                )}
               </div>
 
               <div className="border rounded-lg p-4">
@@ -2717,6 +2747,12 @@ function AddEmployeeForm({
                     }}
                   />
                 </div>
+                {formData.documents.find((doc) => doc.type === "Medical Report") && (
+                  <div className="mt-2 flex items-center text-green-600 text-sm">
+                    <CheckCircle className="w-4 h-4 mr-1" />
+                    {formData.documents.find((doc) => doc.type === "Medical Report")?.name} uploaded successfully
+                  </div>
+                )}
               </div>
 
               <div className="border rounded-lg p-4">
@@ -2745,6 +2781,12 @@ function AddEmployeeForm({
                     }}
                   />
                 </div>
+                {formData.documents.find((doc) => doc.type === "Police Report") && (
+                  <div className="mt-2 flex items-center text-green-600 text-sm">
+                    <CheckCircle className="w-4 h-4 mr-1" />
+                    {formData.documents.find((doc) => doc.type === "Police Report")?.name} uploaded successfully
+                  </div>
+                )}
               </div>
 
               <div className="border rounded-lg p-4">
@@ -2774,6 +2816,12 @@ function AddEmployeeForm({
                     }}
                   />
                 </div>
+                {formData.documents.find((doc) => doc.type === "Other Uploads") && (
+                  <div className="mt-2 flex items-center text-green-600 text-sm">
+                    <CheckCircle className="w-4 h-4 mr-1" />
+                    {formData.documents.find((doc) => doc.type === "Other Uploads")?.name} uploaded successfully
+                  </div>
+                )}
               </div>
             </div>
           </div>
