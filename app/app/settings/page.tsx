@@ -780,7 +780,18 @@ export default function SettingsPage() {
       }
 
       console.log("[v0] Loaded subsidiaries from database:", data?.length || 0)
-      setSubsidiaries(data || [])
+
+      const mappedSubsidiaries =
+        data?.map((sub) => ({
+          ...sub,
+          taxId: sub.tax_id,
+          ssnitNumber: sub.ssnit_number,
+          phoneNumber: sub.phone_number,
+          emailAddress: sub.email_address,
+          logoUrl: sub.logo_url,
+        })) || []
+
+      setSubsidiaries(mappedSubsidiaries)
     } catch (error) {
       console.error("[v0] Error in loadSubsidiaries:", error)
     }
