@@ -497,17 +497,55 @@ export default function EmployeesPage() {
         employeeId = `${companyInitials}${sequence}`
       }
 
-      const newEmployee = {
-        ...employeeData,
+      const employeeRecord = {
         employee_id: employeeId,
+        prefix: employeeData.prefix || null,
+        first_name: employeeData.firstName,
+        other_names: employeeData.otherNames || null,
+        last_name: employeeData.lastName,
+        full_name: employeeData.fullName,
+        display_name: employeeData.displayName,
+        marital_status: employeeData.maritalStatus || null,
+        gender: employeeData.gender || null,
+        personal_email: employeeData.personalEmail,
+        corporate_email: employeeData.corporateEmail || null,
+        phone: employeeData.phone,
+        date_of_birth: employeeData.dateOfBirth || null,
+        address: employeeData.address || null,
+        educational_level: employeeData.educationalLevel || null,
+        emergency_contact_name: employeeData.emergencyContactName || null,
+        emergency_contact_tel: employeeData.emergencyContactTel || null,
+        position: employeeData.position,
+        special_role: employeeData.specialRole || null,
+        subsidiary_id: employeeData.subsidiary || null,
+        division: employeeData.division || null,
+        department: employeeData.department,
+        location: employeeData.location,
+        contract_type: employeeData.contractType || "Permanent",
+        date_of_joining: employeeData.dateOfJoining || null,
+        date_of_exit: employeeData.dateOfExit || null,
+        status: employeeData.status || "Active",
+        probation_period: employeeData.probationPeriod ? Number.parseInt(employeeData.probationPeriod) : null,
+        confirmation_date: employeeData.confirmationDate || null,
+        notice_period: employeeData.noticePeriod || null,
+        direct_supervisor: employeeData.directSupervisor || null,
+        head_of_department: employeeData.headOfDepartment || null,
+        ghana_card_number: employeeData.ghanaCard || null,
+        profile_picture: employeeData.profilePicture || null,
+        company_id: "00000000-0000-0000-0000-000000000001", // Main company ID
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
 
-      const { data, error } = await supabase.from("employees").insert([newEmployee]).select().single()
+      // Insert employee record
+      const { data: employeeResult, error: employeeError } = await supabase
+        .from("employees")
+        .insert([employeeRecord])
+        .select()
+        .single()
 
-      if (error) {
-        console.error("Error adding employee:", error)
+      if (employeeError) {
+        console.error("Error adding employee:", employeeError)
         toast({
           title: "Error",
           description: "Failed to add employee to database.",
@@ -516,14 +554,72 @@ export default function EmployeesPage() {
         return
       }
 
-      console.log("[v0] Employee added successfully:", data)
+      console.log("[v0] Employee added successfully:", employeeResult)
+
+      const financialRecord = {
+        employee_id: employeeResult.id,
+        monthly_salary: employeeData.salary ? Number.parseFloat(employeeData.salary) : null,
+        transport_allowance: employeeData.transportAllowance
+          ? Number.parseFloat(employeeData.transportAllowance)
+          : null,
+        housing_allowance: employeeData.housingAllowance ? Number.parseFloat(employeeData.housingAllowance) : null,
+        medical_allowance: employeeData.medicalAllowance ? Number.parseFloat(employeeData.medicalAllowance) : null,
+        meal_allowance: employeeData.mealAllowance ? Number.parseFloat(employeeData.mealAllowance) : null,
+        uniform_allowance: employeeData.uniformAllowance ? Number.parseFloat(employeeData.uniformAllowance) : null,
+        communication_allowance: employeeData.communicationAllowance
+          ? Number.parseFloat(employeeData.communicationAllowance)
+          : null,
+        other_allowances: employeeData.otherAllowances ? Number.parseFloat(employeeData.otherAllowances) : null,
+        tax_deduction: employeeData.taxDeduction ? Number.parseFloat(employeeData.taxDeduction) : null,
+        ssnit_number: employeeData.ssnit || null,
+        tier3_contribution: employeeData.tier3 ? Number.parseFloat(employeeData.tier3) : null,
+        loan_deduction: employeeData.loanDeduction ? Number.parseFloat(employeeData.loanDeduction) : null,
+        advance_deduction: employeeData.advanceDeduction ? Number.parseFloat(employeeData.advanceDeduction) : null,
+        other_deductions: employeeData.otherDeductions ? Number.parseFloat(employeeData.otherDeductions) : null,
+        loan_amount: employeeData.loanAmount ? Number.parseFloat(employeeData.loanAmount) : null,
+        loan_balance: employeeData.loanBalance ? Number.parseFloat(employeeData.loanBalance) : null,
+        loan_installment: employeeData.loanInstallment ? Number.parseFloat(employeeData.loanInstallment) : null,
+        loan_start_date: employeeData.loanStartDate || null,
+        loan_end_date: employeeData.loanEndDate || null,
+        bank_name: employeeData.bankName || null,
+        bank_account_number: employeeData.bankAccount || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      const { error: financialError } = await supabase.from("employee_financial").insert([financialRecord])
+
+      if (financialError) {
+        console.error("Error adding financial data:", financialError)
+        // Don't fail the entire operation, just log the error
+      }
+
+      if (employeeData.documents && employeeData.documents.length > 0) {
+        const documentRecords = employeeData.documents.map((doc: any) => ({
+          employee_id: employeeResult.id,
+          document_type: doc.type,
+          document_name: doc.name,
+          file_path: doc.path || null,
+          file_size: doc.size || null,
+          upload_date: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }))
+
+        const { error: documentsError } = await supabase.from("employee_documents").insert(documentRecords)
+
+        if (documentsError) {
+          console.error("Error adding documents:", documentsError)
+          // Don't fail the entire operation, just log the error
+        }
+      }
 
       // Immediately update local state
-      setEmployees((prev) => [data, ...prev])
+      setEmployees((prev) => [employeeResult, ...prev])
 
       toast({
         title: "Success",
-        description: `Employee ${employeeData.display_name} has been added successfully!`,
+        description: `Employee ${employeeData.displayName} has been added successfully!`,
       })
 
       setIsAddDialogOpen(false)
@@ -1673,6 +1769,8 @@ function AddEmployeeForm({
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log("[v0] Form submit triggered")
+
     if (validateForm()) {
       const fullName = [formData.prefix, formData.firstName, formData.otherNames, formData.lastName]
         .filter(Boolean)
@@ -1680,72 +1778,31 @@ function AddEmployeeForm({
 
       const employeeData = {
         ...formData,
-        name: fullName,
         fullName: fullName,
         displayName: `${formData.firstName} ${formData.lastName}`,
         email: formData.personalEmail, // Primary email for system use
       }
 
       console.log("[v0] Submitting employee data:", employeeData)
-      onSubmit(employeeData)
 
-      // Reset form after successful submission
-      setFormData({
-        employeeId: "",
-        prefix: "",
-        firstName: "",
-        otherNames: "",
-        lastName: "",
-        maritalStatus: "",
-        gender: "",
-        corporateEmail: "",
-        personalEmail: "",
-        phone: "",
-        dateOfBirth: "",
-        address: "",
-        educationalLevel: "",
-        emergencyContactName: "",
-        emergencyContactTel: "",
-        position: "",
-        directSupervisor: "",
-        headOfDepartment: "",
-        subsidiary: "",
-        division: "",
-        department: "",
-        location: "",
-        contractType: "Permanent",
-        dateOfJoining: "",
-        dateOfExit: "",
-        status: "Active",
-        probationPeriod: "6",
-        confirmationDate: "",
-        noticePeriod: "",
-        salary: "",
-        transportAllowance: "",
-        housingAllowance: "",
-        medicalAllowance: "",
-        mealAllowance: "",
-        uniformAllowance: "",
-        communicationAllowance: "",
-        otherAllowances: "",
-        taxDeduction: "",
-        tier3: "",
-        loanDeduction: "",
-        advanceDeduction: "",
-        otherDeductions: "",
-        loanAmount: "",
-        loanBalance: "",
-        loanInstallment: "",
-        loanStartDate: "",
-        loanEndDate: "",
-        bankName: "",
-        bankAccount: "",
-        ghanaCard: "",
-        documents: [],
-        profilePicture: "",
-        profilePictureFile: null,
+      try {
+        await onSubmit(employeeData)
+        console.log("[v0] Employee submission completed successfully")
+      } catch (error) {
+        console.error("[v0] Error during employee submission:", error)
+        toast({
+          title: "Error",
+          description: "Failed to submit employee data. Please try again.",
+          variant: "destructive",
+        })
+      }
+    } else {
+      console.log("[v0] Form validation failed")
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields correctly.",
+        variant: "destructive",
       })
-      setErrors({})
     }
   }
 
