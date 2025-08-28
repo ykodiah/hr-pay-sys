@@ -36,6 +36,7 @@ interface OrgChart {
   preview_image?: string
   is_active: boolean
   created_at: string
+  user_id?: string
 }
 
 export default function OrganizationalChartPage() {
@@ -454,6 +455,22 @@ export default function OrganizationalChartPage() {
     try {
       const supabase = createClient()
 
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+
+      if (authError || !user) {
+        toast({
+          title: "Authentication Required",
+          description: "You must be logged in to save organizational charts.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      console.log("[v0] User authenticated, proceeding with chart save:", user.id)
+
       const { data, error } = await supabase.from("organizational_charts").insert([
         {
           name: previewChart.name,
@@ -465,10 +482,13 @@ export default function OrganizationalChartPage() {
           chart_data: previewChart.chart_data,
           preview_image: previewChart.preview_image,
           is_active: false,
+          user_id: user.id,
         },
       ])
 
       if (error) throw error
+
+      console.log("[v0] Chart saved successfully:", data)
 
       toast({
         title: "Chart Saved",
@@ -482,7 +502,7 @@ export default function OrganizationalChartPage() {
       console.error("Error saving chart:", error)
       toast({
         title: "Save Error",
-        description: "Failed to save organizational chart. Please try again.",
+        description: `Failed to save organizational chart: ${error.message}`,
         variant: "destructive",
       })
     }
@@ -491,6 +511,20 @@ export default function OrganizationalChartPage() {
   const activateChart = async (chartId: string) => {
     try {
       const supabase = createClient()
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+
+      if (authError || !user) {
+        toast({
+          title: "Authentication Required",
+          description: "You must be logged in to activate organizational charts.",
+          variant: "destructive",
+        })
+        return
+      }
 
       // Deactivate all other charts
       await supabase.from("organizational_charts").update({ is_active: false }).neq("id", chartId)
