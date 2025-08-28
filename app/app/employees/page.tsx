@@ -1880,6 +1880,7 @@ function AddEmployeeForm({
                     <SelectItem value="Married">Married</SelectItem>
                     <SelectItem value="Divorced">Divorced</SelectItem>
                     <SelectItem value="Widowed">Widowed</SelectItem>
+                    <SelectItem value="Separated">Separated</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1892,7 +1893,6 @@ function AddEmployeeForm({
                   <SelectContent>
                     <SelectItem value="Male">Male</SelectItem>
                     <SelectItem value="Female">Female</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1961,11 +1961,15 @@ function AddEmployeeForm({
                     <SelectValue placeholder="Select education level" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="High School">High School</SelectItem>
+                    <SelectItem value="JHS">JHS</SelectItem>
+                    <SelectItem value="SHS">SHS</SelectItem>
                     <SelectItem value="Diploma">Diploma</SelectItem>
-                    <SelectItem value="Bachelor's Degree">Bachelor's Degree</SelectItem>
-                    <SelectItem value="Master's Degree">Master's Degree</SelectItem>
-                    <SelectItem value="PhD">PhD</SelectItem>
+                    <SelectItem value="HND">HND</SelectItem>
+                    <SelectItem value="Degree">Degree</SelectItem>
+                    <SelectItem value="Masters">Masters</SelectItem>
+                    <SelectItem value="Doctorate">Doctorate</SelectItem>
+                    <SelectItem value="Professional">Professional</SelectItem>
+                    <SelectItem value="Other Certificate">Other Certificate</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2019,46 +2023,6 @@ function AddEmployeeForm({
                 {errors.position && <p className="text-red-500 text-sm mt-1">{errors.position}</p>}
               </div>
               <div>
-                <Label htmlFor="directSupervisor">1a. Direct Supervisor *</Label>
-                <Select
-                  value={formData.directSupervisor}
-                  onValueChange={(value) => handleInputChange("directSupervisor", value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select direct supervisor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employees
-                      .filter((emp) => emp.id !== selectedEmployee?.id)
-                      .map((employee) => (
-                        <SelectItem key={employee.id} value={employee.id}>
-                          {employee.name || `${employee.firstName} ${employee.lastName}`}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="headOfDepartment">1b. Head of Department *</Label>
-                <Select
-                  value={formData.headOfDepartment}
-                  onValueChange={(value) => handleInputChange("headOfDepartment", value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select head of department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employees
-                      .filter((emp) => emp.id !== selectedEmployee?.id)
-                      .map((employee) => (
-                        <SelectItem key={employee.id} value={employee.id}>
-                          {employee.name || `${employee.firstName} ${employee.lastName}`}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
                 <Label htmlFor="subsidiary">2. Subsidiary</Label>
                 <Select value={formData.subsidiary} onValueChange={(value) => handleInputChange("subsidiary", value)}>
                   <SelectTrigger className="w-full">
@@ -2103,6 +2067,46 @@ function AddEmployeeForm({
                   </SelectContent>
                 </Select>
                 {errors.department && <p className="text-red-500 text-sm mt-1">{errors.department}</p>}
+              </div>
+              <div>
+                <Label htmlFor="directSupervisor">4a. Direct Supervisor *</Label>
+                <Select
+                  value={formData.directSupervisor}
+                  onValueChange={(value) => handleInputChange("directSupervisor", value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select direct supervisor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees
+                      .filter((emp) => emp.id !== selectedEmployee?.id)
+                      .map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.name || `${employee.firstName} ${employee.lastName}`}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="headOfDepartment">4b. Head of Department *</Label>
+                <Select
+                  value={formData.headOfDepartment}
+                  onValueChange={(value) => handleInputChange("headOfDepartment", value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select head of department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees
+                      .filter((emp) => emp.id !== selectedEmployee?.id)
+                      .map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.name || `${employee.firstName} ${employee.lastName}`}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="location">5. Location *</Label>
