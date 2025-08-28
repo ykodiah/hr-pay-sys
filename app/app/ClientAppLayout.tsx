@@ -36,6 +36,7 @@ import {
   FileText,
   Shield,
   Clock,
+  Sigma as Sitemap,
 } from "lucide-react"
 import { Suspense, useState, useEffect } from "react"
 
@@ -407,6 +408,21 @@ export default function ClientAppLayout({
                 >
                   <Users className="w-5 h-5" />
                   <span>Employees</span>
+                </a>
+                <a
+                  href="/app/org-chart"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
+                    e.currentTarget.style.color = "white"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = ""
+                    e.currentTarget.style.color = ""
+                  }}
+                >
+                  <Sitemap className="w-5 h-5" />
+                  <span>Organizational Chart</span>
                 </a>
                 <a
                   href="/app/documents"
