@@ -249,6 +249,7 @@ export default function EmployeesPage() {
   useEffect(() => {
     loadEmployees()
     loadSubsidiaries()
+    loadCompanyData()
   }, [])
 
   useEffect(() => {
