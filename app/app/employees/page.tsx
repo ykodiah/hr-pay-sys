@@ -1602,12 +1602,21 @@ function AddEmployeeForm({
         }
       }
 
-      const nextNumber = Math.floor(Math.random() * 9999) + 1
-      return `${prefix}${String(nextNumber).padStart(4, "0")}`
+      // Generate sequential number starting from 0001
+      const existingEmployees = employees || []
+      const nextNumber = existingEmployees.length + 1
+      const paddedNumber = nextNumber.toString().padStart(4, "0")
+
+      return `${prefix}${paddedNumber}`
     }
 
-    setFormData((prev) => ({ ...prev, employeeId: generateId() }))
-  }, [formData.subsidiary, subsidiaries])
+    if (!formData.employeeId) {
+      setFormData((prev: any) => ({
+        ...prev,
+        employeeId: generateId(),
+      }))
+    }
+  }, [formData.subsidiary, subsidiaries, employees, formData.employeeId, setFormData])
 
   const validateForm = () => {
     const newErrors: any = {}
@@ -1951,20 +1960,21 @@ function AddEmployeeForm({
               />
             </div>
             <div>
-              <Label htmlFor="position">Position</Label>
+              <Label htmlFor="position">1. Position *</Label>
               <Input
                 type="text"
                 id="position"
+                placeholder="Enter position/job title"
                 value={formData.position}
                 onChange={(e) => handleInputChange("position", e.target.value)}
               />
               {errors.position && <p className="text-red-500 text-sm mt-1">{errors.position}</p>}
             </div>
             <div>
-              <Label htmlFor="subsidiary">Subsidiary</Label>
+              <Label htmlFor="subsidiary">2. Subsidiary</Label>
               <Select value={formData.subsidiary} onValueChange={(value) => handleInputChange("subsidiary", value)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select subsidiary" />
+                  <SelectValue placeholder="Select subsidiary (optional)" />
                 </SelectTrigger>
                 <SelectContent>
                   {subsidiaries.map((subsidiary) => (
@@ -1976,10 +1986,10 @@ function AddEmployeeForm({
               </Select>
             </div>
             <div>
-              <Label htmlFor="division">Division</Label>
+              <Label htmlFor="division">3. Division / Branch</Label>
               <Select value={formData.division} onValueChange={(value) => handleInputChange("division", value)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select division" />
+                  <SelectValue placeholder="Select division/branch" />
                 </SelectTrigger>
                 <SelectContent>
                   {divisions.map((division) => (
@@ -1991,7 +2001,7 @@ function AddEmployeeForm({
               </Select>
             </div>
             <div>
-              <Label htmlFor="department">Department</Label>
+              <Label htmlFor="department">4. Department *</Label>
               <Select value={formData.department} onValueChange={(value) => handleInputChange("department", value)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select department" />
@@ -2007,7 +2017,7 @@ function AddEmployeeForm({
               {errors.department && <p className="text-red-500 text-sm mt-1">{errors.department}</p>}
             </div>
             <div>
-              <Label htmlFor="location">Location</Label>
+              <Label htmlFor="location">5. Location *</Label>
               <Select value={formData.location} onValueChange={(value) => handleInputChange("location", value)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select location" />
@@ -2023,7 +2033,7 @@ function AddEmployeeForm({
               {errors.location && <p className="text-red-500 text-sm mt-1">{errors.location}</p>}
             </div>
             <div>
-              <Label htmlFor="contractType">Contract Type</Label>
+              <Label htmlFor="contractType">6. Contract Type</Label>
               <Select value={formData.contractType} onValueChange={(value) => handleInputChange("contractType", value)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select contract type" />
@@ -2036,7 +2046,7 @@ function AddEmployeeForm({
               </Select>
             </div>
             <div>
-              <Label htmlFor="dateOfJoining">Date of Joining</Label>
+              <Label htmlFor="dateOfJoining">7. Date of Joining</Label>
               <Input
                 type="date"
                 id="dateOfJoining"
@@ -2045,16 +2055,7 @@ function AddEmployeeForm({
               />
             </div>
             <div>
-              <Label htmlFor="dateOfExit">Date of Exit</Label>
-              <Input
-                type="date"
-                id="dateOfExit"
-                value={formData.dateOfExit}
-                onChange={(e) => handleInputChange("dateOfExit", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="status">Status</Label>
+              <Label htmlFor="status">8. Status</Label>
               <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select status" />
@@ -2068,7 +2069,7 @@ function AddEmployeeForm({
               </Select>
             </div>
             <div>
-              <Label htmlFor="probationPeriod">Probation Period (Months)</Label>
+              <Label htmlFor="probationPeriod">9. Probation Period (Months)</Label>
               <Input
                 type="number"
                 id="probationPeriod"
@@ -2077,7 +2078,7 @@ function AddEmployeeForm({
               />
             </div>
             <div>
-              <Label htmlFor="confirmationDate">Confirmation Date</Label>
+              <Label htmlFor="confirmationDate">10. Confirmation Date</Label>
               <Input
                 type="date"
                 id="confirmationDate"
@@ -2086,12 +2087,21 @@ function AddEmployeeForm({
               />
             </div>
             <div>
-              <Label htmlFor="noticePeriod">Notice Period (Days)</Label>
+              <Label htmlFor="noticePeriod">11. Notice Period (Days)</Label>
               <Input
                 type="number"
                 id="noticePeriod"
                 value={formData.noticePeriod}
                 onChange={(e) => handleInputChange("noticePeriod", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="startDate">12. Start Date</Label>
+              <Input
+                type="date"
+                id="startDate"
+                value={formData.startDate}
+                onChange={(e) => handleInputChange("startDate", e.target.value)}
               />
             </div>
           </div>
@@ -2100,7 +2110,7 @@ function AddEmployeeForm({
         <TabsContent value="financial">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="salary">Salary</Label>
+              <Label htmlFor="salary">Monthly Salary</Label>
               <Input
                 type="number"
                 id="salary"
@@ -2108,124 +2118,6 @@ function AddEmployeeForm({
                 onChange={(e) => handleInputChange("salary", e.target.value)}
               />
               {errors.salary && <p className="text-red-500 text-sm mt-1">{errors.salary}</p>}
-            </div>
-            <div>
-              <Label htmlFor="transportAllowance">Transport Allowance</Label>
-              <Input
-                type="number"
-                id="transportAllowance"
-                value={formData.transportAllowance}
-                onChange={(e) => handleInputChange("transportAllowance", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="housingAllowance">Housing Allowance</Label>
-              <Input
-                type="number"
-                id="housingAllowance"
-                value={formData.housingAllowance}
-                onChange={(e) => handleInputChange("housingAllowance", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="medicalAllowance">Medical Allowance</Label>
-              <Input
-                type="number"
-                id="medicalAllowance"
-                value={formData.medicalAllowance}
-                onChange={(e) => handleInputChange("medicalAllowance", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="mealAllowance">Meal Allowance</Label>
-              <Input
-                type="number"
-                id="mealAllowance"
-                value={formData.mealAllowance}
-                onChange={(e) => handleInputChange("mealAllowance", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="uniformAllowance">Uniform Allowance</Label>
-              <Input
-                type="number"
-                id="uniformAllowance"
-                value={formData.uniformAllowance}
-                onChange={(e) => handleInputChange("uniformAllowance", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="communicationAllowance">Communication Allowance</Label>
-              <Input
-                type="number"
-                id="communicationAllowance"
-                value={formData.communicationAllowance}
-                onChange={(e) => handleInputChange("communicationAllowance", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="otherAllowances">Other Allowances</Label>
-              <Input
-                type="number"
-                id="otherAllowances"
-                value={formData.otherAllowances}
-                onChange={(e) => handleInputChange("otherAllowances", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="taxDeduction">Tax Deduction</Label>
-              <Input
-                type="number"
-                id="taxDeduction"
-                value={formData.taxDeduction}
-                onChange={(e) => handleInputChange("taxDeduction", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="ssnit">SSNIT Number</Label>
-              <Input
-                type="text"
-                id="ssnit"
-                value={formData.ssnit}
-                onChange={(e) => handleInputChange("ssnit", e.target.value)}
-              />
-              {errors.ssnit && <p className="text-red-500 text-sm mt-1">{errors.ssnit}</p>}
-            </div>
-            <div>
-              <Label htmlFor="tier3">Tier 3</Label>
-              <Input
-                type="number"
-                id="tier3"
-                value={formData.tier3}
-                onChange={(e) => handleInputChange("tier3", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="loanDeduction">Loan Deduction</Label>
-              <Input
-                type="number"
-                id="loanDeduction"
-                value={formData.loanDeduction}
-                onChange={(e) => handleInputChange("loanDeduction", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="advanceDeduction">Advance Deduction</Label>
-              <Input
-                type="number"
-                id="advanceDeduction"
-                value={formData.advanceDeduction}
-                onChange={(e) => handleInputChange("advanceDeduction", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="otherDeductions">Other Deductions</Label>
-              <Input
-                type="number"
-                id="otherDeductions"
-                value={formData.otherDeductions}
-                onChange={(e) => handleInputChange("otherDeductions", e.target.value)}
-              />
             </div>
             <div>
               <Label htmlFor="bankName">Bank Name</Label>
@@ -2248,14 +2140,14 @@ function AddEmployeeForm({
               {errors.bankAccount && <p className="text-red-500 text-sm mt-1">{errors.bankAccount}</p>}
             </div>
             <div>
-              <Label htmlFor="ghanaCard">Ghana Card Number</Label>
+              <Label htmlFor="ssnit">SSNIT Number</Label>
               <Input
                 type="text"
-                id="ghanaCard"
-                value={formData.ghanaCard}
-                onChange={(e) => handleInputChange("ghanaCard", e.target.value)}
+                id="ssnit"
+                value={formData.ssnit}
+                onChange={(e) => handleInputChange("ssnit", e.target.value)}
               />
-              {errors.ghanaCard && <p className="text-red-500 text-sm mt-1">{errors.ghanaCard}</p>}
+              {errors.ssnit && <p className="text-red-500 text-sm mt-1">{errors.ssnit}</p>}
             </div>
           </div>
         </TabsContent>
@@ -2352,5 +2244,79 @@ function AddEmployeeForm({
         )}
       </div>
     </form>
+  )
+}
+
+function EmployeeProfile({ employee }: { employee: any }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center space-x-4">
+        <Avatar className="h-20 w-20">
+          <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${employee.display_name}`} />
+          <AvatarFallback>
+            {employee.display_name
+              ?.split(" ")
+              .map((n: string) => n[0])
+              .join("")}
+          </AvatarFallback>
+        </Avatar>
+        <div>
+          <h2 className="text-2xl font-semibold">{employee.display_name}</h2>
+          <p className="text-muted-foreground">{employee.position}</p>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Personal Information</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>Email</Label>
+            <p className="font-medium">{employee.personal_email}</p>
+          </div>
+          <div>
+            <Label>Phone</Label>
+            <p className="font-medium">{employee.phone_number}</p>
+          </div>
+          <div>
+            <Label>Date of Birth</Label>
+            <p className="font-medium">{employee.date_of_birth}</p>
+          </div>
+          <div>
+            <Label>Address</Label>
+            <p className="font-medium">{employee.address}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Employment Details</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>Employee ID</Label>
+            <p className="font-medium">{employee.employee_id}</p>
+          </div>
+          <div>
+            <Label>Department</Label>
+            <p className="font-medium">{employee.department}</p>
+          </div>
+          <div>
+            <Label>Position</Label>
+            <p className="font-medium">{employee.position}</p>
+          </div>
+          <div>
+            <Label>Status</Label>
+            <Badge variant={employee.status === "Active" ? "default" : "secondary"}>{employee.status}</Badge>
+          </div>
+          <div>
+            <Label>Salary</Label>
+            <p className="font-medium">GHS {employee.salary?.toLocaleString()}</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
