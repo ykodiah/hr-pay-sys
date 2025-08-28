@@ -315,55 +315,44 @@ export default function EmployeesPage() {
         .from("companies")
         .select("*")
         .eq("id", MAIN_COMPANY_ID)
-        .single()
+        .maybeSingle()
 
       if (companyError) {
         console.error("[v0] Error loading company data:", companyError)
-      } else {
+      } else if (companyData) {
         setCompanySettings(companyData)
         console.log("[v0] Company data loaded:", companyData)
 
-        if (companyData) {
-          const companyDivisions = Array.isArray(companyData.divisions)
-            ? companyData.divisions
-            : companyData.divisions
-              ? JSON.parse(companyData.divisions)
-              : ["Head Office", "Regional Office"]
+        const companyDivisions = Array.isArray(companyData.divisions)
+          ? companyData.divisions
+          : companyData.divisions
+            ? JSON.parse(companyData.divisions)
+            : ["Head Office", "Regional Office"]
 
-          const companyDepartments = Array.isArray(companyData.departments)
-            ? companyData.departments
-            : companyData.departments
-              ? JSON.parse(companyData.departments)
-              : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+        const companyDepartments = Array.isArray(companyData.departments)
+          ? companyData.departments
+          : companyData.departments
+            ? JSON.parse(companyData.departments)
+            : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
 
-          const companyLocations = Array.isArray(companyData.locations)
-            ? companyData.locations
-            : companyData.locations
-              ? JSON.parse(companyData.locations)
-              : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
+        const companyLocations = Array.isArray(companyData.locations)
+          ? companyData.locations
+          : companyData.locations
+            ? JSON.parse(companyData.locations)
+            : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
 
-          setDivisions(companyDivisions)
-          setDepartments(companyDepartments)
-          setLocations(companyLocations)
+        setDivisions(companyDivisions)
+        setDepartments(companyDepartments)
+        setLocations(companyLocations)
 
-          console.log("[v0] Set company divisions:", companyDivisions)
-          console.log("[v0] Set company departments:", companyDepartments)
-          console.log("[v0] Set company locations:", companyLocations)
-        }
-      }
-
-      // Load subsidiaries
-      const { data: subsidiaryData, error: subsidiaryError } = await supabase
-        .from("subsidiaries")
-        .select("*")
-        .eq("company_id", MAIN_COMPANY_ID)
-        .eq("status", "active")
-
-      if (subsidiaryError) {
-        console.error("[v0] Error loading subsidiaries:", subsidiaryError)
+        console.log("[v0] Set company divisions:", companyDivisions)
+        console.log("[v0] Set company departments:", companyDepartments)
+        console.log("[v0] Set company locations:", companyLocations)
       } else {
-        setSubsidiaries(subsidiaryData || [])
-        console.log("[v0] Subsidiaries loaded:", subsidiaryData?.length || 0)
+        console.log("[v0] No company data found, using default values")
+        setDivisions(["Head Office", "Regional Office"])
+        setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
+        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
       }
     } catch (error) {
       console.error("[v0] Error in loadCompanyData:", error)
