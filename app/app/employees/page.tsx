@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
-import { Search, Filter, Plus, Edit, FileText, Download, Upload, X } from "lucide-react"
+import { Search, Filter, Plus, Edit, Download, Upload } from "lucide-react"
 
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 import { useToast } from "@/hooks/use-toast"
@@ -1645,7 +1645,7 @@ function AddEmployeeForm({
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (validateForm()) {
       const fullName = [formData.prefix, formData.firstName, formData.otherNames, formData.lastName]
@@ -1765,19 +1765,7 @@ function AddEmployeeForm({
         setFormData((prev) => ({ ...prev, documents: updatedDocuments }))
       }
 
-      // Track document in central system
-      await CentralDocumentService.trackUpload({
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        uploadSource: "employee-onboarding",
-        category: documentType,
-        employeeId: formData.firstName ? `${formData.firstName} ${formData.lastName}` : "New Employee",
-        metadata: {
-          documentType: documentType,
-          uploadDate: new Date().toISOString(),
-        },
-      })
+      console.log(`[v0] Document ${documentType} stored in form data successfully`)
 
       toast({
         title: "Document Uploaded",
@@ -1794,336 +1782,189 @@ function AddEmployeeForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
-      <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-8">
-          <TabsTrigger value="personal">Personal Info</TabsTrigger>
+    <form onSubmit={handleFormSubmit} className="space-y-4">
+      <Tabs value={currentTab} onValueChange={handleTabChange}>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="personal">Personal</TabsTrigger>
           <TabsTrigger value="employment">Employment</TabsTrigger>
           <TabsTrigger value="financial">Financial</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="personal" className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">1. Prefix</Label>
-              <Select value={formData.prefix} onValueChange={(value) => handleInputChange("prefix", value)}>
-                <SelectTrigger className="form-input">
-                  <SelectValue placeholder="Select prefix" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Mr">Mr</SelectItem>
-                  <SelectItem value="Mrs">Mrs</SelectItem>
-                  <SelectItem value="Miss">Miss</SelectItem>
-                  <SelectItem value="Ms">Ms</SelectItem>
-                  <SelectItem value="Dr">Dr</SelectItem>
-                  <SelectItem value="Prof">Prof</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">2. First Name *</Label>
-              <div className="flex-1">
-                <Input
-                  value={formData.firstName ?? ""}
-                  onChange={(e) => handleInputChange("firstName", e.target.value)}
-                  placeholder="Enter first name"
-                  className={`form-input ${errors.firstName ? "border-red-500" : ""}`}
-                />
-                {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">3. Other Name(s)</Label>
+        <TabsContent value="personal">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="prefix">Prefix</Label>
               <Input
-                value={formData.otherNames ?? ""}
-                onChange={(e) => handleInputChange("otherNames", e.target.value)}
-                placeholder="Middle names"
-                className="form-input flex-1"
+                type="text"
+                id="prefix"
+                value={formData.prefix}
+                onChange={(e) => handleInputChange("prefix", e.target.value)}
               />
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">4. Last Name *</Label>
-              <div className="flex-1">
-                <Input
-                  value={formData.lastName ?? ""}
-                  onChange={(e) => handleInputChange("lastName", e.target.value)}
-                  placeholder="Enter last name"
-                  className={`form-input ${errors.lastName ? "border-red-500" : ""}`}
-                />
-                {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
-              </div>
+            <div>
+              <Label htmlFor="firstName">First Name</Label>
+              <Input
+                type="text"
+                id="firstName"
+                value={formData.firstName}
+                onChange={(e) => handleInputChange("firstName", e.target.value)}
+              />
+              {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">5. Marital Status</Label>
+            <div>
+              <Label htmlFor="otherNames">Other Names</Label>
+              <Input
+                type="text"
+                id="otherNames"
+                value={formData.otherNames}
+                onChange={(e) => handleInputChange("otherNames", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input
+                type="text"
+                id="lastName"
+                value={formData.lastName}
+                onChange={(e) => handleInputChange("lastName", e.target.value)}
+              />
+              {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
+            </div>
+            <div>
+              <Label htmlFor="maritalStatus">Marital Status</Label>
               <Select
-                value={formData.maritalStatus ?? ""}
+                value={formData.maritalStatus}
                 onValueChange={(value) => handleInputChange("maritalStatus", value)}
               >
-                <SelectTrigger className="form-input flex-1">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select marital status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Single">Single</SelectItem>
                   <SelectItem value="Married">Married</SelectItem>
                   <SelectItem value="Divorced">Divorced</SelectItem>
-                  <SelectItem value="Separated">Separated</SelectItem>
+                  <SelectItem value="Widowed">Widowed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">6. Gender</Label>
+            <div>
+              <Label htmlFor="gender">Gender</Label>
               <Select value={formData.gender} onValueChange={(value) => handleInputChange("gender", value)}>
-                <SelectTrigger className="form-input flex-1">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select gender" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Male">Male</SelectItem>
                   <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">7. Corporate Email Address</Label>
-              <div className="flex-1">
-                <Input
-                  type="email"
-                  value={formData.corporateEmail}
-                  onChange={(e) => handleInputChange("corporateEmail", e.target.value)}
-                  placeholder="employee@company.com"
-                  className={`form-input ${errors.corporateEmail ? "border-red-500" : ""}`}
-                />
-                {errors.corporateEmail && <p className="text-red-500 text-sm mt-1">{errors.corporateEmail}</p>}
-              </div>
+            <div>
+              <Label htmlFor="personalEmail">Personal Email</Label>
+              <Input
+                type="email"
+                id="personalEmail"
+                value={formData.personalEmail}
+                onChange={(e) => handleInputChange("personalEmail", e.target.value)}
+              />
+              {errors.personalEmail && <p className="text-red-500 text-sm mt-1">{errors.personalEmail}</p>}
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">8. Personal Email Address *</Label>
-              <div className="flex-1">
-                <Input
-                  type="email"
-                  value={formData.personalEmail}
-                  onChange={(e) => handleInputChange("personalEmail", e.target.value)}
-                  placeholder="personal@email.com"
-                  className={`form-input ${errors.personalEmail ? "border-red-500" : ""}`}
-                />
-                {errors.personalEmail && <p className="text-red-500 text-sm mt-1">{errors.personalEmail}</p>}
-              </div>
+            <div>
+              <Label htmlFor="corporateEmail">Corporate Email</Label>
+              <Input
+                type="email"
+                id="corporateEmail"
+                value={formData.corporateEmail}
+                onChange={(e) => handleInputChange("corporateEmail", e.target.value)}
+              />
+              {errors.corporateEmail && <p className="text-red-500 text-sm mt-1">{errors.corporateEmail}</p>}
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">9. Phone Number *</Label>
-              <div className="flex-1">
-                <Input
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange("phone", e.target.value)}
-                  placeholder="+233 XX XXX XXXX"
-                  className={`form-input ${errors.phone ? "border-red-500" : ""}`}
-                />
-                {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
-              </div>
+            <div>
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                type="tel"
+                id="phone"
+                value={formData.phone}
+                onChange={(e) => handleInputChange("phone", e.target.value)}
+              />
+              {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">10. Date of Birth</Label>
+            <div>
+              <Label htmlFor="dateOfBirth">Date of Birth</Label>
               <Input
                 type="date"
+                id="dateOfBirth"
                 value={formData.dateOfBirth}
                 onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
-                className="form-input flex-1"
               />
             </div>
-
-            <div className="flex items-start gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48 pt-2">11. Address</Label>
-              <textarea
+            <div>
+              <Label htmlFor="address">Address</Label>
+              <Input
+                type="text"
+                id="address"
                 value={formData.address}
                 onChange={(e) => handleInputChange("address", e.target.value)}
-                placeholder="Full address"
-                className="form-input flex-1 min-h-[80px] max-h-[120px] resize-none overflow-y-auto"
-                rows={3}
               />
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">12. Educational Level</Label>
-              <Select
-                value={formData.educationalLevel}
-                onChange={(value) => handleInputChange("educationalLevel", value)}
-              >
-                <SelectTrigger className="form-input flex-1">
-                  <SelectValue placeholder="Select education level" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="JHS">JHS</SelectItem>
-                  <SelectItem value="SHS">SHS</SelectItem>
-                  <SelectItem value="Diploma">Diploma</SelectItem>
-                  <SelectItem value="HND">HND</SelectItem>
-                  <SelectItem value="Degree">Degree</SelectItem>
-                  <SelectItem value="Masters">Masters</SelectItem>
-                  <SelectItem value="Doctorate">Doctorate</SelectItem>
-                  <SelectItem value="Professional">Professional</SelectItem>
-                  <SelectItem value="Other Certificate">Other Certificate</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">13. Emergency Contact Name</Label>
+            <div>
+              <Label htmlFor="educationalLevel">Educational Level</Label>
               <Input
+                type="text"
+                id="educationalLevel"
+                value={formData.educationalLevel}
+                onChange={(e) => handleInputChange("educationalLevel", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="emergencyContactName">Emergency Contact Name</Label>
+              <Input
+                type="text"
+                id="emergencyContactName"
                 value={formData.emergencyContactName}
                 onChange={(e) => handleInputChange("emergencyContactName", e.target.value)}
-                placeholder="Contact person name"
-                className="form-input flex-1"
               />
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">14. Emergency Contact Tel</Label>
+            <div>
+              <Label htmlFor="emergencyContactTel">Emergency Contact Tel</Label>
               <Input
+                type="tel"
+                id="emergencyContactTel"
                 value={formData.emergencyContactTel}
                 onChange={(e) => handleInputChange("emergencyContactTel", e.target.value)}
-                placeholder="+233 XX XXX XXXX"
-                className="form-input flex-1"
               />
             </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="employment" className="space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">Employee ID</Label>
+        <TabsContent value="employment">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="employeeId">Employee ID</Label>
               <Input
+                type="text"
+                id="employeeId"
                 value={formData.employeeId}
-                readOnly
-                className="form-input flex-1 bg-gray-50"
-                placeholder="Auto-generated"
+                onChange={(e) => handleInputChange("employeeId", e.target.value)}
+                disabled
               />
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">1. Position *</Label>
+            <div>
+              <Label htmlFor="position">Position</Label>
               <Input
+                type="text"
+                id="position"
                 value={formData.position}
                 onChange={(e) => handleInputChange("position", e.target.value)}
-                placeholder="Enter position/job title"
-                className={`form-input ${errors.position ? "border-red-500" : ""}`}
               />
+              {errors.position && <p className="text-red-500 text-sm mt-1">{errors.position}</p>}
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">1a. Direct Supervisor *</Label>
-              <Select
-                value={formData.directSupervisor}
-                onValueChange={(value) => handleInputChange("directSupervisor", value)}
-              >
-                <SelectTrigger className="form-input flex-1">
-                  <SelectValue placeholder="Select direct supervisor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {employees
-                    .filter((emp) => emp.id !== selectedEmployee?.id)
-                    .map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id}>
-                        {employee.firstName} {employee.lastName} - {employee.position}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">1b. Head of Department *</Label>
-              <Select
-                value={formData.headOfDepartment}
-                onValueChange={(value) => handleInputChange("headOfDepartment", value)}
-              >
-                <SelectTrigger className="form-input flex-1">
-                  <SelectValue placeholder="Select head of department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {employees
-                    .filter((emp) => emp.id !== selectedEmployee?.id && emp.id !== formData.directSupervisor)
-                    .map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id}>
-                        {employee.firstName} {employee.lastName} - {employee.position}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">2. Subsidiary</Label>
-              <Select
-                value={formData.subsidiary}
-                onValueChange={(value) => {
-                  handleInputChange("subsidiary", value)
-                  if (value) {
-                    const selectedSub = subsidiaries.find((s) => s.id === value)
-                    if (selectedSub) {
-                      console.log("[v0] Subsidiary selected:", selectedSub.name)
-
-                      const subDivisions = Array.isArray(selectedSub.divisions)
-                        ? selectedSub.divisions
-                        : selectedSub.divisions
-                          ? JSON.parse(selectedSub.divisions)
-                          : []
-
-                      const subDepartments = Array.isArray(selectedSub.departments)
-                        ? selectedSub.departments
-                        : selectedSub.departments
-                          ? JSON.parse(selectedSub.departments)
-                          : []
-
-                      const subLocations = Array.isArray(selectedSub.locations)
-                        ? selectedSub.locations
-                        : selectedSub.locations
-                          ? JSON.parse(selectedSub.locations)
-                          : []
-
-                      setDivisions(subDivisions)
-                      setDepartments(subDepartments)
-                      setLocations(subLocations)
-                    }
-                  } else {
-                    console.log("[v0] No subsidiary selected, using company data")
-                    // Use company data when no subsidiary selected
-                    if (companySettings) {
-                      const companyDivisions = Array.isArray(companySettings.divisions)
-                        ? companySettings.divisions
-                        : companySettings.divisions
-                          ? JSON.parse(companySettings.divisions)
-                          : ["Head Office", "Regional Office"]
-
-                      const companyDepartments = Array.isArray(companySettings.departments)
-                        ? companySettings.departments
-                        : companySettings.departments
-                          ? JSON.parse(companySettings.departments)
-                          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
-
-                      const companyLocations = Array.isArray(companySettings.locations)
-                        ? companySettings.locations
-                        : companySettings.locations
-                          ? JSON.parse(companySettings.locations)
-                          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
-
-                      setDivisions(companyDivisions)
-                      setDepartments(companyDepartments)
-                      setLocations(companyLocations)
-                    }
-                  }
-                }}
-              >
-                <SelectTrigger className="form-input flex-1">
-                  <SelectValue placeholder="Select subsidiary (optional)" />
+            <div>
+              <Label htmlFor="subsidiary">Subsidiary</Label>
+              <Select value={formData.subsidiary} onValueChange={(value) => handleInputChange("subsidiary", value)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select subsidiary" />
                 </SelectTrigger>
                 <SelectContent>
                   {subsidiaries.map((subsidiary) => (
@@ -2134,12 +1975,11 @@ function AddEmployeeForm({
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">3. Division / Branch</Label>
+            <div>
+              <Label htmlFor="division">Division</Label>
               <Select value={formData.division} onValueChange={(value) => handleInputChange("division", value)}>
-                <SelectTrigger className="form-input flex-1">
-                  <SelectValue placeholder="Select division/branch" />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select division" />
                 </SelectTrigger>
                 <SelectContent>
                   {divisions.map((division) => (
@@ -2150,11 +1990,10 @@ function AddEmployeeForm({
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">4. Department *</Label>
+            <div>
+              <Label htmlFor="department">Department</Label>
               <Select value={formData.department} onValueChange={(value) => handleInputChange("department", value)}>
-                <SelectTrigger className={`form-input flex-1 ${errors.department ? "border-red-500" : ""}`}>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2165,12 +2004,12 @@ function AddEmployeeForm({
                   ))}
                 </SelectContent>
               </Select>
+              {errors.department && <p className="text-red-500 text-sm mt-1">{errors.department}</p>}
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">5. Location *</Label>
+            <div>
+              <Label htmlFor="location">Location</Label>
               <Select value={formData.location} onValueChange={(value) => handleInputChange("location", value)}>
-                <SelectTrigger className={`form-input flex-1 ${errors.location ? "border-red-500" : ""}`}>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2181,936 +2020,337 @@ function AddEmployeeForm({
                   ))}
                 </SelectContent>
               </Select>
+              {errors.location && <p className="text-red-500 text-sm mt-1">{errors.location}</p>}
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">6. Contract Type *</Label>
+            <div>
+              <Label htmlFor="contractType">Contract Type</Label>
               <Select value={formData.contractType} onValueChange={(value) => handleInputChange("contractType", value)}>
-                <SelectTrigger className="form-input flex-1">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select contract type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Permanent">Permanent</SelectItem>
-                  <SelectItem value="Temporary">Temporary</SelectItem>
                   <SelectItem value="Contract">Contract</SelectItem>
-                  <SelectItem value="Outsourced">Outsourced</SelectItem>
+                  <SelectItem value="Intern">Intern</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">7. Date of Joining *</Label>
+            <div>
+              <Label htmlFor="dateOfJoining">Date of Joining</Label>
               <Input
                 type="date"
+                id="dateOfJoining"
                 value={formData.dateOfJoining}
                 onChange={(e) => handleInputChange("dateOfJoining", e.target.value)}
-                className="form-input flex-1"
               />
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">8. Date of Exit</Label>
+            <div>
+              <Label htmlFor="dateOfExit">Date of Exit</Label>
               <Input
                 type="date"
+                id="dateOfExit"
                 value={formData.dateOfExit}
                 onChange={(e) => handleInputChange("dateOfExit", e.target.value)}
-                className="form-input flex-1"
               />
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">9. Status *</Label>
+            <div>
+              <Label htmlFor="status">Status</Label>
               <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
-                <SelectTrigger className="form-input flex-1">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Active">Active</SelectItem>
                   <SelectItem value="Inactive">Inactive</SelectItem>
+                  <SelectItem value="On Leave">On Leave</SelectItem>
+                  <SelectItem value="Suspended">Suspended</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            {formData.status === "Inactive" && (
-              <div className="flex items-center gap-4">
-                <Label className="text-sm font-medium text-gray-700 w-48">Reason for Inactive Status</Label>
-                <Select onValueChange={(value) => handleInputChange("inactiveReason", value)}>
-                  <SelectTrigger className="form-input flex-1">
-                    <SelectValue placeholder="Select reason" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Resignation">Resignation</SelectItem>
-                    <SelectItem value="Termination">Termination</SelectItem>
-                    <SelectItem value="Death">Death</SelectItem>
-                    <SelectItem value="Suspended">Suspended</SelectItem>
-                    <SelectItem value="Leave without pay">Leave without pay</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">10. Probation Period (months)</Label>
-              <Select
+            <div>
+              <Label htmlFor="probationPeriod">Probation Period (Months)</Label>
+              <Input
+                type="number"
+                id="probationPeriod"
                 value={formData.probationPeriod}
-                onValueChange={(value) => handleInputChange("probationPeriod", value)}
-              >
-                <SelectTrigger className="form-input flex-1">
-                  <SelectValue placeholder="Select probation period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="3">3 months</SelectItem>
-                  <SelectItem value="6">6 months</SelectItem>
-                  <SelectItem value="9">9 months</SelectItem>
-                  <SelectItem value="12">12 months</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(e) => handleInputChange("probationPeriod", e.target.value)}
+              />
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">11. Confirmation Date</Label>
+            <div>
+              <Label htmlFor="confirmationDate">Confirmation Date</Label>
               <Input
                 type="date"
+                id="confirmationDate"
                 value={formData.confirmationDate}
                 onChange={(e) => handleInputChange("confirmationDate", e.target.value)}
-                className="form-input flex-1"
               />
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium text-gray-700 w-48">12. Notice Period</Label>
+            <div>
+              <Label htmlFor="noticePeriod">Notice Period (Days)</Label>
               <Input
+                type="number"
+                id="noticePeriod"
                 value={formData.noticePeriod}
                 onChange={(e) => handleInputChange("noticePeriod", e.target.value)}
-                placeholder="e.g., 1 month, 3 months"
-                className="form-input flex-1"
               />
             </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="financial" className="space-y-6">
-          <div className="space-y-6">
-            <div className="border-b pb-4">
-              <h3 className="text-lg font-semibold mb-4">Basic Salary Information</h3>
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="salary" className="text-base font-medium mb-2 block">
-                    Monthly Salary (GHS) *
-                  </Label>
-                  <Input
-                    id="salary"
-                    type="number"
-                    value={formData.salary}
-                    onChange={(e) => handleInputChange("salary", Number.parseFloat(e.target.value))}
-                    placeholder="5000"
-                    className={`h-12 ${errors.salary ? "border-red-500" : ""}`}
-                  />
-                  {errors.salary && <p className="text-red-500 text-sm mt-1">{errors.salary}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="bankName" className="text-base font-medium mb-2 block">
-                    Bank Name
-                  </Label>
-                  <Select value={formData.bankName} onValueChange={(value) => handleInputChange("bankName", value)}>
-                    <SelectTrigger className="h-12">
-                      <SelectValue placeholder="Select bank" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="GT Bank">GT Bank</SelectItem>
-                      <SelectItem value="Ecobank">Ecobank</SelectItem>
-                      <SelectItem value="Standard Chartered">Standard Chartered</SelectItem>
-                      <SelectItem value="Fidelity Bank">Fidelity Bank</SelectItem>
-                      <SelectItem value="Access Bank">Access Bank</SelectItem>
-                      <SelectItem value="Absa Bank">Absa Bank</SelectItem>
-                      <SelectItem value="Stanbic Bank">Stanbic Bank</SelectItem>
-                      <SelectItem value="UMB Bank">UMB Bank</SelectItem>
-                      <SelectItem value="CAL Bank">CAL Bank</SelectItem>
-                      <SelectItem value="GCB Bank">GCB Bank</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6 mt-4">
-                <div>
-                  <Label htmlFor="bankAccount" className="text-base font-medium mb-2 block">
-                    Bank Account Number
-                  </Label>
-                  <Input
-                    id="bankAccount"
-                    value={formData.bankAccount}
-                    onChange={(e) => handleInputChange("bankAccount", e.target.value)}
-                    placeholder="Account number"
-                    className="h-12"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="ssnit" className="text-base font-medium mb-2 block">
-                    SSNIT Number
-                  </Label>
-                  <Input
-                    id="ssnit"
-                    value={formData.ssnit}
-                    onChange={(e) => handleInputChange("ssnit", e.target.value)}
-                    placeholder="GHA-123456789-0"
-                    className="h-12"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="border-b pb-4">
-              <h3 className="text-lg font-semibold mb-4">Allowances</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="transportAllowance" className="text-sm font-medium mb-2 block">
-                    Transport Allowance (GHS)
-                  </Label>
-                  <Input
-                    id="transportAllowance"
-                    type="number"
-                    value={formData.transportAllowance}
-                    onChange={(e) => handleInputChange("transportAllowance", e.target.value)}
-                    placeholder="0"
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="housingAllowance" className="text-sm font-medium mb-2 block">
-                    Housing Allowance (GHS)
-                  </Label>
-                  <Input
-                    id="housingAllowance"
-                    type="number"
-                    value={formData.housingAllowance}
-                    onChange={(e) => handleInputChange("housingAllowance", e.target.value)}
-                    placeholder="0"
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="medicalAllowance" className="text-sm font-medium mb-2 block">
-                    Medical Allowance (GHS)
-                  </Label>
-                  <Input
-                    id="medicalAllowance"
-                    type="number"
-                    value={formData.medicalAllowance}
-                    onChange={(e) => handleInputChange("medicalAllowance", e.target.value)}
-                    placeholder="0"
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="mealAllowance" className="text-sm font-medium mb-2 block">
-                    Meal Allowance (GHS)
-                  </Label>
-                  <Input
-                    id="mealAllowance"
-                    type="number"
-                    value={formData.mealAllowance}
-                    onChange={(e) => handleInputChange("mealAllowance", e.target.value)}
-                    placeholder="0"
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="uniformAllowance" className="text-sm font-medium mb-2 block">
-                    Uniform Allowance (GHS)
-                  </Label>
-                  <Input
-                    id="uniformAllowance"
-                    type="number"
-                    value={formData.uniformAllowance}
-                    onChange={(e) => handleInputChange("uniformAllowance", e.target.value)}
-                    placeholder="0"
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="communicationAllowance" className="text-sm font-medium mb-2 block">
-                    Communication Allowance (GHS)
-                  </Label>
-                  <Input
-                    id="communicationAllowance"
-                    type="number"
-                    value={formData.communicationAllowance}
-                    onChange={(e) => handleInputChange("communicationAllowance", e.target.value)}
-                    placeholder="0"
-                    className="h-10"
-                  />
-                </div>
-              </div>
-              <div className="mt-4">
-                <Label htmlFor="otherAllowances" className="text-sm font-medium mb-2 block">
-                  Other Allowances (GHS)
-                </Label>
-                <Input
-                  id="otherAllowances"
-                  type="number"
-                  value={formData.otherAllowances}
-                  onChange={(e) => handleInputChange("otherAllowances", e.target.value)}
-                  placeholder="0"
-                  className="h-10"
-                />
-              </div>
-            </div>
-
-            <div className="border-b pb-4">
-              <h3 className="text-lg font-semibold mb-4">Deductions</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="taxDeduction" className="text-sm font-medium mb-2 block">
-                    Tax Deduction (GHS)
-                  </Label>
-                  <Input
-                    id="taxDeduction"
-                    type="number"
-                    value={formData.taxDeduction}
-                    onChange={(e) => handleInputChange("taxDeduction", e.target.value)}
-                    placeholder="Auto-calculated"
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="tier3" className="text-sm font-medium mb-2 block">
-                    Tier 3 Contribution (GHS)
-                  </Label>
-                  <Input
-                    id="tier3"
-                    type="number"
-                    value={formData.tier3}
-                    onChange={(e) => handleInputChange("tier3", e.target.value)}
-                    placeholder="Auto-calculated"
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="loanDeduction" className="text-sm font-medium mb-2 block">
-                    Loan Deduction (GHS)
-                  </Label>
-                  <Input
-                    id="loanDeduction"
-                    type="number"
-                    value={formData.loanDeduction}
-                    onChange={(e) => handleInputChange("loanDeduction", e.target.value)}
-                    placeholder="0"
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="advanceDeduction" className="text-sm font-medium mb-2 block">
-                    Advance Deduction (GHS)
-                  </Label>
-                  <Input
-                    id="advanceDeduction"
-                    type="number"
-                    value={formData.advanceDeduction}
-                    onChange={(e) => handleInputChange("advanceDeduction", e.target.value)}
-                    placeholder="0"
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="otherDeductions" className="text-sm font-medium mb-2 block">
-                    Other Deductions (GHS)
-                  </Label>
-                  <Input
-                    id="otherDeductions"
-                    type="number"
-                    value={formData.otherDeductions}
-                    onChange={(e) => handleInputChange("otherDeductions", e.target.value)}
-                    placeholder="0"
-                    className="h-10"
-                  />
-                </div>
-              </div>
-            </div>
-
+        <TabsContent value="financial">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h3 className="text-lg font-semibold mb-4">Loan Information</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="loanAmount" className="text-sm font-medium mb-2 block">
-                    Total Loan Amount (GHS)
-                  </Label>
-                  <Input
-                    id="loanAmount"
-                    type="number"
-                    value={formData.loanAmount}
-                    onChange={(e) => handleInputChange("loanAmount", e.target.value)}
-                    placeholder="0"
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="loanBalance" className="text-sm font-medium mb-2 block">
-                    Outstanding Balance (GHS)
-                  </Label>
-                  <Input
-                    id="loanBalance"
-                    type="number"
-                    value={formData.loanBalance}
-                    onChange={(e) => handleInputChange("loanBalance", e.target.value)}
-                    placeholder="0"
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="loanInstallment" className="text-sm font-medium mb-2 block">
-                    Monthly Installment (GHS)
-                  </Label>
-                  <Input
-                    id="loanInstallment"
-                    type="number"
-                    value={formData.loanInstallment}
-                    onChange={(e) => handleInputChange("loanInstallment", e.target.value)}
-                    placeholder="0"
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="ghanaCard" className="text-sm font-medium mb-2 block">
-                    Ghana Card Number
-                  </Label>
-                  <Input
-                    id="ghanaCard"
-                    value={formData.ghanaCard}
-                    onChange={(e) => handleInputChange("ghanaCard", e.target.value)}
-                    placeholder="GHA-123456789-0"
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="loanStartDate" className="text-sm font-medium mb-2 block">
-                    Loan Start Date
-                  </Label>
-                  <Input
-                    id="loanStartDate"
-                    type="date"
-                    value={formData.loanStartDate}
-                    onChange={(e) => handleInputChange("loanStartDate", e.target.value)}
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="loanEndDate" className="text-sm font-medium mb-2 block">
-                    Loan End Date
-                  </Label>
-                  <Input
-                    id="loanEndDate"
-                    type="date"
-                    value={formData.loanEndDate}
-                    onChange={(e) => handleInputChange("loanEndDate", e.target.value)}
-                    className="h-10"
-                  />
-                </div>
-              </div>
+              <Label htmlFor="salary">Salary</Label>
+              <Input
+                type="number"
+                id="salary"
+                value={formData.salary}
+                onChange={(e) => handleInputChange("salary", e.target.value)}
+              />
+              {errors.salary && <p className="text-red-500 text-sm mt-1">{errors.salary}</p>}
+            </div>
+            <div>
+              <Label htmlFor="transportAllowance">Transport Allowance</Label>
+              <Input
+                type="number"
+                id="transportAllowance"
+                value={formData.transportAllowance}
+                onChange={(e) => handleInputChange("transportAllowance", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="housingAllowance">Housing Allowance</Label>
+              <Input
+                type="number"
+                id="housingAllowance"
+                value={formData.housingAllowance}
+                onChange={(e) => handleInputChange("housingAllowance", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="medicalAllowance">Medical Allowance</Label>
+              <Input
+                type="number"
+                id="medicalAllowance"
+                value={formData.medicalAllowance}
+                onChange={(e) => handleInputChange("medicalAllowance", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="mealAllowance">Meal Allowance</Label>
+              <Input
+                type="number"
+                id="mealAllowance"
+                value={formData.mealAllowance}
+                onChange={(e) => handleInputChange("mealAllowance", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="uniformAllowance">Uniform Allowance</Label>
+              <Input
+                type="number"
+                id="uniformAllowance"
+                value={formData.uniformAllowance}
+                onChange={(e) => handleInputChange("uniformAllowance", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="communicationAllowance">Communication Allowance</Label>
+              <Input
+                type="number"
+                id="communicationAllowance"
+                value={formData.communicationAllowance}
+                onChange={(e) => handleInputChange("communicationAllowance", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="otherAllowances">Other Allowances</Label>
+              <Input
+                type="number"
+                id="otherAllowances"
+                value={formData.otherAllowances}
+                onChange={(e) => handleInputChange("otherAllowances", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="taxDeduction">Tax Deduction</Label>
+              <Input
+                type="number"
+                id="taxDeduction"
+                value={formData.taxDeduction}
+                onChange={(e) => handleInputChange("taxDeduction", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="ssnit">SSNIT Number</Label>
+              <Input
+                type="text"
+                id="ssnit"
+                value={formData.ssnit}
+                onChange={(e) => handleInputChange("ssnit", e.target.value)}
+              />
+              {errors.ssnit && <p className="text-red-500 text-sm mt-1">{errors.ssnit}</p>}
+            </div>
+            <div>
+              <Label htmlFor="tier3">Tier 3</Label>
+              <Input
+                type="number"
+                id="tier3"
+                value={formData.tier3}
+                onChange={(e) => handleInputChange("tier3", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="loanDeduction">Loan Deduction</Label>
+              <Input
+                type="number"
+                id="loanDeduction"
+                value={formData.loanDeduction}
+                onChange={(e) => handleInputChange("loanDeduction", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="advanceDeduction">Advance Deduction</Label>
+              <Input
+                type="number"
+                id="advanceDeduction"
+                value={formData.advanceDeduction}
+                onChange={(e) => handleInputChange("advanceDeduction", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="otherDeductions">Other Deductions</Label>
+              <Input
+                type="number"
+                id="otherDeductions"
+                value={formData.otherDeductions}
+                onChange={(e) => handleInputChange("otherDeductions", e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="bankName">Bank Name</Label>
+              <Input
+                type="text"
+                id="bankName"
+                value={formData.bankName}
+                onChange={(e) => handleInputChange("bankName", e.target.value)}
+              />
+              {errors.bankName && <p className="text-red-500 text-sm mt-1">{errors.bankName}</p>}
+            </div>
+            <div>
+              <Label htmlFor="bankAccount">Bank Account Number</Label>
+              <Input
+                type="text"
+                id="bankAccount"
+                value={formData.bankAccount}
+                onChange={(e) => handleInputChange("bankAccount", e.target.value)}
+              />
+              {errors.bankAccount && <p className="text-red-500 text-sm mt-1">{errors.bankAccount}</p>}
+            </div>
+            <div>
+              <Label htmlFor="ghanaCard">Ghana Card Number</Label>
+              <Input
+                type="text"
+                id="ghanaCard"
+                value={formData.ghanaCard}
+                onChange={(e) => handleInputChange("ghanaCard", e.target.value)}
+              />
+              {errors.ghanaCard && <p className="text-red-500 text-sm mt-1">{errors.ghanaCard}</p>}
             </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="documents" className="space-y-6">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Required Documents</h3>
-
-            <div className="grid gap-4">
-              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div>
-                  <span className="font-medium text-gray-900">1. Academic Certificate(s)</span>
-                  <p className="text-sm text-gray-500">Educational certificates and transcripts</p>
-                </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="academic-certificates"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        handleDocumentUpload("Academic Certificate(s)", file)
-                      }
-                    }}
+        <TabsContent value="documents">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="profilePicture">Passport Picture</Label>
+              <Input
+                type="file"
+                id="profilePicture"
+                accept="image/*"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleDocumentUpload("Passport Picture", e.target.files[0])
+                  }
+                }}
+              />
+              {formData.profilePicture && (
+                <div className="mt-2">
+                  <img
+                    src={formData.profilePicture || "/placeholder.svg"}
+                    alt="Profile"
+                    className="max-h-32 rounded-md"
                   />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div>
-                  <span className="font-medium text-gray-900">2. Passport Picture</span>
-                  <p className="text-sm text-gray-500">Professional passport-sized photograph</p>
-                </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="passport-picture"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        handleDocumentUpload("Passport Picture", file)
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div>
-                  <span className="font-medium text-gray-900">3. Resume & Application Letter</span>
-                  <p className="text-sm text-gray-500">Current CV and cover letter</p>
-                </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="resume-application"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        handleDocumentUpload("Resume & Application Letter", file)
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div>
-                  <span className="font-medium text-gray-900">4. Passport</span>
-                  <p className="text-sm text-gray-500">Valid passport copy</p>
-                </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="passport-copy"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        handleDocumentUpload("Passport", file)
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div>
-                  <span className="font-medium text-gray-900">5. National ID</span>
-                  <p className="text-sm text-gray-500">Ghana Card or Voter's ID</p>
-                </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="national-id"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        handleDocumentUpload("National ID", file)
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div>
-                  <span className="font-medium text-gray-900">6. Medical Report</span>
-                  <p className="text-sm text-gray-500">Health clearance certificate</p>
-                </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="medical-report"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        handleDocumentUpload("Medical Report", file)
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div>
-                  <span className="font-medium text-gray-900">7. Police Report</span>
-                  <p className="text-sm text-gray-500">Criminal background check</p>
-                </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="police-report"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        handleDocumentUpload("Police Report", file)
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div>
-                  <span className="font-medium text-gray-900">8. Other Uploads</span>
-                  <p className="text-sm text-gray-500">Additional supporting documents</p>
-                </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="other-uploads"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    multiple
-                    onChange={(e) => {
-                      const files = Array.from(e.target.files || [])
-                      if (files.length > 0) {
-                        console.log(
-                          "[v0] Other documents selected:",
-                          files.map((f) => f.name),
-                        )
-                        files.forEach((file) => {
-                          handleDocumentUpload("Other Uploads", file)
-                        })
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" className="bg-transparent">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {formData.documents && formData.documents.length > 0 && (
-              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-medium text-gray-900 mb-3">Uploaded Documents</h4>
-                <div className="space-y-2">
-                  {formData.documents.map((doc: any, index: number) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-white rounded border">
-                      <div className="flex items-center">
-                        <FileText className="w-4 h-4 mr-2 text-gray-500" />
-                        <span className="text-sm">{doc.name}</span>
-                        <span className="text-xs text-gray-500 ml-2">({doc.type})</span>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            documents: prev.documents?.filter((_, i) => i !== index) || [],
-                          }))
-                        }}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Documents are stored securely in the employee's document vault. Supported file
-                formats: PDF, DOC, DOCX, JPG, PNG. Maximum file size: 5MB per document.
-              </p>
-            </div>
-          </div>
-        </TabsContent>
-
-        <div className="flex justify-end gap-4 pt-6 border-t">
-          <Button type="button" variant="outline" onClick={onClose} className="px-6 bg-transparent">
-            Cancel
-          </Button>
-          {currentTab === "documents" ? (
-            <Button
-              type="submit"
-              className="px-6 bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={handleSubmit}
-            >
-              Save Employee
-            </Button>
-          ) : (
-            <Button type="button" className="px-6 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleNext}>
-              Next
-            </Button>
-          )}
-        </div>
-      </Tabs>
-    </form>
-  )
-}
-
-function FormRow({
-  label,
-  children,
-  full = false,
-  error,
-}: {
-  label: string
-  children: React.ReactNode
-  full?: boolean
-  error?: string
-}) {
-  return (
-    <div className={full ? "lg:col-span-2" : ""}>
-      <div className="grid items-center gap-3 sm:grid-cols-[200px_1fr]">
-        <Label className="text-sm font-medium text-gray-700">{label}</Label>
-        <div>
-          {children}
-          {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function EmployeeProfile({ employee }: { employee: any }) {
-  return (
-    <Tabs defaultValue="overview" className="w-full">
-      <TabsList className="grid w-full grid-cols-5">
-        <TabsTrigger value="overview">Overview</TabsTrigger>
-        <TabsTrigger value="employment">Employment</TabsTrigger>
-        <TabsTrigger value="payroll">Payroll</TabsTrigger>
-        <TabsTrigger value="leave">Leave</TabsTrigger>
-        <TabsTrigger value="documents">Documents</TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="overview" className="space-y-6">
-        <div className="flex items-center space-x-4">
-          <Avatar className="w-20 h-20">
-            <AvatarImage src={employee.avatar || "/placeholder.svg"} />
-            <AvatarFallback className="text-lg">
-              {employee.name
-                .split(" ")
-                .map((n: string) => n[0])
-                .join("")}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <h2 className="text-2xl font-bold">{employee.name}</h2>
-            <p className="text-gray-600">{employee.position}</p>
-            <Badge className="mt-1">{employee.employeeId}</Badge>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Personal Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Email:</span>
-                <span>{employee.email}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Phone:</span>
-                <span>{employee.phone}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Date of Birth:</span>
-                <span>{employee.dateOfBirth || "Not provided"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Address:</span>
-                <span className="text-right">{employee.address || "Not provided"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Emergency Contact:</span>
-                <span className="text-right">{employee.emergencyContact || "Not provided"}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Employment Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Department:</span>
-                <span>{employee.department}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Location:</span>
-                <span>{employee.location}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Start Date:</span>
-                <span>{employee.startDate}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Status:</span>
-                <Badge variant={employee.status === "Active" ? "default" : "secondary"}>{employee.status}</Badge>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Salary:</span>
-                <span className="font-semibold">GHS {employee.salary?.toLocaleString()}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Financial Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Bank Name:</span>
-                <span>{employee.bankName || "Not provided"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Account Number:</span>
-                <span>{employee.bankAccount || "Not provided"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">SSNIT Number:</span>
-                <span>{employee.ssnit || "Not provided"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Ghana Card Number:</span>
-                <span>{employee.ghanaCard || "Not provided"}</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
-
-      <TabsContent value="employment" className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Employment History</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="border-l-2 border-emerald-500 pl-4">
-                <h4 className="font-semibold">{employee.position}</h4>
-                <p className="text-sm text-gray-600">{employee.department}</p>
-                <p className="text-xs text-gray-500">{employee.startDate} - Present</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="payroll" className="space-y-4">
-        <div className="grid grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-emerald-600">GHS {employee.salary?.toLocaleString()}</div>
-              <p className="text-sm text-gray-600">Monthly Salary</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-blue-600">GHS {((employee.salary || 0) * 0.055).toFixed(0)}</div>
-              <p className="text-sm text-gray-600">SSNIT (5.5%)</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-purple-600">GHS {((employee.salary || 0) * 0.05).toFixed(0)}</div>
-              <p className="text-sm text-gray-600">Tier 3 (5%)</p>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
-
-      <TabsContent value="leave" className="space-y-4">
-        <div className="grid grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-green-600">{employee.leaveBalance?.annual || 0}</div>
-              <p className="text-sm text-gray-600">Annual Leave</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-orange-600">{employee.leaveBalance?.sick || 0}</div>
-              <p className="text-sm text-gray-600">Sick Leave</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-blue-600">{employee.leaveBalance?.casual || 0}</div>
-              <p className="text-sm text-gray-600">Casual Leave</p>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
-
-      <TabsContent value="documents" className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Employee Documents</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {employee.documents?.length > 0 ? (
-                employee.documents.map((doc: any, index: number) => (
-                  <div key={index} className="flex items-center justify-between p-2 border rounded">
-                    <div className="flex items-center">
-                      <FileText className="w-4 h-4 mr-2" />
-                      <span>{doc}</span>
-                    </div>
-                    <Button variant="ghost" size="sm">
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))
-              ) : (
-                <p className="text-gray-500 text-center py-4">No documents uploaded</p>
               )}
             </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
+            <div>
+              <Label htmlFor="contractDocument">Contract Document</Label>
+              <Input
+                type="file"
+                id="contractDocument"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleDocumentUpload("Contract", e.target.files[0])
+                  }
+                }}
+              />
+            </div>
+            <div>
+              <Label htmlFor="idCopyDocument">ID Copy Document</Label>
+              <Input
+                type="file"
+                id="idCopyDocument"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleDocumentUpload("ID Copy", e.target.files[0])
+                  }
+                }}
+              />
+            </div>
+            <div>
+              <Label htmlFor="cvDocument">CV Document</Label>
+              <Input
+                type="file"
+                id="cvDocument"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleDocumentUpload("CV", e.target.files[0])
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      <div className="flex justify-end space-x-2">
+        <Button type="button" variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        {currentTab !== "personal" && (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() =>
+              setCurrentTab(
+                currentTab === "employment" ? "personal" : currentTab === "financial" ? "employment" : "financial",
+              )
+            }
+          >
+            Previous
+          </Button>
+        )}
+        {currentTab !== "documents" ? (
+          <Button type="button" onClick={handleNext}>
+            Next
+          </Button>
+        ) : (
+          <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">
+            Submit
+          </Button>
+        )}
+      </div>
+    </form>
   )
 }
