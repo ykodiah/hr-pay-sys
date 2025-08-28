@@ -459,7 +459,6 @@ export default function SettingsPage() {
       setIsLoading(true)
       const supabase = createClient()
 
-      // Save company settings to database
       const { error: companyError } = await supabase.from("companies").upsert({
         id: MAIN_COMPANY_ID, // Use UUID instead of integer
         name: companySettings.name,
@@ -467,9 +466,9 @@ export default function SettingsPage() {
         ssnit_number: companySettings.ssnitNumber,
         industry: companySettings.industry,
         address: companySettings.address,
-        phone: companySettings.phone,
-        email: companySettings.email,
-        logo: companySettings.logo,
+        phone_number: companySettings.phone,
+        email_address: companySettings.email,
+        logo_url: companySettings.logo,
         divisions: companySettings.divisions,
         departments: companySettings.departments,
         locations: companySettings.locations,
@@ -643,9 +642,9 @@ export default function SettingsPage() {
         ssnit_number: companySettings.ssnitNumber || "",
         industry: companySettings.industry || "",
         address: companySettings.address || "",
-        phone: companySettings.phone || "",
-        email: companySettings.email || "",
-        logo: companySettings.logo || null,
+        phone_number: companySettings.phone || "",
+        email_address: companySettings.email || "",
+        logo_url: companySettings.logo || null,
         divisions: companySettings.divisions || [],
         departments: companySettings.departments || [],
         locations: companySettings.locations || [],
