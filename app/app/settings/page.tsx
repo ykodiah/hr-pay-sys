@@ -127,12 +127,14 @@ interface DeductionSettings {
 }
 
 interface LoanSettings {
-  maxLoanAmount: number
+  id: number
+  code: string
+  description: string
+  maximumAmount: number
   interestRate: number
-  maxRepaymentPeriod: number
-  autoDeductFromSalary: boolean
-  requireGuarantor: boolean
-  minimumServicePeriod: number
+  rateMethod: "REDUCING_BALANCE" | "STRAIGHT_LINE"
+  adminCharges: number
+  loanTenure: number
 }
 
 interface CompanySettings {
@@ -341,12 +343,14 @@ export default function SettingsPage() {
       otherDeductions: 0,
     },
     loans: {
-      maxLoanAmount: 0,
+      id: 0,
+      code: "",
+      description: "",
+      maximumAmount: 0,
       interestRate: 0,
-      maxRepaymentPeriod: 0,
-      autoDeductFromSalary: false,
-      requireGuarantor: false,
-      minimumServicePeriod: 0,
+      rateMethod: "REDUCING_BALANCE",
+      adminCharges: 0,
+      loanTenure: 12,
     },
   })
 
@@ -489,26 +493,26 @@ export default function SettingsPage() {
     },
   ])
 
-  const [loanSettingsData, setLoanSettingsData] = useState([
+  const [loanSettingsData, setLoanSettingsData] = useState<LoanSettings[]>([
     {
       id: 1,
       code: "PERSONAL",
       description: "Personal Loan",
-      taxable: false,
-      recurring: true,
-      amount: 50000,
-      percentage: 10,
-      type: "FIXED",
+      maximumAmount: 50000,
+      interestRate: 10,
+      rateMethod: "REDUCING_BALANCE",
+      adminCharges: 500,
+      loanTenure: 12,
     },
     {
       id: 2,
       code: "EMERGENCY",
       description: "Emergency Loan",
-      taxable: false,
-      recurring: false,
-      amount: 10000,
-      percentage: 5,
-      type: "FIXED",
+      maximumAmount: 10000,
+      interestRate: 5,
+      rateMethod: "STRAIGHT_LINE",
+      adminCharges: 200,
+      loanTenure: 6,
     },
   ])
 
@@ -641,11 +645,11 @@ export default function SettingsPage() {
         id: newId,
         code: "",
         description: "",
-        taxable: false,
-        recurring: true,
-        amount: 0,
-        percentage: 0,
-        type: "FIXED",
+        maximumAmount: 0,
+        interestRate: 0,
+        rateMethod: "REDUCING_BALANCE",
+        adminCharges: 0,
+        loanTenure: 12,
       },
     ])
   }
@@ -1124,12 +1128,14 @@ export default function SettingsPage() {
               otherDeductions: 0,
             },
             loans: companyData.loans || {
-              maxLoanAmount: 0,
+              id: 0,
+              code: "",
+              description: "",
+              maximumAmount: 0,
               interestRate: 0,
-              maxRepaymentPeriod: 0,
-              autoDeductFromSalary: false,
-              requireGuarantor: false,
-              minimumServicePeriod: 0,
+              rateMethod: "REDUCING_BALANCE",
+              adminCharges: 0,
+              loanTenure: 12,
             },
           })
         }
@@ -2643,11 +2649,11 @@ export default function SettingsPage() {
                     <TableRow className="bg-gray-50">
                       <TableHead className="font-semibold">Code</TableHead>
                       <TableHead className="font-semibold">Description</TableHead>
-                      <TableHead className="font-semibold">Taxable</TableHead>
-                      <TableHead className="font-semibold">Recurring</TableHead>
-                      <TableHead className="font-semibold">AMOUNT</TableHead>
-                      <TableHead className="font-semibold">%</TableHead>
-                      <TableHead className="font-semibold">FIXED/VARIABLE</TableHead>
+                      <TableHead className="font-semibold">Maximum Amount</TableHead>
+                      <TableHead className="font-semibold">Interest Rate (%)</TableHead>
+                      <TableHead className="font-semibold">Rate Method</TableHead>
+                      <TableHead className="font-semibold">Admin Charges</TableHead>
+                      <TableHead className="font-semibold">Loan Tenure (months)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -2670,23 +2676,60 @@ export default function SettingsPage() {
                           />
                         </TableCell>
                         <TableCell>
-                          <Switch
-                            checked={loanSetting.taxable}
-                            onCheckedChange={(checked) => updateLoanSettingRow(loanSetting.id, "taxable", checked)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={loanSetting.recurring}
-                            onCheckedChange={(checked) => updateLoanSettingRow(loanSetting.id, "recurring", checked)}
+                          <Input
+                            type="number"
+                            value={loanSetting.maximumAmount}
+                            onChange={(e) =>
+                              updateLoanSettingRow(
+                                loanSetting.id,
+                                "maximumAmount",
+                                Number.parseFloat(e.target.value) || 0,
+                              )
+                            }
+                            className="w-28"
+                            placeholder="0.00"
                           />
                         </TableCell>
                         <TableCell>
                           <Input
                             type="number"
-                            value={loanSetting.amount}
+                            value={loanSetting.interestRate}
                             onChange={(e) =>
-                              updateLoanSettingRow(loanSetting.id, "amount", Number.parseFloat(e.target.value) || 0)
+                              updateLoanSettingRow(
+                                loanSetting.id,
+                                "interestRate",
+                                Number.parseFloat(e.target.value) || 0,
+                              )
+                            }
+                            className="w-20"
+                            placeholder="0"
+                            step="0.1"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={loanSetting.rateMethod}
+                            onValueChange={(value) => updateLoanSettingRow(loanSetting.id, "rateMethod", value)}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="REDUCING_BALANCE">Reducing Balance Method</SelectItem>
+                              <SelectItem value="STRAIGHT_LINE">Straight Line Method</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={loanSetting.adminCharges}
+                            onChange={(e) =>
+                              updateLoanSettingRow(
+                                loanSetting.id,
+                                "adminCharges",
+                                Number.parseFloat(e.target.value) || 0,
+                              )
                             }
                             className="w-24"
                             placeholder="0.00"
@@ -2695,27 +2738,14 @@ export default function SettingsPage() {
                         <TableCell>
                           <Input
                             type="number"
-                            value={loanSetting.percentage}
+                            value={loanSetting.loanTenure}
                             onChange={(e) =>
-                              updateLoanSettingRow(loanSetting.id, "percentage", Number.parseFloat(e.target.value) || 0)
+                              updateLoanSettingRow(loanSetting.id, "loanTenure", Number.parseInt(e.target.value) || 12)
                             }
                             className="w-20"
-                            placeholder="0"
+                            placeholder="12"
+                            min="1"
                           />
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={loanSetting.type}
-                            onValueChange={(value) => updateLoanSettingRow(loanSetting.id, "type", value)}
-                          >
-                            <SelectTrigger className="w-28">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="FIXED">FIXED</SelectItem>
-                              <SelectItem value="VARIABLE">VARIABLE</SelectItem>
-                            </SelectContent>
-                          </Select>
                         </TableCell>
                       </TableRow>
                     ))}
