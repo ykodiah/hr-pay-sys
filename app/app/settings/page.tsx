@@ -1289,8 +1289,8 @@ export default function SettingsPage() {
                                 <Input
                                   type="email"
                                   placeholder="Enter email address"
-                                  value={editForm.email}
-                                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                                  value={editForm?.email ?? ""}
+                                  onChange={(e) => setEditForm({ ...editForm!, email: e.target.value })}
                                 />
                               </div>
                               <div className="space-y-2">
@@ -1305,8 +1305,8 @@ export default function SettingsPage() {
                                 className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                 rows={3}
                                 placeholder="Enter full address"
-                                value={editForm.address}
-                                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                                value={editForm?.address ?? ""}
+                                onChange={(e) => setEditForm({ ...editForm!, address: e.target.value })}
                               />
                             </div>
 
