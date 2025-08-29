@@ -220,19 +220,6 @@ export default function EmployeesPage() {
     profilePictureFile: null,
   })
 
-  const countryCodes = [
-    { code: "+233", country: "Ghana", flag: "🇬🇭" },
-    { code: "+1", country: "USA", flag: "🇺🇸" },
-    { code: "+44", country: "UK", flag: "🇬🇧" },
-    { code: "+234", country: "Nigeria", flag: "🇳🇬" },
-    { code: "+27", country: "South Africa", flag: "🇿🇦" },
-    { code: "+254", country: "Kenya", flag: "🇰🇪" },
-    { code: "+256", country: "Uganda", flag: "🇺🇬" },
-  ]
-
-  const [phoneCountryCode, setPhoneCountryCode] = useState("+233")
-  const [emergencyCountryCode, setEmergencyCountryCode] = useState("+233")
-
   const loadSubsidiaries = async () => {
     try {
       const supabase = createClient()
@@ -1619,8 +1606,24 @@ function AddEmployeeForm({
   const [divisions, setDivisions] = useState<string[]>([])
   const [departments, setDepartments] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [supervisors, setSupervisors] = useState<any[]>([])
+  const [headsOfDepartment, setHeadsOfDepartment] = useState<any[]>([])
+  const { toast } = useToast()
   const [currentTab, setCurrentTab] = useState("personal")
-  const [errors, setErrors] = useState<any>({})
+
+  const countryCodes = [
+    { code: "+233", country: "Ghana", flag: "🇬🇭" },
+    { code: "+1", country: "USA", flag: "🇺🇸" },
+    { code: "+44", country: "UK", flag: "🇬🇧" },
+    { code: "+234", country: "Nigeria", flag: "🇳🇬" },
+    { code: "+27", country: "South Africa", flag: "🇿🇦" },
+    { code: "+254", country: "Kenya", flag: "🇰🇪" },
+    { code: "+256", country: "Uganda", flag: "🇺🇬" },
+  ]
+
+  const [phoneCountryCode, setPhoneCountryCode] = useState("+233")
+  const [emergencyCountryCode, setEmergencyCountryCode] = useState("+233")
 
   const handleNext = () => {
     if (currentTab === "personal") {
