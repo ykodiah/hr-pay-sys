@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { MessageCircle, Send, X, Bot, User, Minimize2, Maximize2 } from "lucide-react"
+import { MessageCircle, Send, X, Bot, User, Minimize2, Maximize2, ChevronUp, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
 
 interface Message {
@@ -30,12 +30,25 @@ export function EmployeeAIChatbox() {
   ])
   const [inputMessage, setInputMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [showScrollButtons, setShowScrollButtons] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
+
+  const scrollToTop = () => {
+    const scrollArea = scrollAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]")
+    if (scrollArea) {
+      scrollArea.scrollTo({ top: 0, behavior: "smooth" })
+    }
+  }
+
+  useEffect(() => {
+    setShowScrollButtons(messages.length > 5)
+  }, [messages])
 
   useEffect(() => {
     scrollToBottom()
@@ -206,7 +219,28 @@ export function EmployeeAIChatbox() {
               </Button>
             </div>
 
-            <ScrollArea className="flex-1 p-4">
+            <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 relative">
+              {showScrollButtons && (
+                <div className="absolute right-2 top-2 z-10 flex flex-col gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={scrollToTop}
+                    className="h-8 w-8 bg-white/90 hover:bg-white shadow-sm"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={scrollToBottom}
+                    className="h-8 w-8 bg-white/90 hover:bg-white shadow-sm"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
               <div className="space-y-4">
                 {messages.map((message) => (
                   <div
