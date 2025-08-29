@@ -397,7 +397,7 @@ export default function ClientAppLayout({
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">HR Management</p>
                 <a
                   href="/app/employees"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:text-white transition-colors font-sans bg-green-50"
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
                     e.currentTarget.style.color = "white"
