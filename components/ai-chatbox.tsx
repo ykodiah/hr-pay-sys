@@ -6,7 +6,6 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   MessageCircle,
   Send,
@@ -48,7 +47,7 @@ export function AIChatbox() {
   const [showScrollButtons, setShowScrollButtons] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
   const speakText = (text: string) => {
     if (!isTTSEnabled || !("speechSynthesis" in window)) return
@@ -82,13 +81,20 @@ export function AIChatbox() {
   }
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      })
+    }
   }
 
   const scrollToTop = () => {
-    const scrollArea = scrollAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]")
-    if (scrollArea) {
-      scrollArea.scrollTo({ top: 0, behavior: "smooth" })
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      })
     }
   }
 
@@ -288,7 +294,7 @@ export function AIChatbox() {
               </Button>
             </div>
 
-            <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 relative">
+            <div ref={messagesContainerRef} className="flex-1 p-4 relative overflow-y-auto scroll-smooth">
               {showScrollButtons && (
                 <div className="absolute right-2 top-2 z-10 flex flex-col gap-1">
                   <Button
@@ -296,6 +302,7 @@ export function AIChatbox() {
                     size="icon"
                     onClick={scrollToTop}
                     className="h-8 w-8 bg-white/90 hover:bg-white shadow-sm"
+                    title="Scroll to top"
                   >
                     <ChevronUp className="h-4 w-4" />
                   </Button>
@@ -304,6 +311,7 @@ export function AIChatbox() {
                     size="icon"
                     onClick={scrollToBottom}
                     className="h-8 w-8 bg-white/90 hover:bg-white shadow-sm"
+                    title="Scroll to bottom"
                   >
                     <ChevronDown className="h-4 w-4" />
                   </Button>
@@ -380,7 +388,7 @@ export function AIChatbox() {
                 )}
                 <div ref={messagesEndRef} />
               </div>
-            </ScrollArea>
+            </div>
 
             <div className="border-t p-4">
               <div className="flex gap-2">
