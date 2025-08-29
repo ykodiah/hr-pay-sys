@@ -712,6 +712,21 @@ export default function SettingsPage() {
       setIsLoading(true)
       const supabase = createClient()
 
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+      if (authError || !user) {
+        console.error("[v0] Authentication required for saving settings")
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to save company settings.",
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
+      }
+
       const { error: companyError } = await supabase.from("companies").upsert({
         id: MAIN_COMPANY_ID, // Use UUID instead of integer
         name: companySettings.name,
