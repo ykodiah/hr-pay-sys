@@ -14,6 +14,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { EmployeeAIChatbox } from "@/components/employee-ai-chatbox"
 import {
   User,
   FileText,
@@ -343,6 +344,8 @@ export default function SelfServiceLayout({
         {/* Main Content */}
         <main className="flex-1 p-6">{children}</main>
       </div>
+
+      <EmployeeAIChatbox />
     </div>
   )
 }
