@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     const result = await Promise.race([
       generateText({
-        model: groq("llama-3.1-70b-versatile"),
+        model: groq("llama3-groq-70b-8192-tool-use-preview"),
         system: SYSTEM_CONTEXT,
         messages: [
           ...conversationHistory,
