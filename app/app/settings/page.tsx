@@ -760,7 +760,6 @@ export default function SettingsPage() {
           variant: "destructive",
         })
         setIsLoading(false)
-        return
       }
 
       const { error: companyError } = await supabase.from("companies").upsert({
