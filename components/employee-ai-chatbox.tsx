@@ -6,7 +6,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { MessageCircle, Send, X, Bot, User, Minimize2, Maximize2, ChevronUp, ChevronDown } from "lucide-react"
+import {
+  MessageCircle,
+  Send,
+  X,
+  Bot,
+  User,
+  Minimize2,
+  Maximize2,
+  ChevronUp,
+  ChevronDown,
+  Volume2,
+  VolumeX,
+} from "lucide-react"
 import { toast } from "sonner"
 
 interface Message {
@@ -19,6 +31,8 @@ interface Message {
 export function EmployeeAIChatbox() {
   const [isOpen, setIsOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
+  const [isTTSEnabled, setIsTTSEnabled] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -34,6 +48,37 @@ export function EmployeeAIChatbox() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+
+  const speakText = (text: string) => {
+    if (!isTTSEnabled || !("speechSynthesis" in window)) return
+
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel()
+
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = 0.9
+    utterance.pitch = 1
+    utterance.volume = 0.8
+
+    utterance.onstart = () => setIsSpeaking(true)
+    utterance.onend = () => setIsSpeaking(false)
+    utterance.onerror = () => setIsSpeaking(false)
+
+    window.speechSynthesis.speak(utterance)
+  }
+
+  const toggleTTS = () => {
+    if (isTTSEnabled && isSpeaking) {
+      window.speechSynthesis.cancel()
+      setIsSpeaking(false)
+    }
+    setIsTTSEnabled(!isTTSEnabled)
+  }
+
+  const stopSpeaking = () => {
+    window.speechSynthesis.cancel()
+    setIsSpeaking(false)
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -116,6 +161,10 @@ export function EmployeeAIChatbox() {
       }
 
       setMessages((prev) => [...prev, assistantMessage])
+
+      if (isTTSEnabled) {
+        speakText(data.response)
+      }
     } catch (error) {
       console.error("[v0] Employee chat error:", error)
 
@@ -151,6 +200,7 @@ export function EmployeeAIChatbox() {
   }
 
   const clearChat = () => {
+    stopSpeaking()
     setMessages([
       {
         id: "1",
@@ -189,6 +239,23 @@ export function EmployeeAIChatbox() {
           <Button
             variant="ghost"
             size="icon"
+            onClick={toggleTTS}
+            className={`h-8 w-8 text-white hover:bg-emerald-700 ${isTTSEnabled ? "bg-emerald-700" : ""}`}
+            title={isTTSEnabled ? "Disable voice" : "Enable voice"}
+          >
+            {isTTSEnabled ? (
+              isSpeaking ? (
+                <VolumeX className="h-4 w-4" />
+              ) : (
+                <Volume2 className="h-4 w-4" />
+              )
+            ) : (
+              <VolumeX className="h-4 w-4 opacity-50" />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setIsMinimized(!isMinimized)}
             className="h-8 w-8 text-white hover:bg-emerald-700"
           >
@@ -208,7 +275,14 @@ export function EmployeeAIChatbox() {
       {!isMinimized && (
         <CardContent className="flex flex-col h-[calc(600px-80px)] p-0">
           <div className="flex-1 flex flex-col">
-            <div className="flex justify-end p-2 border-b">
+            <div className="flex justify-between items-center p-2 border-b">
+              {isTTSEnabled && (
+                <div className="flex items-center gap-2 text-xs text-green-600">
+                  <Volume2 className="h-3 w-3" />
+                  {isSpeaking ? "Speaking..." : "Voice enabled"}
+                </div>
+              )}
+              {!isTTSEnabled && <div></div>}
               <Button
                 variant="ghost"
                 size="sm"
@@ -258,15 +332,28 @@ export function EmployeeAIChatbox() {
                       }`}
                     >
                       <div className="whitespace-pre-wrap">{message.content}</div>
-                      <div
-                        className={`text-xs mt-1 opacity-70 ${
-                          message.role === "user" ? "text-emerald-100" : "text-gray-500"
-                        }`}
-                      >
-                        {message.timestamp.toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                      <div className="flex items-center justify-between mt-1">
+                        <div
+                          className={`text-xs opacity-70 ${
+                            message.role === "user" ? "text-emerald-100" : "text-gray-500"
+                          }`}
+                        >
+                          {message.timestamp.toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                        {message.role === "assistant" && isTTSEnabled && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => speakText(message.content)}
+                            className="h-6 w-6 opacity-50 hover:opacity-100"
+                            title="Speak this message"
+                          >
+                            <Volume2 className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                     {message.role === "user" && (
