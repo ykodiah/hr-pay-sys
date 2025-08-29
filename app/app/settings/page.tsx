@@ -465,7 +465,6 @@ export default function SettingsPage() {
       id: 1,
       code: "TAX",
       description: "Tax Deduction",
-      taxable: false,
       recurring: true,
       amount: 0,
       percentage: 0,
@@ -475,7 +474,6 @@ export default function SettingsPage() {
       id: 2,
       code: "SSNIT",
       description: "SSNIT Deduction",
-      taxable: false,
       recurring: true,
       amount: 0,
       percentage: 5.5,
@@ -485,7 +483,6 @@ export default function SettingsPage() {
       id: 3,
       code: "LOAN",
       description: "Loan Deduction",
-      taxable: false,
       recurring: true,
       amount: 0,
       percentage: 0,
@@ -515,6 +512,51 @@ export default function SettingsPage() {
       loanTenure: 6,
     },
   ])
+
+  const [taxConfig, setTaxConfig] = useState({
+    payeTaxBands: [
+      { threshold: 4380, rate: 0 },
+      { threshold: 1000, rate: 5 },
+      { threshold: 2000, rate: 10 },
+      { threshold: 20000, rate: 17.5 },
+      { threshold: 20000, rate: 25 },
+      { threshold: 0, rate: 30 }, // remaining amount
+    ],
+    ssnitRates: {
+      employee: 5.5,
+      employer: 13,
+      total: 18.5,
+    },
+    tier3Rates: {
+      employee: 5,
+      employer: 5,
+      total: 10,
+    },
+  })
+
+  const updateTaxBand = (index: number, field: string, value: number) => {
+    setTaxConfig((prev) => ({
+      ...prev,
+      payeTaxBands: prev.payeTaxBands.map((band, i) => (i === index ? { ...band, [field]: value } : band)),
+    }))
+    setHasUnsavedChanges(true)
+  }
+
+  const updateSSNITRate = (field: string, value: number) => {
+    setTaxConfig((prev) => ({
+      ...prev,
+      ssnitRates: { ...prev.ssnitRates, [field]: value },
+    }))
+    setHasUnsavedChanges(true)
+  }
+
+  const updateTier3Rate = (field: string, value: number) => {
+    setTaxConfig((prev) => ({
+      ...prev,
+      tier3Rates: { ...prev.tier3Rates, [field]: value },
+    }))
+    setHasUnsavedChanges(true)
+  }
 
   const handleEditSubsidiary = (subsidiary: Subsidiary) => {
     setEditingSubsidiary(subsidiary.id)
@@ -628,7 +670,6 @@ export default function SettingsPage() {
         id: newId,
         code: "",
         description: "",
-        taxable: false,
         recurring: true,
         amount: 0,
         percentage: 0,
@@ -1734,6 +1775,13 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          <div className="flex justify-end pt-4 border-t">
+            <Button onClick={handleSaveSettings} disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700">
+              <Save className="w-4 h-4 mr-2" />
+              {isLoading ? "Saving..." : "Save Multi-Company Settings"}
+            </Button>
+          </div>
         </TabsContent>
 
         <TabsContent value="rbac" className="space-y-6">
@@ -2255,6 +2303,13 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </div>
+
+          <div className="flex justify-end pt-4 border-t">
+            <Button onClick={handleSaveSettings} disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700">
+              <Save className="w-4 h-4 mr-2" />
+              {isLoading ? "Saving..." : "Save Company Settings"}
+            </Button>
+          </div>
         </TabsContent>
 
         {activeTab === "payroll" && (
@@ -2397,46 +2452,100 @@ export default function SettingsPage() {
                       <div className="p-3 border rounded-lg">
                         <div className="flex items-center justify-between mb-2">
                           <Label className="font-medium">PAYE Tax Bands</Label>
-                          <Button variant="outline" size="sm">
-                            <Edit className="w-3 h-3 mr-1" />
-                            Edit
-                          </Button>
                         </div>
-                        <div className="text-sm text-gray-600 space-y-1">
-                          <div>0% on first GHS 4,380</div>
-                          <div>5% on next GHS 1,000</div>
-                          <div>10% on next GHS 2,000</div>
-                          <div>17.5% on next GHS 20,000</div>
-                          <div>25% on next GHS 20,000</div>
-                          <div>30% on remaining amount</div>
+                        <div className="space-y-2">
+                          {taxConfig.payeTaxBands.map((band, index) => (
+                            <div key={index} className="flex items-center space-x-2">
+                              <Input
+                                type="number"
+                                value={band.rate}
+                                onChange={(e) => updateTaxBand(index, "rate", Number.parseFloat(e.target.value) || 0)}
+                                className="w-20"
+                                placeholder="Rate %"
+                              />
+                              <span>% on</span>
+                              {index === taxConfig.payeTaxBands.length - 1 ? (
+                                <span>remaining amount</span>
+                              ) : (
+                                <>
+                                  <span>{index === 0 ? "first" : "next"} GHS</span>
+                                  <Input
+                                    type="number"
+                                    value={band.threshold}
+                                    onChange={(e) =>
+                                      updateTaxBand(index, "threshold", Number.parseFloat(e.target.value) || 0)
+                                    }
+                                    className="w-24"
+                                    placeholder="Amount"
+                                  />
+                                </>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       </div>
+
                       <div className="p-3 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <Label className="font-medium">SSNIT Rates</Label>
-                          <Button variant="outline" size="sm">
-                            <Edit className="w-3 h-3 mr-1" />
-                            Edit
-                          </Button>
-                        </div>
-                        <div className="text-sm text-gray-600 space-y-1">
-                          <div>Employee: 5.5%</div>
-                          <div>Employer: 13%</div>
-                          <div>Total: 18.5%</div>
+                        <Label className="font-medium mb-2 block">SSNIT Rates</Label>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <span className="w-20">Employee:</span>
+                            <Input
+                              type="number"
+                              value={taxConfig.ssnitRates.employee}
+                              onChange={(e) => updateSSNITRate("employee", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20"
+                              step="0.1"
+                            />
+                            <span>%</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="w-20">Employer:</span>
+                            <Input
+                              type="number"
+                              value={taxConfig.ssnitRates.employer}
+                              onChange={(e) => updateSSNITRate("employer", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20"
+                              step="0.1"
+                            />
+                            <span>%</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="w-20">Total:</span>
+                            <span className="font-medium">{taxConfig.ssnitRates.total}%</span>
+                          </div>
                         </div>
                       </div>
+
                       <div className="p-3 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <Label className="font-medium">Tier 3 Rates</Label>
-                          <Button variant="outline" size="sm">
-                            <Edit className="w-3 h-3 mr-1" />
-                            Edit
-                          </Button>
-                        </div>
-                        <div className="text-sm text-gray-600 space-y-1">
-                          <div>Employee: 5%</div>
-                          <div>Employer: 5%</div>
-                          <div>Total: 10%</div>
+                        <Label className="font-medium mb-2 block">Tier 3 Rates</Label>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <span className="w-20">Employee:</span>
+                            <Input
+                              type="number"
+                              value={taxConfig.tier3Rates.employee}
+                              onChange={(e) => updateTier3Rate("employee", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20"
+                              step="0.1"
+                            />
+                            <span>%</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="w-20">Employer:</span>
+                            <Input
+                              type="number"
+                              value={taxConfig.tier3Rates.employer}
+                              onChange={(e) => updateTier3Rate("employer", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20"
+                              step="0.1"
+                            />
+                            <span>%</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="w-20">Total:</span>
+                            <span className="font-medium">{taxConfig.tier3Rates.total}%</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2554,7 +2663,6 @@ export default function SettingsPage() {
                     <TableRow className="bg-gray-50">
                       <TableHead className="font-semibold">Code</TableHead>
                       <TableHead className="font-semibold">Description</TableHead>
-                      <TableHead className="font-semibold">Taxable</TableHead>
                       <TableHead className="font-semibold">Recurring</TableHead>
                       <TableHead className="font-semibold">AMOUNT</TableHead>
                       <TableHead className="font-semibold">%</TableHead>
@@ -2578,12 +2686,6 @@ export default function SettingsPage() {
                             onChange={(e) => updateDeductionRow(deduction.id, "description", e.target.value)}
                             className="min-w-40"
                             placeholder="Description"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={deduction.taxable}
-                            onCheckedChange={(checked) => updateDeductionRow(deduction.id, "taxable", checked)}
                           />
                         </TableCell>
                         <TableCell>
@@ -2709,7 +2811,7 @@ export default function SettingsPage() {
                         <TableCell>
                           <Select
                             value={loanSetting.rateMethod}
-                            onValueChange={(value) => updateLoanSettingRow(loanSetting.id, "rateMethod", value)}
+                            onChange={(e) => updateLoanSettingRow(loanSetting.id, "rateMethod", e.target.value)}
                           >
                             <SelectTrigger className="w-40">
                               <SelectValue />
@@ -2753,470 +2855,504 @@ export default function SettingsPage() {
                 </Table>
               </div>
             </div>
+
+            <div className="flex justify-end pt-4 border-t">
+              <Button onClick={handleSaveSettings} disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700">
+                <Save className="w-4 h-4 mr-2" />
+                {isLoading ? "Saving..." : "Save Payroll Settings"}
+              </Button>
+            </div>
           </div>
         )}
 
-        <TabsContent value="hr" className="space-y-6">
-          <div className="grid lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Users className="w-5 h-5 text-emerald-600" />
-                  <span>HR Configuration</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="leave-year">Leave Year Start</Label>
-                    <Select
-                      value={hrSettings.leaveYearStart}
-                      onValueChange={(value) => updateHRSettings("leaveYearStart", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="january">January</SelectItem>
-                        <SelectItem value="april">April</SelectItem>
-                        <SelectItem value="july">July</SelectItem>
-                        <SelectItem value="october">October</SelectItem>
-                      </SelectContent>
-                    </Select>
+        {activeTab === "hr" && (
+          <div className="space-y-6">
+            <div className="grid lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Users className="w-5 h-5 text-emerald-600" />
+                    <span>HR Configuration</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="leave-year">Leave Year Start</Label>
+                      <Select
+                        value={hrSettings.leaveYearStart}
+                        onValueChange={(value) => updateHRSettings("leaveYearStart", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="january">January</SelectItem>
+                          <SelectItem value="april">April</SelectItem>
+                          <SelectItem value="july">July</SelectItem>
+                          <SelectItem value="october">October</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="probation">Probation Period (months)</Label>
+                      <Input
+                        id="probation"
+                        type="number"
+                        value={hrSettings.probationPeriod}
+                        onChange={(e) => updateHRSettings("probationPeriod", Number.parseInt(e.target.value) || 0)}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="probation">Probation Period (months)</Label>
-                    <Input
-                      id="probation"
-                      type="number"
-                      value={hrSettings.probationPeriod}
-                      onChange={(e) => updateHRSettings("probationPeriod", Number.parseInt(e.target.value) || 0)}
-                    />
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="annual-leave">Annual Leave Days</Label>
+                      <Input
+                        id="annual-leave"
+                        type="number"
+                        value={hrSettings.annualLeaveDays}
+                        onChange={(e) => updateHRSettings("annualLeaveDays", Number.parseInt(e.target.value) || 0)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sick-leave">Sick Leave Days</Label>
+                      <Input
+                        id="sick-leave"
+                        type="number"
+                        value={hrSettings.sickLeaveDays}
+                        onChange={(e) => updateHRSettings("sickLeaveDays", Number.parseInt(e.target.value) || 0)}
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="annual-leave">Annual Leave Days</Label>
-                    <Input
-                      id="annual-leave"
-                      type="number"
-                      value={hrSettings.annualLeaveDays}
-                      onChange={(e) => updateHRSettings("annualLeaveDays", Number.parseInt(e.target.value) || 0)}
-                    />
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="working-hours">Working Hours/Day</Label>
+                      <Input
+                        id="working-hours"
+                        type="number"
+                        value={hrSettings.workingHoursPerDay}
+                        onChange={(e) => updateHRSettings("workingHoursPerDay", Number.parseInt(e.target.value) || 0)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="working-days">Working Days/Week</Label>
+                      <Input
+                        id="working-days"
+                        type="number"
+                        value={hrSettings.workingDaysPerWeek}
+                        onChange={(e) => updateHRSettings("workingDaysPerWeek", Number.parseInt(e.target.value) || 0)}
+                        min="1"
+                        max="7"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sick-leave">Sick Leave Days</Label>
-                    <Input
-                      id="sick-leave"
-                      type="number"
-                      value={hrSettings.sickLeaveDays}
-                      onChange={(e) => updateHRSettings("sickLeaveDays", Number.parseInt(e.target.value) || 0)}
-                    />
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="auto-approve">Auto-approve leave requests</Label>
+                        <p className="text-sm text-gray-500">Automatically approve requests within policy</p>
+                      </div>
+                      <Switch
+                        id="auto-approve"
+                        checked={hrSettings.autoApproveLeave}
+                        onCheckedChange={(checked) => updateHRSettings("autoApproveLeave", checked)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="email-notifications">Email notifications</Label>
+                        <p className="text-sm text-gray-500">Send email updates for HR activities</p>
+                      </div>
+                      <Switch
+                        id="email-notifications"
+                        checked={hrSettings.emailNotifications}
+                        onCheckedChange={(checked) => updateHRSettings("emailNotifications", checked)}
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="working-hours">Working Hours/Day</Label>
-                    <Input
-                      id="working-hours"
-                      type="number"
-                      value={hrSettings.workingHoursPerDay}
-                      onChange={(e) => updateHRSettings("workingHoursPerDay", Number.parseInt(e.target.value) || 0)}
-                    />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <FileText className="w-5 h-5 text-emerald-600" />
+                    <span>Leave Policies</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="font-medium">Annual Leave</Label>
+                        <Button variant="outline" size="sm">
+                          <Edit className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        <div>Accrual: 1.75 days per month</div>
+                        <div>Max carry over: 5 days</div>
+                        <div>Notice period: 2 weeks</div>
+                      </div>
+                    </div>
+                    <div className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="font-medium">Sick Leave</Label>
+                        <Button variant="outline" size="sm">
+                          <Edit className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        <div>Medical certificate: After 3 days</div>
+                        <div>Max consecutive: 30 days</div>
+                        <div>Paid: 100% for first 10 days</div>
+                      </div>
+                    </div>
+                    <div className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="font-medium">Maternity/Paternity</Label>
+                        <Button variant="outline" size="sm">
+                          <Edit className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        <div>Maternity: 12 weeks</div>
+                        <div>Paternity: 2 weeks</div>
+                        <div>Notice: 4 weeks before</div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="working-days">Working Days/Week</Label>
-                    <Input
-                      id="working-days"
-                      type="number"
-                      value={hrSettings.workingDaysPerWeek}
-                      onChange={(e) => updateHRSettings("workingDaysPerWeek", Number.parseInt(e.target.value) || 0)}
-                      min="1"
-                      max="7"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-3">
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t">
+              <Button onClick={handleSaveSettings} disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700">
+                <Save className="w-4 h-4 mr-2" />
+                {isLoading ? "Saving..." : "Save HR Settings"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "security" && (
+          <div className="space-y-6">
+            <div className="grid lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Shield className="w-5 h-5 text-emerald-600" />
+                    <span>Security Settings</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label htmlFor="auto-approve">Auto-approve leave requests</Label>
-                      <p className="text-sm text-gray-500">Automatically approve requests within policy</p>
+                      <Label htmlFor="two-factor">Two-Factor Authentication</Label>
+                      <p className="text-sm text-gray-500">Add an extra layer of security</p>
                     </div>
                     <Switch
-                      id="auto-approve"
-                      checked={hrSettings.autoApproveLeave}
-                      onCheckedChange={(checked) => updateHRSettings("autoApproveLeave", checked)}
+                      id="two-factor"
+                      checked={securitySettings.twoFactor}
+                      onCheckedChange={(checked) => updateSecuritySettings("twoFactor", checked)}
                     />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label htmlFor="email-notifications">Email notifications</Label>
-                      <p className="text-sm text-gray-500">Send email updates for HR activities</p>
+                      <Label htmlFor="session-timeout">Auto Session Timeout</Label>
+                      <p className="text-sm text-gray-500">Automatically log out inactive users</p>
                     </div>
                     <Switch
-                      id="email-notifications"
-                      checked={hrSettings.emailNotifications}
-                      onCheckedChange={(checked) => updateHRSettings("emailNotifications", checked)}
+                      id="session-timeout"
+                      checked={securitySettings.sessionTimeout}
+                      onCheckedChange={(checked) => updateSecuritySettings("sessionTimeout", checked)}
                     />
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                  {securitySettings.sessionTimeout && (
+                    <div className="space-y-2 ml-4">
+                      <Label htmlFor="timeout-duration">Timeout Duration (minutes)</Label>
+                      <Select
+                        value={securitySettings.timeoutDuration.toString()}
+                        onValueChange={(value) => updateSecuritySettings("timeoutDuration", Number.parseInt(value))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="15">15 minutes</SelectItem>
+                          <SelectItem value="30">30 minutes</SelectItem>
+                          <SelectItem value="60">1 hour</SelectItem>
+                          <SelectItem value="120">2 hours</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="audit-log">Audit Logging</Label>
+                      <p className="text-sm text-gray-500">Track all system activities</p>
+                    </div>
+                    <Switch
+                      id="audit-log"
+                      checked={securitySettings.auditLog}
+                      onCheckedChange={(checked) => updateSecuritySettings("auditLog", checked)}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Button variant="outline" className="w-full bg-transparent">
+                      <Key className="w-4 h-4 mr-2" />
+                      Change Admin Password
+                    </Button>
+                    <Button variant="outline" className="w-full bg-transparent">
+                      <Download className="w-4 h-4 mr-2" />
+                      Download Security Report
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <FileText className="w-5 h-5 text-emerald-600" />
-                  <span>Leave Policies</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="p-3 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="font-medium">Annual Leave</Label>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-3 h-3 mr-1" />
-                        Edit
-                      </Button>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Key className="w-5 h-5 text-emerald-600" />
+                    <span>Password Policy</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="min-length">Minimum Length</Label>
+                    <Input
+                      id="min-length"
+                      type="number"
+                      value={securitySettings.passwordPolicy.minLength}
+                      onChange={(e) =>
+                        updateSecuritySettings("passwordPolicy", {
+                          ...securitySettings.passwordPolicy,
+                          minLength: Number.parseInt(e.target.value) || 8,
+                        })
+                      }
+                      min="6"
+                      max="20"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="require-uppercase">Require Uppercase Letters</Label>
+                      <Switch
+                        id="require-uppercase"
+                        checked={securitySettings.passwordPolicy.requireUppercase}
+                        onCheckedChange={(checked) =>
+                          updateSecuritySettings("passwordPolicy", {
+                            ...securitySettings.passwordPolicy,
+                            requireUppercase: checked,
+                          })
+                        }
+                      />
                     </div>
-                    <div className="text-sm text-gray-600">
-                      <div>Accrual: 1.75 days per month</div>
-                      <div>Max carry over: 5 days</div>
-                      <div>Notice period: 2 weeks</div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="require-numbers">Require Numbers</Label>
+                      <Switch
+                        id="require-numbers"
+                        checked={securitySettings.passwordPolicy.requireNumbers}
+                        onCheckedChange={(checked) =>
+                          updateSecuritySettings("passwordPolicy", {
+                            ...securitySettings.passwordPolicy,
+                            requireNumbers: checked,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="require-symbols">Require Symbols</Label>
+                      <Switch
+                        id="require-symbols"
+                        checked={securitySettings.passwordPolicy.requireSymbols}
+                        onCheckedChange={(checked) =>
+                          updateSecuritySettings("passwordPolicy", {
+                            ...securitySettings.passwordPolicy,
+                            requireSymbols: checked,
+                          })
+                        }
+                      />
                     </div>
                   </div>
-                  <div className="p-3 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="font-medium">Sick Leave</Label>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-3 h-3 mr-1" />
-                        Edit
-                      </Button>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      <div>Medical certificate: After 3 days</div>
-                      <div>Max consecutive: 30 days</div>
-                      <div>Paid: 100% for first 10 days</div>
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <Label className="text-sm font-medium">Password Strength Preview</Label>
+                    <div className="mt-2">
+                      <Progress value={75} className="h-2" />
+                      <p className="text-xs text-gray-600 mt-1">Strong password policy</p>
                     </div>
                   </div>
-                  <div className="p-3 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="font-medium">Maternity/Paternity</Label>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-3 h-3 mr-1" />
-                        Edit
-                      </Button>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      <div>Maternity: 12 weeks</div>
-                      <div>Paternity: 2 weeks</div>
-                      <div>Notice: 4 weeks before</div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t">
+              <Button onClick={handleSaveSettings} disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700">
+                <Save className="w-4 h-4 mr-2" />
+                {isLoading ? "Saving..." : "Save Security Settings"}
+              </Button>
+            </div>
           </div>
-        </TabsContent>
+        )}
 
-        <TabsContent value="security" className="space-y-6">
-          <div className="grid lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5 text-emerald-600" />
-                  <span>Security Settings</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="two-factor">Two-Factor Authentication</Label>
-                    <p className="text-sm text-gray-500">Add an extra layer of security</p>
+        {activeTab === "notifications" && (
+          <div className="space-y-6">
+            <div className="grid lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Bell className="w-5 h-5 text-emerald-600" />
+                    <span>Notification Settings</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="payroll-alerts">Payroll Processing Alerts</Label>
+                      <p className="text-sm text-gray-500">Get notified about payroll status</p>
+                    </div>
+                    <Switch
+                      id="payroll-alerts"
+                      checked={notificationSettings.payrollAlerts}
+                      onCheckedChange={(checked) => updateNotificationSettings("payrollAlerts", checked)}
+                    />
                   </div>
-                  <Switch
-                    id="two-factor"
-                    checked={securitySettings.twoFactor}
-                    onCheckedChange={(checked) => updateSecuritySettings("twoFactor", checked)}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="session-timeout">Auto Session Timeout</Label>
-                    <p className="text-sm text-gray-500">Automatically log out inactive users</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="leave-alerts">Leave Request Alerts</Label>
+                      <p className="text-sm text-gray-500">New leave requests and approvals</p>
+                    </div>
+                    <Switch
+                      id="leave-alerts"
+                      checked={notificationSettings.leaveAlerts}
+                      onCheckedChange={(checked) => updateNotificationSettings("leaveAlerts", checked)}
+                    />
                   </div>
-                  <Switch
-                    id="session-timeout"
-                    checked={securitySettings.sessionTimeout}
-                    onCheckedChange={(checked) => updateSecuritySettings("sessionTimeout", checked)}
-                  />
-                </div>
-                {securitySettings.sessionTimeout && (
-                  <div className="space-y-2 ml-4">
-                    <Label htmlFor="timeout-duration">Timeout Duration (minutes)</Label>
-                    <Select
-                      value={securitySettings.timeoutDuration.toString()}
-                      onValueChange={(value) => updateSecuritySettings("timeoutDuration", Number.parseInt(value))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="15">15 minutes</SelectItem>
-                        <SelectItem value="30">30 minutes</SelectItem>
-                        <SelectItem value="60">1 hour</SelectItem>
-                        <SelectItem value="120">2 hours</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="employee-alerts">Employee Updates</Label>
+                      <p className="text-sm text-gray-500">New employees and profile changes</p>
+                    </div>
+                    <Switch
+                      id="employee-alerts"
+                      checked={notificationSettings.employeeAlerts}
+                      onCheckedChange={(checked) => updateNotificationSettings("employeeAlerts", checked)}
+                    />
                   </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="audit-log">Audit Logging</Label>
-                    <p className="text-sm text-gray-500">Track all system activities</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="system-alerts">System Maintenance</Label>
+                      <p className="text-sm text-gray-500">Scheduled maintenance and updates</p>
+                    </div>
+                    <Switch
+                      id="system-alerts"
+                      checked={notificationSettings.systemAlerts}
+                      onCheckedChange={(checked) => updateNotificationSettings("systemAlerts", checked)}
+                    />
                   </div>
-                  <Switch
-                    id="audit-log"
-                    checked={securitySettings.auditLog}
-                    onCheckedChange={(checked) => updateSecuritySettings("auditLog", checked)}
-                  />
-                </div>
-                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="sms-notifications">SMS Notifications</Label>
+                      <p className="text-sm text-gray-500">Send critical alerts via SMS</p>
+                    </div>
+                    <Switch
+                      id="sms-notifications"
+                      checked={notificationSettings.smsNotifications}
+                      onCheckedChange={(checked) => updateNotificationSettings("smsNotifications", checked)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="notification-email">Notification Email</Label>
+                    <Input
+                      id="notification-email"
+                      type="email"
+                      value={notificationSettings.notificationEmail}
+                      onChange={(e) => updateNotificationSettings("notificationEmail", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="webhook-url">Webhook URL (Optional)</Label>
+                    <Input
+                      id="webhook-url"
+                      type="url"
+                      value={notificationSettings.webhookUrl || ""}
+                      onChange={(e) => updateNotificationSettings("webhookUrl", e.target.value)}
+                      placeholder="https://your-app.com/webhook"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Mail className="w-5 h-5 text-emerald-600" />
+                    <span>Email Templates</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="font-medium">Welcome Email</Label>
+                        <Button variant="outline" size="sm">
+                          <Edit className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+                      </div>
+                      <p className="text-sm text-gray-600">Sent to new employees</p>
+                    </div>
+                    <div className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="font-medium">Payslip Notification</Label>
+                        <Button variant="outline" size="sm">
+                          <Edit className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+                      </div>
+                      <p className="text-sm text-gray-600">Monthly payslip availability</p>
+                    </div>
+                    <div className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="font-medium">Leave Approval</Label>
+                        <Button variant="outline" size="sm">
+                          <Edit className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+                      </div>
+                      <p className="text-sm text-gray-600">Leave request status updates</p>
+                    </div>
+                    <div className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="font-medium">Password Reset</Label>
+                        <Button variant="outline" size="sm">
+                          <Edit className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+                      </div>
+                      <p className="text-sm text-gray-600">Password reset instructions</p>
+                    </div>
+                  </div>
                   <Button variant="outline" className="w-full bg-transparent">
-                    <Key className="w-4 h-4 mr-2" />
-                    Change Admin Password
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Custom Template
                   </Button>
-                  <Button variant="outline" className="w-full bg-transparent">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download Security Report
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Key className="w-5 h-5 text-emerald-600" />
-                  <span>Password Policy</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="min-length">Minimum Length</Label>
-                  <Input
-                    id="min-length"
-                    type="number"
-                    value={securitySettings.passwordPolicy.minLength}
-                    onChange={(e) =>
-                      updateSecuritySettings("passwordPolicy", {
-                        ...securitySettings.passwordPolicy,
-                        minLength: Number.parseInt(e.target.value) || 8,
-                      })
-                    }
-                    min="6"
-                    max="20"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="require-uppercase">Require Uppercase Letters</Label>
-                    <Switch
-                      id="require-uppercase"
-                      checked={securitySettings.passwordPolicy.requireUppercase}
-                      onCheckedChange={(checked) =>
-                        updateSecuritySettings("passwordPolicy", {
-                          ...securitySettings.passwordPolicy,
-                          requireUppercase: checked,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="require-numbers">Require Numbers</Label>
-                    <Switch
-                      id="require-numbers"
-                      checked={securitySettings.passwordPolicy.requireNumbers}
-                      onCheckedChange={(checked) =>
-                        updateSecuritySettings("passwordPolicy", {
-                          ...securitySettings.passwordPolicy,
-                          requireNumbers: checked,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="require-symbols">Require Symbols</Label>
-                    <Switch
-                      id="require-symbols"
-                      checked={securitySettings.passwordPolicy.requireSymbols}
-                      onCheckedChange={(checked) =>
-                        updateSecuritySettings("passwordPolicy", {
-                          ...securitySettings.passwordPolicy,
-                          requireSymbols: checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <Label className="text-sm font-medium">Password Strength Preview</Label>
-                  <div className="mt-2">
-                    <Progress value={75} className="h-2" />
-                    <p className="text-xs text-gray-600 mt-1">Strong password policy</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="flex justify-end pt-4 border-t">
+              <Button onClick={handleSaveSettings} disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700">
+                <Save className="w-4 h-4 mr-2" />
+                {isLoading ? "Saving..." : "Save Notification Settings"}
+              </Button>
+            </div>
           </div>
-        </TabsContent>
-
-        <TabsContent value="notifications" className="space-y-6">
-          <div className="grid lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Bell className="w-5 h-5 text-emerald-600" />
-                  <span>Notification Settings</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="payroll-alerts">Payroll Processing Alerts</Label>
-                    <p className="text-sm text-gray-500">Get notified about payroll status</p>
-                  </div>
-                  <Switch
-                    id="payroll-alerts"
-                    checked={notificationSettings.payrollAlerts}
-                    onCheckedChange={(checked) => updateNotificationSettings("payrollAlerts", checked)}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="leave-alerts">Leave Request Alerts</Label>
-                    <p className="text-sm text-gray-500">New leave requests and approvals</p>
-                  </div>
-                  <Switch
-                    id="leave-alerts"
-                    checked={notificationSettings.leaveAlerts}
-                    onCheckedChange={(checked) => updateNotificationSettings("leaveAlerts", checked)}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="employee-alerts">Employee Updates</Label>
-                    <p className="text-sm text-gray-500">New employees and profile changes</p>
-                  </div>
-                  <Switch
-                    id="employee-alerts"
-                    checked={notificationSettings.employeeAlerts}
-                    onCheckedChange={(checked) => updateNotificationSettings("employeeAlerts", checked)}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="system-alerts">System Maintenance</Label>
-                    <p className="text-sm text-gray-500">Scheduled maintenance and updates</p>
-                  </div>
-                  <Switch
-                    id="system-alerts"
-                    checked={notificationSettings.systemAlerts}
-                    onCheckedChange={(checked) => updateNotificationSettings("systemAlerts", checked)}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="sms-notifications">SMS Notifications</Label>
-                    <p className="text-sm text-gray-500">Send critical alerts via SMS</p>
-                  </div>
-                  <Switch
-                    id="sms-notifications"
-                    checked={notificationSettings.smsNotifications}
-                    onCheckedChange={(checked) => updateNotificationSettings("smsNotifications", checked)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="notification-email">Notification Email</Label>
-                  <Input
-                    id="notification-email"
-                    type="email"
-                    value={notificationSettings.notificationEmail}
-                    onChange={(e) => updateNotificationSettings("notificationEmail", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="webhook-url">Webhook URL (Optional)</Label>
-                  <Input
-                    id="webhook-url"
-                    type="url"
-                    value={notificationSettings.webhookUrl || ""}
-                    onChange={(e) => updateNotificationSettings("webhookUrl", e.target.value)}
-                    placeholder="https://your-app.com/webhook"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Mail className="w-5 h-5 text-emerald-600" />
-                  <span>Email Templates</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="p-3 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="font-medium">Welcome Email</Label>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-3 h-3 mr-1" />
-                        Edit
-                      </Button>
-                    </div>
-                    <p className="text-sm text-gray-600">Sent to new employees</p>
-                  </div>
-                  <div className="p-3 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="font-medium">Payslip Notification</Label>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-3 h-3 mr-1" />
-                        Edit
-                      </Button>
-                    </div>
-                    <p className="text-sm text-gray-600">Monthly payslip availability</p>
-                  </div>
-                  <div className="p-3 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="font-medium">Leave Approval</Label>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-3 h-3 mr-1" />
-                        Edit
-                      </Button>
-                    </div>
-                    <p className="text-sm text-gray-600">Leave request status updates</p>
-                  </div>
-                  <div className="p-3 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="font-medium">Password Reset</Label>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-3 h-3 mr-1" />
-                        Edit
-                      </Button>
-                    </div>
-                    <p className="text-sm text-gray-600">Password reset instructions</p>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full bg-transparent">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Custom Template
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+        )}
 
         <TabsContent value="system" className="space-y-6">
           <div className="grid lg:grid-cols-3 gap-6">
