@@ -159,7 +159,8 @@ interface PayrollSettings {
   frequency: string
   currency: string
   minWage: number
-  overtimeRate: number
+  weekdayOvertimeRate: number
+  weekendOvertimeRate: number
   autoPaye: boolean
   autoSsnit: boolean
   autoProvident: boolean
@@ -359,7 +360,8 @@ export default function SettingsPage() {
     frequency: "monthly",
     currency: "ghs",
     minWage: 18.15,
-    overtimeRate: 1.5,
+    weekdayOvertimeRate: 1.5,
+    weekendOvertimeRate: 2.0,
     autoPaye: true,
     autoSsnit: true,
     autoProvident: true,
@@ -516,17 +518,22 @@ export default function SettingsPage() {
 
   const [taxConfig, setTaxConfig] = useState({
     payeTaxBands: [
-      { threshold: 4380, rate: 0 },
-      { threshold: 1000, rate: 5 },
-      { threshold: 2000, rate: 10 },
-      { threshold: 20000, rate: 17.5 },
-      { threshold: 20000, rate: 25 },
-      { threshold: 0, rate: 30 }, // remaining amount
+      { rate: 0, threshold: 4380, type: "first" },
+      { rate: 5, threshold: 1000, type: "next" },
+      { rate: 10, threshold: 2000, type: "next" },
+      { rate: 17.5, threshold: 20000, type: "next" },
+      { rate: 25, threshold: 20000, type: "next" },
+      { rate: 30, threshold: 0, type: "remaining" },
     ],
     ssnitRates: {
       employee: 5.5,
       employer: 13,
       total: 18.5,
+    },
+    tier2Rates: {
+      employee: 5.5,
+      employer: 5.5,
+      total: 11,
     },
     tier3Rates: {
       employee: 5,
@@ -589,6 +596,20 @@ export default function SettingsPage() {
       return {
         ...prev,
         tier3Rates: newRates,
+      }
+    })
+    setHasUnsavedChanges(true)
+  }
+
+  const updateTier2Rate = (field: string, value: number) => {
+    setTaxConfig((prev) => {
+      const newRates = { ...prev.tier2Rates, [field]: value }
+      if (field === "employee" || field === "employer") {
+        newRates.total = newRates.employee + newRates.employer
+      }
+      return {
+        ...prev,
+        tier2Rates: newRates,
       }
     })
     setHasUnsavedChanges(true)
@@ -743,27 +764,15 @@ export default function SettingsPage() {
     setLoanSettingsData((prev) => prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)))
   }
 
+  const [uploadedFileName, setUploadedFileName] = useState<string>("")
+
   const handleSaveSettings = async () => {
     try {
       setIsLoading(true)
       const supabase = createClient()
 
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser()
-      if (authError || !user) {
-        console.error("[v0] Authentication required for saving settings")
-        toast({
-          title: "Authentication Required",
-          description: "Please log in to save company settings.",
-          variant: "destructive",
-        })
-        setIsLoading(false)
-      }
-
       const { error: companyError } = await supabase.from("companies").upsert({
-        id: MAIN_COMPANY_ID, // Use UUID instead of integer
+        id: MAIN_COMPANY_ID,
         name: companySettings.name,
         tax_id: companySettings.taxId,
         ssnit_number: companySettings.ssnitNumber,
@@ -781,27 +790,6 @@ export default function SettingsPage() {
       if (companyError) {
         console.error("[v0] Error saving company settings:", companyError)
         throw companyError
-      }
-
-      const { error: settingsError } = await supabase.from("company_settings").upsert({
-        id: MAIN_COMPANY_ID,
-        name: companySettings.name,
-        tax_id: companySettings.taxId,
-        ssnit_number: companySettings.ssnitNumber,
-        industry: companySettings.industry,
-        address: companySettings.address,
-        phone: companySettings.phone, // Use 'phone' not 'phone_number'
-        email: companySettings.email, // Use 'email' not 'email_address'
-        logo: companySettings.logo, // Use 'logo' not 'logo_url'
-        divisions: companySettings.divisions, // ARRAY type in company_settings
-        departments: companySettings.departments, // ARRAY type in company_settings
-        locations: companySettings.locations, // ARRAY type in company_settings
-        updated_at: new Date().toISOString(),
-      })
-
-      if (settingsError) {
-        console.error("[v0] Error saving company settings:", settingsError)
-        throw settingsError
       }
 
       console.log("[v0] Company settings saved successfully to database")
@@ -837,29 +825,11 @@ export default function SettingsPage() {
     if (file) {
       try {
         console.log("[v0] Starting company logo upload...")
-
         const supabase = createClient()
-
-        // Check if user is authenticated
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser()
-        if (authError || !user) {
-          console.error("[v0] Authentication required for logo upload")
-          toast({
-            title: "Authentication Required",
-            description: "Please log in to upload company logo.",
-            variant: "destructive",
-          })
-          return
-        }
 
         // Create a unique filename
         const fileExt = file.name.split(".").pop()
         const fileName = `company-logo-${Date.now()}.${fileExt}`
-
-        // Upload to Vercel Blob or similar storage (simulated)
         const logoUrl = URL.createObjectURL(file)
 
         // Save logo URL to companies table
@@ -887,6 +857,7 @@ export default function SettingsPage() {
           ...prev,
           logo: logoUrl,
         }))
+        setUploadedFileName(file.name) // store uploaded file name
 
         toast({
           title: "Logo Uploaded",
@@ -2348,6 +2319,9 @@ export default function SettingsPage() {
                       <br />
                       Recommended: 200x200px
                     </p>
+                    {uploadedFileName && (
+                      <p className="text-xs text-emerald-600 mt-1 font-medium">Uploaded: {uploadedFileName}</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -2421,13 +2395,27 @@ export default function SettingsPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="overtime-rate">Overtime Rate Multiplier</Label>
+                        <Label htmlFor="weekday-overtime-rate">Weekday Overtime Rate Multiplier</Label>
                         <Input
-                          id="overtime-rate"
+                          id="weekday-overtime-rate"
                           type="number"
-                          value={payrollSettings.overtimeRate}
+                          value={payrollSettings.weekdayOvertimeRate}
                           onChange={(e) =>
-                            updatePayrollSettings("overtimeRate", Number.parseFloat(e.target.value) || 0)
+                            updatePayrollSettings("weekdayOvertimeRate", Number.parseFloat(e.target.value) || 0)
+                          }
+                          step="0.1"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="weekend-overtime-rate">Weekend Overtime Rate Multiplier</Label>
+                        <Input
+                          id="weekend-overtime-rate"
+                          type="number"
+                          value={payrollSettings.weekendOvertimeRate}
+                          onChange={(e) =>
+                            updatePayrollSettings("weekendOvertimeRate", Number.parseFloat(e.target.value) || 0)
                           }
                           step="0.1"
                         />
@@ -2590,6 +2578,40 @@ export default function SettingsPage() {
                       </div>
 
                       <div className="p-3 border rounded-lg">
+                        <Label className="font-medium mb-2 block">Tier 2 Rates</Label>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <span className="w-20">Employee:</span>
+                            <Input
+                              type="number"
+                              value={taxConfig.tier2Rates.employee}
+                              onChange={(e) => updateTier2Rate("employee", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20"
+                              step="0.1"
+                            />
+                            <span>%</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="w-20">Employer:</span>
+                            <Input
+                              type="number"
+                              value={taxConfig.tier2Rates.employer}
+                              onChange={(e) => updateTier2Rate("employer", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20"
+                              step="0.1"
+                            />
+                            <span>%</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="w-20">Total:</span>
+                            <span className="font-medium">
+                              {(taxConfig.tier2Rates.employee + taxConfig.tier2Rates.employer).toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-3 border rounded-lg">
                         <Label className="font-medium mb-2 block">Tier 3 Rates</Label>
                         <div className="space-y-2">
                           <div className="flex items-center space-x-2">
@@ -2622,6 +2644,17 @@ export default function SettingsPage() {
                           </div>
                         </div>
                       </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t">
+                      <Button
+                        onClick={handleSaveSettings}
+                        disabled={isLoading}
+                        className="bg-emerald-600 hover:bg-emerald-700"
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        {isLoading ? "Saving..." : "Save Payroll Settings"}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

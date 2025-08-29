@@ -220,6 +220,19 @@ export default function EmployeesPage() {
     profilePictureFile: null,
   })
 
+  const countryCodes = [
+    { code: "+233", country: "Ghana", flag: "🇬🇭" },
+    { code: "+1", country: "USA", flag: "🇺🇸" },
+    { code: "+44", country: "UK", flag: "🇬🇧" },
+    { code: "+234", country: "Nigeria", flag: "🇳🇬" },
+    { code: "+27", country: "South Africa", flag: "🇿🇦" },
+    { code: "+254", country: "Kenya", flag: "🇰🇪" },
+    { code: "+256", country: "Uganda", flag: "🇺🇬" },
+  ]
+
+  const [phoneCountryCode, setPhoneCountryCode] = useState("+233")
+  const [emergencyCountryCode, setEmergencyCountryCode] = useState("+233")
+
   const loadSubsidiaries = async () => {
     try {
       const supabase = createClient()
@@ -1731,37 +1744,20 @@ function AddEmployeeForm({
     }
   }, [formData.subsidiary, subsidiaries, employees, formData.employeeId, setFormData])
 
-  const validateForm = () => {
-    const newErrors: any = {}
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {}
 
+    // Personal Info validation
     if (!formData.firstName.trim()) newErrors.firstName = "First name is required"
     if (!formData.lastName.trim()) newErrors.lastName = "Last name is required"
     if (!formData.personalEmail.trim()) newErrors.personalEmail = "Personal email is required"
-    if (!formData.phone.trim()) newErrors.phone = "Phone is required"
+    if (!formData.dateOfBirth.trim()) newErrors.dateOfBirth = "Date of birth is required" // made mandatory
+
+    // Employment validation
     if (!formData.position.trim()) newErrors.position = "Position is required"
-    if (!formData.department) newErrors.department = "Department is required"
-    if (!formData.salary) newErrors.salary = "Salary is required"
-    if (!formData.location) newErrors.location = "Location is required"
-    if (!formData.dateOfJoining) newErrors.dateOfJoining = "Date of joining is required"
-    if (!formData.bankName) newErrors.bankName = "Bank Name is required"
-    if (!formData.bankAccount) newErrors.bankAccount = "Bank Account Number is required"
-    if (!formData.ssnit) newErrors.ssnit = "SSNIT Number is required"
-    if (!formData.ghanaCard) newErrors.ghanaCard = "Ghana Card Number is required"
-
-    // Email validation for both emails
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (formData.personalEmail && !emailRegex.test(formData.personalEmail)) {
-      newErrors.personalEmail = "Invalid email format"
-    }
-    if (formData.corporateEmail && !emailRegex.test(formData.corporateEmail)) {
-      newErrors.corporateEmail = "Invalid email format"
-    }
-
-    // Phone validation
-    const phoneRegex = /^\+233\s\d{2}\s\d{3}\s\d{4}$/
-    if (formData.phone && !phoneRegex.test(formData.phone)) {
-      newErrors.phone = "Phone must be in format: +233 XX XXX XXXX"
-    }
+    if (!formData.department.trim()) newErrors.department = "Department is required"
+    if (!formData.location.trim()) newErrors.location = "Location is required"
+    if (!formData.dateOfJoining.trim()) newErrors.dateOfJoining = "Date of joining is required"
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -1976,18 +1972,33 @@ function AddEmployeeForm({
                 {errors.personalEmail && <p className="text-red-500 text-sm mt-1">{errors.personalEmail}</p>}
               </div>
               <div>
-                <Label htmlFor="phone">9. Phone Number *</Label>
-                <Input
-                  type="tel"
-                  id="phone"
-                  placeholder="+233 XX XXX XXXX"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange("phone", e.target.value)}
-                />
+                <Label htmlFor="phone">9. Phone Number</Label>
+                <div className="flex">
+                  <Select value={phoneCountryCode} onValueChange={setPhoneCountryCode}>
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {countryCodes.map((country) => (
+                        <SelectItem key={country.code} value={country.code}>
+                          {country.flag} {country.code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="tel"
+                    id="phone"
+                    placeholder="XX XXX XXXX"
+                    value={formData.phone}
+                    onChange={(e) => handleInputChange("phone", e.target.value)}
+                    className="flex-1 ml-2"
+                  />
+                </div>
                 {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
               </div>
               <div>
-                <Label htmlFor="dateOfBirth">10. Date of Birth</Label>
+                <Label htmlFor="dateOfBirth">10. Date of Birth *</Label>
                 <Input
                   type="date"
                   id="dateOfBirth"
@@ -1995,6 +2006,7 @@ function AddEmployeeForm({
                   value={formData.dateOfBirth}
                   onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
                 />
+                {errors.dateOfBirth && <p className="text-red-500 text-sm mt-1">{errors.dateOfBirth}</p>}
               </div>
             </div>
             <div>
@@ -2042,13 +2054,28 @@ function AddEmployeeForm({
               </div>
               <div>
                 <Label htmlFor="emergencyContactTel">14. Emergency Contact Tel</Label>
-                <Input
-                  type="tel"
-                  id="emergencyContactTel"
-                  placeholder="+233 XX XXX XXXX"
-                  value={formData.emergencyContactTel}
-                  onChange={(e) => handleInputChange("emergencyContactTel", e.target.value)}
-                />
+                <div className="flex">
+                  <Select value={emergencyCountryCode} onValueChange={setEmergencyCountryCode}>
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {countryCodes.map((country) => (
+                        <SelectItem key={country.code} value={country.code}>
+                          {country.flag} {country.code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="tel"
+                    id="emergencyContactTel"
+                    placeholder="XX XXX XXXX"
+                    value={formData.emergencyContactTel}
+                    onChange={(e) => handleInputChange("emergencyContactTel", e.target.value)}
+                    className="flex-1 ml-2"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -2242,6 +2269,8 @@ function AddEmployeeForm({
                     <SelectItem value="Active">Active</SelectItem>
                     <SelectItem value="Inactive">Inactive</SelectItem>
                     <SelectItem value="On Leave">On Leave</SelectItem>
+                    <SelectItem value="Resigned">Resigned</SelectItem>
+                    <SelectItem value="Terminated">Terminated</SelectItem>
                     <SelectItem value="Suspended">Suspended</SelectItem>
                   </SelectContent>
                 </Select>
