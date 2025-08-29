@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
+import Groq from "groq-sdk"
 
-let groq: any = null
+let groq: Groq | null = null
 
 // HR/Payroll system knowledge base
 const SYSTEM_CONTEXT = `You are an AI assistant for an HR and Payroll Management System called "Akwaaba HR & Payroll". You help users with:
@@ -35,7 +36,6 @@ Always provide step-by-step instructions and reference specific sections of the 
 async function initializeGroq() {
   if (!groq) {
     try {
-      const { default: Groq } = await import("groq-sdk")
       groq = new Groq({
         apiKey: process.env.GROQ_API_KEY,
       })
