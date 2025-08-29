@@ -274,146 +274,142 @@ export function AIChatbox() {
       </CardHeader>
 
       {!isMinimized && (
-        <CardContent className="flex flex-col h-[calc(600px-80px)] p-0">
-          <div className="flex flex-col h-full">
-            <div className="flex justify-between items-center p-2 border-b flex-shrink-0">
-              {isTTSEnabled && (
-                <div className="flex items-center gap-2 text-xs text-green-600">
-                  <Volume2 className="h-3 w-3" />
-                  {isSpeaking ? "Speaking..." : "Voice enabled"}
-                </div>
-              )}
-              {!isTTSEnabled && <div></div>}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearChat}
-                className="text-xs text-gray-500 hover:text-gray-700"
-              >
-                Clear Chat
-              </Button>
-            </div>
+        <CardContent className="flex flex-col p-0 h-[calc(600px-80px)]">
+          {/* Status bar */}
+          <div className="flex justify-between items-center p-3 border-b bg-gray-50 flex-shrink-0">
+            {isTTSEnabled && (
+              <div className="flex items-center gap-2 text-xs text-green-600">
+                <Volume2 className="h-3 w-3" />
+                {isSpeaking ? "Speaking..." : "Voice enabled"}
+              </div>
+            )}
+            {!isTTSEnabled && <div></div>}
+            <Button variant="ghost" size="sm" onClick={clearChat} className="text-xs text-gray-500 hover:text-gray-700">
+              Clear Chat
+            </Button>
+          </div>
 
-            <div
-              ref={messagesContainerRef}
-              className="flex-1 p-4 relative overflow-y-auto scroll-smooth min-h-0"
-              style={{ maxHeight: "calc(100% - 120px)" }}
-            >
-              {showScrollButtons && (
-                <div className="absolute right-2 top-2 z-10 flex flex-col gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={scrollToTop}
-                    className="h-8 w-8 bg-white/90 hover:bg-white shadow-sm"
-                    title="Scroll to top"
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={scrollToBottom}
-                    className="h-8 w-8 bg-white/90 hover:bg-white shadow-sm"
-                    title="Scroll to bottom"
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+          {/* Messages container with fixed height and proper scrolling */}
+          <div
+            ref={messagesContainerRef}
+            className="flex-1 p-4 overflow-y-auto scroll-smooth relative min-h-0"
+            style={{ maxHeight: "calc(100% - 120px)" }}
+          >
+            {/* Scroll buttons */}
+            {showScrollButtons && (
+              <div className="absolute right-2 top-2 z-10 flex flex-col gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={scrollToTop}
+                  className="h-8 w-8 bg-white/90 hover:bg-white shadow-sm"
+                  title="Scroll to top"
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={scrollToBottom}
+                  className="h-8 w-8 bg-white/90 hover:bg-white shadow-sm"
+                  title="Scroll to bottom"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
 
-              <div className="space-y-4 pb-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    {message.role === "assistant" && (
-                      <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Bot className="h-4 w-4 text-blue-600" />
-                      </div>
-                    )}
-                    <div
-                      className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                        message.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
-                      }`}
-                    >
-                      <div className="whitespace-pre-wrap">{message.content}</div>
-                      <div className="flex items-center justify-between mt-1">
-                        <div
-                          className={`text-xs opacity-70 ${
-                            message.role === "user" ? "text-blue-100" : "text-gray-500"
-                          }`}
-                        >
-                          {message.timestamp.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </div>
-                        {message.role === "assistant" && isTTSEnabled && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => speakText(message.content)}
-                            className="h-6 w-6 opacity-50 hover:opacity-100"
-                            title="Speak this message"
-                          >
-                            <Volume2 className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                    {message.role === "user" && (
-                      <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                        <User className="h-4 w-4 text-gray-600" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {isLoading && (
-                  <div className="flex gap-3 justify-start">
+            {/* Messages */}
+            <div className="space-y-4 pb-4">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  {message.role === "assistant" && (
                     <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                       <Bot className="h-4 w-4 text-blue-600" />
                     </div>
-                    <div className="bg-gray-100 rounded-lg px-3 py-2 text-sm">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div
-                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "0.1s" }}
-                        ></div>
-                        <div
-                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "0.2s" }}
-                        ></div>
+                  )}
+                  <div
+                    className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
+                      message.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
+                    }`}
+                  >
+                    <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                    <div className="flex items-center justify-between mt-1">
+                      <div
+                        className={`text-xs opacity-70 ${message.role === "user" ? "text-blue-100" : "text-gray-500"}`}
+                      >
+                        {message.timestamp.toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </div>
+                      {message.role === "assistant" && isTTSEnabled && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => speakText(message.content)}
+                          className="h-6 w-6 opacity-50 hover:opacity-100"
+                          title="Speak this message"
+                        >
+                          <Volume2 className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
                   </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
+                  {message.role === "user" && (
+                    <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                      <User className="h-4 w-4 text-gray-600" />
+                    </div>
+                  )}
+                </div>
+              ))}
+              {isLoading && (
+                <div className="flex gap-3 justify-start">
+                  <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Bot className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="bg-gray-100 rounded-lg px-3 py-2 text-sm">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                      <div
+                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                        style={{ animationDelay: "0.1s" }}
+                      ></div>
+                      <div
+                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                        style={{ animationDelay: "0.2s" }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
             </div>
+          </div>
 
-            <div className="border-t p-4 flex-shrink-0 bg-white">
-              <div className="flex gap-2">
-                <Input
-                  ref={inputRef}
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Ask me about HR, payroll, employees..."
-                  disabled={isLoading}
-                  className="flex-1"
-                />
-                <Button
-                  onClick={sendMessage}
-                  disabled={!inputMessage.trim() || isLoading}
-                  size="icon"
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
+          {/* Input area - fixed at bottom */}
+          <div className="border-t p-4 bg-white flex-shrink-0">
+            <div className="flex gap-2">
+              <Input
+                ref={inputRef}
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask me about HR, payroll, employees..."
+                disabled={isLoading}
+                className="flex-1"
+              />
+              <Button
+                onClick={sendMessage}
+                disabled={!inputMessage.trim() || isLoading}
+                size="icon"
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </CardContent>
