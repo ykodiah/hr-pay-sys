@@ -397,7 +397,7 @@ export default function ClientAppLayout({
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">HR Management</p>
                 <a
                   href="/app/employees"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:text-white transition-colors font-sans bg-green-50"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:text-white transition-colors font-sans"
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
                     e.currentTarget.style.color = "white"
@@ -412,7 +412,7 @@ export default function ClientAppLayout({
                 </a>
                 <a
                   href="/app/org-chart"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans"
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
                     e.currentTarget.style.color = "white"
@@ -427,7 +427,7 @@ export default function ClientAppLayout({
                 </a>
                 <a
                   href="/app/documents"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans"
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
                     e.currentTarget.style.color = "white"
@@ -442,7 +442,7 @@ export default function ClientAppLayout({
                 </a>
                 <a
                   href="/app/recruitment"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans"
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
                     e.currentTarget.style.color = "white"
@@ -468,7 +468,7 @@ export default function ClientAppLayout({
                   }}
                 >
                   <Shield className="w-5 h-5" />
-                  <span>Disciplinary & Grievance</span>
+                  <span className="font-sans" className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans">Disciplinary & Grievance</span>
                 </a>
                 <a
                   href="/app/attendance"
@@ -483,7 +483,7 @@ export default function ClientAppLayout({
                   }}
                 >
                   <Clock className="w-5 h-5" />
-                  <span>Time & Attendance</span>
+                  <span className="font-sans">Time & Attendance</span>
                 </a>
                 <a
                   href="/app/offboarding"
@@ -498,7 +498,7 @@ export default function ClientAppLayout({
                   }}
                 >
                   <LogOut className="w-5 h-5" />
-                  <span>Employee Offboarding</span>
+                  <span className="font-sans">Employee Offboarding</span>
                 </a>
                 <a
                   href="/app/performance"
@@ -513,7 +513,7 @@ export default function ClientAppLayout({
                   }}
                 >
                   <Target className="w-5 h-5" />
-                  <span>Performance</span>
+                  <span className="font-sans">Performance</span>
                 </a>
                 <a
                   href="/app/learning"
@@ -528,7 +528,7 @@ export default function ClientAppLayout({
                   }}
                 >
                   <BookOpen className="w-5 h-5" />
-                  <span>Learning & Development</span>
+                  <span className="font-sans">Learning & Development</span>
                 </a>
                 <a
                   href="/app/leave"
@@ -543,7 +543,7 @@ export default function ClientAppLayout({
                   }}
                 >
                   <Calendar className="w-5 h-5" />
-                  <span>Leave Management</span>
+                  <span className="font-sans">Leave Management</span>
                 </a>
               </div>
 
@@ -562,7 +562,7 @@ export default function ClientAppLayout({
                   }}
                 >
                   <Calculator className="w-5 h-5" />
-                  <span>Payroll Processing</span>
+                  <span className="font-sans">Payroll Processing</span>
                 </a>
                 <a
                   href="/app/loans"
@@ -577,7 +577,7 @@ export default function ClientAppLayout({
                   }}
                 >
                   <CreditCard className="w-5 h-5" />
-                  <span>Loans & Advances</span>
+                  <span className="font-sans">Loans & Advances</span>
                 </a>
               </div>
 
@@ -585,7 +585,7 @@ export default function ClientAppLayout({
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Analytics</p>
                 <a
                   href="/app/analytics"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans"
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
                     e.currentTarget.style.color = "white"
@@ -604,7 +604,7 @@ export default function ClientAppLayout({
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">System</p>
                 <a
                   href="/app/integrations"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans font-sans"
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
                     e.currentTarget.style.color = "white"
@@ -619,7 +619,7 @@ export default function ClientAppLayout({
                 </a>
                 <a
                   href="/app/settings"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans"
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
                     e.currentTarget.style.color = "white"
