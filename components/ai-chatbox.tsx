@@ -57,6 +57,8 @@ export function AIChatbox() {
     setIsLoading(true)
 
     try {
+      console.log("[v0] Sending message to API...")
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -71,11 +73,20 @@ export function AIChatbox() {
         }),
       })
 
+      console.log("[v0] API response status:", response.status)
+
       if (!response.ok) {
-        throw new Error("Failed to get response")
+        const errorData = await response.json().catch(() => ({}))
+        console.error("[v0] API error:", errorData)
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
       const data = await response.json()
+      console.log("[v0] API response data received")
+
+      if (!data.response) {
+        throw new Error("Invalid response format")
+      }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -86,8 +97,29 @@ export function AIChatbox() {
 
       setMessages((prev) => [...prev, assistantMessage])
     } catch (error) {
-      console.error("Chat error:", error)
-      toast.error("Failed to send message. Please try again.")
+      console.error("[v0] Chat error:", error)
+
+      let errorMessage = "Failed to send message. Please try again."
+      if (error instanceof Error) {
+        if (error.message.includes("timeout")) {
+          errorMessage = "Request timed out. Please try again."
+        } else if (error.message.includes("503")) {
+          errorMessage = "AI service is temporarily unavailable."
+        } else if (error.message.includes("authentication")) {
+          errorMessage = "AI service authentication error."
+        }
+      }
+
+      toast.error(errorMessage)
+
+      const errorAssistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content:
+          "I'm sorry, I'm having trouble connecting to the AI service right now. Please try again in a moment, or contact your system administrator if the problem persists.",
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, errorAssistantMessage])
     } finally {
       setIsLoading(false)
     }

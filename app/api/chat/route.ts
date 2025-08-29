@@ -1,9 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
-import Groq from "groq-sdk"
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-})
+let groq: any = null
+
+try {
+  const Groq = require("groq-sdk")
+  groq = new Groq({
+    apiKey: process.env.GROQ_API_KEY,
+  })
+} catch (error) {
+  console.error("Failed to initialize Groq SDK:", error)
+}
 
 // HR/Payroll system knowledge base
 const SYSTEM_CONTEXT = `You are an AI assistant for an HR and Payroll Management System called "Akwaaba HR & Payroll". You help users with:
@@ -37,7 +43,20 @@ Always provide step-by-step instructions and reference specific sections of the 
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("[v0] Chat API called")
+
+    if (!groq) {
+      console.error("[v0] Groq SDK not initialized")
+      return NextResponse.json({ error: "AI service not available" }, { status: 503 })
+    }
+
+    if (!process.env.GROQ_API_KEY) {
+      console.error("[v0] GROQ_API_KEY not found")
+      return NextResponse.json({ error: "AI service configuration error" }, { status: 503 })
+    }
+
     const { message, conversationHistory = [] } = await request.json()
+    console.log("[v0] Received message:", message)
 
     if (!message) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 })
@@ -56,14 +75,21 @@ export async function POST(request: NextRequest) {
       },
     ]
 
-    const completion = await groq.chat.completions.create({
-      messages,
-      model: "llama-3.1-70b-versatile",
-      temperature: 0.7,
-      max_tokens: 1000,
-      top_p: 1,
-      stream: false,
-    })
+    console.log("[v0] Calling Groq API...")
+
+    const completion = await Promise.race([
+      groq.chat.completions.create({
+        messages,
+        model: "llama-3.1-70b-versatile",
+        temperature: 0.7,
+        max_tokens: 1000,
+        top_p: 1,
+        stream: false,
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Request timeout")), 30000)),
+    ])
+
+    console.log("[v0] Groq API response received")
 
     const response =
       completion.choices[0]?.message?.content || "I apologize, but I could not generate a response. Please try again."
@@ -73,7 +99,19 @@ export async function POST(request: NextRequest) {
       conversationId: Date.now().toString(),
     })
   } catch (error) {
-    console.error("Chat API Error:", error)
-    return NextResponse.json({ error: "Failed to process chat request" }, { status: 500 })
+    console.error("[v0] Chat API Error:", error)
+
+    let errorMessage = "Failed to process chat request"
+    if (error instanceof Error) {
+      if (error.message.includes("timeout")) {
+        errorMessage = "Request timed out. Please try again."
+      } else if (error.message.includes("API key")) {
+        errorMessage = "AI service authentication error"
+      } else if (error.message.includes("rate limit")) {
+        errorMessage = "Too many requests. Please wait a moment."
+      }
+    }
+
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
