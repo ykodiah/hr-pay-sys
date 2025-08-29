@@ -2,17 +2,6 @@ import { type NextRequest, NextResponse } from "next/server"
 
 let groq: any = null
 
-try {
-  // Use dynamic import instead of require for ES modules
-  const { default: Groq } = await import("groq-sdk")
-  groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY,
-  })
-  console.log("[v0] Groq SDK initialized successfully")
-} catch (error) {
-  console.error("[v0] Failed to initialize Groq SDK:", error)
-}
-
 // HR/Payroll system knowledge base
 const SYSTEM_CONTEXT = `You are an AI assistant for an HR and Payroll Management System called "Akwaaba HR & Payroll". You help users with:
 
@@ -43,22 +32,27 @@ const SYSTEM_CONTEXT = `You are an AI assistant for an HR and Payroll Management
 
 Always provide step-by-step instructions and reference specific sections of the system when helping users.`
 
+async function initializeGroq() {
+  if (!groq) {
+    try {
+      const { default: Groq } = await import("groq-sdk")
+      groq = new Groq({
+        apiKey: process.env.GROQ_API_KEY,
+      })
+      console.log("[v0] Groq SDK initialized successfully")
+    } catch (error) {
+      console.error("[v0] Failed to initialize Groq SDK:", error)
+      throw new Error("AI service initialization failed")
+    }
+  }
+  return groq
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log("[v0] Chat API called")
 
-    if (!groq) {
-      try {
-        const { default: Groq } = await import("groq-sdk")
-        groq = new Groq({
-          apiKey: process.env.GROQ_API_KEY,
-        })
-        console.log("[v0] Groq SDK initialized in request handler")
-      } catch (initError) {
-        console.error("[v0] Failed to initialize Groq SDK in request:", initError)
-        return NextResponse.json({ error: "AI service initialization failed" }, { status: 503 })
-      }
-    }
+    const groqClient = await initializeGroq()
 
     if (!process.env.GROQ_API_KEY) {
       console.error("[v0] GROQ_API_KEY not found")
@@ -88,7 +82,7 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Calling Groq API...")
 
     const completion = await Promise.race([
-      groq.chat.completions.create({
+      groqClient.chat.completions.create({
         messages,
         model: "llama-3.1-70b-versatile",
         temperature: 0.7,
@@ -119,6 +113,8 @@ export async function POST(request: NextRequest) {
         errorMessage = "AI service authentication error"
       } else if (error.message.includes("rate limit")) {
         errorMessage = "Too many requests. Please wait a moment."
+      } else if (error.message.includes("initialization")) {
+        errorMessage = "AI service initialization failed"
       }
     }
 
