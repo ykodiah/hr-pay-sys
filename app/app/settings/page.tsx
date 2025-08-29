@@ -42,6 +42,7 @@ import {
   MoreVertical,
   Eye,
   Power,
+  Minus,
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -534,6 +535,29 @@ export default function SettingsPage() {
     },
   })
 
+  const addTaxBand = () => {
+    setTaxConfig((prev) => ({
+      ...prev,
+      payeTaxBands: [
+        ...prev.payeTaxBands.slice(0, -1), // Remove the "remaining amount" band
+        { threshold: 0, rate: 0 }, // Add new band
+        prev.payeTaxBands[prev.payeTaxBands.length - 1], // Add back the "remaining amount" band
+      ],
+    }))
+    setHasUnsavedChanges(true)
+  }
+
+  const removeTaxBand = (index: number) => {
+    if (taxConfig.payeTaxBands.length > 2) {
+      // Keep at least one regular band + remaining amount
+      setTaxConfig((prev) => ({
+        ...prev,
+        payeTaxBands: prev.payeTaxBands.filter((_, i) => i !== index),
+      }))
+      setHasUnsavedChanges(true)
+    }
+  }
+
   const updateTaxBand = (index: number, field: string, value: number) => {
     setTaxConfig((prev) => ({
       ...prev,
@@ -543,18 +567,30 @@ export default function SettingsPage() {
   }
 
   const updateSSNITRate = (field: string, value: number) => {
-    setTaxConfig((prev) => ({
-      ...prev,
-      ssnitRates: { ...prev.ssnitRates, [field]: value },
-    }))
+    setTaxConfig((prev) => {
+      const newRates = { ...prev.ssnitRates, [field]: value }
+      if (field === "employee" || field === "employer") {
+        newRates.total = newRates.employee + newRates.employer
+      }
+      return {
+        ...prev,
+        ssnitRates: newRates,
+      }
+    })
     setHasUnsavedChanges(true)
   }
 
   const updateTier3Rate = (field: string, value: number) => {
-    setTaxConfig((prev) => ({
-      ...prev,
-      tier3Rates: { ...prev.tier3Rates, [field]: value },
-    }))
+    setTaxConfig((prev) => {
+      const newRates = { ...prev.tier3Rates, [field]: value }
+      if (field === "employee" || field === "employer") {
+        newRates.total = newRates.employee + newRates.employer
+      }
+      return {
+        ...prev,
+        tier3Rates: newRates,
+      }
+    })
     setHasUnsavedChanges(true)
   }
 
@@ -2467,6 +2503,15 @@ export default function SettingsPage() {
                       <div className="p-3 border rounded-lg">
                         <div className="flex items-center justify-between mb-2">
                           <Label className="font-medium">PAYE Tax Bands</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={addTaxBand}
+                            className="h-8 w-8 p-0 bg-transparent"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
                         </div>
                         <div className="space-y-2">
                           {taxConfig.payeTaxBands.map((band, index) => (
@@ -2494,6 +2539,17 @@ export default function SettingsPage() {
                                     placeholder="Amount"
                                   />
                                 </>
+                              )}
+                              {index !== taxConfig.payeTaxBands.length - 1 && taxConfig.payeTaxBands.length > 2 && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeTaxBand(index)}
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </Button>
                               )}
                             </div>
                           ))}
@@ -2527,7 +2583,9 @@ export default function SettingsPage() {
                           </div>
                           <div className="flex items-center space-x-2">
                             <span className="w-20">Total:</span>
-                            <span className="font-medium">{taxConfig.ssnitRates.total}%</span>
+                            <span className="font-medium">
+                              {(taxConfig.ssnitRates.employee + taxConfig.ssnitRates.employer).toFixed(1)}%
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -2559,7 +2617,9 @@ export default function SettingsPage() {
                           </div>
                           <div className="flex items-center space-x-2">
                             <span className="w-20">Total:</span>
-                            <span className="font-medium">{taxConfig.tier3Rates.total}%</span>
+                            <span className="font-medium">
+                              {(taxConfig.tier3Rates.employee + taxConfig.tier3Rates.employer).toFixed(1)}%
+                            </span>
                           </div>
                         </div>
                       </div>
