@@ -39,6 +39,7 @@ import {
   Sigma as Sitemap,
 } from "lucide-react"
 import { Suspense, useState, useEffect } from "react"
+import { AIChatbox } from "@/components/ai-chatbox"
 
 // Theme configuration and state management
 const themes = {
@@ -649,6 +650,8 @@ export default function ClientAppLayout({
         {/* Main Content */}
         <main className="flex-1 p-6">{children}</main>
       </div>
+
+      <AIChatbox />
     </div>
   )
 }
