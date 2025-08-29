@@ -275,8 +275,8 @@ export function AIChatbox() {
 
       {!isMinimized && (
         <CardContent className="flex flex-col h-[calc(600px-80px)] p-0">
-          <div className="flex-1 flex flex-col">
-            <div className="flex justify-between items-center p-2 border-b">
+          <div className="flex flex-col h-full">
+            <div className="flex justify-between items-center p-2 border-b flex-shrink-0">
               {isTTSEnabled && (
                 <div className="flex items-center gap-2 text-xs text-green-600">
                   <Volume2 className="h-3 w-3" />
@@ -294,7 +294,11 @@ export function AIChatbox() {
               </Button>
             </div>
 
-            <div ref={messagesContainerRef} className="flex-1 p-4 relative overflow-y-auto scroll-smooth">
+            <div
+              ref={messagesContainerRef}
+              className="flex-1 p-4 relative overflow-y-auto scroll-smooth min-h-0"
+              style={{ maxHeight: "calc(100% - 120px)" }}
+            >
               {showScrollButtons && (
                 <div className="absolute right-2 top-2 z-10 flex flex-col gap-1">
                   <Button
@@ -318,7 +322,7 @@ export function AIChatbox() {
                 </div>
               )}
 
-              <div className="space-y-4">
+              <div className="space-y-4 pb-4">
                 {messages.map((message) => (
                   <div
                     key={message.id}
@@ -390,7 +394,7 @@ export function AIChatbox() {
               </div>
             </div>
 
-            <div className="border-t p-4">
+            <div className="border-t p-4 flex-shrink-0 bg-white">
               <div className="flex gap-2">
                 <Input
                   ref={inputRef}
