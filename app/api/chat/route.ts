@@ -3,12 +3,14 @@ import { type NextRequest, NextResponse } from "next/server"
 let groq: any = null
 
 try {
-  const Groq = require("groq-sdk")
+  // Use dynamic import instead of require for ES modules
+  const { default: Groq } = await import("groq-sdk")
   groq = new Groq({
     apiKey: process.env.GROQ_API_KEY,
   })
+  console.log("[v0] Groq SDK initialized successfully")
 } catch (error) {
-  console.error("Failed to initialize Groq SDK:", error)
+  console.error("[v0] Failed to initialize Groq SDK:", error)
 }
 
 // HR/Payroll system knowledge base
@@ -46,8 +48,16 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Chat API called")
 
     if (!groq) {
-      console.error("[v0] Groq SDK not initialized")
-      return NextResponse.json({ error: "AI service not available" }, { status: 503 })
+      try {
+        const { default: Groq } = await import("groq-sdk")
+        groq = new Groq({
+          apiKey: process.env.GROQ_API_KEY,
+        })
+        console.log("[v0] Groq SDK initialized in request handler")
+      } catch (initError) {
+        console.error("[v0] Failed to initialize Groq SDK in request:", initError)
+        return NextResponse.json({ error: "AI service initialization failed" }, { status: 503 })
+      }
     }
 
     if (!process.env.GROQ_API_KEY) {
