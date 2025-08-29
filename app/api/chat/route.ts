@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import Groq from "groq-sdk"
-
-let groq: Groq | null = null
+import { generateText } from "ai"
+import { groq } from "@ai-sdk/groq"
 
 // HR/Payroll system knowledge base
 const SYSTEM_CONTEXT = `You are an AI assistant for an HR and Payroll Management System called "Akwaaba HR & Payroll". You help users with:
@@ -33,26 +32,9 @@ const SYSTEM_CONTEXT = `You are an AI assistant for an HR and Payroll Management
 
 Always provide step-by-step instructions and reference specific sections of the system when helping users.`
 
-async function initializeGroq() {
-  if (!groq) {
-    try {
-      groq = new Groq({
-        apiKey: process.env.GROQ_API_KEY,
-      })
-      console.log("[v0] Groq SDK initialized successfully")
-    } catch (error) {
-      console.error("[v0] Failed to initialize Groq SDK:", error)
-      throw new Error("AI service initialization failed")
-    }
-  }
-  return groq
-}
-
 export async function POST(request: NextRequest) {
   try {
     console.log("[v0] Chat API called")
-
-    const groqClient = await initializeGroq()
 
     if (!process.env.GROQ_API_KEY) {
       console.error("[v0] GROQ_API_KEY not found")
@@ -66,37 +48,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 })
     }
 
-    // Prepare conversation with system context
-    const messages = [
-      {
-        role: "system" as const,
-        content: SYSTEM_CONTEXT,
-      },
-      ...conversationHistory,
-      {
-        role: "user" as const,
-        content: message,
-      },
-    ]
+    console.log("[v0] Calling Groq API via AI SDK...")
 
-    console.log("[v0] Calling Groq API...")
-
-    const completion = await Promise.race([
-      groqClient.chat.completions.create({
-        messages,
-        model: "llama-3.1-70b-versatile",
+    const result = await Promise.race([
+      generateText({
+        model: groq("llama-3.1-70b-versatile"),
+        system: SYSTEM_CONTEXT,
+        messages: [
+          ...conversationHistory,
+          {
+            role: "user",
+            content: message,
+          },
+        ],
         temperature: 0.7,
-        max_tokens: 1000,
-        top_p: 1,
-        stream: false,
+        maxTokens: 1000,
       }),
       new Promise((_, reject) => setTimeout(() => reject(new Error("Request timeout")), 30000)),
     ])
 
-    console.log("[v0] Groq API response received")
+    console.log("[v0] AI SDK response received")
 
-    const response =
-      completion.choices[0]?.message?.content || "I apologize, but I could not generate a response. Please try again."
+    const response = result.text || "I apologize, but I could not generate a response. Please try again."
 
     return NextResponse.json({
       response,
@@ -113,8 +86,6 @@ export async function POST(request: NextRequest) {
         errorMessage = "AI service authentication error"
       } else if (error.message.includes("rate limit")) {
         errorMessage = "Too many requests. Please wait a moment."
-      } else if (error.message.includes("initialization")) {
-        errorMessage = "AI service initialization failed"
       }
     }
 
