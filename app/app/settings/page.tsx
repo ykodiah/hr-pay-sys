@@ -1360,7 +1360,10 @@ export default function SettingsPage() {
 
   const handleRemovePolicy = (policyId: number) => {
     setLeavePolicies((prev) => prev.filter((p) => p.id !== policyId))
-    toast.success("Leave policy removed successfully")
+    toast({
+      title: "Success",
+      description: "Leave policy removed successfully",
+    })
   }
 
   const handleAddPolicy = () => {
@@ -1371,14 +1374,20 @@ export default function SettingsPage() {
   const handleSavePolicy = (policyData: any) => {
     if (editingPolicy) {
       setLeavePolicies((prev) => prev.map((p) => (p.id === editingPolicy.id ? { ...p, ...policyData } : p)))
-      toast.success("Leave policy updated successfully")
+      toast({
+        title: "Success",
+        description: "Leave policy updated successfully",
+      })
     } else {
       const newPolicy = {
         id: Date.now(),
         ...policyData,
       }
       setLeavePolicies((prev) => [...prev, newPolicy])
-      toast.success("Leave policy added successfully")
+      toast({
+        title: "Success",
+        description: "Leave policy added successfully",
+      })
     }
     setShowPolicyDialog(false)
     setEditingPolicy(null)
@@ -1391,7 +1400,10 @@ export default function SettingsPage() {
 
   const handleRemoveGrade = (gradeId: number) => {
     setSalaryGrades((prev) => prev.filter((g) => g.id !== gradeId))
-    toast.success("Salary grade removed successfully")
+    toast({
+      title: "Success",
+      description: "Salary grade removed successfully",
+    })
   }
 
   const handleAddGrade = () => {
@@ -1402,14 +1414,20 @@ export default function SettingsPage() {
   const handleSaveGrade = (gradeData: any) => {
     if (editingGrade) {
       setSalaryGrades((prev) => prev.map((g) => (g.id === editingGrade.id ? { ...g, ...gradeData } : g)))
-      toast.success("Salary grade updated successfully")
+      toast({
+        title: "Success",
+        description: "Salary grade updated successfully",
+      })
     } else {
       const newGrade = {
         id: Date.now(),
         ...gradeData,
       }
       setSalaryGrades((prev) => [...prev, newGrade])
-      toast.success("Salary grade added successfully")
+      toast({
+        title: "Success",
+        description: "Salary grade added successfully",
+      })
     }
     setShowGradeDialog(false)
     setEditingGrade(null)
