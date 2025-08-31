@@ -132,10 +132,11 @@ export function createClient() {
   const url = getSupabaseUrl()
   const key = getSupabaseAnonKey()
 
-  if (!url || url === "https://your-project.supabase.co" || !key || key === "your-anon-key") {
-    console.error("[v0] Supabase environment variables not properly configured")
+  // Let Supabase client attempt connection - if it fails, it will throw proper errors
+  try {
+    return createBrowserClient(url, key)
+  } catch (error) {
+    console.error("[v0] Failed to create Supabase client:", error)
     return createMockSupabaseClient() as any
   }
-
-  return createBrowserClient(url, key)
 }
