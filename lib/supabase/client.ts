@@ -1,25 +1,15 @@
 import { createBrowserClient } from "@supabase/ssr"
 
 function getSupabaseUrl(): string {
-  // Try multiple ways to access the Supabase URL
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    (typeof window !== "undefined" && (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_SUPABASE_URL) ||
-    "https://your-project.supabase.co" // This will be replaced by the actual URL from integration
-
-  console.log("[v0] Supabase URL:", url)
-  return url
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  console.log("[v0] Supabase URL:", url || "not found")
+  return url || ""
 }
 
 function getSupabaseAnonKey(): string {
-  // Try multiple ways to access the Supabase anon key
-  const key =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    (typeof window !== "undefined" && (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY) ||
-    "your-anon-key" // This will be replaced by the actual key from integration
-
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   console.log("[v0] Supabase Key length:", key?.length || 0)
-  return key
+  return key || ""
 }
 
 function createMockSupabaseClient() {
@@ -38,67 +28,75 @@ function createMockSupabaseClient() {
       },
     ],
     subsidiaries: [{ id: 1, name: "Main Office", status: "active" }],
-    companies: [{ id: 1, name: "Akwaaba HR Pay", logo_url: null }],
+    companies: [
+      {
+        id: "f44f079e-1779-446d-9194-199994111111",
+        name: "Akwaaba HR Pay",
+        logo_url: null,
+        divisions: ["Head Office", "Regional Office"],
+        departments: ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"],
+        locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
+      },
+    ],
   }
 
   const createQueryBuilder = (tableName: string) => {
-    const query = { table: tableName, filters: {}, orderBy: null, limit: null }
-
     return {
       select: (columns = "*") => ({
-        eq: (column: string, value: any) => {
-          query.filters[column] = value
-          return {
-            maybeSingle: () =>
-              Promise.resolve({
-                data: mockData[tableName as keyof typeof mockData]?.[0] || null,
-                error: null,
-              }),
-            single: () =>
-              Promise.resolve({
-                data: mockData[tableName as keyof typeof mockData]?.[0] || null,
-                error: null,
-              }),
-            order: (column: string, options?: any) => ({
-              limit: (count: number) =>
-                Promise.resolve({
-                  data: mockData[tableName as keyof typeof mockData]?.slice(0, count) || [],
-                  error: null,
-                }),
-            }),
-          }
-        },
-        order: (column: string, options?: any) => ({
-          limit: (count: number) =>
-            Promise.resolve({
-              data: mockData[tableName as keyof typeof mockData]?.slice(0, count) || [],
+        eq: (column: string, value: any) => ({
+          maybeSingle: async () => {
+            const tableData = mockData[tableName as keyof typeof mockData] as any[]
+            const matchedItem = tableData?.find((item) => item.id === value || item.id.toString() === value.toString())
+            return Promise.resolve({
+              data: matchedItem || null,
               error: null,
-            }),
-          then: (callback: any) =>
-            callback({
-              data: mockData[tableName as keyof typeof mockData] || [],
+            })
+          },
+          single: async () => {
+            const tableData = mockData[tableName as keyof typeof mockData] as any[]
+            const matchedItem = tableData?.find((item) => item.id === value || item.id.toString() === value.toString())
+            return Promise.resolve({
+              data: matchedItem || null,
               error: null,
-            }),
-        }),
-        then: (callback: any) =>
-          callback({
-            data: mockData[tableName as keyof typeof mockData] || [],
-            error: null,
+            })
+          },
+          order: (column: string, options?: any) => ({
+            limit: async (count: number) => {
+              const tableData = mockData[tableName as keyof typeof mockData] as any[]
+              return Promise.resolve({
+                data: tableData?.slice(0, count) || [],
+                error: null,
+              })
+            },
           }),
+        }),
+        order: (column: string, options?: any) => ({
+          limit: async (count: number) => {
+            const tableData = mockData[tableName as keyof typeof mockData] as any[]
+            return Promise.resolve({
+              data: tableData?.slice(0, count) || [],
+              error: null,
+            })
+          },
+        }),
+        then: async (callback: any) => {
+          const tableData = mockData[tableName as keyof typeof mockData] || []
+          return callback({
+            data: tableData,
+            error: null,
+          })
+        },
       }),
       insert: (data: any) => ({
         select: () => ({
-          single: () =>
-            Promise.resolve({
-              data: { id: Date.now(), ...data[0] },
+          single: async () => {
+            const newItem = { id: Date.now(), ...data[0] }
+            return Promise.resolve({
+              data: newItem,
               error: null,
-            }),
+            })
+          },
         }),
-        then: (callback: any) =>
-          callback({
-            data: { id: Date.now(), ...data[0] },
-            error: null,
-          }),
       }),
       update: (data: any) => ({
         eq: (column: string, value: any) =>
@@ -121,8 +119,8 @@ function createMockSupabaseClient() {
     }),
     auth: {
       getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-      signInWithPassword: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-      signUp: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      signInWithPassword: () => Promise.resolve({ data: null, error: { message: "Mock Supabase client" } }),
+      signUp: () => Promise.resolve({ data: null, error: { message: "Mock Supabase client" } }),
       signOut: () => Promise.resolve({ error: null }),
     },
   }
@@ -132,11 +130,15 @@ export function createClient() {
   const url = getSupabaseUrl()
   const key = getSupabaseAnonKey()
 
-  // Let Supabase client attempt connection - if it fails, it will throw proper errors
-  try {
-    return createBrowserClient(url, key)
-  } catch (error) {
-    console.error("[v0] Failed to create Supabase client:", error)
-    return createMockSupabaseClient() as any
+  if (url && key && url.includes("supabase.co") && !url.includes("your-project") && key.length > 20) {
+    try {
+      console.log("[v0] Creating real Supabase client")
+      return createBrowserClient(url, key)
+    } catch (error) {
+      console.error("[v0] Failed to create real Supabase client:", error)
+    }
   }
+
+  console.log("[v0] Using mock Supabase client")
+  return createMockSupabaseClient() as any
 }
