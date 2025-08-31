@@ -1150,7 +1150,13 @@ export default function SettingsPage() {
   useEffect(() => {
     const loadSettingsFromDatabase = async () => {
       try {
-        const supabase = createClient()
+        let supabase
+        try {
+          supabase = createClient()
+        } catch (clientError) {
+          console.error("[v0] Failed to create Supabase client:", clientError)
+          return
+        }
 
         // Load company settings
         const { data: companyData, error: companyError } = await supabase
@@ -1166,8 +1172,8 @@ export default function SettingsPage() {
             ssnitNumber: companyData.ssnit_number || "",
             industry: companyData.industry || "",
             address: companyData.address || "",
-            phone: companyData.phone_number || "", // Fixed: was companyData.phone
-            email: companyData.email_address || "", // Fixed: was companyData.email
+            phone: companyData.phone_number || "",
+            email: companyData.email_address || "",
             logo: companyData.logo_url || "",
             divisions: companyData.divisions || [],
             departments: companyData.departments || [],
@@ -1206,6 +1212,9 @@ export default function SettingsPage() {
         await loadSubsidiaries()
       } catch (error) {
         console.error("[v0] Error loading settings from database:", error)
+        if (error instanceof Error && error.message.includes("Supabase configuration")) {
+          console.warn("[v0] Using default settings due to Supabase configuration issue")
+        }
       }
     }
 
