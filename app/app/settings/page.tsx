@@ -60,6 +60,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { createClient } from "@/lib/supabase/client"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useCurrency } from "@/lib/currency-context"
 
 interface Company {
   id: string
@@ -206,6 +207,8 @@ interface NotificationSettings {
 const MAIN_COMPANY_ID = "00000000-0000-0000-0000-000000000001" // Fixed UUID for main company
 
 export default function SettingsPage() {
+  const { currency, currencySymbol, setCurrency: setSystemCurrency, formatAmount } = useCurrency()
+
   const [activeTab, setActiveTab] = useState("company")
   const [isLoading, setIsLoading] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -911,9 +914,13 @@ export default function SettingsPage() {
     setHasUnsavedChanges(true)
   }
 
-  const updatePayrollSettings = (field: keyof PayrollSettings, value: any) => {
-    setPayrollSettings((prev) => ({ ...prev, [field]: value }))
+  const updatePayrollSettings = (key: string, value: any) => {
+    setPayrollSettings((prev) => ({ ...prev, [key]: value }))
     setHasUnsavedChanges(true)
+
+    if (key === "currency") {
+      setSystemCurrency(value)
+    }
   }
 
   const updateHRSettings = (field: keyof HRSettings, value: any) => {
@@ -2482,7 +2489,7 @@ export default function SettingsPage() {
                     </div>
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="min-wage">Minimum Wage (GHS)</Label>
+                        <Label htmlFor="min-wage">Minimum Wage ({currencySymbol})</Label>
                         <Input
                           id="min-wage"
                           type="number"
@@ -2612,7 +2619,9 @@ export default function SettingsPage() {
                                 <span>remaining amount</span>
                               ) : (
                                 <>
-                                  <span>{index === 0 ? "first" : "next"} GHS</span>
+                                  <span>
+                                    {index === 0 ? "first" : "next"} {currencySymbol}
+                                  </span>
                                   <Input
                                     type="number"
                                     value={band.threshold}

@@ -1,25 +1,26 @@
 "use client"
 
-import { DialogTrigger } from "@/components/ui/dialog"
+import { DialogDescription } from "@/components/ui/dialog"
 
-import { useState, useEffect } from "react"
 import type React from "react"
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { toast } from "@/hooks/use-toast"
-import { Search, Filter, Plus, Edit, Download, Upload } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { useCurrency } from "@/lib/currency-context"
+import { Plus, Search, Filter, Download, Upload, MoreHorizontal, Edit, Trash2, Eye, Mail } from "lucide-react"
 
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 import { useToast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
 // import { EmployeeProfile } from "@/components/employee-profile"
 
 const initialEmployees = [
@@ -145,6 +146,8 @@ const departments = ["Technology", "Human Resources", "Finance", "Marketing", "S
 const MAIN_COMPANY_ID = "f44f079e-1779-446d-9194-199994111111"
 
 export default function EmployeesPage() {
+  const { currencySymbol, formatAmount } = useCurrency()
+
   const [employees, setEmployees] = useState<any[]>([])
   const [showAddEmployee, setShowAddEmployee] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -939,36 +942,46 @@ export default function EmployeesPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Employee Management</h1>
-          <p className="text-muted-foreground">Manage your team members and their information</p>
+          <h1 className="text-3xl font-bold text-gray-900">Employees</h1>
+          <p className="text-gray-600 mt-1">Manage your workforce and employee information</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Employee
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Add New Employee</DialogTitle>
-              <DialogDescription>Enter the employee's information below.</DialogDescription>
-            </DialogHeader>
-            <AddEmployeeForm
-              onSubmit={handleAddEmployee}
-              onClose={() => setIsAddDialogOpen(false)}
-              subsidiaries={subsidiaries}
-              setFormData={setFormData}
-              formData={formData}
-              employees={employees}
-              selectedEmployee={selectedEmployee}
-              companySettings={companySettings}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center space-x-3">
+          <Button variant="outline" className="bg-transparent">
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </Button>
+          <Button variant="outline" className="bg-transparent">
+            <Upload className="w-4 h-4 mr-2" />
+            Import
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-emerald-600 hover:bg-emerald-700">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Employee
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Add New Employee</DialogTitle>
+                <DialogDescription>Enter the employee's information below.</DialogDescription>
+              </DialogHeader>
+              <AddEmployeeForm
+                onSubmit={handleAddEmployee}
+                onClose={() => setIsAddDialogOpen(false)}
+                subsidiaries={subsidiaries}
+                setFormData={setFormData}
+                formData={formData}
+                employees={employees}
+                selectedEmployee={selectedEmployee}
+                companySettings={companySettings}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Filters and Search */}
@@ -1041,42 +1054,89 @@ export default function EmployeesPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid gap-6">
+            <div className="grid gap-4">
               {filteredEmployees.map((employee) => (
-                <Card key={employee.id} className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${employee.display_name}`} />
-                        <AvatarFallback>
-                          {employee.display_name
-                            ?.split(" ")
-                            .map((n: string) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h3 className="text-lg font-semibold">{employee.display_name}</h3>
-                        <p className="text-sm text-muted-foreground">{employee.position}</p>
-                        <p className="text-sm text-muted-foreground">{employee.personal_email}</p>
+                <Card key={employee.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <Avatar className="w-12 h-12">
+                          <AvatarImage
+                            src={`https://api.dicebear.com/7.x/initials/svg?seed=${employee.display_name}`}
+                          />
+                          <AvatarFallback className="bg-emerald-100 text-emerald-700">
+                            {employee.display_name
+                              ?.split(" ")
+                              .map((n: string) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="font-semibold text-lg">{employee.display_name}</h3>
+                          <p className="text-gray-600">{employee.position}</p>
+                          <div className="flex items-center space-x-4 mt-1">
+                            <span className="text-sm text-gray-500">{employee.department}</span>
+                            <span className="text-sm text-gray-500">•</span>
+                            <span className="text-sm text-gray-500">ID: {employee.employeeId}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-6">
+                        <div className="text-right">
+                          <p className="text-sm text-gray-500">Monthly Salary</p>
+                          <p className="text-sm font-medium">{formatAmount(employee.salary || 0)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-500">Status</p>
+                          <Badge
+                            variant={employee.status === "Active" ? "default" : "secondary"}
+                            className={
+                              employee.status === "Active"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-gray-100 text-gray-800"
+                            }
+                          >
+                            {employee.status}
+                          </Badge>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedEmployee(employee)
+                                setIsEditDialogOpen(true)
+                              }}
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedEmployee(employee)
+                                setIsEditDialogOpen(true)
+                              }}
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Employee
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Mail className="w-4 h-4 mr-2" />
+                              Send Email
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-red-600">
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Employee
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <Badge variant={employee.status === "Active" ? "default" : "secondary"}>{employee.status}</Badge>
-                      <Badge variant="outline">{employee.department}</Badge>
-                      <p className="text-sm font-medium">GHS {employee.salary?.toLocaleString()}</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedEmployee(employee)
-                          setIsEditDialogOpen(true)
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                  </CardContent>
                 </Card>
               ))}
             </div>
