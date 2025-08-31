@@ -2000,6 +2000,28 @@ function AddEmployeeForm({
     }
   }
 
+  const ghanaianBanks = [
+    "Access Bank",
+    "Agricultural Development Bank",
+    "Bank of Africa",
+    "CalBank",
+    "Consolidated Bank Ghana",
+    "Ecobank Ghana",
+    "Fidelity Bank Ghana",
+    "First Atlantic Bank",
+    "GCB Bank Limited",
+    "Guaranty Trust Bank Ghana",
+    "National Investment Bank",
+    "OmniBSIC Bank",
+    "Prudential Bank Ghana",
+    "Republic Bank Ghana",
+    "Societe Generale Ghana",
+    "Stanbic Bank Ghana",
+    "Standard Chartered Bank Ghana",
+    "United Bank for Africa Ghana",
+    "Zenith Bank Ghana",
+  ]
+
   return (
     <div className="space-y-6">
       <Tabs value={currentTab} onValueChange={handleInputChange}>
@@ -2007,9 +2029,8 @@ function AddEmployeeForm({
           <TabsTrigger value="personal">Personal</TabsTrigger>
           <TabsTrigger value="employment">Employment</TabsTrigger>
           <TabsTrigger value="financial">Financial</TabsTrigger>
-          {/* <TabsTrigger value="documents">Documents</TabsTrigger> */}
+          <TabsTrigger value="documents">Documents</TabsTrigger>
         </TabsList>
-
         <TabsContent value="personal" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -2224,7 +2245,6 @@ function AddEmployeeForm({
             </div>
           </div>
         </TabsContent>
-
         <TabsContent value="employment" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -2435,227 +2455,336 @@ function AddEmployeeForm({
             </div>
           </div>
         </TabsContent>
-
         <TabsContent value="financial" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="salary">1. Monthly Salary</Label>
-              <Input
-                type="number"
-                id="salary"
-                value={formData.salary}
-                onChange={(e) => handleInputChange("salary", e.target.value)}
-              />
+          <div className="space-y-6">
+            {/* Basic Financial Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="salary">Monthly Salary (GHS) *</Label>
+                <Input
+                  type="number"
+                  id="salary"
+                  value={formData.salary}
+                  onChange={(e) => handleInputChange("salary", e.target.value)}
+                  placeholder="5000"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="bankName">Bank Name</Label>
+                <Select value={formData.bankName} onValueChange={(value) => handleInputChange("bankName", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select bank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ghanaianBanks.map((bank) => (
+                      <SelectItem key={bank} value={bank}>
+                        {bank}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="bankAccount">Bank Account Number</Label>
+                <Input
+                  type="text"
+                  id="bankAccount"
+                  value={formData.bankAccount}
+                  onChange={(e) => handleInputChange("bankAccount", e.target.value)}
+                  placeholder="Account number"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ssnitNumber">SSNIT Number</Label>
+                <Input
+                  type="text"
+                  id="ssnitNumber"
+                  value={formData.ssnitNumber}
+                  onChange={(e) => handleInputChange("ssnitNumber", e.target.value)}
+                  placeholder="GHA-123456789-0"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ghanaCardNumber">Ghana Card Number</Label>
+                <Input
+                  type="text"
+                  id="ghanaCardNumber"
+                  value={formData.ghanaCardNumber}
+                  onChange={(e) => handleInputChange("ghanaCardNumber", e.target.value)}
+                  placeholder="GHA-123456789-0"
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="transportAllowance">2. Transport Allowance</Label>
-              <Input
-                type="number"
-                id="transportAllowance"
-                value={formData.transportAllowance}
-                onChange={(e) => handleInputChange("transportAllowance", e.target.value)}
-              />
+            {/* Allowances Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Allowances</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="transportAllowance">Transport Allowance (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="transportAllowance"
+                    value={formData.transportAllowance}
+                    onChange={(e) => handleInputChange("transportAllowance", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="housingAllowance">Housing Allowance (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="housingAllowance"
+                    value={formData.housingAllowance}
+                    onChange={(e) => handleInputChange("housingAllowance", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="medicalAllowance">Medical Allowance (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="medicalAllowance"
+                    value={formData.medicalAllowance}
+                    onChange={(e) => handleInputChange("medicalAllowance", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="mealAllowance">Meal Allowance (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="mealAllowance"
+                    value={formData.mealAllowance}
+                    onChange={(e) => handleInputChange("mealAllowance", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="uniformAllowance">Uniform Allowance (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="uniformAllowance"
+                    value={formData.uniformAllowance}
+                    onChange={(e) => handleInputChange("uniformAllowance", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="communicationAllowance">Communication Allowance (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="communicationAllowance"
+                    value={formData.communicationAllowance}
+                    onChange={(e) => handleInputChange("communicationAllowance", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="otherAllowances">Other Allowances (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="otherAllowances"
+                    value={formData.otherAllowances}
+                    onChange={(e) => handleInputChange("otherAllowances", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="housingAllowance">3. Housing Allowance</Label>
-              <Input
-                type="number"
-                id="housingAllowance"
-                value={formData.housingAllowance}
-                onChange={(e) => handleInputChange("housingAllowance", e.target.value)}
-              />
+            {/* Deductions Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Deductions</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="taxDeduction">Tax Deduction (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="taxDeduction"
+                    value={formData.taxDeduction}
+                    onChange={(e) => handleInputChange("taxDeduction", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="tier3Contribution">Tier 3 Contribution (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="tier3Contribution"
+                    value={formData.tier3Contribution}
+                    onChange={(e) => handleInputChange("tier3Contribution", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="loanDeduction">Loan Deduction (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="loanDeduction"
+                    value={formData.loanDeduction}
+                    onChange={(e) => handleInputChange("loanDeduction", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="advanceDeduction">Advance Deduction (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="advanceDeduction"
+                    value={formData.advanceDeduction}
+                    onChange={(e) => handleInputChange("advanceDeduction", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="otherDeductions">Other Deductions (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="otherDeductions"
+                    value={formData.otherDeductions}
+                    onChange={(e) => handleInputChange("otherDeductions", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="medicalAllowance">4. Medical Allowance</Label>
-              <Input
-                type="number"
-                id="medicalAllowance"
-                value={formData.medicalAllowance}
-                onChange={(e) => handleInputChange("medicalAllowance", e.target.value)}
-              />
-            </div>
+            {/* Loan Details Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Loan Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="loanAmount">Loan Amount (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="loanAmount"
+                    value={formData.loanAmount}
+                    onChange={(e) => handleInputChange("loanAmount", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="mealAllowance">5. Meal Allowance</Label>
-              <Input
-                type="number"
-                id="mealAllowance"
-                value={formData.mealAllowance}
-                onChange={(e) => handleInputChange("mealAllowance", e.target.value)}
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="loanBalance">Loan Balance (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="loanBalance"
+                    value={formData.loanBalance}
+                    onChange={(e) => handleInputChange("loanBalance", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="uniformAllowance">6. Uniform Allowance</Label>
-              <Input
-                type="number"
-                id="uniformAllowance"
-                value={formData.uniformAllowance}
-                onChange={(e) => handleInputChange("uniformAllowance", e.target.value)}
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="monthlyInstallment">Monthly Installment (GHS)</Label>
+                  <Input
+                    type="number"
+                    id="monthlyInstallment"
+                    value={formData.monthlyInstallment}
+                    onChange={(e) => handleInputChange("monthlyInstallment", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="communicationAllowance">7. Communication Allowance</Label>
-              <Input
-                type="number"
-                id="communicationAllowance"
-                value={formData.communicationAllowance}
-                onChange={(e) => handleInputChange("communicationAllowance", e.target.value)}
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="loanStartDate">Loan Start Date</Label>
+                  <Input
+                    type="date"
+                    id="loanStartDate"
+                    value={formData.loanStartDate}
+                    onChange={(e) => handleInputChange("loanStartDate", e.target.value)}
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="otherAllowances">8. Other Allowances</Label>
-              <Input
-                type="number"
-                id="otherAllowances"
-                value={formData.otherAllowances}
-                onChange={(e) => handleInputChange("otherAllowances", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="taxDeduction">9. Tax Deduction</Label>
-              <Input
-                type="number"
-                id="taxDeduction"
-                value={formData.taxDeduction}
-                onChange={(e) => handleInputChange("taxDeduction", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="ssnit">10. SSNIT Number</Label>
-              <Input
-                type="text"
-                id="ssnit"
-                value={formData.ssnit}
-                onChange={(e) => handleInputChange("ssnit", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="tier3">11. Tier 3 Contribution</Label>
-              <Input
-                type="number"
-                id="tier3"
-                value={formData.tier3}
-                onChange={(e) => handleInputChange("tier3", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="loanDeduction">12. Loan Deduction</Label>
-              <Input
-                type="number"
-                id="loanDeduction"
-                value={formData.loanDeduction}
-                onChange={(e) => handleInputChange("loanDeduction", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="advanceDeduction">13. Advance Deduction</Label>
-              <Input
-                type="number"
-                id="advanceDeduction"
-                value={formData.advanceDeduction}
-                onChange={(e) => handleInputChange("advanceDeduction", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="otherDeductions">14. Other Deductions</Label>
-              <Input
-                type="number"
-                id="otherDeductions"
-                value={formData.otherDeductions}
-                onChange={(e) => handleInputChange("otherDeductions", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="loanAmount">15. Loan Amount</Label>
-              <Input
-                type="number"
-                id="loanAmount"
-                value={formData.loanAmount}
-                onChange={(e) => handleInputChange("loanAmount", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="loanBalance">16. Loan Balance</Label>
-              <Input
-                type="number"
-                id="loanBalance"
-                value={formData.loanBalance}
-                onChange={(e) => handleInputChange("loanBalance", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="loanInstallment">17. Loan Installment</Label>
-              <Input
-                type="number"
-                id="loanInstallment"
-                value={formData.loanInstallment}
-                onChange={(e) => handleInputChange("loanInstallment", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="loanStartDate">18. Loan Start Date</Label>
-              <Input
-                type="date"
-                id="loanStartDate"
-                value={formData.loanStartDate}
-                onChange={(e) => handleInputChange("loanStartDate", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="loanEndDate">19. Loan End Date</Label>
-              <Input
-                type="date"
-                id="loanEndDate"
-                value={formData.loanEndDate}
-                onChange={(e) => handleInputChange("loanEndDate", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bankName">20. Bank Name</Label>
-              <Input
-                type="text"
-                id="bankName"
-                value={formData.bankName}
-                onChange={(e) => handleInputChange("bankName", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bankAccount">21. Bank Account Number</Label>
-              <Input
-                type="text"
-                id="bankAccount"
-                value={formData.bankAccount}
-                onChange={(e) => handleInputChange("bankAccount", e.target.value)}
-              />
+                <div className="space-y-2">
+                  <Label htmlFor="loanEndDate">Loan End Date</Label>
+                  <Input
+                    type="date"
+                    id="loanEndDate"
+                    value={formData.loanEndDate}
+                    onChange={(e) => handleInputChange("loanEndDate", e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </TabsContent>
-
-        {/* <TabsContent value="documents" className="space-y-4">
-          <div>
-            <Label>Upload Documents</Label>
-            <Input type="file" multiple />
+        // Restored comprehensive Documents tab with all required documents as shown in images
+        <TabsContent value="documents" className="space-y-4">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Required Documents</h3>
+            <div className="space-y-4">
+              {[
+                {
+                  id: "academicCertificate",
+                  title: "1. Academic Certificate(s)",
+                  description: "Educational certificates and transcripts",
+                },
+                {
+                  id: "passportPicture",
+                  title: "2. Passport Picture",
+                  description: "Professional passport-sized photograph",
+                },
+                {
+                  id: "resumeApplication",
+                  title: "3. Resume & Application Letter",
+                  description: "Current CV and cover letter",
+                },
+                {
+                  id: "passport",
+                  title: "4. Passport",
+                  description: "Valid passport copy",
+                },
+                {
+                  id: "nationalId",
+                  title: "5. National ID",
+                  description: "Ghana Card or Voter ID",
+                },
+                {
+                  id: "medicalReport",
+                  title: "6. Medical Report",
+                  description: "Health clearance certificate",
+                },
+                {
+                  id: "policeReport",
+                  title: "7. Police Report",
+                  description: "Criminal background check",
+                },
+                {
+                  id: "otherUploads",
+                  title: "8. Other Uploads",
+                  description: "Additional supporting documents",
+                },
+              ].map((doc) => (
+                <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <h4 className="font-medium">{doc.title}</h4>
+                    <p className="text-sm text-gray-600">{doc.description}</p>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
-        </TabsContent> */}
+        </TabsContent>
       </Tabs>
 
       <div className="flex justify-between">
@@ -2664,7 +2793,7 @@ function AddEmployeeForm({
             Previous
           </Button>
         )}
-        {currentTab !== "financial" ? (
+        {currentTab !== "documents" ? (
           <Button onClick={handleNext}>Next</Button>
         ) : (
           <div className="flex justify-end space-x-2">

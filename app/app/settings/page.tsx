@@ -43,6 +43,7 @@ import {
   Power,
   Minus,
   DollarSign,
+  Users,
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -1269,6 +1270,44 @@ export default function SettingsPage() {
   useEffect(() => {
     loadSettingsFromDatabase()
   }, [])
+
+  const handleSaveHRSettings = async () => {
+    try {
+      setIsLoading(true)
+      const supabase = createClient()
+
+      const { error } = await supabase.from("hr_settings").upsert({
+        id: 1,
+        leave_year_start: hrSettings.leaveYearStart,
+        probation_period: hrSettings.probationPeriod,
+        auto_approve_leave: hrSettings.autoApproveLeave,
+        email_notifications: hrSettings.emailNotifications,
+        working_hours_per_day: hrSettings.workingHoursPerDay,
+        working_days_per_week: hrSettings.workingDaysPerWeek,
+        updated_at: new Date().toISOString(),
+      })
+
+      if (error) {
+        console.error("[v0] Error saving HR settings:", error)
+        throw error
+      }
+
+      toast({
+        title: "HR Settings Saved",
+        description: "Your HR configuration has been updated successfully.",
+      })
+      setHasUnsavedChanges(false)
+    } catch (error) {
+      console.error("[v0] Error saving HR settings:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save HR settings. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -3147,8 +3186,110 @@ export default function SettingsPage() {
               </Card>
             </div>
 
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="w-5 h-5 text-emerald-600" />
+                  <span>HR Configuration</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="leaveYearStart">Leave Year Start</Label>
+                    <Select
+                      value={hrSettings.leaveYearStart}
+                      onValueChange={(value) => updateHRSettings("leaveYearStart", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="january">January</SelectItem>
+                        <SelectItem value="february">February</SelectItem>
+                        <SelectItem value="march">March</SelectItem>
+                        <SelectItem value="april">April</SelectItem>
+                        <SelectItem value="may">May</SelectItem>
+                        <SelectItem value="june">June</SelectItem>
+                        <SelectItem value="july">July</SelectItem>
+                        <SelectItem value="august">August</SelectItem>
+                        <SelectItem value="september">September</SelectItem>
+                        <SelectItem value="october">October</SelectItem>
+                        <SelectItem value="november">November</SelectItem>
+                        <SelectItem value="december">December</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="probationPeriod">Probation Period (months)</Label>
+                    <Input
+                      type="number"
+                      id="probationPeriod"
+                      value={hrSettings.probationPeriod}
+                      onChange={(e) => updateHRSettings("probationPeriod", Number.parseInt(e.target.value))}
+                      min="1"
+                      max="12"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="workingHoursPerDay">Working Hours/Day</Label>
+                    <Input
+                      type="number"
+                      id="workingHoursPerDay"
+                      value={hrSettings.workingHoursPerDay}
+                      onChange={(e) => updateHRSettings("workingHoursPerDay", Number.parseInt(e.target.value))}
+                      min="1"
+                      max="24"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="workingDaysPerWeek">Working Days/Week</Label>
+                    <Input
+                      type="number"
+                      id="workingDaysPerWeek"
+                      value={hrSettings.workingDaysPerWeek}
+                      onChange={(e) => updateHRSettings("workingDaysPerWeek", Number.parseInt(e.target.value))}
+                      min="1"
+                      max="7"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Auto-approve leave requests</Label>
+                      <p className="text-sm text-gray-600">Automatically approve requests within policy</p>
+                    </div>
+                    <Switch
+                      checked={hrSettings.autoApproveLeave}
+                      onCheckedChange={(checked) => updateHRSettings("autoApproveLeave", checked)}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Email notifications</Label>
+                      <p className="text-sm text-gray-600">Send email updates for HR activities</p>
+                    </div>
+                    <Switch
+                      checked={hrSettings.emailNotifications}
+                      onCheckedChange={(checked) => updateHRSettings("emailNotifications", checked)}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="flex justify-end pt-4 border-t">
-              <Button onClick={handleSaveSettings} disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700">
+              <Button
+                onClick={handleSaveHRSettings}
+                disabled={isLoading}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
                 <Save className="w-4 h-4 mr-2" />
                 {isLoading ? "Saving..." : "Save HR Settings"}
               </Button>
