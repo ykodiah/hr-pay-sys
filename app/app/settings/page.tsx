@@ -1147,17 +1147,60 @@ export default function SettingsPage() {
     })
   }
 
-  useEffect(() => {
-    const loadSettingsFromDatabase = async () => {
+  const loadSettingsFromDatabase = async () => {
+    try {
+      let supabase
       try {
-        let supabase
-        try {
-          supabase = createClient()
-        } catch (clientError) {
-          console.error("[v0] Failed to create Supabase client:", clientError)
-          return
-        }
+        supabase = createClient()
+        console.log("[v0] Supabase client created successfully for settings")
+      } catch (clientError) {
+        console.error("[v0] Failed to create Supabase client:", clientError)
+        console.warn("[v0] Using default settings due to Supabase client creation failure")
+        // Set default company settings when client creation fails
+        setCompanySettings({
+          name: "Akwaaba HR Pay",
+          taxId: "",
+          ssnitNumber: "",
+          industry: "",
+          address: "",
+          phone: "",
+          email: "",
+          logo: "",
+          divisions: ["Head Office", "Regional Office"],
+          departments: ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"],
+          locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
+          allowances: {
+            transportAllowance: 0,
+            housingAllowance: 0,
+            medicalAllowance: 0,
+            mealAllowance: 0,
+            uniformAllowance: 0,
+            communicationAllowance: 0,
+            otherAllowances: 0,
+          },
+          deductions: {
+            taxDeduction: 0,
+            ssnitDeduction: 0,
+            tier3Deduction: 0,
+            loanDeduction: 0,
+            advanceDeduction: 0,
+            otherDeductions: 0,
+          },
+          loans: {
+            id: 0,
+            code: "",
+            description: "",
+            maximumAmount: 0,
+            interestRate: 0,
+            rateMethod: "REDUCING_BALANCE",
+            adminCharges: 0,
+            loanTenure: 12,
+          },
+        })
+        return
+      }
 
+      try {
         // Load company settings
         const { data: companyData, error: companyError } = await supabase
           .from("companies")
@@ -1206,18 +1249,24 @@ export default function SettingsPage() {
               loanTenure: 12,
             },
           })
+          console.log("[v0] Company settings loaded successfully")
+        } else if (companyError) {
+          console.error("[v0] Error loading company data:", companyError)
         }
 
         // Load subsidiaries
         await loadSubsidiaries()
-      } catch (error) {
-        console.error("[v0] Error loading settings from database:", error)
-        if (error instanceof Error && error.message.includes("Supabase configuration")) {
-          console.warn("[v0] Using default settings due to Supabase configuration issue")
-        }
+      } catch (dbError) {
+        console.error("[v0] Database operation error:", dbError)
+        console.warn("[v0] Using default settings due to database error")
       }
+    } catch (error) {
+      console.error("[v0] Error loading settings from database:", error)
+      console.warn("[v0] Using default settings due to unexpected error")
     }
+  }
 
+  useEffect(() => {
     loadSettingsFromDatabase()
   }, [])
 
