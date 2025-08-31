@@ -576,6 +576,9 @@ export default function SettingsPage() {
   const [isLeaveTypeDialogOpen, setIsLeaveTypeDialogOpen] = useState(false)
   const [isLoadingLeaveTypes, setIsLoadingLeaveTypes] = useState(false)
 
+  const [uploadedFileName, setUploadedFileName] = useState("")
+  const [logoFileId, setLogoFileId] = useState<string | null>(null)
+
   const addTaxBand = () => {
     setTaxConfig((prev) => ({
       ...prev,
@@ -651,6 +654,10 @@ export default function SettingsPage() {
       setHasUnsavedChanges(true)
     }
   }
+
+  useEffect(() => {
+    loadCompanyLogo()
+  }, [])
 
   useEffect(() => {
     loadLeaveTypes()
@@ -865,8 +872,6 @@ export default function SettingsPage() {
     setLoanSettingsData((prev) => prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)))
   }
 
-  const [uploadedFileName, setUploadedFileName] = useState<string>("")
-
   const handleSaveSettings = async () => {
     try {
       setIsLoading(true)
@@ -1024,26 +1029,71 @@ export default function SettingsPage() {
     if (file) {
       try {
         console.log("[v0] Starting company logo upload...")
+
+        // Validate file size (2MB limit)
+        if (file.size > 2 * 1024 * 1024) {
+          toast({
+            title: "File Too Large",
+            description: "Please select a file smaller than 2MB.",
+            variant: "destructive",
+          })
+          return
+        }
+
+        // Validate file type
+        if (!file.type.startsWith("image/")) {
+          toast({
+            title: "Invalid File Type",
+            description: "Please select a valid image file (PNG, JPG, etc.).",
+            variant: "destructive",
+          })
+          return
+        }
+
         const supabase = createClient()
 
-        // Create a unique filename
-        const fileExt = file.name.split(".").pop()
-        const fileName = `company-logo-${Date.now()}.${fileExt}`
-        const logoUrl = URL.createObjectURL(file)
+        // Convert file to base64 for database storage
+        const fileBuffer = await file.arrayBuffer()
+        const fileData = new Uint8Array(fileBuffer)
 
-        // Save logo URL to companies table
-        const MAIN_COMPANY_ID = "00000000-0000-0000-0000-000000000001"
-        const { error: updateError } = await supabase.from("companies").upsert({
-          id: MAIN_COMPANY_ID,
-          logo_url: logoUrl,
-          updated_at: new Date().toISOString(),
-        })
+        // Create file record in database
+        const { data: fileRecord, error: fileError } = await supabase
+          .from("company_files")
+          .insert({
+            company_id: MAIN_COMPANY_ID,
+            file_name: file.name, // Use original filename
+            file_type: file.type,
+            file_size: file.size,
+            file_data: Array.from(fileData), // Convert to array for JSON storage
+            file_category: "logo",
+          })
+          .select()
+          .single()
 
-        if (updateError) {
-          console.error("[v0] Error saving logo to database:", updateError)
+        if (fileError) {
+          console.error("[v0] Error saving file to database:", fileError)
           toast({
             title: "Upload Error",
-            description: "Failed to save logo to database.",
+            description: "Failed to save logo file to database.",
+            variant: "destructive",
+          })
+          return
+        }
+
+        // Update company record with logo file reference
+        const { error: companyError } = await supabase
+          .from("companies")
+          .update({
+            logo_file_id: fileRecord.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", MAIN_COMPANY_ID)
+
+        if (companyError) {
+          console.error("[v0] Error updating company logo reference:", companyError)
+          toast({
+            title: "Upload Error",
+            description: "Failed to update company logo reference.",
             variant: "destructive",
           })
           return
@@ -1051,16 +1101,20 @@ export default function SettingsPage() {
 
         console.log("[v0] Company logo uploaded and saved to database successfully")
 
+        // Create blob URL for immediate display
+        const logoUrl = URL.createObjectURL(file)
+
         // Update UI state
         setCompanySettings((prev) => ({
           ...prev,
           logo: logoUrl,
         }))
-        setUploadedFileName(file.name) // store uploaded file name
+        setUploadedFileName(file.name)
+        setLogoFileId(fileRecord.id)
 
         toast({
           title: "Logo Uploaded",
-          description: "Company logo has been uploaded successfully.",
+          description: `Company logo "${file.name}" has been uploaded successfully.`,
         })
       } catch (error) {
         console.error("[v0] Logo upload failed:", error)
@@ -1070,6 +1124,44 @@ export default function SettingsPage() {
           variant: "destructive",
         })
       }
+    }
+  }
+
+  const loadCompanyLogo = async () => {
+    try {
+      const supabase = createClient()
+
+      // Get company with logo file reference
+      const { data: company, error: companyError } = await supabase
+        .from("companies")
+        .select(`
+          *,
+          logo_file:company_files(*)
+        `)
+        .eq("id", MAIN_COMPANY_ID)
+        .single()
+
+      if (companyError) {
+        console.error("[v0] Error loading company data:", companyError)
+        return
+      }
+
+      if (company?.logo_file) {
+        const logoFile = company.logo_file
+        // Convert array back to Uint8Array and create blob
+        const fileData = new Uint8Array(logoFile.file_data)
+        const blob = new Blob([fileData], { type: logoFile.file_type })
+        const logoUrl = URL.createObjectURL(blob)
+
+        setCompanySettings((prev) => ({
+          ...prev,
+          logo: logoUrl,
+        }))
+        setUploadedFileName(logoFile.file_name)
+        setLogoFileId(logoFile.id)
+      }
+    } catch (error) {
+      console.error("[v0] Error loading company logo:", error)
     }
   }
 
@@ -2694,31 +2786,35 @@ export default function SettingsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex flex-col items-center space-y-4">
+                <div className="space-y-4">
                   {companySettings.logo ? (
-                    <div className="relative">
+                    <div className="relative inline-block">
                       <img
                         src={companySettings.logo || "/placeholder.svg"}
                         alt="Company Logo"
-                        className="w-32 h-32 object-contain border rounded-lg"
+                        className="w-32 h-32 object-contain border rounded-lg bg-white"
                       />
                       <Button
                         variant="destructive"
                         size="sm"
                         className="absolute -top-2 -right-2"
-                        onClick={() => updateCompanySettings("logo", "")}
+                        onClick={() => {
+                          setCompanySettings((prev) => ({ ...prev, logo: "" }))
+                          setUploadedFileName("")
+                          setLogoFileId(null)
+                        }}
                       >
                         <Trash2 className="w-3 h-3" />
                       </Button>
                     </div>
                   ) : (
-                    <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                    <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
                       <Upload className="w-8 h-8 text-gray-400" />
                     </div>
                   )}
                   <div className="text-center">
                     <Label htmlFor="logo-upload" className="cursor-pointer">
-                      <Button variant="outline" className="bg-transparent">
+                      <Button variant="outline" className="bg-transparent hover:bg-gray-50">
                         <Upload className="w-4 h-4 mr-2" />
                         Upload Logo
                       </Button>
@@ -2726,17 +2822,20 @@ export default function SettingsPage() {
                     <Input
                       id="logo-upload"
                       type="file"
-                      accept="image/*"
+                      accept="image/png,image/jpeg,image/jpg,image/gif"
                       className="hidden"
                       onChange={handleLogoUpload}
                     />
                     <p className="text-xs text-gray-500 mt-2">
                       PNG, JPG up to 2MB
                       <br />
-                      Recommended: 200x200px
+                      Recommended: 200×200px
                     </p>
                     {uploadedFileName && (
-                      <p className="text-xs text-emerald-600 mt-1 font-medium">Uploaded: {uploadedFileName}</p>
+                      <div className="mt-2 p-2 bg-emerald-50 rounded border">
+                        <p className="text-xs text-emerald-700 font-medium">📁 Uploaded: {uploadedFileName}</p>
+                        {logoFileId && <p className="text-xs text-gray-500">File ID: {logoFileId.slice(0, 8)}...</p>}
+                      </div>
                     )}
                   </div>
                 </div>
