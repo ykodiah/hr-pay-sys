@@ -1316,6 +1316,105 @@ export default function SettingsPage() {
     }
   }
 
+  const [leavePolicies, setLeavePolicies] = useState([
+    {
+      id: 1,
+      name: "Annual Leave",
+      accrual: "1.75 days per month",
+      carryOver: "5 days",
+      notice: "2 weeks",
+    },
+    {
+      id: 2,
+      name: "Sick Leave",
+      accrual: "Medical certificate after 3 days",
+      carryOver: "30 days max consecutive",
+      notice: "100% paid for first 10 days",
+    },
+    {
+      id: 3,
+      name: "Maternity/Paternity",
+      accrual: "Maternity: 12 weeks",
+      carryOver: "Paternity: 2 weeks",
+      notice: "4 weeks before",
+    },
+  ])
+
+  const [salaryGrades, setSalaryGrades] = useState([
+    { id: 1, grade: "Grade 1", minSalary: 1800, maxSalary: 2400, steps: 5 },
+    { id: 2, grade: "Grade 2", minSalary: 2200, maxSalary: 2920, steps: 5 },
+    { id: 3, grade: "Grade 3", minSalary: 2600, maxSalary: 3440, steps: 5 },
+    { id: 4, grade: "Grade 4", minSalary: 3000, maxSalary: 3960, steps: 5 },
+    { id: 5, grade: "Grade 5", minSalary: 3400, maxSalary: 4480, steps: 5 },
+  ])
+
+  const [editingPolicy, setEditingPolicy] = useState<any>(null)
+  const [editingGrade, setEditingGrade] = useState<any>(null)
+  const [showPolicyDialog, setShowPolicyDialog] = useState(false)
+  const [showGradeDialog, setShowGradeDialog] = useState(false)
+
+  const handleEditPolicy = (policy: any) => {
+    setEditingPolicy(policy)
+    setShowPolicyDialog(true)
+  }
+
+  const handleRemovePolicy = (policyId: number) => {
+    setLeavePolicies((prev) => prev.filter((p) => p.id !== policyId))
+    toast.success("Leave policy removed successfully")
+  }
+
+  const handleAddPolicy = () => {
+    setEditingPolicy(null)
+    setShowPolicyDialog(true)
+  }
+
+  const handleSavePolicy = (policyData: any) => {
+    if (editingPolicy) {
+      setLeavePolicies((prev) => prev.map((p) => (p.id === editingPolicy.id ? { ...p, ...policyData } : p)))
+      toast.success("Leave policy updated successfully")
+    } else {
+      const newPolicy = {
+        id: Date.now(),
+        ...policyData,
+      }
+      setLeavePolicies((prev) => [...prev, newPolicy])
+      toast.success("Leave policy added successfully")
+    }
+    setShowPolicyDialog(false)
+    setEditingPolicy(null)
+  }
+
+  const handleEditGrade = (grade: any) => {
+    setEditingGrade(grade)
+    setShowGradeDialog(true)
+  }
+
+  const handleRemoveGrade = (gradeId: number) => {
+    setSalaryGrades((prev) => prev.filter((g) => g.id !== gradeId))
+    toast.success("Salary grade removed successfully")
+  }
+
+  const handleAddGrade = () => {
+    setEditingGrade(null)
+    setShowGradeDialog(true)
+  }
+
+  const handleSaveGrade = (gradeData: any) => {
+    if (editingGrade) {
+      setSalaryGrades((prev) => prev.map((g) => (g.id === editingGrade.id ? { ...g, ...gradeData } : g)))
+      toast.success("Salary grade updated successfully")
+    } else {
+      const newGrade = {
+        id: Date.now(),
+        ...gradeData,
+      }
+      setSalaryGrades((prev) => [...prev, newGrade])
+      toast.success("Salary grade added successfully")
+    }
+    setShowGradeDialog(false)
+    setEditingGrade(null)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -3088,7 +3187,7 @@ export default function SettingsPage() {
                       <FileText className="w-5 h-5 text-emerald-600" />
                       <span>Leave Policies</span>
                     </div>
-                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={handleAddPolicy}>
                       <Plus className="w-4 h-4 mr-1" />
                       Add Policy
                     </Button>
@@ -3096,27 +3195,8 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
-                    {[
-                      {
-                        name: "Annual Leave",
-                        accrual: "1.75 days per month",
-                        carryOver: "5 days",
-                        notice: "2 weeks",
-                      },
-                      {
-                        name: "Sick Leave",
-                        accrual: "Medical certificate after 3 days",
-                        carryOver: "30 days max consecutive",
-                        notice: "100% paid for first 10 days",
-                      },
-                      {
-                        name: "Maternity/Paternity",
-                        accrual: "Maternity: 12 weeks",
-                        carryOver: "Paternity: 2 weeks",
-                        notice: "4 weeks before",
-                      },
-                    ].map((policy, index) => (
-                      <div key={index} className="p-3 border rounded-lg">
+                    {leavePolicies.map((policy) => (
+                      <div key={policy.id} className="p-3 border rounded-lg">
                         <div className="flex items-center justify-between mb-2">
                           <Label className="font-medium">{policy.name}</Label>
                           <DropdownMenu>
@@ -3126,11 +3206,11 @@ export default function SettingsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditPolicy(policy)}>
                                 <Edit className="w-4 h-4 mr-2" />
                                 Edit Policy
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600">
+                              <DropdownMenuItem className="text-red-600" onClick={() => handleRemovePolicy(policy.id)}>
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 Remove Policy
                               </DropdownMenuItem>
@@ -3155,7 +3235,7 @@ export default function SettingsPage() {
                       <DollarSign className="w-5 h-5 text-emerald-600" />
                       <span>Salary Grades & Notches</span>
                     </div>
-                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={handleAddGrade}>
                       <Plus className="w-4 h-4 mr-1" />
                       Add Grade
                     </Button>
@@ -3163,29 +3243,30 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
-                    {[
-                      { grade: "Grade 1", range: "GH¢1,800 - GH¢2,400", steps: 5 },
-                      { grade: "Grade 2", range: "GH¢2,200 - GH¢2,920", steps: 5 },
-                      { grade: "Grade 3", range: "GH¢2,600 - GH¢3,440", steps: 5 },
-                      { grade: "Grade 4", range: "GH¢3,000 - GH¢3,960", steps: 5 },
-                      { grade: "Grade 5", range: "GH¢3,400 - GH¢4,480", steps: 5 },
-                    ].map((grade, index) => (
-                      <div key={index} className="p-3 border rounded-lg">
+                    {salaryGrades.map((grade) => (
+                      <div key={grade.id} className="p-3 border rounded-lg">
                         <div className="flex items-center justify-between mb-2">
                           <Label className="font-medium">{grade.grade}</Label>
                           <div className="flex space-x-2">
-                            <Button variant="outline" size="sm">
+                            <Button variant="outline" size="sm" onClick={() => handleEditGrade(grade)}>
                               <Edit className="w-3 h-3 mr-1" />
                               Edit
                             </Button>
-                            <Button variant="outline" size="sm" className="text-red-600 bg-transparent">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600 bg-transparent"
+                              onClick={() => handleRemoveGrade(grade.id)}
+                            >
                               <Minus className="w-3 h-3 mr-1" />
                               Remove
                             </Button>
                           </div>
                         </div>
                         <div className="text-sm text-gray-600">
-                          <div>Salary Range: {grade.range}</div>
+                          <div>
+                            Salary Range: {formatAmount(grade.minSalary)} - {formatAmount(grade.maxSalary)}
+                          </div>
                           <div>Steps: {grade.steps}</div>
                         </div>
                       </div>
@@ -3194,6 +3275,154 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
             </div>
+
+            <Dialog open={showPolicyDialog} onOpenChange={setShowPolicyDialog}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{editingPolicy ? "Edit Leave Policy" : "Add Leave Policy"}</DialogTitle>
+                </DialogHeader>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    const formData = new FormData(e.target as HTMLFormElement)
+                    handleSavePolicy({
+                      name: formData.get("name"),
+                      accrual: formData.get("accrual"),
+                      carryOver: formData.get("carryOver"),
+                      notice: formData.get("notice"),
+                    })
+                  }}
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="name">Policy Name</Label>
+                      <Input
+                        id="name"
+                        name="name"
+                        defaultValue={editingPolicy?.name || ""}
+                        placeholder="e.g., Annual Leave"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="accrual">Accrual Details</Label>
+                      <Input
+                        id="accrual"
+                        name="accrual"
+                        defaultValue={editingPolicy?.accrual || ""}
+                        placeholder="e.g., 1.75 days per month"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="carryOver">Carry Over/Limit</Label>
+                      <Input
+                        id="carryOver"
+                        name="carryOver"
+                        defaultValue={editingPolicy?.carryOver || ""}
+                        placeholder="e.g., 5 days"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="notice">Notice Period</Label>
+                      <Input
+                        id="notice"
+                        name="notice"
+                        defaultValue={editingPolicy?.notice || ""}
+                        placeholder="e.g., 2 weeks"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter className="mt-6">
+                    <Button type="button" variant="outline" onClick={() => setShowPolicyDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">
+                      {editingPolicy ? "Update Policy" : "Add Policy"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={showGradeDialog} onOpenChange={setShowGradeDialog}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{editingGrade ? "Edit Salary Grade" : "Add Salary Grade"}</DialogTitle>
+                </DialogHeader>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    const formData = new FormData(e.target as HTMLFormElement)
+                    handleSaveGrade({
+                      grade: formData.get("grade"),
+                      minSalary: Number.parseFloat(formData.get("minSalary") as string),
+                      maxSalary: Number.parseFloat(formData.get("maxSalary") as string),
+                      steps: Number.parseInt(formData.get("steps") as string),
+                    })
+                  }}
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="grade">Grade Name</Label>
+                      <Input
+                        id="grade"
+                        name="grade"
+                        defaultValue={editingGrade?.grade || ""}
+                        placeholder="e.g., Grade 6"
+                        required
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="minSalary">Minimum Salary</Label>
+                        <Input
+                          id="minSalary"
+                          name="minSalary"
+                          type="number"
+                          defaultValue={editingGrade?.minSalary || ""}
+                          placeholder="1800"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="maxSalary">Maximum Salary</Label>
+                        <Input
+                          id="maxSalary"
+                          name="maxSalary"
+                          type="number"
+                          defaultValue={editingGrade?.maxSalary || ""}
+                          placeholder="2400"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="steps">Number of Steps</Label>
+                      <Input
+                        id="steps"
+                        name="steps"
+                        type="number"
+                        defaultValue={editingGrade?.steps || 5}
+                        min="1"
+                        max="10"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter className="mt-6">
+                    <Button type="button" variant="outline" onClick={() => setShowGradeDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">
+                      {editingGrade ? "Update Grade" : "Add Grade"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
 
             <Card>
               <CardHeader>
@@ -3757,6 +3986,16 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label htmlFor="retention">Backup Retention (days)</Label>
                   <Input id="retention" type="number" defaultValue="30" />
+                </div>
+                <div className="space-y-3">
+                  <Button variant="outline" className="w-full bg-transparent">
+                    <Database className="w-4 h-4 mr-2" />
+                    Create Manual Backup
+                  </Button>
+                  <Button variant="outline" className="w-full bg-transparent">
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Restore from Backup
+                  </Button>
                 </div>
                 <div className="space-y-3">
                   <Button variant="outline" className="w-full bg-transparent">
