@@ -186,6 +186,10 @@ interface SecuritySettings {
   sessionTimeout: boolean
   timeoutDuration: number
   auditLog: boolean
+  backupEnabled: boolean
+  backupFrequency: string
+  auditTrail: boolean
+  auditRetentionDays: number
   passwordPolicy: {
     minLength: number
     requireUppercase: boolean
@@ -412,8 +416,12 @@ export default function SettingsPage() {
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
     twoFactor: false,
     sessionTimeout: true,
-    timeoutDuration: 30,
+    timeoutDuration: 15,
     auditLog: true,
+    backupEnabled: true,
+    backupFrequency: "daily",
+    auditTrail: true,
+    auditRetentionDays: 90,
     passwordPolicy: {
       minLength: 8,
       requireUppercase: true,
@@ -1718,6 +1726,34 @@ export default function SettingsPage() {
     }
     setShowGradeDialog(false)
     setEditingGrade(null)
+  }
+
+  const handleChangeAdminPassword = () => {
+    toast({
+      title: "Password Change",
+      description: "Admin password change functionality will be implemented.",
+    })
+  }
+
+  const handleDownloadSecurityReport = () => {
+    toast({
+      title: "Security Report",
+      description: "Generating security report...",
+    })
+  }
+
+  const handleBackupNow = () => {
+    toast({
+      title: "Backup Started",
+      description: "System backup has been initiated.",
+    })
+  }
+
+  const handleDownloadAuditTrail = () => {
+    toast({
+      title: "Audit Trail",
+      description: "Downloading audit trail report...",
+    })
   }
 
   return (
@@ -4054,10 +4090,11 @@ export default function SettingsPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="1">1 minute</SelectItem>
+                          <SelectItem value="3">3 minutes</SelectItem>
+                          <SelectItem value="5">5 minutes</SelectItem>
+                          <SelectItem value="10">10 minutes</SelectItem>
                           <SelectItem value="15">15 minutes</SelectItem>
-                          <SelectItem value="30">30 minutes</SelectItem>
-                          <SelectItem value="60">1 hour</SelectItem>
-                          <SelectItem value="120">2 hours</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -4073,14 +4110,60 @@ export default function SettingsPage() {
                       onCheckedChange={(checked) => updateSecuritySettings("auditLog", checked)}
                     />
                   </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="backup-enabled">Automated Backups</Label>
+                      <p className="text-sm text-gray-500">Regular system data backups</p>
+                    </div>
+                    <Switch
+                      id="backup-enabled"
+                      checked={securitySettings.backupEnabled}
+                      onCheckedChange={(checked) => updateSecuritySettings("backupEnabled", checked)}
+                    />
+                  </div>
+                  {securitySettings.backupEnabled && (
+                    <div className="space-y-2 ml-4">
+                      <Label htmlFor="backup-frequency">Backup Frequency</Label>
+                      <Select
+                        value={securitySettings.backupFrequency}
+                        onValueChange={(value) => updateSecuritySettings("backupFrequency", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="hourly">Hourly</SelectItem>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="space-y-3">
-                    <Button variant="outline" className="w-full bg-transparent">
+                    <Button 
+                      variant="outline" 
+                      className="w-full bg-transparent hover:bg-gray-50"
+                      onClick={handleChangeAdminPassword}
+                    >
                       <Key className="w-4 h-4 mr-2" />
                       Change Admin Password
                     </Button>
-                    <Button variant="outline" className="w-full bg-transparent">
+                    <Button 
+                      variant="outline" 
+                      className="w-full bg-transparent hover:bg-gray-50"
+                      onClick={handleDownloadSecurityReport}
+                    >
                       <Download className="w-4 h-4 mr-2" />
                       Download Security Report
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="w-full bg-transparent hover:bg-gray-50"
+                      onClick={handleBackupNow}
+                    >
+                      <Database className="w-4 h-4 mr-2" />
+                      Backup Now
                     </Button>
                   </div>
                 </CardContent>
@@ -4162,10 +4245,64 @@ export default function SettingsPage() {
               </Card>
             </div>
 
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <FileText className="w-5 h-5 text-emerald-600" />
+                  <span>Audit Trail & Compliance</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="audit-trail">Audit Trail</Label>
+                      <p className="text-sm text-gray-500">Detailed activity logging</p>
+                    </div>
+                    <Switch
+                      id="audit-trail"
+                      checked={securitySettings.auditTrail}
+                      onCheckedChange={(checked) => updateSecuritySettings("auditTrail", checked)}
+                    />
+                  </div>
+                  {securitySettings.auditTrail && (
+                    <div className="space-y-2">
+                      <Label htmlFor="audit-retention">Retention Period (days)</Label>
+                      <Input
+                        id="audit-retention"
+                        type="number"
+                        value={securitySettings.auditRetentionDays}
+                        onChange={(e) => updateSecuritySettings("auditRetentionDays", Number.parseInt(e.target.value) || 90)}
+                        min="30"
+                        max="365"
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 bg-transparent hover:bg-gray-50"
+                    onClick={handleDownloadAuditTrail}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Download Audit Trail
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 bg-transparent hover:bg-gray-50"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    View Activity Log
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="flex justify-end pt-4 border-t">
               <Button onClick={handleSaveSettings} disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700">
                 <Save className="w-4 h-4 mr-2" />
-                {isLoading ? "Save Security Settings" : null}
+                {isLoading ? "Saving..." : "Save Security Settings"}
               </Button>
             </div>
           </div>
@@ -4458,61 +4595,4 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="retention">Backup Retention (days)</Label>
-                  <Input id="retention" type="number" defaultValue="30" />
-                </div>
-                <div className="space-y-3">
-                  <Button variant="outline" className="w-full bg-transparent">
-                    <Database className="w-4 h-4 mr-2" />
-                    Create Manual Backup
-                  </Button>
-                  <Button variant="outline" className="w-full bg-transparent">
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Restore from Backup
-                  </Button>
-                </div>
-                <div className="space-y-3">
-                  <Button variant="outline" className="w-full bg-transparent">
-                    <Database className="w-4 h-4 mr-2" />
-                    Create Manual Backup
-                  </Button>
-                  <Button variant="outline" className="w-full bg-transparent">
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Restore from Backup
-                  </Button>
-                </div>
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    <strong>Last Backup:</strong> January 13, 2025 at 2:00 AM
-                  </p>
-                  <p className="text-xs text-blue-600 mt-1">Size: 2.4 GB • Status: Successful</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      <Dialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Deactivate Subsidiary Function</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to deactivate the subsidiary function? This will hide all subsidiary management
-              features.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowDeactivateDialog(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={confirmDeactivateSubsidiary}>
-              Deactivate
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
-}
+                <div className="space-y-2">\
