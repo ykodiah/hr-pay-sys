@@ -826,13 +826,14 @@ export default function SettingsPage() {
         const fileName = `company-logo-${Date.now()}.${fileExt}`
         const logoUrl = URL.createObjectURL(file)
 
-        // Save logo URL to companies table
         const MAIN_COMPANY_ID = "00000000-0000-0000-0000-000000000001"
-        const { error: updateError } = await supabase.from("companies").upsert({
-          id: MAIN_COMPANY_ID,
-          logo_url: logoUrl,
-          updated_at: new Date().toISOString(),
-        })
+        const { error: updateError } = await supabase
+          .from("companies")
+          .update({
+            logo_url: logoUrl,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", MAIN_COMPANY_ID)
 
         if (updateError) {
           console.error("[v0] Error saving logo to database:", updateError)
