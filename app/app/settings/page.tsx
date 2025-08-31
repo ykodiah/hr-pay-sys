@@ -1131,12 +1131,12 @@ export default function SettingsPage() {
     try {
       const supabase = createClient()
 
-      // Get company with logo file reference
+      // Get company with logo file reference using explicit foreign key relationship
       const { data: company, error: companyError } = await supabase
         .from("companies")
         .select(`
           *,
-          logo_file:company_files(*)
+          logo_file:company_files!logo_file_id(*)
         `)
         .eq("id", MAIN_COMPANY_ID)
         .single()
