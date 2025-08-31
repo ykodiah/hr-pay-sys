@@ -1612,6 +1612,9 @@ function AddEmployeeForm({
   const { toast } = useToast()
   const [currentTab, setCurrentTab] = useState("personal")
 
+  const [phoneCountryCode, setPhoneCountryCode] = useState("+233")
+  const [emergencyCountryCode, setEmergencyCountryCode] = useState("+233")
+
   const countryCodes = [
     { code: "+233", country: "Ghana", flag: "🇬🇭" },
     { code: "+1", country: "USA", flag: "🇺🇸" },
@@ -1621,9 +1624,6 @@ function AddEmployeeForm({
     { code: "+254", country: "Kenya", flag: "🇰🇪" },
     { code: "+256", country: "Uganda", flag: "🇺🇬" },
   ]
-
-  const [phoneCountryCode, setPhoneCountryCode] = useState("+233")
-  const [emergencyCountryCode, setEmergencyCountryCode] = useState("+233")
 
   const handleNext = () => {
     if (currentTab === "personal") {
@@ -1978,13 +1978,17 @@ function AddEmployeeForm({
                 <Label htmlFor="phone">9. Phone Number</Label>
                 <div className="flex">
                   <Select value={phoneCountryCode} onValueChange={setPhoneCountryCode}>
-                    <SelectTrigger className="w-24">
+                    <SelectTrigger className="w-32">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-h-60">
                       {countryCodes.map((country) => (
-                        <SelectItem key={country.code} value={country.code}>
-                          {country.flag} {country.code}
+                        <SelectItem key={`${country.code}-${country.country}`} value={country.code}>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-lg">{country.flag}</span>
+                            <span className="text-sm">{country.code}</span>
+                            <span className="text-xs text-gray-500">{country.name}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -2059,13 +2063,17 @@ function AddEmployeeForm({
                 <Label htmlFor="emergencyContactTel">14. Emergency Contact Tel</Label>
                 <div className="flex">
                   <Select value={emergencyCountryCode} onValueChange={setEmergencyCountryCode}>
-                    <SelectTrigger className="w-24">
+                    <SelectTrigger className="w-32">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-h-60">
                       {countryCodes.map((country) => (
-                        <SelectItem key={country.code} value={country.code}>
-                          {country.flag} {country.code}
+                        <SelectItem key={`emergency-${country.code}-${country.country}`} value={country.code}>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-lg">{country.flag}</span>
+                            <span className="text-sm">{country.code}</span>
+                            <span className="text-xs text-gray-500">{country.name}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
