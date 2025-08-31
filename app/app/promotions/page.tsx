@@ -1,6 +1,7 @@
 "use client"
 import { useState } from "react"
 import type React from "react"
+import { useCurrency } from "@/lib/currency-context"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -138,6 +139,8 @@ function getStatusBadge(status: string) {
 }
 
 export default function PromotionsPage() {
+  const { formatAmount, currencySymbol } = useCurrency()
+
   const [promotions, setPromotions] = useState(initialPromotions)
   const [statusFilter, setStatusFilter] = useState("all")
   const [departmentFilter, setDepartmentFilter] = useState("all")
@@ -298,10 +301,9 @@ export default function PromotionsPage() {
                   <DollarSign className="w-5 h-5 text-blue-600" />
                   <div>
                     <div className="text-2xl font-bold text-gray-900">
-                      GH¢
-                      {promotions
-                        .reduce((sum, promo) => sum + (promo.proposedSalary - promo.currentSalary), 0)
-                        .toLocaleString()}
+                      {formatAmount(
+                        promotions.reduce((sum, promo) => sum + (promo.proposedSalary - promo.currentSalary), 0),
+                      )}
                     </div>
                     <p className="text-sm text-gray-600">Salary Impact</p>
                   </div>
@@ -393,8 +395,8 @@ export default function PromotionsPage() {
                         </div>
                         <p className="text-sm text-gray-600">{promotion.department}</p>
                         <p className="text-xs text-gray-500 mt-1">
-                          {promotion.currentGrade} → {promotion.proposedGrade} | GH¢
-                          {promotion.currentSalary.toLocaleString()} → GH¢{promotion.proposedSalary.toLocaleString()}
+                          {promotion.currentGrade} → {promotion.proposedGrade} | {formatAmount(promotion.currentSalary)}{" "}
+                          → {formatAmount(promotion.proposedSalary)}
                         </p>
                       </div>
                     </div>
@@ -409,7 +411,7 @@ export default function PromotionsPage() {
 
                       <div className="text-center">
                         <p className="text-sm font-medium text-emerald-600">
-                          +GH¢{(promotion.proposedSalary - promotion.currentSalary).toLocaleString()}
+                          +{formatAmount(promotion.proposedSalary - promotion.currentSalary)}
                         </p>
                         <p className="text-xs text-gray-500">Salary Increase</p>
                       </div>
@@ -649,6 +651,7 @@ function PromotionDetail({
 }) {
   const [comment, setComment] = useState("")
   const [action, setAction] = useState<"approve" | "reject" | null>(null)
+  const { formatAmount } = useCurrency()
 
   const handleAction = () => {
     if (action === "approve") {
@@ -699,7 +702,7 @@ function PromotionDetail({
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Current Salary:</span>
-              <span className="font-medium">GH¢{promotion.currentSalary.toLocaleString()}</span>
+              <span className="font-medium">{formatAmount(promotion.currentSalary)}</span>
             </div>
           </CardContent>
         </Card>
@@ -719,12 +722,12 @@ function PromotionDetail({
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Proposed Salary:</span>
-              <span className="font-medium text-emerald-600">GH¢{promotion.proposedSalary.toLocaleString()}</span>
+              <span className="font-medium text-emerald-600">{formatAmount(promotion.proposedSalary)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Salary Increase:</span>
               <span className="font-medium text-emerald-600">
-                +GH¢{(promotion.proposedSalary - promotion.currentSalary).toLocaleString()}
+                +{formatAmount(promotion.proposedSalary - promotion.currentSalary)}
               </span>
             </div>
           </CardContent>
@@ -809,6 +812,8 @@ function PromotionDetail({
 }
 
 function SalaryGradesView({ grades }: { grades: any[] }) {
+  const { formatAmount } = useCurrency()
+
   return (
     <Card>
       <CardHeader>
@@ -823,7 +828,7 @@ function SalaryGradesView({ grades }: { grades: any[] }) {
                 {grade.steps.map((salary: number, stepIndex: number) => (
                   <div key={stepIndex} className="text-center p-3 bg-gray-50 rounded">
                     <div className="text-sm text-gray-600">Step {stepIndex + 1}</div>
-                    <div className="font-semibold text-emerald-600">GH¢{salary.toLocaleString()}</div>
+                    <div className="font-semibold text-emerald-600">{formatAmount(salary)}</div>
                   </div>
                 ))}
               </div>
@@ -867,6 +872,7 @@ function PromotionAnalyticsView({ promotions }: { promotions: any[] }) {
   const rejectedPromotions = promotions.filter((promo) => promo.status === "Rejected").length
 
   const approvalRate = totalPromotions > 0 ? ((approvedPromotions / totalPromotions) * 100).toFixed(1) : 0
+  const { formatAmount } = useCurrency()
 
   return (
     <div className="space-y-6">
@@ -899,11 +905,12 @@ function PromotionAnalyticsView({ promotions }: { promotions: any[] }) {
               <DollarSign className="w-5 h-5 text-blue-600" />
               <div>
                 <div className="text-2xl font-bold text-gray-900">
-                  GH¢
-                  {(
-                    promotions.reduce((sum, promo) => sum + (promo.proposedSalary - promo.currentSalary), 0) /
-                    promotions.length
-                  ).toFixed(0)}
+                  {formatAmount(
+                    Math.round(
+                      promotions.reduce((sum, promo) => sum + (promo.proposedSalary - promo.currentSalary), 0) /
+                        promotions.length,
+                    ),
+                  )}
                 </div>
                 <p className="text-sm text-gray-600">Avg. Salary Increase</p>
               </div>
