@@ -15,11 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
-import { Search, Filter, Plus, Edit, Download, Upload, CheckCircle } from "lucide-react"
+import { Search, Filter, Plus, Edit, Download, Upload } from "lucide-react"
 
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { EmployeeProfile } from "@/components/employee-profile"
 
 const initialEmployees = [
   {
@@ -1616,14 +1617,368 @@ function AddEmployeeForm({
   const [emergencyCountryCode, setEmergencyCountryCode] = useState("+233")
 
   const countryCodes = [
+    { code: "+93", country: "Afghanistan", flag: "🇦🇫" },
+    { code: "+355", country: "Albania", flag: "🇦🇱" },
+    { code: "+213", country: "Algeria", flag: "🇩🇿" },
+    { code: "+1", country: "United States", flag: "🇺🇸" },
+    { code: "+376", country: "Andorra", flag: "🇦🇩" },
+    { code: "+244", country: "Angola", flag: "🇦🇴" },
+    { code: "+54", country: "Argentina", flag: "🇦🇷" },
+    { code: "+374", country: "Armenia", flag: "🇦🇲" },
+    { code: "+61", country: "Australia", flag: "🇦🇺" },
+    { code: "+43", country: "Austria", flag: "🇦🇹" },
+    { code: "+994", country: "Azerbaijan", flag: "🇦🇿" },
+    { code: "+973", country: "Bahrain", flag: "🇧🇭" },
+    { code: "+880", country: "Bangladesh", flag: "🇧🇩" },
+    { code: "+375", country: "Belarus", flag: "🇧🇾" },
+    { code: "+32", country: "Belgium", flag: "🇧🇪" },
+    { code: "+501", country: "Belize", flag: "🇧🇿" },
+    { code: "+229", country: "Benin", flag: "🇧🇯" },
+    { code: "+975", country: "Bhutan", flag: "🇧🇹" },
+    { code: "+591", country: "Bolivia", flag: "🇧🇴" },
+    { code: "+387", country: "Bosnia and Herzegovina", flag: "🇧🇦" },
+    { code: "+267", country: "Botswana", flag: "🇧🇼" },
+    { code: "+55", country: "Brazil", flag: "🇧🇷" },
+    { code: "+673", country: "Brunei", flag: "🇧🇳" },
+    { code: "+359", country: "Bulgaria", flag: "🇧🇬" },
+    { code: "+226", country: "Burkina Faso", flag: "🇧🇫" },
+    { code: "+257", country: "Burundi", flag: "🇧🇮" },
+    { code: "+855", country: "Cambodia", flag: "🇰🇭" },
+    { code: "+237", country: "Cameroon", flag: "🇨🇲" },
+    { code: "+1", country: "Canada", flag: "🇨🇦" },
+    { code: "+238", country: "Cape Verde", flag: "🇨🇻" },
+    { code: "+236", country: "Central African Republic", flag: "🇨🇫" },
+    { code: "+235", country: "Chad", flag: "🇹🇩" },
+    { code: "+56", country: "Chile", flag: "🇨🇱" },
+    { code: "+86", country: "China", flag: "🇨🇳" },
+    { code: "+57", country: "Colombia", flag: "🇨🇴" },
+    { code: "+269", country: "Comoros", flag: "🇰🇲" },
+    { code: "+242", country: "Congo", flag: "🇨🇬" },
+    { code: "+243", country: "Congo (DRC)", flag: "🇨🇩" },
+    { code: "+506", country: "Costa Rica", flag: "🇨🇷" },
+    { code: "+225", country: "Côte d'Ivoire", flag: "🇨🇮" },
+    { code: "+385", country: "Croatia", flag: "🇭🇷" },
+    { code: "+53", country: "Cuba", flag: "🇨🇺" },
+    { code: "+357", country: "Cyprus", flag: "🇨🇾" },
+    { code: "+420", country: "Czech Republic", flag: "🇨🇿" },
+    { code: "+45", country: "Denmark", flag: "🇩🇰" },
+    { code: "+253", country: "Djibouti", flag: "🇩🇯" },
+    { code: "+593", country: "Ecuador", flag: "🇪🇨" },
+    { code: "+20", country: "Egypt", flag: "🇪🇬" },
+    { code: "+503", country: "El Salvador", flag: "🇸🇻" },
+    { code: "+240", country: "Equatorial Guinea", flag: "🇬🇶" },
+    { code: "+291", country: "Eritrea", flag: "🇪🇷" },
+    { code: "+372", country: "Estonia", flag: "🇪🇪" },
+    { code: "+251", country: "Ethiopia", flag: "🇪🇹" },
+    { code: "+679", country: "Fiji", flag: "🇫🇯" },
+    { code: "+358", country: "Finland", flag: "🇫🇮" },
+    { code: "+33", country: "France", flag: "🇫🇷" },
+    { code: "+241", country: "Gabon", flag: "🇬🇦" },
+    { code: "+220", country: "Gambia", flag: "🇬🇲" },
+    { code: "+995", country: "Georgia", flag: "🇬🇪" },
+    { code: "+49", country: "Germany", flag: "🇩🇪" },
     { code: "+233", country: "Ghana", flag: "🇬🇭" },
-    { code: "+1", country: "USA", flag: "🇺🇸" },
-    { code: "+44", country: "UK", flag: "🇬🇧" },
-    { code: "+234", country: "Nigeria", flag: "🇳🇬" },
-    { code: "+27", country: "South Africa", flag: "🇿🇦" },
+    { code: "+30", country: "Greece", flag: "🇬🇷" },
+    { code: "+502", country: "Guatemala", flag: "🇬🇹" },
+    { code: "+224", country: "Guinea", flag: "🇬🇳" },
+    { code: "+245", country: "Guinea-Bissau", flag: "🇬🇼" },
+    { code: "+592", country: "Guyana", flag: "🇬🇾" },
+    { code: "+509", country: "Haiti", flag: "🇭🇹" },
+    { code: "+504", country: "Honduras", flag: "🇭🇳" },
+    { code: "+36", country: "Hungary", flag: "🇭🇺" },
+    { code: "+354", country: "Iceland", flag: "🇮🇸" },
+    { code: "+91", country: "India", flag: "🇮🇳" },
+    { code: "+62", country: "Indonesia", flag: "🇮🇩" },
+    { code: "+98", country: "Iran", flag: "🇮🇷" },
+    { code: "+964", country: "Iraq", flag: "🇮🇶" },
+    { code: "+353", country: "Ireland", flag: "🇮🇪" },
+    { code: "+972", country: "Israel", flag: "🇮🇱" },
+    { code: "+39", country: "Italy", flag: "🇮🇹" },
+    { code: "+81", country: "Japan", flag: "🇯🇵" },
+    { code: "+962", country: "Jordan", flag: "🇯🇴" },
+    { code: "+7", country: "Kazakhstan", flag: "🇰🇿" },
     { code: "+254", country: "Kenya", flag: "🇰🇪" },
+    { code: "+965", country: "Kuwait", flag: "🇰🇼" },
+    { code: "+996", country: "Kyrgyzstan", flag: "🇰🇬" },
+    { code: "+856", country: "Laos", flag: "🇱🇦" },
+    { code: "+371", country: "Latvia", flag: "🇱🇻" },
+    { code: "+961", country: "Lebanon", flag: "🇱🇧" },
+    { code: "+266", country: "Lesotho", flag: "🇱🇸" },
+    { code: "+231", country: "Liberia", flag: "🇱🇷" },
+    { code: "+218", country: "Libya", flag: "🇱🇾" },
+    { code: "+370", country: "Lithuania", flag: "🇱🇹" },
+    { code: "+352", country: "Luxembourg", flag: "🇱🇺" },
+    { code: "+261", country: "Madagascar", flag: "🇲🇬" },
+    { code: "+265", country: "Malawi", flag: "🇲🇼" },
+    { code: "+60", country: "Malaysia", flag: "🇲🇾" },
+    { code: "+960", country: "Maldives", flag: "🇲🇻" },
+    { code: "+223", country: "Mali", flag: "🇲🇱" },
+    { code: "+356", country: "Malta", flag: "🇲🇹" },
+    { code: "+222", country: "Mauritania", flag: "🇲🇷" },
+    { code: "+230", country: "Mauritius", flag: "🇲🇺" },
+    { code: "+52", country: "Mexico", flag: "🇲🇽" },
+    { code: "+373", country: "Moldova", flag: "🇲🇩" },
+    { code: "+377", country: "Monaco", flag: "🇲🇨" },
+    { code: "+976", country: "Mongolia", flag: "🇲🇳" },
+    { code: "+382", country: "Montenegro", flag: "🇲🇪" },
+    { code: "+212", country: "Morocco", flag: "🇲🇦" },
+    { code: "+258", country: "Mozambique", flag: "🇲🇿" },
+    { code: "+95", country: "Myanmar", flag: "🇲🇲" },
+    { code: "+264", country: "Namibia", flag: "🇳🇦" },
+    { code: "+977", country: "Nepal", flag: "🇳🇵" },
+    { code: "+31", country: "Netherlands", flag: "🇳🇱" },
+    { code: "+64", country: "New Zealand", flag: "🇳🇿" },
+    { code: "+505", country: "Nicaragua", flag: "🇳🇮" },
+    { code: "+227", country: "Niger", flag: "🇳🇪" },
+    { code: "+234", country: "Nigeria", flag: "🇳🇬" },
+    { code: "+47", country: "Norway", flag: "🇳🇴" },
+    { code: "+968", country: "Oman", flag: "🇴🇲" },
+    { code: "+92", country: "Pakistan", flag: "🇵🇰" },
+    { code: "+507", country: "Panama", flag: "🇵🇦" },
+    { code: "+595", country: "Paraguay", flag: "🇵🇾" },
+    { code: "+51", country: "Peru", flag: "🇵🇪" },
+    { code: "+63", country: "Philippines", flag: "🇵🇭" },
+    { code: "+48", country: "Poland", flag: "🇵🇱" },
+    { code: "+351", country: "Portugal", flag: "🇵🇹" },
+    { code: "+974", country: "Qatar", flag: "🇶🇦" },
+    { code: "+40", country: "Romania", flag: "🇷🇴" },
+    { code: "+7", country: "Russia", flag: "🇷🇺" },
+    { code: "+250", country: "Rwanda", flag: "🇷🇼" },
+    { code: "+966", country: "Saudi Arabia", flag: "🇸🇦" },
+    { code: "+221", country: "Senegal", flag: "🇸🇳" },
+    { code: "+381", country: "Serbia", flag: "🇷🇸" },
+    { code: "+248", country: "Seychelles", flag: "🇸🇨" },
+    { code: "+232", country: "Sierra Leone", flag: "🇸🇱" },
+    { code: "+65", country: "Singapore", flag: "🇸🇬" },
+    { code: "+421", country: "Slovakia", flag: "🇸🇰" },
+    { code: "+386", country: "Slovenia", flag: "🇸🇮" },
+    { code: "+252", country: "Somalia", flag: "🇸🇴" },
+    { code: "+27", country: "South Africa", flag: "🇿🇦" },
+    { code: "+82", country: "South Korea", flag: "🇰🇷" },
+    { code: "+211", country: "South Sudan", flag: "🇸🇸" },
+    { code: "+34", country: "Spain", flag: "🇪🇸" },
+    { code: "+94", country: "Sri Lanka", flag: "🇱🇰" },
+    { code: "+249", country: "Sudan", flag: "🇸🇩" },
+    { code: "+597", country: "Suriname", flag: "🇸🇷" },
+    { code: "+268", country: "Eswatini", flag: "🇸🇿" },
+    { code: "+46", country: "Sweden", flag: "🇸🇪" },
+    { code: "+41", country: "Switzerland", flag: "🇨🇭" },
+    { code: "+963", country: "Syria", flag: "🇸🇾" },
+    { code: "+992", country: "Tajikistan", flag: "🇹🇯" },
+    { code: "+255", country: "Tanzania", flag: "🇹🇿" },
+    { code: "+66", country: "Thailand", flag: "🇹🇭" },
+    { code: "+228", country: "Togo", flag: "🇹🇬" },
+    { code: "+216", country: "Tunisia", flag: "🇹🇳" },
+    { code: "+90", country: "Turkey", flag: "🇹🇷" },
+    { code: "+993", country: "Turkmenistan", flag: "🇹🇲" },
     { code: "+256", country: "Uganda", flag: "🇺🇬" },
+    { code: "+380", country: "Ukraine", flag: "🇺🇦" },
+    { code: "+971", country: "UAE", flag: "🇦🇪" },
+    { code: "+44", country: "United Kingdom", flag: "🇬🇧" },
+    { code: "+598", country: "Uruguay", flag: "🇺🇾" },
+    { code: "+998", country: "Uzbekistan", flag: "🇺🇿" },
+    { code: "+58", country: "Venezuela", flag: "🇻🇪" },
+    { code: "+84", country: "Vietnam", flag: "🇻🇳" },
+    { code: "+967", country: "Yemen", flag: "🇾🇪" },
+    { code: "+260", country: "Zambia", flag: "🇿🇲" },
+    { code: "+263", country: "Zimbabwe", flag: "🇿🇼" },
   ]
+
+  const handleInputChange = (key: string, value: any) => {
+    setFormData({
+      ...formData,
+      [key]: value,
+    })
+  }
+
+  useEffect(() => {
+    if (employee) {
+      setFormData({
+        prefix: employee.prefix || "",
+        firstName: employee.first_name || "",
+        otherNames: employee.other_names || "",
+        lastName: employee.last_name || "",
+        maritalStatus: employee.marital_status || "",
+        corporateEmail: employee.corporate_email || "",
+        personalEmail: employee.personal_email || "",
+        phone: employee.phone || "",
+        position: employee.position || "",
+        subsidiary: employee.subsidiary_id || "",
+        division: employee.division || "",
+        department: employee.department || "",
+        location: employee.location || "",
+        contractType: employee.contract_type || "Permanent",
+        dateOfJoining: employee.date_of_joining || "",
+        dateOfExit: employee.date_of_exit || "",
+        status: employee.status || "Active",
+        probationPeriod: employee.probation_period || "6",
+        confirmationDate: employee.confirmation_date || "",
+        noticePeriod: employee.notice_period || "",
+        directSupervisor: employee.direct_supervisor || "",
+        headOfDepartment: employee.head_of_department || "",
+        salary: employee.salary || "",
+        transportAllowance: employee.transport_allowance || "",
+        housingAllowance: employee.housing_allowance || "",
+        medicalAllowance: employee.medical_allowance || "",
+        mealAllowance: employee.meal_allowance || "",
+        uniformAllowance: employee.uniform_allowance || "",
+        communicationAllowance: employee.communication_allowance || "",
+        otherAllowances: employee.other_allowances || "",
+        taxDeduction: employee.tax_deduction || "",
+        ssnit: employee.ssnit_number || "",
+        tier3: employee.tier3_contribution || "",
+        loanDeduction: employee.loan_deduction || "",
+        advanceDeduction: employee.advance_deduction || "",
+        otherDeductions: employee.other_deductions || "",
+        loanAmount: employee.loan_amount || "",
+        loanBalance: employee.loan_balance || "",
+        loanInstallment: employee.loan_installment || "",
+        loanStartDate: employee.loan_start_date || "",
+        loanEndDate: employee.loan_end_date || "",
+        startDate: employee.start_date || "",
+        dateOfBirth: employee.date_of_birth || "",
+        address: employee.address || "",
+        emergencyContactName: employee.emergency_contact_name || "",
+        emergencyContactTel: employee.emergency_contact_tel || "",
+        educationalLevel: employee.educational_level || "",
+        gender: employee.gender || "",
+        bankName: employee.bank_name || "",
+        bankAccount: employee.bank_account_number || "",
+        ghanaCard: employee.ghana_card_number || "",
+        documents: employee.documents || [],
+        profilePicture: employee.profile_picture || "",
+        profilePictureFile: null,
+      })
+    }
+  }, [employee])
+
+  useEffect(() => {
+    if (formData.subsidiary) {
+      const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
+      if (selectedSubsidiary) {
+        console.log("[v0] Loading subsidiary data:", selectedSubsidiary.name)
+
+        const subDivisions = Array.isArray(selectedSubsidiary.divisions)
+          ? selectedSubsidiary.divisions
+          : selectedSubsidiary.divisions
+            ? JSON.parse(selectedSubsidiary.divisions)
+            : []
+
+        const subDepartments = Array.isArray(selectedSubsidiary.departments)
+          ? selectedSubsidiary.departments
+          : selectedSubsidiary.departments
+            ? JSON.parse(selectedSubsidiary.departments)
+            : []
+
+        const subLocations = Array.isArray(selectedSubsidiary.locations)
+          ? selectedSubsidiary.locations
+          : selectedSubsidiary.locations
+            ? JSON.parse(selectedSubsidiary.locations)
+            : []
+
+        setDivisions(subDivisions)
+        setDepartments(subDepartments)
+        setLocations(subLocations)
+
+        console.log("[v0] Set subsidiary divisions:", subDivisions)
+        console.log("[v0] Set subsidiary departments:", subDepartments)
+        console.log("[v0] Set subsidiary locations:", subLocations)
+      }
+    }
+  }, [formData.subsidiary, subsidiaries])
+
+  useEffect(() => {
+    const filteredSupervisors = employees.filter((emp) => emp.department === formData.department)
+    setSupervisors(filteredSupervisors)
+
+    const filteredHeads = employees.filter((emp) => emp.department === formData.department)
+    setHeadsOfDepartment(filteredHeads)
+  }, [formData.department, employees])
+
+  const validateForm = () => {
+    let isValid = true
+    const newErrors: Record<string, string> = {}
+
+    if (!formData.firstName) {
+      newErrors.firstName = "First name is required"
+      isValid = false
+    }
+
+    if (!formData.lastName) {
+      newErrors.lastName = "Last name is required"
+      isValid = false
+    }
+
+    if (!formData.personalEmail) {
+      newErrors.personalEmail = "Personal email is required"
+      isValid = false
+    } else if (!/\S+@\S+\.\S+/.test(formData.personalEmail)) {
+      newErrors.personalEmail = "Personal email is invalid"
+      isValid = false
+    }
+
+    if (!formData.corporateEmail) {
+      newErrors.corporateEmail = "Corporate email is required"
+      isValid = false
+    } else if (!/\S+@\S+\.\S+/.test(formData.corporateEmail)) {
+      newErrors.corporateEmail = "Corporate email is invalid"
+      isValid = false
+    }
+
+    if (!formData.phone) {
+      newErrors.phone = "Phone number is required"
+      isValid = false
+    }
+
+    if (!formData.position) {
+      newErrors.position = "Position is required"
+      isValid = false
+    }
+
+    if (!formData.department) {
+      newErrors.department = "Department is required"
+      isValid = false
+    }
+
+    if (!formData.location) {
+      newErrors.location = "Location is required"
+      isValid = false
+    }
+
+    if (!formData.dateOfBirth) {
+      newErrors.dateOfBirth = "Date of Birth is required"
+      isValid = false
+    }
+
+    if (!formData.status) {
+      newErrors.status = "Status is required"
+      isValid = false
+    }
+
+    setErrors(newErrors)
+    return isValid
+  }
+
+  const handleSubmit = () => {
+    if (validateForm()) {
+      const fullName = `${formData.firstName} ${formData.otherNames} ${formData.lastName}`
+      const displayName = `${formData.firstName} ${formData.lastName}`
+
+      const employeeData = {
+        ...formData,
+        fullName: fullName,
+        displayName: displayName,
+      }
+
+      onSubmit(employeeData)
+    } else {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields correctly.",
+        variant: "destructive",
+      })
+    }
+  }
 
   const handleNext = () => {
     if (currentTab === "personal") {
@@ -1635,1340 +1990,693 @@ function AddEmployeeForm({
     }
   }
 
-  const handleTabChange = (value: string) => {
-    setCurrentTab(value)
-  }
-
-  useEffect(() => {
-    const loadCompanyData = async () => {
-      try {
-        console.log("[v0] Loading company data for dropdowns...")
-        const supabase = createClient()
-
-        if (formData.subsidiary) {
-          const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
-          if (selectedSubsidiary) {
-            console.log("[v0] Loading subsidiary data:", selectedSubsidiary.name)
-            const parseDivisions = (data: any) =>
-              Array.isArray(data) ? data : typeof data === "string" ? JSON.parse(data) : []
-            const parseDepartments = (data: any) =>
-              Array.isArray(data) ? data : typeof data === "string" ? JSON.parse(data) : []
-            const parseLocations = (data: any) =>
-              Array.isArray(data) ? data : typeof data === "string" ? JSON.parse(data) : []
-
-            setDivisions(parseDivisions(selectedSubsidiary.divisions) || [])
-            setDepartments(parseDepartments(selectedSubsidiary.departments) || [])
-            setLocations(parseLocations(selectedSubsidiary.locations) || [])
-          }
-        } else {
-          // Load main company data from database
-          const MAIN_COMPANY_ID = "00000000-0000-0000-0000-000000000001"
-          const { data: companyData, error: companyError } = await supabase
-            .from("companies")
-            .select("*")
-            .eq("id", MAIN_COMPANY_ID)
-            .maybeSingle()
-
-          if (companyError) {
-            console.error("[v0] Error loading company data:", companyError)
-          }
-
-          if (companyData) {
-            console.log("[v0] Loaded company data from database:", companyData)
-            const parseDivisions = (data: any) =>
-              Array.isArray(data)
-                ? data
-                : typeof data === "string"
-                  ? JSON.parse(data)
-                  : ["Head Office", "Regional Office"]
-            const parseDepartments = (data: any) =>
-              Array.isArray(data)
-                ? data
-                : typeof data === "string"
-                  ? JSON.parse(data)
-                  : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
-            const parseLocations = (data: any) =>
-              Array.isArray(data)
-                ? data
-                : typeof data === "string"
-                  ? JSON.parse(data)
-                  : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
-
-            setDivisions(parseDivisions(companyData.divisions))
-            setDepartments(parseDepartments(companyData.departments))
-            setLocations(parseLocations(companyData.locations))
-          } else {
-            // Fallback to default values
-            console.log("[v0] No company data found, using defaults")
-            setDivisions(["Head Office", "Regional Office"])
-            setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
-            setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-          }
-        }
-      } catch (error) {
-        console.error("[v0] Error loading company data:", error)
-        // Fallback to default values
-        setDivisions(["Head Office", "Regional Office"])
-        setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
-        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-      }
-    }
-
-    loadCompanyData()
-  }, [formData.subsidiary, subsidiaries])
-
-  useEffect(() => {
-    const generateId = () => {
-      const companyInitials = "AKWA"
-      let prefix = companyInitials
-
-      if (formData.subsidiary && subsidiaries.length > 0) {
-        const subsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
-        if (subsidiary) {
-          const companyFirst2 = companyInitials.substring(0, 2)
-          const subsidiaryFirst2 = subsidiary.name.substring(0, 2).toUpperCase()
-          prefix = companyFirst2 + subsidiaryFirst2
-        }
-      }
-
-      // Generate sequential number starting from 0001
-      const existingEmployees = employees || []
-      const nextNumber = existingEmployees.length + 1
-      const paddedNumber = nextNumber.toString().padStart(4, "0")
-
-      return `${prefix}${paddedNumber}`
-    }
-
-    if (!formData.employeeId) {
-      setFormData((prev: any) => ({
-        ...prev,
-        employeeId: generateId(),
-      }))
-    }
-  }, [formData.subsidiary, subsidiaries, employees, formData.employeeId, setFormData])
-
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {}
-
-    // Personal Info validation
-    if (!formData.firstName.trim()) newErrors.firstName = "First name is required"
-    if (!formData.lastName.trim()) newErrors.lastName = "Last name is required"
-    if (!formData.personalEmail.trim()) newErrors.personalEmail = "Personal email is required"
-    if (!formData.dateOfBirth.trim()) newErrors.dateOfBirth = "Date of birth is required" // made mandatory
-
-    // Employment validation
-    if (!formData.position.trim()) newErrors.position = "Position is required"
-    if (!formData.department.trim()) newErrors.department = "Department is required"
-    if (!formData.location.trim()) newErrors.location = "Location is required"
-    if (!formData.dateOfJoining.trim()) newErrors.dateOfJoining = "Date of joining is required"
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log("[v0] Form submit triggered")
-
-    if (validateForm()) {
-      const fullName = [formData.prefix, formData.firstName, formData.otherNames, formData.lastName]
-        .filter(Boolean)
-        .join(" ")
-
-      const employeeData = {
-        ...formData,
-        fullName: fullName,
-        displayName: `${formData.firstName} ${formData.lastName}`,
-        email: formData.personalEmail, // Primary email for system use
-      }
-
-      console.log("[v0] Submitting employee data:", employeeData)
-
-      try {
-        await onSubmit(employeeData)
-        console.log("[v0] Employee submission completed successfully")
-      } catch (error) {
-        console.error("[v0] Error during employee submission:", error)
-        toast({
-          title: "Error",
-          description: "Failed to submit employee data. Please try again.",
-          variant: "destructive",
-        })
-      }
-    } else {
-      console.log("[v0] Form validation failed")
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields correctly.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleInputChange = (field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-    if (errors[field]) {
-      setErrors((prev: any) => ({ ...prev, [field]: "" }))
-    }
-  }
-
-  const handleDocumentUpload = async (documentType: string, file: File) => {
-    try {
-      console.log(`[v0] Uploading ${documentType}:`, file.name)
-
-      // Store the file in form data
-      const updatedDocuments = [...formData.documents]
-      const existingIndex = updatedDocuments.findIndex((doc) => doc.type === documentType)
-
-      const documentData = {
-        type: documentType,
-        name: file.name,
-        size: file.size,
-        uploadDate: new Date().toISOString(),
-        file: file,
-      }
-
-      if (existingIndex >= 0) {
-        updatedDocuments[existingIndex] = documentData
-      } else {
-        updatedDocuments.push(documentData)
-      }
-
-      if (documentType === "Passport Picture") {
-        const imageUrl = URL.createObjectURL(file)
-        setFormData((prev) => ({
-          ...prev,
-          documents: updatedDocuments,
-          profilePicture: imageUrl,
-          profilePictureFile: file,
-        }))
-      } else {
-        setFormData((prev) => ({ ...prev, documents: updatedDocuments }))
-      }
-
-      console.log(`[v0] Document ${documentType} stored in form data successfully`)
-
-      toast({
-        title: "Document Uploaded",
-        description: `${documentType} has been uploaded successfully.`,
-      })
-    } catch (error) {
-      console.error(`Error uploading ${documentType}:`, error)
-      toast({
-        title: "Upload Error",
-        description: `Failed to upload ${documentType}. Please try again.`,
-        variant: "destructive",
-      })
+  const handlePrevious = () => {
+    if (currentTab === "employment") {
+      setCurrentTab("personal")
+    } else if (currentTab === "financial") {
+      setCurrentTab("employment")
+    } else if (currentTab === "documents") {
+      setCurrentTab("financial")
     }
   }
 
   return (
-    <form onSubmit={handleFormSubmit} className="space-y-4">
-      <Tabs value={currentTab} onValueChange={handleTabChange}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="personal">Personal Info</TabsTrigger>
+    <div className="space-y-6">
+      <Tabs value={currentTab} onValueChange={handleInputChange}>
+        <TabsList className="flex justify-between">
+          <TabsTrigger value="personal">Personal</TabsTrigger>
           <TabsTrigger value="employment">Employment</TabsTrigger>
           <TabsTrigger value="financial">Financial</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
+          {/* <TabsTrigger value="documents">Documents</TabsTrigger> */}
         </TabsList>
 
-        <TabsContent value="personal">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="prefix">1. Prefix</Label>
-                <Select value={formData.prefix} onValueChange={(value) => handleInputChange("prefix", value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select prefix" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Mr">Mr</SelectItem>
-                    <SelectItem value="Mrs">Mrs</SelectItem>
-                    <SelectItem value="Ms">Ms</SelectItem>
-                    <SelectItem value="Dr">Dr</SelectItem>
-                    <SelectItem value="Prof">Prof</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="firstName">2. First Name *</Label>
-                <Input
-                  type="text"
-                  id="firstName"
-                  placeholder="Enter first name"
-                  value={formData.firstName}
-                  onChange={(e) => handleInputChange("firstName", e.target.value)}
-                />
-                {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
-              </div>
-              <div>
-                <Label htmlFor="otherNames">3. Other Name(s)</Label>
-                <Input
-                  type="text"
-                  id="otherNames"
-                  placeholder="Middle names"
-                  value={formData.otherNames}
-                  onChange={(e) => handleInputChange("otherNames", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="lastName">4. Last Name *</Label>
-                <Input
-                  type="text"
-                  id="lastName"
-                  placeholder="Enter last name"
-                  value={formData.lastName}
-                  onChange={(e) => handleInputChange("lastName", e.target.value)}
-                />
-                {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
-              </div>
-              <div>
-                <Label htmlFor="maritalStatus">5. Marital Status</Label>
-                <Select
-                  value={formData.maritalStatus}
-                  onValueChange={(value) => handleInputChange("maritalStatus", value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select marital status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Single">Single</SelectItem>
-                    <SelectItem value="Married">Married</SelectItem>
-                    <SelectItem value="Divorced">Divorced</SelectItem>
-                    <SelectItem value="Widowed">Widowed</SelectItem>
-                    <SelectItem value="Separated">Separated</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="gender">6. Gender</Label>
-                <Select value={formData.gender} onValueChange={(value) => handleInputChange("gender", value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select gender" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Male">Male</SelectItem>
-                    <SelectItem value="Female">Female</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="corporateEmail">7. Corporate Email Address</Label>
-                <Input
-                  type="email"
-                  id="corporateEmail"
-                  placeholder="employee@company.com"
-                  value={formData.corporateEmail}
-                  onChange={(e) => handleInputChange("corporateEmail", e.target.value)}
-                />
-                {errors.corporateEmail && <p className="text-red-500 text-sm mt-1">{errors.corporateEmail}</p>}
-              </div>
-              <div>
-                <Label htmlFor="personalEmail">8. Personal Email Address *</Label>
-                <Input
-                  type="email"
-                  id="personalEmail"
-                  placeholder="personal@email.com"
-                  value={formData.personalEmail}
-                  onChange={(e) => handleInputChange("personalEmail", e.target.value)}
-                />
-                {errors.personalEmail && <p className="text-red-500 text-sm mt-1">{errors.personalEmail}</p>}
-              </div>
-              <div>
-                <Label htmlFor="phone">9. Phone Number</Label>
-                <div className="flex">
-                  <Select value={phoneCountryCode} onValueChange={setPhoneCountryCode}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60">
-                      {countryCodes.map((country) => (
-                        <SelectItem key={`${country.code}-${country.country}`} value={country.code}>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-lg">{country.flag}</span>
-                            <span className="text-sm">{country.code}</span>
-                            <span className="text-xs text-gray-500">{country.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    type="tel"
-                    id="phone"
-                    placeholder="XX XXX XXXX"
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange("phone", e.target.value)}
-                    className="flex-1 ml-2"
-                  />
-                </div>
-                {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
-              </div>
-              <div>
-                <Label htmlFor="dateOfBirth">10. Date of Birth *</Label>
-                <Input
-                  type="date"
-                  id="dateOfBirth"
-                  placeholder="mm/dd/yyyy"
-                  value={formData.dateOfBirth}
-                  onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
-                />
-                {errors.dateOfBirth && <p className="text-red-500 text-sm mt-1">{errors.dateOfBirth}</p>}
-              </div>
+        <TabsContent value="personal" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="prefix">1. Prefix</Label>
+              <Select value={formData.prefix} onValueChange={(value) => handleInputChange("prefix", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select prefix" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Mr.">Mr.</SelectItem>
+                  <SelectItem value="Mrs.">Mrs.</SelectItem>
+                  <SelectItem value="Ms.">Ms.</SelectItem>
+                  <SelectItem value="Dr.">Dr.</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div>
-              <Label htmlFor="address">11. Address</Label>
-              <textarea
-                id="address"
-                placeholder="Full address"
-                value={formData.address}
-                onChange={(e) => handleInputChange("address", e.target.value)}
-                className="w-full min-h-[80px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+            <div className="space-y-2">
+              <Label htmlFor="firstName">2. First Name *</Label>
+              <Input
+                type="text"
+                id="firstName"
+                value={formData.firstName}
+                onChange={(e) => handleInputChange("firstName", e.target.value)}
+                className={errors.firstName ? "border-red-500" : ""}
+                required
+              />
+              {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="otherNames">3. Other Names</Label>
+              <Input
+                type="text"
+                id="otherNames"
+                value={formData.otherNames}
+                onChange={(e) => handleInputChange("otherNames", e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="educationalLevel">12. Educational Level</Label>
-                <Select
-                  value={formData.educationalLevel}
-                  onValueChange={(value) => handleInputChange("educationalLevel", value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select education level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="JHS">JHS</SelectItem>
-                    <SelectItem value="SHS">SHS</SelectItem>
-                    <SelectItem value="Diploma">Diploma</SelectItem>
-                    <SelectItem value="HND">HND</SelectItem>
-                    <SelectItem value="Degree">Degree</SelectItem>
-                    <SelectItem value="Masters">Masters</SelectItem>
-                    <SelectItem value="Doctorate">Doctorate</SelectItem>
-                    <SelectItem value="Professional">Professional</SelectItem>
-                    <SelectItem value="Other Certificate">Other Certificate</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="emergencyContactName">13. Emergency Contact Name</Label>
-                <Input
-                  type="text"
-                  id="emergencyContactName"
-                  placeholder="Contact person name"
-                  value={formData.emergencyContactName}
-                  onChange={(e) => handleInputChange("emergencyContactName", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="emergencyContactTel">14. Emergency Contact Tel</Label>
-                <div className="flex">
-                  <Select value={emergencyCountryCode} onValueChange={setEmergencyCountryCode}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60">
-                      {countryCodes.map((country) => (
-                        <SelectItem key={`emergency-${country.code}-${country.country}`} value={country.code}>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-lg">{country.flag}</span>
-                            <span className="text-sm">{country.code}</span>
-                            <span className="text-xs text-gray-500">{country.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    type="tel"
-                    id="emergencyContactTel"
-                    placeholder="XX XXX XXXX"
-                    value={formData.emergencyContactTel}
-                    onChange={(e) => handleInputChange("emergencyContactTel", e.target.value)}
-                    className="flex-1 ml-2"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
 
-        <TabsContent value="employment">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="employeeId">Employee ID</Label>
-                <Input
-                  type="text"
-                  id="employeeId"
-                  value={formData.employeeId}
-                  onChange={(e) => handleInputChange("employeeId", e.target.value)}
-                  disabled
-                  className="bg-gray-100"
-                />
-              </div>
-              <div>
-                <Label htmlFor="position">1. Position *</Label>
-                <Input
-                  type="text"
-                  id="position"
-                  placeholder="Enter position/job title"
-                  value={formData.position}
-                  onChange={(e) => handleInputChange("position", e.target.value)}
-                />
-                {errors.position && <p className="text-red-500 text-sm mt-1">{errors.position}</p>}
-              </div>
-              <div>
-                <Label htmlFor="specialRole">1a. Special Role</Label>
-                <Select value={formData.specialRole} onValueChange={(value) => handleInputChange("specialRole", value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="No Special Role" />
+            <div className="space-y-2">
+              <Label htmlFor="lastName">4. Last Name *</Label>
+              <Input
+                type="text"
+                id="lastName"
+                value={formData.lastName}
+                onChange={(e) => handleInputChange("lastName", e.target.value)}
+                className={errors.lastName ? "border-red-500" : ""}
+                required
+              />
+              {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="maritalStatus">5. Marital Status</Label>
+              <Select
+                value={formData.maritalStatus}
+                onValueChange={(value) => handleInputChange("maritalStatus", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select marital status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Single">Single</SelectItem>
+                  <SelectItem value="Married">Married</SelectItem>
+                  <SelectItem value="Divorced">Divorced</SelectItem>
+                  <SelectItem value="Widowed">Widowed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="gender">6. Gender</Label>
+              <Select value={formData.gender} onValueChange={(value) => handleInputChange("gender", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="personalEmail">7. Personal Email *</Label>
+              <Input
+                type="email"
+                id="personalEmail"
+                value={formData.personalEmail}
+                onChange={(e) => handleInputChange("personalEmail", e.target.value)}
+                className={errors.personalEmail ? "border-red-500" : ""}
+                required
+              />
+              {errors.personalEmail && <p className="text-red-500 text-sm mt-1">{errors.personalEmail}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="corporateEmail">8. Corporate Email *</Label>
+              <Input
+                type="email"
+                id="corporateEmail"
+                value={formData.corporateEmail}
+                onChange={(e) => handleInputChange("corporateEmail", e.target.value)}
+                className={errors.corporateEmail ? "border-red-500" : ""}
+                required
+              />
+              {errors.corporateEmail && <p className="text-red-500 text-sm mt-1">{errors.corporateEmail}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">9. Phone Number *</Label>
+              <div className="flex">
+                <Select value={phoneCountryCode} onValueChange={setPhoneCountryCode}>
+                  <SelectTrigger className="w-[80px]">
+                    <SelectValue placeholder="+233" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="No Special Role">No Special Role</SelectItem>
-                    <SelectItem value="Supervisor">Supervisor</SelectItem>
-                    <SelectItem value="Head of Department">Head of Department</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="subsidiary">2. Subsidiary</Label>
-                <Select value={formData.subsidiary} onValueChange={(value) => handleInputChange("subsidiary", value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select subsidiary (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {subsidiaries.map((subsidiary) => (
-                      <SelectItem key={subsidiary.id} value={subsidiary.id}>
-                        {subsidiary.name}
+                  <SelectContent className="max-h-64 overflow-auto">
+                    {countryCodes.map((country) => (
+                      <SelectItem key={`${country.code}-${country.country}`} value={country.code}>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-lg">{country.flag}</span>
+                          <span className="text-sm">{country.code}</span>
+                          <span className="text-xs text-gray-500">{country.country}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <Input
+                  type="tel"
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange("phone", e.target.value)}
+                  className={`flex-1 ${errors.phone ? "border-red-500" : ""}`}
+                  required
+                />
               </div>
-              <div>
-                <Label htmlFor="division">3. Division / Branch</Label>
-                <Select value={formData.division} onValueChange={(value) => handleInputChange("division", value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select division/branch" />
+              {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dateOfBirth">10. Date of Birth *</Label>
+              <Input
+                type="date"
+                id="dateOfBirth"
+                value={formData.dateOfBirth}
+                onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
+                className={errors.dateOfBirth ? "border-red-500" : ""}
+                required
+              />
+              {errors.dateOfBirth && <p className="text-red-500 text-sm mt-1">{errors.dateOfBirth}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address">11. Address</Label>
+              <Input
+                type="text"
+                id="address"
+                value={formData.address}
+                onChange={(e) => handleInputChange("address", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="educationalLevel">12. Educational Level</Label>
+              <Input
+                type="text"
+                id="educationalLevel"
+                value={formData.educationalLevel}
+                onChange={(e) => handleInputChange("educationalLevel", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="emergencyContactName">13. Emergency Contact Name</Label>
+              <Input
+                type="text"
+                id="emergencyContactName"
+                value={formData.emergencyContactName}
+                onChange={(e) => handleInputChange("emergencyContactName", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="emergencyContactTel">14. Emergency Contact Tel</Label>
+              <div className="flex">
+                <Select value={emergencyCountryCode} onValueChange={setEmergencyCountryCode}>
+                  <SelectTrigger className="w-[80px]">
+                    <SelectValue placeholder="+233" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {divisions.map((division) => (
-                      <SelectItem key={division} value={division}>
-                        {division}
+                  <SelectContent className="max-h-64 overflow-auto">
+                    {countryCodes.map((country) => (
+                      <SelectItem key={`${country.code}-${country.country}`} value={country.code}>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-lg">{country.flag}</span>
+                          <span className="text-sm">{country.code}</span>
+                          <span className="text-xs text-gray-500">{country.country}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div>
-                <Label htmlFor="department">4. Department *</Label>
-                <Select value={formData.department} onValueChange={(value) => handleInputChange("department", value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.map((department) => (
-                      <SelectItem key={department} value={department}>
-                        {department}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.department && <p className="text-red-500 text-sm mt-1">{errors.department}</p>}
-              </div>
-              <div>
-                <Label htmlFor="directSupervisor">4a. Direct Supervisor</Label>
-                <Select
-                  value={formData.directSupervisor}
-                  onValueChange={(value) => handleInputChange("directSupervisor", value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select direct supervisor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employees
-                      .filter((emp) => emp.id !== selectedEmployee?.id)
-                      .map((employee) => (
-                        <SelectItem key={employee.id} value={employee.id}>
-                          {employee.name || `${employee.firstName} ${employee.lastName}`}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="headOfDepartment">4b. Head of Department</Label>
-                <Select
-                  value={formData.headOfDepartment}
-                  onValueChange={(value) => handleInputChange("headOfDepartment", value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select head of department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employees
-                      .filter((emp) => emp.id !== selectedEmployee?.id)
-                      .map((employee) => (
-                        <SelectItem key={employee.id} value={employee.id}>
-                          {employee.name || `${employee.firstName} ${employee.lastName}`}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="location">5. Location *</Label>
-                <Select value={formData.location} onValueChange={(value) => handleInputChange("location", value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select location" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locations.map((location) => (
-                      <SelectItem key={location} value={location}>
-                        {location}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.location && <p className="text-red-500 text-sm mt-1">{errors.location}</p>}
-              </div>
-              <div>
-                <Label htmlFor="contractType">6. Contract Type *</Label>
-                <Select
-                  value={formData.contractType}
-                  onValueChange={(value) => handleInputChange("contractType", value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Permanent" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Permanent">Permanent</SelectItem>
-                    <SelectItem value="Contract">Contract</SelectItem>
-                    <SelectItem value="Intern">Intern</SelectItem>
-                    <SelectItem value="Temporary">Temporary</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="dateOfJoining">7. Date of Joining *</Label>
                 <Input
-                  type="date"
-                  id="dateOfJoining"
-                  placeholder="mm/dd/yyyy"
-                  value={formData.dateOfJoining}
-                  onChange={(e) => handleInputChange("dateOfJoining", e.target.value)}
-                />
-                {errors.dateOfJoining && <p className="text-red-500 text-sm mt-1">{errors.dateOfJoining}</p>}
-              </div>
-              <div>
-                <Label htmlFor="dateOfExit">8. Date of Exit</Label>
-                <Input
-                  type="date"
-                  id="dateOfExit"
-                  placeholder="mm/dd/yyyy"
-                  value={formData.dateOfExit}
-                  onChange={(e) => handleInputChange("dateOfExit", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="status">9. Status *</Label>
-                <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Active" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="Inactive">Inactive</SelectItem>
-                    <SelectItem value="On Leave">On Leave</SelectItem>
-                    <SelectItem value="Resigned">Resigned</SelectItem>
-                    <SelectItem value="Terminated">Terminated</SelectItem>
-                    <SelectItem value="Suspended">Suspended</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="probationPeriod">10. Probation Period (months)</Label>
-                <Select
-                  value={formData.probationPeriod}
-                  onValueChange={(value) => handleInputChange("probationPeriod", value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="6 months" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="3">3 months</SelectItem>
-                    <SelectItem value="6">6 months</SelectItem>
-                    <SelectItem value="12">12 months</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="confirmationDate">11. Confirmation Date</Label>
-                <Input
-                  type="date"
-                  id="confirmationDate"
-                  placeholder="mm/dd/yyyy"
-                  value={formData.confirmationDate}
-                  onChange={(e) => handleInputChange("confirmationDate", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="noticePeriod">12. Notice Period</Label>
-                <Input
-                  type="text"
-                  id="noticePeriod"
-                  placeholder="e.g. 1 month, 3 months"
-                  value={formData.noticePeriod}
-                  onChange={(e) => handleInputChange("noticePeriod", e.target.value)}
+                  type="tel"
+                  id="emergencyContactTel"
+                  value={formData.emergencyContactTel}
+                  onChange={(e) => handleInputChange("emergencyContactTel", e.target.value)}
                 />
               </div>
             </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="financial">
-          <div className="space-y-6">
-            {/* Basic Financial Information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="salary">Monthly Salary (GHS) *</Label>
-                <Input
-                  type="number"
-                  id="salary"
-                  placeholder="5000"
-                  value={formData.salary}
-                  onChange={(e) => handleInputChange("salary", e.target.value)}
-                />
-                {errors.salary && <p className="text-red-500 text-sm mt-1">{errors.salary}</p>}
-              </div>
-              <div>
-                <Label htmlFor="bankName">Bank Name</Label>
-                <Select value={formData.bankName} onValueChange={(value) => handleInputChange("bankName", value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select bank" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="GCB Bank">GCB Bank</SelectItem>
-                    <SelectItem value="Ecobank">Ecobank</SelectItem>
-                    <SelectItem value="Standard Chartered">Standard Chartered</SelectItem>
-                    <SelectItem value="Absa Bank">Absa Bank</SelectItem>
-                    <SelectItem value="Fidelity Bank">Fidelity Bank</SelectItem>
-                    <SelectItem value="Zenith Bank">Zenith Bank</SelectItem>
-                    <SelectItem value="Stanbic Bank">Stanbic Bank</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.bankName && <p className="text-red-500 text-sm mt-1">{errors.bankName}</p>}
-              </div>
-              <div>
-                <Label htmlFor="bankAccount">Bank Account Number</Label>
-                <Input
-                  type="text"
-                  id="bankAccount"
-                  placeholder="Account number"
-                  value={formData.bankAccount}
-                  onChange={(e) => handleInputChange("bankAccount", e.target.value)}
-                />
-                {errors.bankAccount && <p className="text-red-500 text-sm mt-1">{errors.bankAccount}</p>}
-              </div>
-              <div>
-                <Label htmlFor="ssnit">SSNIT Number</Label>
-                <Input
-                  type="text"
-                  id="ssnit"
-                  placeholder="GHA-123456789-0"
-                  value={formData.ssnit}
-                  onChange={(e) => handleInputChange("ssnit", e.target.value)}
-                />
-                {errors.ssnit && <p className="text-red-500 text-sm mt-1">{errors.ssnit}</p>}
-              </div>
-              <div>
-                <Label htmlFor="ghanaCard">Ghana Card Number</Label>
-                <Input
-                  type="text"
-                  id="ghanaCard"
-                  placeholder="GHA-123456789-0"
-                  value={formData.ghanaCard}
-                  onChange={(e) => handleInputChange("ghanaCard", e.target.value)}
-                />
-                {errors.ghanaCard && <p className="text-red-500 text-sm mt-1">{errors.ghanaCard}</p>}
-              </div>
+        <TabsContent value="employment" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="position">1. Position *</Label>
+              <Input
+                type="text"
+                id="position"
+                value={formData.position}
+                onChange={(e) => handleInputChange("position", e.target.value)}
+                className={errors.position ? "border-red-500" : ""}
+                required
+              />
+              {errors.position && <p className="text-red-500 text-sm mt-1">{errors.position}</p>}
             </div>
 
-            {/* Allowances Section */}
-            <div>
-              <h3 className="text-lg font-semibold mb-3">Allowances</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="transportAllowance">Transport Allowance (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="transportAllowance"
-                    placeholder="0"
-                    value={formData.transportAllowance}
-                    onChange={(e) => handleInputChange("transportAllowance", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="housingAllowance">Housing Allowance (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="housingAllowance"
-                    placeholder="0"
-                    value={formData.housingAllowance}
-                    onChange={(e) => handleInputChange("housingAllowance", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="medicalAllowance">Medical Allowance (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="medicalAllowance"
-                    placeholder="0"
-                    value={formData.medicalAllowance}
-                    onChange={(e) => handleInputChange("medicalAllowance", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="mealAllowance">Meal Allowance (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="mealAllowance"
-                    placeholder="0"
-                    value={formData.mealAllowance}
-                    onChange={(e) => handleInputChange("mealAllowance", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="uniformAllowance">Uniform Allowance (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="uniformAllowance"
-                    placeholder="0"
-                    value={formData.uniformAllowance}
-                    onChange={(e) => handleInputChange("uniformAllowance", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="communicationAllowance">Communication Allowance (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="communicationAllowance"
-                    placeholder="0"
-                    value={formData.communicationAllowance}
-                    onChange={(e) => handleInputChange("communicationAllowance", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="otherAllowances">Other Allowances (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="otherAllowances"
-                    placeholder="0"
-                    value={formData.otherAllowances}
-                    onChange={(e) => handleInputChange("otherAllowances", e.target.value)}
-                  />
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="subsidiary">2. Subsidiary</Label>
+              <Select value={formData.subsidiary} onValueChange={(value) => handleInputChange("subsidiary", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select subsidiary" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subsidiaries.map((subsidiary) => (
+                    <SelectItem key={subsidiary.id} value={subsidiary.id}>
+                      {subsidiary.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Deductions Section */}
-            <div>
-              <h3 className="text-lg font-semibold mb-3">Deductions</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="taxDeduction">Tax Deduction (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="taxDeduction"
-                    placeholder="0"
-                    value={formData.taxDeduction}
-                    onChange={(e) => handleInputChange("taxDeduction", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="tier3">Tier 3 Contribution (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="tier3"
-                    placeholder="0"
-                    value={formData.tier3}
-                    onChange={(e) => handleInputChange("tier3", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="loanDeduction">Loan Deduction (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="loanDeduction"
-                    placeholder="0"
-                    value={formData.loanDeduction}
-                    onChange={(e) => handleInputChange("loanDeduction", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="advanceDeduction">Advance Deduction (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="advanceDeduction"
-                    placeholder="0"
-                    value={formData.advanceDeduction}
-                    onChange={(e) => handleInputChange("advanceDeduction", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="otherDeductions">Other Deductions (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="otherDeductions"
-                    placeholder="0"
-                    value={formData.otherDeductions}
-                    onChange={(e) => handleInputChange("otherDeductions", e.target.value)}
-                  />
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="division">3. Division</Label>
+              <Select value={formData.division} onValueChange={(value) => handleInputChange("division", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select division" />
+                </SelectTrigger>
+                <SelectContent>
+                  {divisions.map((division) => (
+                    <SelectItem key={division} value={division}>
+                      {division}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Loan Details Section */}
-            <div>
-              <h3 className="text-lg font-semibold mb-3">Loan Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="loanAmount">Loan Amount (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="loanAmount"
-                    placeholder="0"
-                    value={formData.loanAmount}
-                    onChange={(e) => handleInputChange("loanAmount", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="loanBalance">Loan Balance (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="loanBalance"
-                    placeholder="0"
-                    value={formData.loanBalance}
-                    onChange={(e) => handleInputChange("loanBalance", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="loanInstallment">Monthly Installment (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="loanInstallment"
-                    placeholder="0"
-                    value={formData.loanInstallment}
-                    onChange={(e) => handleInputChange("loanInstallment", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="loanStartDate">Loan Start Date</Label>
-                  <Input
-                    type="date"
-                    id="loanStartDate"
-                    value={formData.loanStartDate}
-                    onChange={(e) => handleInputChange("loanStartDate", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="loanEndDate">Loan End Date</Label>
-                  <Input
-                    type="date"
-                    id="loanEndDate"
-                    value={formData.loanEndDate}
-                    onChange={(e) => handleInputChange("loanEndDate", e.target.value)}
-                  />
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="department">4. Department *</Label>
+              <Select
+                value={formData.department}
+                onValueChange={(value) => handleInputChange("department", value)}
+                required
+              >
+                <SelectTrigger className={errors.department ? "border-red-500" : ""}>
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((department) => (
+                    <SelectItem key={department} value={department}>
+                      {department}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.department && <p className="text-red-500 text-sm mt-1">{errors.department}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="location">5. Location *</Label>
+              <Select
+                value={formData.location}
+                onValueChange={(value) => handleInputChange("location", value)}
+                required
+              >
+                <SelectTrigger className={errors.location ? "border-red-500" : ""}>
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((location) => (
+                    <SelectItem key={location} value={location}>
+                      {location}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.location && <p className="text-red-500 text-sm mt-1">{errors.location}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contractType">6. Contract Type</Label>
+              <Select value={formData.contractType} onValueChange={(value) => handleInputChange("contractType", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select contract type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Permanent">Permanent</SelectItem>
+                  <SelectItem value="Contract">Contract</SelectItem>
+                  <SelectItem value="Intern">Intern</SelectItem>
+                  <SelectItem value="Consultant">Consultant</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dateOfJoining">7. Date of Joining</Label>
+              <Input
+                type="date"
+                id="dateOfJoining"
+                value={formData.dateOfJoining}
+                onChange={(e) => handleInputChange("dateOfJoining", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dateOfExit">8. Date of Exit</Label>
+              <Input
+                type="date"
+                id="dateOfExit"
+                value={formData.dateOfExit}
+                onChange={(e) => handleInputChange("dateOfExit", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="status">9. Status *</Label>
+              <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
+                <SelectTrigger className={errors.status ? "border-red-500" : ""}>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="On leave">On leave</SelectItem>
+                  <SelectItem value="Resigned">Resigned</SelectItem>
+                  <SelectItem value="Terminated">Terminated</SelectItem>
+                  <SelectItem value="Suspend">Suspend</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.status && <p className="text-red-500 text-sm mt-1">{errors.status}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="probationPeriod">10. Probation Period (Months)</Label>
+              <Input
+                type="number"
+                id="probationPeriod"
+                value={formData.probationPeriod}
+                onChange={(e) => handleInputChange("probationPeriod", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmationDate">11. Confirmation Date</Label>
+              <Input
+                type="date"
+                id="confirmationDate"
+                value={formData.confirmationDate}
+                onChange={(e) => handleInputChange("confirmationDate", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="noticePeriod">12. Notice Period</Label>
+              <Input
+                type="text"
+                id="noticePeriod"
+                value={formData.noticePeriod}
+                onChange={(e) => handleInputChange("noticePeriod", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="directSupervisor">13. Direct Supervisor</Label>
+              <Select
+                value={formData.directSupervisor}
+                onValueChange={(value) => handleInputChange("directSupervisor", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select supervisor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {supervisors.map((supervisor) => (
+                    <SelectItem key={supervisor.id} value={supervisor.id}>
+                      {supervisor.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="headOfDepartment">14. Head of Department</Label>
+              <Select
+                value={formData.headOfDepartment}
+                onValueChange={(value) => handleInputChange("headOfDepartment", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select head" />
+                </SelectTrigger>
+                <SelectContent>
+                  {headsOfDepartment.map((head) => (
+                    <SelectItem key={head.id} value={head.id}>
+                      {head.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="documents">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold mb-4">Required Documents</h3>
+        <TabsContent value="financial" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="salary">1. Monthly Salary</Label>
+              <Input
+                type="number"
+                id="salary"
+                value={formData.salary}
+                onChange={(e) => handleInputChange("salary", e.target.value)}
+              />
+            </div>
 
-            <div className="space-y-4">
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">1. Academic Certificate(s)</h4>
-                    <p className="text-sm text-gray-600">Educational certificates and transcripts</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => document.getElementById("academic-cert")?.click()}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                  <input
-                    id="academic-cert"
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleDocumentUpload("Academic Certificate(s)", e.target.files[0])
-                      }
-                    }}
-                  />
-                </div>
-                {formData.documents.find((doc) => doc.type === "Academic Certificate(s)") && (
-                  <div className="mt-2 flex items-center text-green-600 text-sm">
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    {formData.documents.find((doc) => doc.type === "Academic Certificate(s)")?.name} uploaded
-                    successfully
-                  </div>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="transportAllowance">2. Transport Allowance</Label>
+              <Input
+                type="number"
+                id="transportAllowance"
+                value={formData.transportAllowance}
+                onChange={(e) => handleInputChange("transportAllowance", e.target.value)}
+              />
+            </div>
 
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">2. Passport Picture</h4>
-                    <p className="text-sm text-gray-600">Professional passport-sized photograph</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => document.getElementById("passport-picture")?.click()}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                  <input
-                    id="passport-picture"
-                    type="file"
-                    className="hidden"
-                    accept="image/*"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleDocumentUpload("Passport Picture", e.target.files[0])
-                      }
-                    }}
-                  />
-                </div>
-                {formData.profilePicture && (
-                  <div className="mt-2 flex items-center space-x-2">
-                    <img
-                      src={formData.profilePicture || "/placeholder.svg"}
-                      alt="Profile"
-                      className="w-20 h-20 object-cover rounded-md"
-                    />
-                    <div className="flex items-center text-green-600 text-sm">
-                      <CheckCircle className="w-4 h-4 mr-1" />
-                      Image uploaded successfully
-                    </div>
-                  </div>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="housingAllowance">3. Housing Allowance</Label>
+              <Input
+                type="number"
+                id="housingAllowance"
+                value={formData.housingAllowance}
+                onChange={(e) => handleInputChange("housingAllowance", e.target.value)}
+              />
+            </div>
 
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">3. Resume & Application Letter</h4>
-                    <p className="text-sm text-gray-600">Current CV and cover letter</p>
-                  </div>
-                  <Button type="button" variant="outline" onClick={() => document.getElementById("resume-cv")?.click()}>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                  <input
-                    id="resume-cv"
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleDocumentUpload("Resume & Application Letter", e.target.files[0])
-                      }
-                    }}
-                  />
-                </div>
-                {formData.documents.find((doc) => doc.type === "Resume & Application Letter") && (
-                  <div className="mt-2 flex items-center text-green-600 text-sm">
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    {formData.documents.find((doc) => doc.type === "Resume & Application Letter")?.name} uploaded
-                    successfully
-                  </div>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="medicalAllowance">4. Medical Allowance</Label>
+              <Input
+                type="number"
+                id="medicalAllowance"
+                value={formData.medicalAllowance}
+                onChange={(e) => handleInputChange("medicalAllowance", e.target.value)}
+              />
+            </div>
 
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">4. Passport</h4>
-                    <p className="text-sm text-gray-600">Valid passport copy</p>
-                  </div>
-                  <Button type="button" variant="outline" onClick={() => document.getElementById("passport")?.click()}>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                  <input
-                    id="passport"
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleDocumentUpload("Passport", e.target.files[0])
-                      }
-                    }}
-                  />
-                </div>
-                {formData.documents.find((doc) => doc.type === "Passport") && (
-                  <div className="mt-2 flex items-center text-green-600 text-sm">
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    {formData.documents.find((doc) => doc.type === "Passport")?.name} uploaded successfully
-                  </div>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="mealAllowance">5. Meal Allowance</Label>
+              <Input
+                type="number"
+                id="mealAllowance"
+                value={formData.mealAllowance}
+                onChange={(e) => handleInputChange("mealAllowance", e.target.value)}
+              />
+            </div>
 
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">5. National ID</h4>
-                    <p className="text-sm text-gray-600">Ghana Card or Voter's ID</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => document.getElementById("national-id")?.click()}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                  <input
-                    id="national-id"
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleDocumentUpload("National ID", e.target.files[0])
-                      }
-                    }}
-                  />
-                </div>
-                {formData.documents.find((doc) => doc.type === "National ID") && (
-                  <div className="mt-2 flex items-center text-green-600 text-sm">
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    {formData.documents.find((doc) => doc.type === "National ID")?.name} uploaded successfully
-                  </div>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="uniformAllowance">6. Uniform Allowance</Label>
+              <Input
+                type="number"
+                id="uniformAllowance"
+                value={formData.uniformAllowance}
+                onChange={(e) => handleInputChange("uniformAllowance", e.target.value)}
+              />
+            </div>
 
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">6. Medical Report</h4>
-                    <p className="text-sm text-gray-600">Health clearance certificate</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => document.getElementById("medical-report")?.click()}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                  <input
-                    id="medical-report"
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleDocumentUpload("Medical Report", e.target.files[0])
-                      }
-                    }}
-                  />
-                </div>
-                {formData.documents.find((doc) => doc.type === "Medical Report") && (
-                  <div className="mt-2 flex items-center text-green-600 text-sm">
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    {formData.documents.find((doc) => doc.type === "Medical Report")?.name} uploaded successfully
-                  </div>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="communicationAllowance">7. Communication Allowance</Label>
+              <Input
+                type="number"
+                id="communicationAllowance"
+                value={formData.communicationAllowance}
+                onChange={(e) => handleInputChange("communicationAllowance", e.target.value)}
+              />
+            </div>
 
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">7. Police Report</h4>
-                    <p className="text-sm text-gray-600">Criminal background check</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => document.getElementById("police-report")?.click()}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                  <input
-                    id="police-report"
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleDocumentUpload("Police Report", e.target.files[0])
-                      }
-                    }}
-                  />
-                </div>
-                {formData.documents.find((doc) => doc.type === "Police Report") && (
-                  <div className="mt-2 flex items-center text-green-600 text-sm">
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    {formData.documents.find((doc) => doc.type === "Police Report")?.name} uploaded successfully
-                  </div>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="otherAllowances">8. Other Allowances</Label>
+              <Input
+                type="number"
+                id="otherAllowances"
+                value={formData.otherAllowances}
+                onChange={(e) => handleInputChange("otherAllowances", e.target.value)}
+              />
+            </div>
 
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">8. Other Uploads</h4>
-                    <p className="text-sm text-gray-600">Additional supporting documents</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => document.getElementById("other-uploads")?.click()}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                  <input
-                    id="other-uploads"
-                    type="file"
-                    className="hidden"
-                    multiple
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleDocumentUpload("Other Uploads", e.target.files[0])
-                      }
-                    }}
-                  />
-                </div>
-                {formData.documents.find((doc) => doc.type === "Other Uploads") && (
-                  <div className="mt-2 flex items-center text-green-600 text-sm">
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    {formData.documents.find((doc) => doc.type === "Other Uploads")?.name} uploaded successfully
-                  </div>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="taxDeduction">9. Tax Deduction</Label>
+              <Input
+                type="number"
+                id="taxDeduction"
+                value={formData.taxDeduction}
+                onChange={(e) => handleInputChange("taxDeduction", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ssnit">10. SSNIT Number</Label>
+              <Input
+                type="text"
+                id="ssnit"
+                value={formData.ssnit}
+                onChange={(e) => handleInputChange("ssnit", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tier3">11. Tier 3 Contribution</Label>
+              <Input
+                type="number"
+                id="tier3"
+                value={formData.tier3}
+                onChange={(e) => handleInputChange("tier3", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="loanDeduction">12. Loan Deduction</Label>
+              <Input
+                type="number"
+                id="loanDeduction"
+                value={formData.loanDeduction}
+                onChange={(e) => handleInputChange("loanDeduction", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="advanceDeduction">13. Advance Deduction</Label>
+              <Input
+                type="number"
+                id="advanceDeduction"
+                value={formData.advanceDeduction}
+                onChange={(e) => handleInputChange("advanceDeduction", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="otherDeductions">14. Other Deductions</Label>
+              <Input
+                type="number"
+                id="otherDeductions"
+                value={formData.otherDeductions}
+                onChange={(e) => handleInputChange("otherDeductions", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="loanAmount">15. Loan Amount</Label>
+              <Input
+                type="number"
+                id="loanAmount"
+                value={formData.loanAmount}
+                onChange={(e) => handleInputChange("loanAmount", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="loanBalance">16. Loan Balance</Label>
+              <Input
+                type="number"
+                id="loanBalance"
+                value={formData.loanBalance}
+                onChange={(e) => handleInputChange("loanBalance", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="loanInstallment">17. Loan Installment</Label>
+              <Input
+                type="number"
+                id="loanInstallment"
+                value={formData.loanInstallment}
+                onChange={(e) => handleInputChange("loanInstallment", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="loanStartDate">18. Loan Start Date</Label>
+              <Input
+                type="date"
+                id="loanStartDate"
+                value={formData.loanStartDate}
+                onChange={(e) => handleInputChange("loanStartDate", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="loanEndDate">19. Loan End Date</Label>
+              <Input
+                type="date"
+                id="loanEndDate"
+                value={formData.loanEndDate}
+                onChange={(e) => handleInputChange("loanEndDate", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bankName">20. Bank Name</Label>
+              <Input
+                type="text"
+                id="bankName"
+                value={formData.bankName}
+                onChange={(e) => handleInputChange("bankName", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bankAccount">21. Bank Account Number</Label>
+              <Input
+                type="text"
+                id="bankAccount"
+                value={formData.bankAccount}
+                onChange={(e) => handleInputChange("bankAccount", e.target.value)}
+              />
             </div>
           </div>
         </TabsContent>
+
+        {/* <TabsContent value="documents" className="space-y-4">
+          <div>
+            <Label>Upload Documents</Label>
+            <Input type="file" multiple />
+          </div>
+        </TabsContent> */}
       </Tabs>
 
-      <div className="flex justify-end space-x-2 pt-4 border-t">
-        <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
+      <div className="flex justify-between">
         {currentTab !== "personal" && (
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() =>
-              setCurrentTab(
-                currentTab === "employment" ? "personal" : currentTab === "financial" ? "employment" : "financial",
-              )
-            }
-          >
+          <Button variant="secondary" onClick={handlePrevious}>
             Previous
           </Button>
         )}
-        {currentTab !== "documents" ? (
-          <Button type="button" onClick={handleNext} className="bg-teal-600 hover:bg-teal-700">
-            Next
-          </Button>
+        {currentTab !== "financial" ? (
+          <Button onClick={handleNext}>Next</Button>
         ) : (
-          <Button type="submit" className="bg-teal-600 hover:bg-teal-700">
-            Submit
-          </Button>
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700">
+              Submit
+            </Button>
+          </div>
         )}
       </div>
-    </form>
-  )
-}
-
-function EmployeeProfile({ employee }: { employee: any }) {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center space-x-4">
-        <Avatar className="h-20 w-20">
-          <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${employee.display_name}`} />
-          <AvatarFallback>
-            {employee.display_name
-              ?.split(" ")
-              .map((n: string) => n[0])
-              .join("")}
-          </AvatarFallback>
-        </Avatar>
-        <div>
-          <h2 className="text-2xl font-semibold">{employee.display_name}</h2>
-          <p className="text-muted-foreground">{employee.position}</p>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label>Email</Label>
-            <p className="font-medium">{employee.personal_email}</p>
-          </div>
-          <div>
-            <Label>Phone</Label>
-            <p className="font-medium">{employee.phone_number}</p>
-          </div>
-          <div>
-            <Label>Date of Birth</Label>
-            <p className="font-medium">{employee.date_of_birth}</p>
-          </div>
-          <div>
-            <Label>Address</Label>
-            <p className="font-medium">{employee.address}</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Employment Details</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label>Employee ID</Label>
-            <p className="font-medium">{employee.employee_id}</p>
-          </div>
-          <div>
-            <Label>Department</Label>
-            <p className="font-medium">{employee.department}</p>
-          </div>
-          <div>
-            <Label>Position</Label>
-            <p className="font-medium">{employee.position}</p>
-          </div>
-          <div>
-            <Label>Status</Label>
-            <Badge variant={employee.status === "Active" ? "default" : "secondary"}>{employee.status}</Badge>
-          </div>
-          <div>
-            <Label>Salary</Label>
-            <p className="font-medium">GHS {employee.salary?.toLocaleString()}</p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

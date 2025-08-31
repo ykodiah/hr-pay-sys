@@ -20,7 +20,6 @@ import {
   Trash2,
   Shield,
   Bell,
-  Users,
   Building,
   UserCheck,
   Plus,
@@ -43,6 +42,7 @@ import {
   Eye,
   Power,
   Minus,
+  DollarSign,
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -2977,160 +2977,113 @@ export default function SettingsPage() {
             <div className="grid lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Users className="w-5 h-5 text-emerald-600" />
-                    <span>HR Configuration</span>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <FileText className="w-5 h-5 text-emerald-600" />
+                      <span>Leave Policies</span>
+                    </div>
+                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Policy
+                    </Button>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="leave-year">Leave Year Start</Label>
-                      <Select
-                        value={hrSettings.leaveYearStart}
-                        onValueChange={(value) => updateHRSettings("leaveYearStart", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="january">January</SelectItem>
-                          <SelectItem value="april">April</SelectItem>
-                          <SelectItem value="july">July</SelectItem>
-                          <SelectItem value="october">October</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="probation">Probation Period (months)</Label>
-                      <Input
-                        id="probation"
-                        type="number"
-                        value={hrSettings.probationPeriod}
-                        onChange={(e) => updateHRSettings("probationPeriod", Number.parseInt(e.target.value) || 0)}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="annual-leave">Annual Leave Days</Label>
-                      <Input
-                        id="annual-leave"
-                        type="number"
-                        value={hrSettings.annualLeaveDays}
-                        onChange={(e) => updateHRSettings("annualLeaveDays", Number.parseInt(e.target.value) || 0)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="sick-leave">Sick Leave Days</Label>
-                      <Input
-                        id="sick-leave"
-                        type="number"
-                        value={hrSettings.sickLeaveDays}
-                        onChange={(e) => updateHRSettings("sickLeaveDays", Number.parseInt(e.target.value) || 0)}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="working-hours">Working Hours/Day</Label>
-                      <Input
-                        id="working-hours"
-                        type="number"
-                        value={hrSettings.workingHoursPerDay}
-                        onChange={(e) => updateHRSettings("workingHoursPerDay", Number.parseInt(e.target.value) || 0)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="working-days">Working Days/Week</Label>
-                      <Input
-                        id="working-days"
-                        type="number"
-                        value={hrSettings.workingDaysPerWeek}
-                        onChange={(e) => updateHRSettings("workingDaysPerWeek", Number.parseInt(e.target.value) || 0)}
-                        min="1"
-                        max="7"
-                      />
-                    </div>
-                  </div>
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label htmlFor="auto-approve">Auto-approve leave requests</Label>
-                        <p className="text-sm text-gray-500">Automatically approve requests within policy</p>
+                    {[
+                      {
+                        name: "Annual Leave",
+                        accrual: "1.75 days per month",
+                        carryOver: "5 days",
+                        notice: "2 weeks",
+                      },
+                      {
+                        name: "Sick Leave",
+                        accrual: "Medical certificate after 3 days",
+                        carryOver: "30 days max consecutive",
+                        notice: "100% paid for first 10 days",
+                      },
+                      {
+                        name: "Maternity/Paternity",
+                        accrual: "Maternity: 12 weeks",
+                        carryOver: "Paternity: 2 weeks",
+                        notice: "4 weeks before",
+                      },
+                    ].map((policy, index) => (
+                      <div key={index} className="p-3 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="font-medium">{policy.name}</Label>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Policy
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-red-600">
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Remove Policy
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          <div>{policy.accrual}</div>
+                          <div>{policy.carryOver}</div>
+                          <div>{policy.notice}</div>
+                        </div>
                       </div>
-                      <Switch
-                        id="auto-approve"
-                        checked={hrSettings.autoApproveLeave}
-                        onCheckedChange={(checked) => updateHRSettings("autoApproveLeave", checked)}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label htmlFor="email-notifications">Email notifications</Label>
-                        <p className="text-sm text-gray-500">Send email updates for HR activities</p>
-                      </div>
-                      <Switch
-                        id="email-notifications"
-                        checked={hrSettings.emailNotifications}
-                        onCheckedChange={(checked) => updateHRSettings("emailNotifications", checked)}
-                      />
-                    </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <FileText className="w-5 h-5 text-emerald-600" />
-                    <span>Leave Policies</span>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <DollarSign className="w-5 h-5 text-emerald-600" />
+                      <span>Salary Grades & Notches</span>
+                    </div>
+                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Grade
+                    </Button>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
-                    <div className="p-3 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <Label className="font-medium">Annual Leave</Label>
-                        <Button variant="outline" size="sm">
-                          <Edit className="w-3 h-3 mr-1" />
-                          Edit
-                        </Button>
+                    {[
+                      { grade: "Grade 1", range: "GH¢1,800 - GH¢2,400", steps: 5 },
+                      { grade: "Grade 2", range: "GH¢2,200 - GH¢2,920", steps: 5 },
+                      { grade: "Grade 3", range: "GH¢2,600 - GH¢3,440", steps: 5 },
+                      { grade: "Grade 4", range: "GH¢3,000 - GH¢3,960", steps: 5 },
+                      { grade: "Grade 5", range: "GH¢3,400 - GH¢4,480", steps: 5 },
+                    ].map((grade, index) => (
+                      <div key={index} className="p-3 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="font-medium">{grade.grade}</Label>
+                          <div className="flex space-x-2">
+                            <Button variant="outline" size="sm">
+                              <Edit className="w-3 h-3 mr-1" />
+                              Edit
+                            </Button>
+                            <Button variant="outline" size="sm" className="text-red-600 bg-transparent">
+                              <Minus className="w-3 h-3 mr-1" />
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          <div>Salary Range: {grade.range}</div>
+                          <div>Steps: {grade.steps}</div>
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        <div>Accrual: 1.75 days per month</div>
-                        <div>Max carry over: 5 days</div>
-                        <div>Notice period: 2 weeks</div>
-                      </div>
-                    </div>
-                    <div className="p-3 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <Label className="font-medium">Sick Leave</Label>
-                        <Button variant="outline" size="sm">
-                          <Edit className="w-3 h-3 mr-1" />
-                          Edit
-                        </Button>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        <div>Medical certificate: After 3 days</div>
-                        <div>Max consecutive: 30 days</div>
-                        <div>Paid: 100% for first 10 days</div>
-                      </div>
-                    </div>
-                    <div className="p-3 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <Label className="font-medium">Maternity/Paternity</Label>
-                        <Button variant="outline" size="sm">
-                          <Edit className="w-3 h-3 mr-1" />
-                          Edit
-                        </Button>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        <div>Maternity: 12 weeks</div>
-                        <div>Paternity: 2 weeks</div>
-                        <div>Notice: 4 weeks before</div>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
