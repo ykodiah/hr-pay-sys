@@ -20,7 +20,7 @@ import { Search, Filter, Plus, Edit, Download, Upload } from "lucide-react"
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
-import { EmployeeProfile } from "@/components/employee-profile"
+// import { EmployeeProfile } from "@/components/employee-profile"
 
 const initialEmployees = [
   {
@@ -1084,15 +1084,15 @@ export default function EmployeesPage() {
         </CardContent>
       </Card>
 
-      {/* Employee Profile Dialog */}
-      <Dialog open={false} onOpenChange={() => {}}>
+      {/* Employee Profile Dialog - Currently disabled */}
+      {/* <Dialog open={false} onOpenChange={() => {}}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Employee Profile</DialogTitle>
           </DialogHeader>
           {selectedEmployee && <EmployeeProfile employee={selectedEmployee} />}
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
 
       {/* Edit Employee Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
