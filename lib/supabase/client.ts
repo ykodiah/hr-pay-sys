@@ -22,27 +22,119 @@ function getSupabaseAnonKey(): string {
   return key
 }
 
+function createMockSupabaseClient() {
+  const mockData = {
+    employees: [
+      {
+        id: 1,
+        employee_id: "AKWA0001",
+        first_name: "John",
+        last_name: "Doe",
+        email: "john.doe@example.com",
+        phone: "+233123456789",
+        status: "Active",
+        created_at: new Date().toISOString(),
+        subsidiaries: { name: "Main Office", id: 1 },
+      },
+    ],
+    subsidiaries: [{ id: 1, name: "Main Office", status: "active" }],
+    companies: [{ id: 1, name: "Akwaaba HR Pay", logo_url: null }],
+  }
+
+  const createQueryBuilder = (tableName: string) => {
+    const query = { table: tableName, filters: {}, orderBy: null, limit: null }
+
+    return {
+      select: (columns = "*") => ({
+        eq: (column: string, value: any) => {
+          query.filters[column] = value
+          return {
+            maybeSingle: () =>
+              Promise.resolve({
+                data: mockData[tableName as keyof typeof mockData]?.[0] || null,
+                error: null,
+              }),
+            single: () =>
+              Promise.resolve({
+                data: mockData[tableName as keyof typeof mockData]?.[0] || null,
+                error: null,
+              }),
+            order: (column: string, options?: any) => ({
+              limit: (count: number) =>
+                Promise.resolve({
+                  data: mockData[tableName as keyof typeof mockData]?.slice(0, count) || [],
+                  error: null,
+                }),
+            }),
+          }
+        },
+        order: (column: string, options?: any) => ({
+          limit: (count: number) =>
+            Promise.resolve({
+              data: mockData[tableName as keyof typeof mockData]?.slice(0, count) || [],
+              error: null,
+            }),
+          then: (callback: any) =>
+            callback({
+              data: mockData[tableName as keyof typeof mockData] || [],
+              error: null,
+            }),
+        }),
+        then: (callback: any) =>
+          callback({
+            data: mockData[tableName as keyof typeof mockData] || [],
+            error: null,
+          }),
+      }),
+      insert: (data: any) => ({
+        select: () => ({
+          single: () =>
+            Promise.resolve({
+              data: { id: Date.now(), ...data[0] },
+              error: null,
+            }),
+        }),
+        then: (callback: any) =>
+          callback({
+            data: { id: Date.now(), ...data[0] },
+            error: null,
+          }),
+      }),
+      update: (data: any) => ({
+        eq: (column: string, value: any) =>
+          Promise.resolve({
+            data: { ...data, id: value },
+            error: null,
+          }),
+      }),
+    }
+  }
+
+  return {
+    from: (tableName: string) => createQueryBuilder(tableName),
+    channel: (channelName: string) => ({
+      on: (event: string, config: any, callback: Function) => ({
+        subscribe: () => ({
+          unsubscribe: () => {},
+        }),
+      }),
+    }),
+    auth: {
+      getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+      signInWithPassword: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      signUp: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      signOut: () => Promise.resolve({ error: null }),
+    },
+  }
+}
+
 export function createClient() {
   const url = getSupabaseUrl()
   const key = getSupabaseAnonKey()
 
   if (!url || url === "https://your-project.supabase.co" || !key || key === "your-anon-key") {
     console.error("[v0] Supabase environment variables not properly configured")
-    // Return a mock client for development that won't crash the app
-    return {
-      from: () => ({
-        select: () => ({ data: [], error: null }),
-        insert: () => ({ data: null, error: { message: "Supabase not configured" } }),
-        update: () => ({ data: null, error: { message: "Supabase not configured" } }),
-        delete: () => ({ data: null, error: { message: "Supabase not configured" } }),
-      }),
-      auth: {
-        getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-        signInWithPassword: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        signUp: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        signOut: () => Promise.resolve({ error: null }),
-      },
-    } as any
+    return createMockSupabaseClient() as any
   }
 
   return createBrowserClient(url, key)
