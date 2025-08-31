@@ -45,7 +45,7 @@ import {
   DollarSign,
   Users,
 } from "lucide-react"
-import { toast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   Dialog,
@@ -207,6 +207,8 @@ interface NotificationSettings {
 const MAIN_COMPANY_ID = "00000000-0000-0000-0000-000000000001" // Fixed UUID for main company
 
 export default function SettingsPage() {
+  const { toast } = useToast()
+
   const { currency, currencySymbol, setCurrency: setSystemCurrency, formatAmount } = useCurrency()
 
   const [activeTab, setActiveTab] = useState("company")
@@ -2021,7 +2023,7 @@ export default function SettingsPage() {
           <div className="flex justify-end pt-4 border-t">
             <Button onClick={handleSaveSettings} disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700">
               <Save className="w-4 h-4 mr-2" />
-              {isLoading ? "Saving..." : "Save Multi-Company Settings"}
+              {isLoading ? "Save Multi-Company Settings" : null}
             </Button>
           </div>
         </TabsContent>
@@ -2552,7 +2554,7 @@ export default function SettingsPage() {
           <div className="flex justify-end pt-4 border-t">
             <Button onClick={handleSaveSettings} disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700">
               <Save className="w-4 h-4 mr-2" />
-              {isLoading ? "Saving..." : "Save Company Settings"}
+              {isLoading ? "Save Company Settings" : null}
             </Button>
           </div>
         </TabsContent>
@@ -3708,7 +3710,7 @@ export default function SettingsPage() {
             <div className="flex justify-end pt-4 border-t">
               <Button onClick={handleSaveSettings} disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700">
                 <Save className="w-4 h-4 mr-2" />
-                {isLoading ? "Saving..." : "Save Security Settings"}
+                {isLoading ? "Save Security Settings" : null}
               </Button>
             </div>
           </div>
@@ -3863,7 +3865,7 @@ export default function SettingsPage() {
             <div className="flex justify-end pt-4 border-t">
               <Button onClick={handleSaveSettings} disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700">
                 <Save className="w-4 h-4 mr-2" />
-                {isLoading ? "Saving..." : "Save Notification Settings"}
+                {isLoading ? "Save Notification Settings" : null}
               </Button>
             </div>
           </div>
