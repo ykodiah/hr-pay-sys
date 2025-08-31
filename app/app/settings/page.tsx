@@ -2813,19 +2813,19 @@ export default function SettingsPage() {
                     </div>
                   )}
                   <div className="text-center">
-                    <Label htmlFor="logo-upload" className="cursor-pointer">
-                      <Button variant="outline" className="bg-transparent hover:bg-gray-50">
+                    <div className="relative">
+                      <Input
+                        id="logo-upload"
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/gif"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        onChange={handleLogoUpload}
+                      />
+                      <Button variant="outline" className="bg-transparent hover:bg-gray-50 relative z-0">
                         <Upload className="w-4 h-4 mr-2" />
                         Upload Logo
                       </Button>
-                    </Label>
-                    <Input
-                      id="logo-upload"
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg,image/gif"
-                      className="hidden"
-                      onChange={handleLogoUpload}
-                    />
+                    </div>
                     <p className="text-xs text-gray-500 mt-2">
                       PNG, JPG up to 2MB
                       <br />
