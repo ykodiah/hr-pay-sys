@@ -209,25 +209,22 @@ interface LeaveType {
   name: string
   code: string
   description: string
-  category: "general" | "medical" | "family" | "emergency"
-  entitlementType: "annual" | "monthly" | "fixed" | "unlimited"
-  entitlementAmount: number
-  maxDaysPerYear?: number
-  maxConsecutiveDays?: number
-  minServiceMonths: number
-  requiresApproval: boolean
-  approvalLevels: number
-  autoApproveThreshold?: number
-  minNoticeDays: number
-  requiresDocumentation: boolean
-  documentationRequiredAfter?: number
-  isPaid: boolean
-  paymentPercentage: number
-  paymentCapDays?: number
-  allowCarryOver: boolean
-  maxCarryOverDays: number
-  carryOverExpiryMonths: number
-  isActive: boolean
+  accrual_method: "annual" | "monthly" | "fixed" | "unlimited"
+  accrual_rate: number
+  annual_entitlement: number
+  max_per_year?: number
+  max_consecutive_days?: number
+  min_service_months: number
+  requires_approval: boolean
+  min_notice_days: number
+  requires_medical_certificate: boolean
+  medical_cert_after_days?: number
+  is_paid: boolean
+  pay_percentage: number
+  allow_carry_over: boolean
+  max_carry_over_days: number
+  carry_over_expiry_months: number
+  is_active: boolean
 }
 
 const MAIN_COMPANY_ID = "00000000-0000-0000-0000-000000000001" // Fixed UUID for main company
@@ -613,25 +610,22 @@ export default function SettingsPage() {
         name: item.name,
         code: item.code,
         description: item.description || "",
-        category: item.category,
-        entitlementType: item.entitlement_type,
-        entitlementAmount: item.entitlement_amount || 0,
-        maxDaysPerYear: item.max_days_per_year,
-        maxConsecutiveDays: item.max_consecutive_days,
-        minServiceMonths: item.min_service_months || 0,
-        requiresApproval: item.requires_approval,
-        approvalLevels: item.approval_levels || 1,
-        autoApproveThreshold: item.auto_approve_threshold,
-        minNoticeDays: item.min_notice_days || 0,
-        requiresDocumentation: item.requires_documentation,
-        documentationRequiredAfter: item.documentation_required_after,
-        isPaid: item.is_paid,
-        paymentPercentage: item.payment_percentage || 100,
-        paymentCapDays: item.payment_cap_days,
-        allowCarryOver: item.allow_carry_over,
-        maxCarryOverDays: item.max_carry_over_days || 0,
-        carryOverExpiryMonths: item.carry_over_expiry_months || 12,
-        isActive: item.is_active,
+        accrual_method: item.accrual_method || "annual",
+        accrual_rate: item.accrual_rate || 0,
+        annual_entitlement: item.annual_entitlement || 0,
+        max_per_year: item.max_per_year,
+        max_consecutive_days: item.max_consecutive_days,
+        min_service_months: item.min_service_months || 0,
+        requires_approval: item.requires_approval,
+        min_notice_days: item.min_notice_days || 0,
+        requires_medical_certificate: item.requires_medical_certificate,
+        medical_cert_after_days: item.medical_cert_after_days,
+        is_paid: item.is_paid,
+        pay_percentage: item.pay_percentage || 100,
+        allow_carry_over: item.allow_carry_over,
+        max_carry_over_days: item.max_carry_over_days || 0,
+        carry_over_expiry_months: item.carry_over_expiry_months || 12,
+        is_active: item.is_active,
       }))
 
       setLeaveTypes(formattedLeaveTypes)
@@ -928,23 +922,18 @@ export default function SettingsPage() {
         name: formData.name,
         code: formData.code.toUpperCase(),
         description: formData.description,
-        category: formData.category,
-        entitlement_type: formData.entitlementType,
-        entitlement_amount: Number.parseFloat(formData.entitlementAmount),
-        max_days_per_year: formData.maxDaysPerYear ? Number.parseFloat(formData.maxDaysPerYear) : null,
+        accrual_method: formData.accrualMethod || "annual",
+        accrual_rate: Number.parseFloat(formData.accrualRate) || 0,
+        annual_entitlement: Number.parseFloat(formData.annualEntitlement) || 0,
+        max_per_year: formData.maxPerYear ? Number.parseFloat(formData.maxPerYear) : null,
         max_consecutive_days: formData.maxConsecutiveDays ? Number.parseInt(formData.maxConsecutiveDays) : null,
         min_service_months: Number.parseInt(formData.minServiceMonths) || 0,
         requires_approval: formData.requiresApproval,
-        approval_levels: Number.parseInt(formData.approvalLevels) || 1,
-        auto_approve_threshold: formData.autoApproveThreshold ? Number.parseInt(formData.autoApproveThreshold) : null,
         min_notice_days: Number.parseInt(formData.minNoticeDays) || 0,
-        requires_documentation: formData.requiresDocumentation,
-        documentation_required_after: formData.documentationRequiredAfter
-          ? Number.parseInt(formData.documentationRequiredAfter)
-          : null,
+        requires_medical_certificate: formData.requiresMedicalCertificate,
+        medical_cert_after_days: formData.medicalCertAfterDays ? Number.parseInt(formData.medicalCertAfterDays) : null,
         is_paid: formData.isPaid,
-        payment_percentage: Number.parseFloat(formData.paymentPercentage) || 100,
-        payment_cap_days: formData.paymentCapDays ? Number.parseInt(formData.paymentCapDays) : null,
+        pay_percentage: Number.parseFloat(formData.payPercentage) || 100,
         allow_carry_over: formData.allowCarryOver,
         max_carry_over_days: Number.parseFloat(formData.maxCarryOverDays) || 0,
         carry_over_expiry_months: Number.parseInt(formData.carryOverExpiryMonths) || 12,
@@ -3552,7 +3541,7 @@ export default function SettingsPage() {
                     const formData = new FormData(e.currentTarget)
                     const data = Object.fromEntries(formData.entries())
                     data.requiresApproval = formData.has("requiresApproval")
-                    data.requiresDocumentation = formData.has("requiresDocumentation")
+                    data.requiresMedicalCertificate = formData.has("requiresMedicalCertificate")
                     data.isPaid = formData.has("isPaid")
                     data.allowCarryOver = formData.has("allowCarryOver")
                     handleSaveLeaveType(data)
@@ -3596,21 +3585,6 @@ export default function SettingsPage() {
                           rows={3}
                         />
                       </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="category">Category</Label>
-                        <Select name="category" defaultValue={editingLeaveType?.category || "general"}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="general">General</SelectItem>
-                            <SelectItem value="medical">Medical</SelectItem>
-                            <SelectItem value="family">Family</SelectItem>
-                            <SelectItem value="emergency">Emergency</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
                     </div>
 
                     {/* Entitlement Settings */}
@@ -3620,8 +3594,8 @@ export default function SettingsPage() {
                       </h4>
 
                       <div className="space-y-2">
-                        <Label htmlFor="entitlementType">Entitlement Type</Label>
-                        <Select name="entitlementType" defaultValue={editingLeaveType?.entitlementType || "annual"}>
+                        <Label htmlFor="accrualMethod">Accrual Method</Label>
+                        <Select name="accrualMethod" defaultValue={editingLeaveType?.accrual_method || "annual"}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -3635,27 +3609,40 @@ export default function SettingsPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="entitlementAmount">Entitlement Amount (days)</Label>
+                        <Label htmlFor="annualEntitlement">Annual Entitlement (days)</Label>
                         <Input
-                          id="entitlementAmount"
-                          name="entitlementAmount"
+                          id="annualEntitlement"
+                          name="annualEntitlement"
                           type="number"
                           step="0.5"
                           min="0"
-                          defaultValue={editingLeaveType?.entitlementAmount || ""}
+                          defaultValue={editingLeaveType?.annual_entitlement || ""}
                           placeholder="e.g., 21"
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="maxDaysPerYear">Max Days Per Year</Label>
+                        <Label htmlFor="accrualRate">Accrual Rate</Label>
                         <Input
-                          id="maxDaysPerYear"
-                          name="maxDaysPerYear"
+                          id="accrualRate"
+                          name="accrualRate"
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          defaultValue={editingLeaveType?.accrual_rate || ""}
+                          placeholder="e.g., 1.75"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="maxPerYear">Max Days Per Year</Label>
+                        <Input
+                          id="maxPerYear"
+                          name="maxPerYear"
                           type="number"
                           step="0.5"
                           min="0"
-                          defaultValue={editingLeaveType?.maxDaysPerYear || ""}
+                          defaultValue={editingLeaveType?.max_per_year || ""}
                           placeholder="Optional limit"
                         />
                       </div>
@@ -3667,7 +3654,7 @@ export default function SettingsPage() {
                           name="maxConsecutiveDays"
                           type="number"
                           min="1"
-                          defaultValue={editingLeaveType?.maxConsecutiveDays || ""}
+                          defaultValue={editingLeaveType?.max_consecutive_days || ""}
                           placeholder="Optional limit"
                         />
                       </div>
@@ -3679,7 +3666,7 @@ export default function SettingsPage() {
                           name="minServiceMonths"
                           type="number"
                           min="0"
-                          defaultValue={editingLeaveType?.minServiceMonths || "0"}
+                          defaultValue={editingLeaveType?.min_service_months || "0"}
                         />
                       </div>
                     </div>
@@ -3693,34 +3680,10 @@ export default function SettingsPage() {
                           type="checkbox"
                           id="requiresApproval"
                           name="requiresApproval"
-                          defaultChecked={editingLeaveType?.requiresApproval ?? true}
+                          defaultChecked={editingLeaveType?.requires_approval ?? true}
                           className="rounded border-gray-300"
                         />
                         <Label htmlFor="requiresApproval">Requires Approval</Label>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="approvalLevels">Approval Levels</Label>
-                        <Input
-                          id="approvalLevels"
-                          name="approvalLevels"
-                          type="number"
-                          min="1"
-                          max="5"
-                          defaultValue={editingLeaveType?.approvalLevels || "1"}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="autoApproveThreshold">Auto-approve if ≤ days</Label>
-                        <Input
-                          id="autoApproveThreshold"
-                          name="autoApproveThreshold"
-                          type="number"
-                          min="0"
-                          defaultValue={editingLeaveType?.autoApproveThreshold || ""}
-                          placeholder="Optional"
-                        />
                       </div>
 
                       <div className="space-y-2">
@@ -3730,29 +3693,29 @@ export default function SettingsPage() {
                           name="minNoticeDays"
                           type="number"
                           min="0"
-                          defaultValue={editingLeaveType?.minNoticeDays || "0"}
+                          defaultValue={editingLeaveType?.min_notice_days || "0"}
                         />
                       </div>
 
                       <div className="flex items-center space-x-2">
                         <input
                           type="checkbox"
-                          id="requiresDocumentation"
-                          name="requiresDocumentation"
-                          defaultChecked={editingLeaveType?.requiresDocumentation || false}
+                          id="requiresMedicalCertificate"
+                          name="requiresMedicalCertificate"
+                          defaultChecked={editingLeaveType?.requires_medical_certificate || false}
                           className="rounded border-gray-300"
                         />
-                        <Label htmlFor="requiresDocumentation">Requires Documentation</Label>
+                        <Label htmlFor="requiresMedicalCertificate">Requires Medical Certificate</Label>
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="documentationRequiredAfter">Documentation required after (days)</Label>
+                        <Label htmlFor="medicalCertAfterDays">Medical certificate required after (days)</Label>
                         <Input
-                          id="documentationRequiredAfter"
-                          name="documentationRequiredAfter"
+                          id="medicalCertAfterDays"
+                          name="medicalCertAfterDays"
                           type="number"
                           min="1"
-                          defaultValue={editingLeaveType?.documentationRequiredAfter || ""}
+                          defaultValue={editingLeaveType?.medical_cert_after_days || ""}
                           placeholder="Optional"
                         />
                       </div>
@@ -3769,34 +3732,22 @@ export default function SettingsPage() {
                           type="checkbox"
                           id="isPaid"
                           name="isPaid"
-                          defaultChecked={editingLeaveType?.isPaid ?? true}
+                          defaultChecked={editingLeaveType?.is_paid ?? true}
                           className="rounded border-gray-300"
                         />
                         <Label htmlFor="isPaid">Paid Leave</Label>
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="paymentPercentage">Payment Percentage</Label>
+                        <Label htmlFor="payPercentage">Payment Percentage</Label>
                         <Input
-                          id="paymentPercentage"
-                          name="paymentPercentage"
+                          id="payPercentage"
+                          name="payPercentage"
                           type="number"
                           min="0"
                           max="100"
                           step="0.1"
-                          defaultValue={editingLeaveType?.paymentPercentage || "100"}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="paymentCapDays">Payment Cap (days)</Label>
-                        <Input
-                          id="paymentCapDays"
-                          name="paymentCapDays"
-                          type="number"
-                          min="1"
-                          defaultValue={editingLeaveType?.paymentCapDays || ""}
-                          placeholder="Optional limit"
+                          defaultValue={editingLeaveType?.pay_percentage || "100"}
                         />
                       </div>
 
@@ -3805,7 +3756,7 @@ export default function SettingsPage() {
                           type="checkbox"
                           id="allowCarryOver"
                           name="allowCarryOver"
-                          defaultChecked={editingLeaveType?.allowCarryOver || false}
+                          defaultChecked={editingLeaveType?.allow_carry_over || false}
                           className="rounded border-gray-300"
                         />
                         <Label htmlFor="allowCarryOver">Allow Carry Over</Label>
@@ -3819,7 +3770,7 @@ export default function SettingsPage() {
                           type="number"
                           step="0.5"
                           min="0"
-                          defaultValue={editingLeaveType?.maxCarryOverDays || "0"}
+                          defaultValue={editingLeaveType?.max_carry_over_days || "0"}
                         />
                       </div>
 
@@ -3831,7 +3782,7 @@ export default function SettingsPage() {
                           type="number"
                           min="1"
                           max="24"
-                          defaultValue={editingLeaveType?.carryOverExpiryMonths || "12"}
+                          defaultValue={editingLeaveType?.carry_over_expiry_months || "12"}
                         />
                       </div>
                     </div>
