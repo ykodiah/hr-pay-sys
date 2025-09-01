@@ -7,6 +7,14 @@ import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrency } from "@/lib/currency-context"
 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { Save, Shield, Key, Download, Database, FileText, Eye } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
 interface Company {
   id: string
   name: string
@@ -211,11 +219,6 @@ export default function SettingsPage() {
       carry_over_expiry_months: 3,
       min_notice_days: 7,
       is_active: true,
-      is_system_default: true,
-      company_id: "1",
-      created_by: "admin",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     },
     {
       id: "2",
@@ -238,11 +241,6 @@ export default function SettingsPage() {
       carry_over_expiry_months: 0,
       min_notice_days: 0,
       is_active: true,
-      is_system_default: true,
-      company_id: "1",
-      created_by: "admin",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     },
   ])
 
@@ -1711,4 +1709,341 @@ SYSTEM METRICS:
       console.error("[v0] Error loading settings from database:", error)
     }
   }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+            <p className="text-gray-600 mt-1">Manage your system configuration and preferences</p>
+          </div>
+          <Button
+            onClick={handleSaveSettings}
+            disabled={isLoading || !hasUnsavedChanges}
+            className="bg-gray-900 hover:bg-gray-800"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            Save Changes
+          </Button>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="flex space-x-1 bg-teal-100 p-1 rounded-lg mb-8">
+          {[
+            { id: "company", label: "Company" },
+            { id: "multi-company", label: "Multi-Company" },
+            { id: "roles", label: "Roles & Access" },
+            { id: "users", label: "Users" },
+            { id: "payroll", label: "Payroll" },
+            { id: "hr", label: "HR" },
+            { id: "security", label: "Security" },
+            { id: "notifications", label: "Notifications" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === tab.id
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Security Tab Content */}
+        {activeTab === "security" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Security Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-5 h-5" />
+                  Security Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Two-Factor Authentication */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">Two-Factor Authentication</h3>
+                    <p className="text-sm text-gray-500">Add an extra layer of security</p>
+                  </div>
+                  <Switch
+                    checked={securitySettings.twoFactor}
+                    onCheckedChange={(checked) => updateSecuritySettings("twoFactor", checked)}
+                  />
+                </div>
+
+                {/* Auto Session Timeout */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">Auto Session Timeout</h3>
+                    <p className="text-sm text-gray-500">Automatically log out inactive users</p>
+                  </div>
+                  <Switch
+                    checked={securitySettings.sessionTimeout}
+                    onCheckedChange={(checked) => updateSecuritySettings("sessionTimeout", checked)}
+                  />
+                </div>
+
+                {securitySettings.sessionTimeout && (
+                  <div className="ml-4">
+                    <Label htmlFor="timeout-duration">Timeout Duration (minutes)</Label>
+                    <Select
+                      value={securitySettings.timeoutDuration.toString()}
+                      onValueChange={(value) => updateSecuritySettings("timeoutDuration", Number.parseInt(value))}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1 minute</SelectItem>
+                        <SelectItem value="3">3 minutes</SelectItem>
+                        <SelectItem value="5">5 minutes</SelectItem>
+                        <SelectItem value="10">10 minutes</SelectItem>
+                        <SelectItem value="15">15 minutes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Audit Logging */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">Audit Logging</h3>
+                    <p className="text-sm text-gray-500">Track all system activities</p>
+                  </div>
+                  <Switch
+                    checked={securitySettings.auditLog}
+                    onCheckedChange={(checked) => updateSecuritySettings("auditLog", checked)}
+                  />
+                </div>
+
+                {/* Automated Backups */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">Automated Backups</h3>
+                    <p className="text-sm text-gray-500">Regular system data backups</p>
+                  </div>
+                  <Switch
+                    checked={securitySettings.backupEnabled}
+                    onCheckedChange={(checked) => updateSecuritySettings("backupEnabled", checked)}
+                  />
+                </div>
+
+                {securitySettings.backupEnabled && (
+                  <div className="ml-4">
+                    <Label htmlFor="backup-frequency">Backup Frequency</Label>
+                    <Select
+                      value={securitySettings.backupFrequency}
+                      onValueChange={(value) => updateSecuritySettings("backupFrequency", value)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="space-y-3 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start bg-transparent"
+                    onClick={handleChangeAdminPassword}
+                  >
+                    <Key className="w-4 h-4 mr-2" />
+                    Change Admin Password
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start bg-transparent"
+                    onClick={handleDownloadSecurityReport}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Security Report
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start bg-transparent"
+                    onClick={handleBackupNow}
+                    disabled={isBackingUp}
+                  >
+                    <Database className="w-4 h-4 mr-2" />
+                    {isBackingUp ? "Backing up..." : "Backup Now"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Password Policy */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Key className="w-5 h-5" />
+                  Password Policy
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <Label htmlFor="min-length">Minimum Length</Label>
+                  <Input
+                    id="min-length"
+                    type="number"
+                    value={securitySettings.passwordPolicy.minLength}
+                    onChange={(e) =>
+                      updateSecuritySettings("passwordPolicy", {
+                        ...securitySettings.passwordPolicy,
+                        minLength: Number.parseInt(e.target.value) || 8,
+                      })
+                    }
+                    min="6"
+                    max="32"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="require-uppercase">Require Uppercase Letters</Label>
+                  <Switch
+                    id="require-uppercase"
+                    checked={securitySettings.passwordPolicy.requireUppercase}
+                    onCheckedChange={(checked) =>
+                      updateSecuritySettings("passwordPolicy", {
+                        ...securitySettings.passwordPolicy,
+                        requireUppercase: checked,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="require-numbers">Require Numbers</Label>
+                  <Switch
+                    id="require-numbers"
+                    checked={securitySettings.passwordPolicy.requireNumbers}
+                    onCheckedChange={(checked) =>
+                      updateSecuritySettings("passwordPolicy", {
+                        ...securitySettings.passwordPolicy,
+                        requireNumbers: checked,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="require-symbols">Require Symbols</Label>
+                  <Switch
+                    id="require-symbols"
+                    checked={securitySettings.passwordPolicy.requireSymbols}
+                    onCheckedChange={(checked) =>
+                      updateSecuritySettings("passwordPolicy", {
+                        ...securitySettings.passwordPolicy,
+                        requireSymbols: checked,
+                      })
+                    }
+                  />
+                </div>
+
+                {/* Password Strength Preview */}
+                <div className="space-y-2">
+                  <Label>Password Strength Preview</Label>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        calculatePasswordStrength(securitySettings.passwordPolicy).color
+                      }`}
+                      style={{
+                        width: `${calculatePasswordStrength(securitySettings.passwordPolicy).score}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {calculatePasswordStrength(securitySettings.passwordPolicy).strength} password policy
+                  </p>
+                  {calculatePasswordStrength(securitySettings.passwordPolicy).feedback.length > 0 && (
+                    <p className="text-xs text-gray-500">
+                      Missing: {calculatePasswordStrength(securitySettings.passwordPolicy).feedback.join(", ")}
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Audit Trail & Compliance */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Audit Trail & Compliance
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium">Audit Trail</h3>
+                        <p className="text-sm text-gray-500">Detailed activity logging</p>
+                      </div>
+                      <Switch
+                        checked={securitySettings.auditTrail}
+                        onCheckedChange={(checked) => updateSecuritySettings("auditTrail", checked)}
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start bg-transparent"
+                        onClick={handleDownloadAuditTrail}
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Download Audit Trail
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start bg-transparent"
+                        onClick={handleViewActivityLog}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        View Activity Log
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="retention-period">Retention Period (days)</Label>
+                    <Input
+                      id="retention-period"
+                      type="number"
+                      value={securitySettings.auditRetentionDays}
+                      onChange={(e) =>
+                        updateSecuritySettings("auditRetentionDays", Number.parseInt(e.target.value) || 90)
+                      }
+                      min="30"
+                      max="365"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Other tab contents would go here */}
+      </div>
+    </div>
+  )
 }
