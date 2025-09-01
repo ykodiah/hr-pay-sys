@@ -3,49 +3,9 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { useCurrency } from "@/lib/currency-context"
 import { createClient } from "@/lib/supabase/client"
-import {
-  Building2,
-  Shield,
-  Users,
-  DollarSign,
-  Bell,
-  Upload,
-  X,
-  Plus,
-  MoreVertical,
-  Eye,
-  Edit,
-  Ban,
-  Key,
-  Download,
-  Settings,
-  Mail,
-  Calendar,
-  Save,
-} from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Badge } from "@/components/ui/badge"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Switch } from "@/components/ui/switch"
-import SubsidiaryForm from "@/components/forms/subsidiary-form"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
 
 interface Company {
   id: string
@@ -160,7 +120,6 @@ export default function SettingsPage() {
   const [showDeactivateModal, setShowDeactivateModal] = useState(false)
 
   const [companyData, setCompanyData] = useState({
-    id: null as string | null,
     name: "",
     email: "",
     tax_id: "",
@@ -243,6 +202,52 @@ export default function SettingsPage() {
     webhookUrl: "",
   })
 
+  const [companyId, setCompanyId] = useState<string>("")
+
+  const generateUUID = () => {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0
+      const v = c == "x" ? r : (r & 0x3) | 0x8
+      return v.toString(16)
+    })
+  }
+
+  const [hrConfig, setHrConfig] = useState({
+    leave_year_start: "01-01",
+    probation_period: 3,
+    working_hours_per_day: 8,
+    working_days_per_week: 5,
+    auto_approve_leave: false,
+    email_notifications: true,
+  })
+
+  const handleSubsidiaryFunctionChange = (checked: boolean) => {
+    if (!checked && subsidiaryFunction) {
+      // Show confirmation modal when trying to deactivate
+      setShowDeactivateModal(true)
+    } else {
+      setSubsidiaryFunction(checked)
+    }
+  }
+
+  const handleViewSubsidiary = (subsidiary: Subsidiary) => {
+    setViewingSubsidiary(subsidiary)
+    setShowViewSubsidiaryDialog(true)
+  }
+
+  const handleCancelDeactivation = () => {
+    setShowDeactivateModal(false)
+  }
+
+  const handleConfirmDeactivation = () => {
+    setSubsidiaryFunction(false)
+    setShowDeactivateModal(false)
+    toast({
+      title: "Success",
+      description: "Subsidiary function has been deactivated.",
+    })
+  }
+
   useEffect(() => {
     const loadAllData = async () => {
       setIsLoading(true)
@@ -281,71 +286,30 @@ export default function SettingsPage() {
       const { data, error } = await supabase.from("companies").select("*").single()
 
       if (error) {
-        console.error("Company data error:", error)
-        // Create a default company if none exists
-        const { data: newCompany, error: createError } = await supabase
-          .from("companies")
-          .insert({
-            name: "Your Company Name",
-            email_address: "info@yourcompany.com",
-            tax_id: "",
-            ssnit_number: "",
-            industry: "",
-            address: "",
-            phone_number: "",
-          })
-          .select()
-          .single()
-
-        if (createError) {
-          console.error("Failed to create company:", createError)
-          setCompanyData({
-            id: null,
-            name: "Your Company Name",
-            email: "info@yourcompany.com",
-            tax_id: "",
-            ssnit_number: "",
-            industry: "",
-            status: "active",
-            address: "",
-            phone: "",
-          })
-          return
+        // If no company exists, create one with proper UUID
+        const newCompanyId = generateUUID()
+        const defaultCompany = {
+          id: newCompanyId,
+          name: "Akwaaba Technologies Ltd",
+          email_address: "info@akwaabatech.com",
+          tax_id: "C0012345678",
+          ssnit_number: "1234567890",
+          industry: "Technology",
+          phone_number: "+233 30 123 4567",
+          address: "123 Liberation Road, Labome, Accra, Ghana",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         }
 
-        setCompanyData({
-          id: newCompany.id,
-          name: newCompany.name || "",
-          email: newCompany.email_address || "",
-          tax_id: newCompany.tax_id || "",
-          ssnit_number: newCompany.ssnit_number || "",
-          industry: newCompany.industry || "",
-          status: "active",
-          address: newCompany.address || "",
-          phone: newCompany.phone_number || "",
-        })
-        return
+        const { error: insertError } = await supabase.from("companies").insert(defaultCompany)
+        if (!insertError) {
+          setCompanyData(defaultCompany)
+          setCompanyId(newCompanyId)
+        }
+      } else {
+        setCompanyData(data)
+        setCompanyId(data.id)
       }
-
-      setCompanyData({
-        id: data.id,
-        name: data.name || "",
-        email: data.email_address || "",
-        tax_id: data.tax_id || "",
-        ssnit_number: data.ssnit_number || "",
-        industry: data.industry || "",
-        status: "active",
-        address: data.address || "",
-        phone: data.phone_number || "",
-      })
-
-      // Load company structure data
-      if (data.divisions) setDivisions(Array.isArray(data.divisions) ? data.divisions : [])
-      if (data.departments) setDepartments(Array.isArray(data.departments) ? data.departments : [])
-      if (data.locations) setLocations(Array.isArray(data.locations) ? data.locations : [])
-
-      // Load logo if exists
-      if (data.logo_url) setLogoPreview(data.logo_url)
     } catch (error) {
       console.error("Error loading company data:", error)
     }
@@ -564,26 +528,16 @@ IT Support Team
   const loadSubsidiaries = async () => {
     try {
       const supabase = createClient()
-      const { data, error } = await supabase.from("subsidiaries").select(`
-          *,
-          divisions:divisions(count),
-          departments:departments(count),
-          locations:locations(count)
-        `)
+      const { data, error } = await supabase.from("subsidiaries").select("*").order("name")
 
-      if (error) {
-        console.error("Subsidiaries loading error:", error)
-        return
-      }
+      if (error) throw error
 
-      // Transform data to include counts
-      const subsidiariesWithCounts =
-        data?.map((subsidiary) => ({
-          ...subsidiary,
-          divisions_count: subsidiary.divisions?.[0]?.count || 0,
-          departments_count: subsidiary.departments?.[0]?.count || 0,
-          locations_count: subsidiary.locations?.[0]?.count || 0,
-        })) || []
+      const subsidiariesWithCounts = (data || []).map((subsidiary) => ({
+        ...subsidiary,
+        divisions_count: subsidiary.divisions?.length || 0,
+        departments_count: subsidiary.departments?.length || 0,
+        locations_count: subsidiary.locations?.length || 0,
+      }))
 
       setSubsidiaries(subsidiariesWithCounts)
     } catch (error) {
@@ -731,12 +685,24 @@ IT Support Team
   }
 
   const handleSaveCompany = async () => {
-    if (!companyData) return
+    if (!companyData || !companyId) return
 
     setIsLoading(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase.from("companies").upsert(companyData)
+      const { error } = await supabase
+        .from("companies")
+        .update({
+          name: companyData.name,
+          email_address: companyData.email,
+          tax_id: companyData.tax_id,
+          ssnit_number: companyData.ssnit_number,
+          industry: companyData.industry,
+          phone_number: companyData.phone_number,
+          address: companyData.address,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", companyId)
 
       if (error) throw error
 
@@ -745,6 +711,7 @@ IT Support Team
         description: "Company settings saved successfully.",
       })
     } catch (error) {
+      console.error("Error saving company:", error)
       toast({
         title: "Error",
         description: "Failed to save company settings.",
@@ -851,7 +818,7 @@ Backup Frequency: ${securitySettings.backupFrequency}
 Password Policy:
 - Minimum Length: ${passwordPolicy.minLength} characters
 - Require Uppercase: ${passwordPolicy.requireUppercase ? "Yes" : "No"}
-- Require Numbers: ${passwordPolicy.requireNumbers} ? "Yes" : "No"}
+- Require Numbers: ${passwordPolicy.requireNumbers ? "Yes" : "No"}
 - Require Symbols: ${passwordPolicy.requireSymbols ? "Yes" : "No"}
 `
 
@@ -975,9 +942,10 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         if (error) throw error
         toast({ title: "Success", description: "Subsidiary updated successfully" })
       } else {
-        // Create new subsidiary
+        // Create new subsidiary with proper UUID
         const { error } = await supabase.from("subsidiaries").insert({
-          company_id: "1", // Replace with actual company ID
+          id: generateUUID(),
+          company_id: companyId,
           name: subsidiaryData.name,
           tax_id: subsidiaryData.tax_id,
           ssnit_number: subsidiaryData.ssnit_number,
@@ -988,6 +956,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           departments: subsidiaryData.departments || [],
           locations: subsidiaryData.locations || [],
           status: "active",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
 
         if (error) throw error
@@ -998,7 +968,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       loadSubsidiaries()
     } catch (error) {
       console.error("Error saving subsidiary:", error)
-      toast({ title: "Error", description: "Failed to save subsidiary" })
+      toast({ title: "Error", description: "Failed to save subsidiary", variant: "destructive" })
     }
   }
 
@@ -1020,15 +990,6 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     try {
       const supabase = createClient()
 
-      if (!companyData.id) {
-        toast({
-          title: "Error",
-          description: "Company ID not found. Please refresh the page and try again.",
-          variant: "destructive",
-        })
-        return
-      }
-
       // Update company settings
       const { error } = await supabase
         .from("companies")
@@ -1040,48 +1001,13 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           industry: companyData.industry,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", companyData.id)
+        .eq("id", companyId)
 
       if (error) throw error
       toast({ title: "Success", description: "Multi-company settings saved successfully" })
     } catch (error) {
       console.error("Error saving multi-company settings:", error)
-      toast({ title: "Error", description: "Failed to save settings" })
-    }
-  }
-
-  const handleSaveCompanySettings = async () => {
-    try {
-      const supabase = createClient()
-
-      if (!companyData.id) {
-        toast({
-          title: "Error",
-          description: "Company ID not found. Please refresh the page and try again.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      const { error } = await supabase
-        .from("companies")
-        .update({
-          name: companyData.name,
-          email_address: companyData.email,
-          tax_id: companyData.tax_id,
-          ssnit_number: companyData.ssnit_number,
-          industry: companyData.industry,
-          address: companyData.address,
-          phone_number: companyData.phone,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", companyData.id)
-
-      if (error) throw error
-      toast({ title: "Success", description: "Company settings saved successfully" })
-    } catch (error) {
-      console.error("Error saving company settings:", error)
-      toast({ title: "Error", description: "Failed to save company settings" })
+      toast({ title: "Error", description: "Failed to save settings", variant: "destructive" })
     }
   }
 
@@ -1091,7 +1017,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
 
       // Save payroll configuration
       const { error: configError } = await supabase.from("payroll_configuration").upsert({
-        company_id: companyData.id,
+        company_id: companyId,
         pay_frequency: payrollConfig.pay_frequency,
         currency: payrollConfig.currency,
         minimum_wage: payrollConfig.minimum_wage,
@@ -1106,24 +1032,10 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
 
       if (configError) throw configError
 
-      // Save tax bands
-      for (const band of taxBands) {
-        const { error: bandError } = await supabase.from("tax_bands").upsert({
-          company_id: companyData.id,
-          band_name: band.band,
-          rate_percentage: band.rate,
-          min_amount: band.min,
-          max_amount: band.max,
-          updated_at: new Date().toISOString(),
-        })
-
-        if (bandError) throw bandError
-      }
-
       toast({ title: "Success", description: "Payroll settings saved successfully" })
     } catch (error) {
       console.error("Error saving payroll settings:", error)
-      toast({ title: "Error", description: "Failed to save payroll settings" })
+      toast({ title: "Error", description: "Failed to save payroll settings", variant: "destructive" })
     }
   }
 
@@ -1131,41 +1043,24 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     try {
       const supabase = createClient()
 
-      // Save leave types
-      for (const leaveType of leaveTypes) {
-        const { error } = await supabase.from("leave_types").upsert({
-          id: leaveType.id,
-          company_id: companyData.id,
-          name: leaveType.name,
-          description: leaveType.description,
-          annual_entitlement: leaveType.annual_entitlement,
-          requires_approval: leaveType.requires_approval,
-          is_paid: leaveType.is_paid,
-          updated_at: new Date().toISOString(),
-        })
+      // Save HR configuration
+      const { error } = await supabase.from("company_settings").upsert({
+        company_id: companyId,
+        leave_year_start: hrConfig.leave_year_start,
+        probation_period: hrConfig.probation_period,
+        working_hours_per_day: hrConfig.working_hours_per_day,
+        working_days_per_week: hrConfig.working_days_per_week,
+        auto_approve_leave: hrConfig.auto_approve_leave,
+        email_notifications: hrConfig.email_notifications,
+        updated_at: new Date().toISOString(),
+      })
 
-        if (error) throw error
-      }
-
-      // Save salary grades
-      for (const grade of salaryGrades) {
-        const { error } = await supabase.from("salary_grades").upsert({
-          id: grade.id,
-          company_id: companyData.id,
-          grade_name: grade.name,
-          min_salary: grade.min_salary,
-          max_salary: grade.max_salary,
-          steps: grade.steps,
-          updated_at: new Date().toISOString(),
-        })
-
-        if (error) throw error
-      }
+      if (error) throw error
 
       toast({ title: "Success", description: "HR settings saved successfully" })
     } catch (error) {
       console.error("Error saving HR settings:", error)
-      toast({ title: "Error", description: "Failed to save HR settings" })
+      toast({ title: "Error", description: "Failed to save HR settings", variant: "destructive" })
     }
   }
 
@@ -1173,24 +1068,25 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     try {
       const supabase = createClient()
 
+      // Save security settings
       const { error } = await supabase.from("security_settings").upsert({
-        company_id: companyData.id,
-        two_factor_enabled: securitySettings.twoFactorAuth,
-        session_timeout_enabled: securitySettings.sessionTimeout,
-        timeout_duration: securitySettings.timeoutDuration,
-        audit_logging_enabled: securitySettings.auditLogging,
-        password_min_length: passwordPolicy.minLength,
-        require_uppercase: passwordPolicy.requireUppercase,
-        require_numbers: passwordPolicy.requireNumbers,
-        require_symbols: passwordPolicy.requireSymbols,
+        company_id: companyId,
+        two_factor_enabled: securitySettings.two_factor_enabled,
+        session_timeout: securitySettings.session_timeout,
+        audit_logging: securitySettings.audit_logging,
+        password_min_length: passwordPolicy.min_length,
+        password_require_uppercase: passwordPolicy.require_uppercase,
+        password_require_numbers: passwordPolicy.require_numbers,
+        password_require_symbols: passwordPolicy.require_symbols,
         updated_at: new Date().toISOString(),
       })
 
       if (error) throw error
+
       toast({ title: "Success", description: "Security settings saved successfully" })
     } catch (error) {
       console.error("Error saving security settings:", error)
-      toast({ title: "Error", description: "Failed to save security settings" })
+      toast({ title: "Error", description: "Failed to save security settings", variant: "destructive" })
     }
   }
 
@@ -1198,1156 +1094,32 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     try {
       const supabase = createClient()
 
+      // Save notification settings
       const { error } = await supabase.from("notification_settings").upsert({
-        company_id: companyData.id,
-        payroll_alerts: notificationSettings.payrollAlerts,
-        leave_alerts: notificationSettings.leaveAlerts,
-        employee_updates: notificationSettings.employeeUpdates,
-        system_maintenance: notificationSettings.systemMaintenance,
-        sms_notifications: notificationSettings.smsNotifications,
-        notification_email: notificationSettings.email,
-        webhook_url: notificationSettings.webhookUrl,
+        company_id: companyId,
+        payroll_alerts: notificationSettings.payroll_alerts,
+        leave_alerts: notificationSettings.leave_alerts,
+        employee_updates: notificationSettings.employee_updates,
+        system_maintenance: notificationSettings.system_maintenance,
+        sms_notifications: notificationSettings.sms_notifications,
+        notification_email: notificationSettings.notification_email,
+        webhook_url: notificationSettings.webhook_url,
         updated_at: new Date().toISOString(),
       })
 
       if (error) throw error
+
       toast({ title: "Success", description: "Notification settings saved successfully" })
     } catch (error) {
       console.error("Error saving notification settings:", error)
-      toast({ title: "Error", description: "Failed to save notification settings" })
+      toast({ title: "Error", description: "Failed to save notification settings", variant: "destructive" })
     }
-  }
-
-  const handleViewSubsidiary = (subsidiary: Subsidiary) => {
-    setViewingSubsidiary(subsidiary)
-    setShowViewSubsidiaryDialog(true)
-  }
-
-  const handleSubsidiaryFunctionChange = (checked: boolean) => {
-    if (!checked && subsidiaryFunction) {
-      // Show confirmation modal when trying to deactivate
-      setShowDeactivateModal(true)
-    } else {
-      setSubsidiaryFunction(checked)
-    }
-  }
-
-  const handleConfirmDeactivation = () => {
-    setSubsidiaryFunction(false)
-    setShowDeactivateModal(false)
-    toast({
-      title: "Subsidiary Function Deactivated",
-      description: "All subsidiary management features have been hidden.",
-    })
-  }
-
-  const handleCancelDeactivation = () => {
-    setShowDeactivateModal(false)
-  }
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading settings...</p>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="text-muted-foreground">Manage your system configuration and preferences</p>
-        </div>
-        <Button onClick={handleSaveCompany} disabled={isLoading}>
-          {isLoading ? "Saving..." : "Save Changes"}
-        </Button>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-8">
-          <TabsTrigger value="company" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Company
-          </TabsTrigger>
-          <TabsTrigger value="multi-company" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Multi-Company
-          </TabsTrigger>
-          <TabsTrigger value="roles" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Roles & Access
-          </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Users
-          </TabsTrigger>
-          <TabsTrigger value="payroll" className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
-            Payroll
-          </TabsTrigger>
-          <TabsTrigger value="hr" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            HR
-          </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Security
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Notifications
-          </TabsTrigger>
-        </TabsList>
-
-        {activeTab === "company" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Company Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="company-name">Company Name *</Label>
-                    <Input
-                      id="company-name"
-                      value={companyData.name}
-                      onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tax-id">Tax ID / TIN *</Label>
-                    <Input
-                      id="tax-id"
-                      value={companyData.tax_id}
-                      onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="ssnit-number">SSNIT Employer Number *</Label>
-                    <Input
-                      id="ssnit-number"
-                      value={companyData.ssnit_number}
-                      onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="industry">Industry</Label>
-                    <Select
-                      value={companyData.industry}
-                      onValueChange={(value) => setCompanyData({ ...companyData, industry: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Technology">Technology</SelectItem>
-                        <SelectItem value="Healthcare">Healthcare</SelectItem>
-                        <SelectItem value="Finance">Finance</SelectItem>
-                        <SelectItem value="Education">Education</SelectItem>
-                        <SelectItem value="Manufacturing">Manufacturing</SelectItem>
-                        <SelectItem value="Retail">Retail</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="company-address">Company Address</Label>
-                  <Textarea
-                    id="company-address"
-                    value={companyData.address}
-                    onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
-                    placeholder="123 Liberation Road, Labome, Accra, Ghana"
-                    className="min-h-[80px]"
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="phone-number">Phone Number</Label>
-                    <Input
-                      id="phone-number"
-                      value={companyData.phone}
-                      onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })}
-                      placeholder="+233 30 123 4567"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email-address">Email Address</Label>
-                    <Input
-                      id="email-address"
-                      type="email"
-                      value={companyData.email}
-                      onChange={(e) => setCompanyData({ ...companyData, email: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Division / Branch</Label>
-                    <div className="space-y-2">
-                      {divisions.map((division, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Input value={division} readOnly />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDivisions(divisions.filter((_, i) => i !== index))}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button variant="outline" size="sm" onClick={() => setDivisions([...divisions, "New Division"])}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Division
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Department</Label>
-                    <div className="space-y-2">
-                      {departments.map((department, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Input value={department} readOnly />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDepartments(departments.filter((_, i) => i !== index))}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setDepartments([...departments, "New Department"])}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Department
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Location</Label>
-                    <div className="space-y-2">
-                      {locations.map((location, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Input value={location} readOnly />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setLocations(locations.filter((_, i) => i !== index))}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button variant="outline" size="sm" onClick={() => setLocations([...locations, "New Location"])}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Location
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-
-              <div className="flex justify-end mt-6">
-                <Button onClick={handleSaveCompanySettings} className="bg-green-600 hover:bg-green-700">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </Button>
-              </div>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Upload className="h-5 w-5" />
-                  Company Logo
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-col items-center space-y-4">
-                  <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                    {logoPreview ? (
-                      <img
-                        src={logoPreview || "/placeholder.svg"}
-                        alt="Company Logo"
-                        className="w-full h-full object-contain rounded-lg"
-                      />
-                    ) : (
-                      <Upload className="h-8 w-8 text-gray-400" />
-                    )}
-                  </div>
-                  <div className="text-center">
-                    <input
-                      type="file"
-                      id="logo-upload"
-                      accept="image/png,image/jpeg"
-                      onChange={handleLogoUpload}
-                      className="hidden"
-                    />
-                    <Button asChild variant="outline">
-                      <label htmlFor="logo-upload" className="cursor-pointer">
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload Logo
-                      </label>
-                    </Button>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      PNG, JPG up to 2MB
-                      <br />
-                      Recommended: 200×200px
-                    </p>
-                  </div>
-                  {uploadedFileName && <p className="text-sm text-green-600">Uploaded: {uploadedFileName}</p>}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {activeTab === "multi-company" && (
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <h2 className="text-2xl font-bold">Multi-Company Management</h2>
-              <p className="text-muted-foreground">Manage multiple companies and subsidiaries</p>
-            </div>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <Building2 className="h-6 w-6 text-blue-600" />
-                    <div>
-                      <h3 className="font-semibold text-lg">{companyData.name}</h3>
-                      <p className="text-sm text-muted-foreground">{companyData.email}</p>
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    active
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-3 gap-6 mb-6">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Tax ID</p>
-                    <p className="font-medium">{companyData.tax_id}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">SSNIT Number</p>
-                    <p className="font-medium">{companyData.ssnit_number}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Industry</p>
-                    <p className="font-medium">{companyData.industry}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 mb-6">
-                  <Checkbox
-                    id="subsidiary-function"
-                    checked={subsidiaryFunction}
-                    onCheckedChange={handleSubsidiaryFunctionChange}
-                  />
-                  <Label htmlFor="subsidiary-function" className="font-medium">
-                    Activate Subsidiary Function
-                  </Label>
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    {subsidiaryFunction ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-
-            {subsidiaryFunction && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Subsidiaries ({subsidiaries.length})</CardTitle>
-                    <Button onClick={() => setShowSubsidiaryDialog(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Subsidiary
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {subsidiaries.map((subsidiary) => (
-                      <Card key={subsidiary.id} className="border-l-4 border-l-green-500">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                              <h4 className="font-semibold">{subsidiary.name}</h4>
-                              <p className="text-sm text-muted-foreground">{subsidiary.email}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                                {subsidiary.status}
-                              </Badge>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                  <DropdownMenuItem onClick={() => handleViewSubsidiary(subsidiary)}>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleEditSubsidiary(subsidiary)}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleDeactivateSubsidiary(subsidiary.id)}>
-                                    <Ban className="h-4 w-4 mr-2" />
-                                    Deactivate
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p className="text-muted-foreground">Tax ID:</p>
-                              <p className="font-medium">{subsidiary.tax_id}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">SSNIT:</p>
-                              <p className="font-medium">{subsidiary.ssnit_number}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Divisions:</p>
-                              <p className="font-medium">{subsidiary.divisions_count}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Departments:</p>
-                              <p className="font-medium">{subsidiary.departments_count}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Locations:</p>
-                              <p className="font-medium">{subsidiary.locations_count}</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <div className="flex justify-end">
-              <Button onClick={handleSaveMultiCompany} disabled={isLoading}>
-                {isLoading ? "Saving..." : "Save Multi-Company Settings"}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "roles" && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Roles & Access Control</CardTitle>
-                <CardDescription>Manage user roles and permissions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {roles.map((role) => (
-                    <div key={role.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Shield className="h-5 w-5 text-blue-600" />
-                        <div>
-                          <h4 className="font-semibold">{role.name}</h4>
-                          <p className="text-sm text-muted-foreground">{role.description}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="font-semibold">{role.user_count} users</p>
-                          <p className="text-sm text-muted-foreground">permissions</p>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          Edit
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {activeTab === "users" && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>Manage system users and their access</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
-                        A
-                      </div>
-                      <div>
-                        <h4 className="font-semibold">Admin User</h4>
-                        <p className="text-sm text-muted-foreground">admin@akwaabatech.com</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Badge>Super Admin</Badge>
-                      <p className="text-sm text-muted-foreground">Last login: 2024-01-15 09:30</p>
-                      <Badge variant="secondary">Active</Badge>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-semibold">
-                        H
-                      </div>
-                      <div>
-                        <h4 className="font-semibold">HR Manager</h4>
-                        <p className="text-sm text-muted-foreground">hr@akwaabatech.com</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Badge variant="outline">HR Manager</Badge>
-                      <p className="text-sm text-muted-foreground">Last login: 2024-01-15 08:45</p>
-                      <Badge variant="secondary">Active</Badge>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {activeTab === "payroll" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Payroll Configuration</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Pay Frequency</Label>
-                    <Select defaultValue="monthly">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Currency</Label>
-                    <Select defaultValue="ghs">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ghs">Ghana Cedis (GHS)</SelectItem>
-                        <SelectItem value="usd">US Dollar (USD)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>Auto-calculate PAYE</Label>
-                    <Switch defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Auto-calculate SSNIT</Label>
-                    <Switch defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Auto-calculate Provident Fund (Tier 3)</Label>
-                    <Switch defaultChecked />
-                  </div>
-                </div>
-              </CardContent>
-
-              <div className="flex justify-end mt-6">
-                <Button onClick={handleSavePayrollSettings} className="bg-green-600 hover:bg-green-700">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Payroll Settings
-                </Button>
-              </div>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Tax Configuration</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold mb-2">PAYE Tax Bands</h4>
-                    <div className="space-y-2">
-                      {taxBands.map((band, index) => (
-                        <div key={index} className="flex items-center justify-between text-sm">
-                          <span>
-                            {band.rate}% on {band.description}
-                          </span>
-                          <span>GH₵ {band.threshold.toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-2">SSNIT Rates</h4>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span>Employee:</span>
-                        <span>5.5%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Employer:</span>
-                        <span>13%</span>
-                      </div>
-                      <div className="flex justify-between font-semibold">
-                        <span>Total:</span>
-                        <span>18.5%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {activeTab === "hr" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Leave Policies
-                  </CardTitle>
-                  <Button size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Policy
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="p-4 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold">Annual Leave</h4>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem>Edit</DropdownMenuItem>
-                          <DropdownMenuItem>Remove</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <p>1.75 days per month</p>
-                      <p>5 days</p>
-                      <p>2 weeks</p>
-                    </div>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold">Sick Leave</h4>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem>Edit</DropdownMenuItem>
-                          <DropdownMenuItem>Remove</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <p>Medical certificate after 3 days</p>
-                      <p>30 days max consecutive</p>
-                      <p>100% paid for first 10 days</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-
-              <div className="flex justify-end mt-6">
-                <Button onClick={handleSaveHRSettings} className="bg-green-600 hover:bg-green-700">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save HR Settings
-                </Button>
-              </div>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5" />
-                    Salary Grades & Notches
-                  </CardTitle>
-                  <Button size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Grade
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {[1, 2, 3, 4, 5].map((grade) => (
-                    <div key={grade} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <h4 className="font-semibold">Grade {grade}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Salary Range: GH₵{(grade * 200).toLocaleString()} - GH₵{(grade * 400).toLocaleString()}
-                        </p>
-                        <p className="text-sm text-muted-foreground">Steps: 5</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-red-600">
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {activeTab === "security" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Security Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Two-Factor Authentication</h4>
-                      <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.twoFactorAuth}
-                      onCheckedChange={(checked) =>
-                        setSecuritySettings({ ...securitySettings, twoFactorAuth: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Auto Session Timeout</h4>
-                      <p className="text-sm text-muted-foreground">Automatically log out inactive users</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.autoSessionTimeout}
-                      onCheckedChange={(checked) =>
-                        setSecuritySettings({ ...securitySettings, autoSessionTimeout: checked })
-                      }
-                    />
-                  </div>
-                  {securitySettings.autoSessionTimeout && (
-                    <div className="ml-4 space-y-2">
-                      <Label>Timeout Duration (minutes)</Label>
-                      <Select
-                        value={securitySettings.timeoutDuration.toString()}
-                        onValueChange={(value) =>
-                          setSecuritySettings({ ...securitySettings, timeoutDuration: Number.parseInt(value) })
-                        }
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">1 minute</SelectItem>
-                          <SelectItem value="3">3 minutes</SelectItem>
-                          <SelectItem value="5">5 minutes</SelectItem>
-                          <SelectItem value="10">10 minutes</SelectItem>
-                          <SelectItem value="15">15 minutes</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Audit Logging</h4>
-                      <p className="text-sm text-muted-foreground">Track all system activities</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.auditLogging}
-                      onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, auditLogging: checked })}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <Button variant="outline" className="w-full justify-start bg-transparent">
-                    <Key className="h-4 w-4 mr-2" />
-                    Change Admin Password
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start bg-transparent">
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Security Report
-                  </Button>
-                </div>
-
-                <div className="flex justify-end mt-6">
-                  <Button onClick={handleSaveSecuritySettings} className="bg-green-600 hover:bg-green-700">
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Security Settings
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="h-5 w-5" />
-                  Password Policy
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Minimum Length</Label>
-                  <Input
-                    type="number"
-                    value={passwordPolicy.minLength}
-                    onChange={(e) =>
-                      setPasswordPolicy({ ...passwordPolicy, minLength: Number.parseInt(e.target.value) })
-                    }
-                    className="w-20"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>Require Uppercase Letters</Label>
-                    <Switch
-                      checked={passwordPolicy.requireUppercase}
-                      onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireUppercase: checked })}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Require Numbers</Label>
-                    <Switch
-                      checked={passwordPolicy.requireNumbers}
-                      onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireNumbers: checked })}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Require Symbols</Label>
-                    <Switch
-                      checked={passwordPolicy.requireSymbols}
-                      onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireSymbols: checked })}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Password Strength Preview</Label>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-green-600 h-2 rounded-full" style={{ width: "85%" }}></div>
-                  </div>
-                  <p className="text-sm text-green-600">Strong password policy</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {activeTab === "notifications" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  Notification Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Payroll Processing Alerts</h4>
-                      <p className="text-sm text-muted-foreground">Get notified about payroll status</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Leave Request Alerts</h4>
-                      <p className="text-sm text-muted-foreground">New leave requests and approvals</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Employee Updates</h4>
-                      <p className="text-sm text-muted-foreground">New employees and profile changes</p>
-                    </div>
-                    <Switch />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">System Maintenance</h4>
-                      <p className="text-sm text-muted-foreground">Scheduled maintenance and updates</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Notification Email</Label>
-                  <Input
-                    value={notificationSettings.email}
-                    onChange={(e) => setNotificationSettings({ ...notificationSettings, email: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Webhook URL (Optional)</Label>
-                  <Input
-                    value={notificationSettings.webhookUrl}
-                    onChange={(e) => setNotificationSettings({ ...notificationSettings, webhookUrl: e.target.value })}
-                    placeholder="https://your-app.com/webhook"
-                  />
-                </div>
-
-                <div className="flex justify-end mt-6">
-                  <Button onClick={handleSaveNotificationSettings} className="bg-green-600 hover:bg-green-700">
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Notification Settings
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Mail className="h-5 w-5" />
-                    Email Templates
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {emailTemplates.slice(0, 4).map((template) => (
-                    <div key={template.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <h4 className="font-semibold">{template.name}</h4>
-                        <p className="text-sm text-muted-foreground">{template.description}</p>
-                      </div>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </Button>
-                    </div>
-                  ))}
-                  <Button variant="outline" className="w-full bg-transparent">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Custom Template
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-      </Tabs>
-
-      {showSubsidiaryDialog && (
-        <SubsidiaryForm
-          subsidiary={editingSubsidiary}
-          onSave={handleSaveSubsidiary}
-          onCancel={() => {
-            setShowSubsidiaryDialog(false)
-            setEditingSubsidiary(null)
-          }}
-        />
-      )}
-
-      <Dialog open={showDeactivateModal} onOpenChange={setShowDeactivateModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">Deactivate Subsidiary Function</DialogTitle>
-            <button
-              onClick={handleCancelDeactivation}
-              className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </button>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground">
-              Are you sure you want to deactivate the subsidiary function? This will hide all subsidiary management
-              features.
-            </p>
-          </div>
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={handleCancelDeactivation}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleConfirmDeactivation}>
-              Deactivate
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showViewSubsidiaryDialog} onOpenChange={setShowViewSubsidiaryDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Subsidiary Details</DialogTitle>
-            <DialogDescription>View detailed information about {viewingSubsidiary?.name}</DialogDescription>
-          </DialogHeader>
-          {viewingSubsidiary && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Company Name</Label>
-                  <p className="text-sm font-medium">{viewingSubsidiary.name}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Status</Label>
-                  <Badge variant="secondary" className="bg-green-100 text-green-800 ml-2">
-                    {viewingSubsidiary.status}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Email</Label>
-                  <p className="text-sm">{viewingSubsidiary.email}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
-                  <p className="text-sm">{viewingSubsidiary.phone || "Not provided"}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Tax ID</Label>
-                  <p className="text-sm">{viewingSubsidiary.tax_id}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">SSNIT Number</Label>
-                  <p className="text-sm">{viewingSubsidiary.ssnit_number}</p>
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Address</Label>
-                <p className="text-sm mt-1">{viewingSubsidiary.address || "Not provided"}</p>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Divisions</Label>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {viewingSubsidiary.divisions?.map((division, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {division}
-                      </Badge>
-                    )) || <span className="text-xs text-muted-foreground">None</span>}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Departments</Label>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {viewingSubsidiary.departments?.map((dept, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {dept}
-                      </Badge>
-                    )) || <span className="text-xs text-muted-foreground">None</span>}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Locations</Label>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {viewingSubsidiary.locations?.map((location, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {location}
-                      </Badge>
-                    )) || <span className="text-xs text-muted-foreground">None</span>}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Created</Label>
-                  <p className="text-sm">
-                    {viewingSubsidiary.created_at
-                      ? new Date(viewingSubsidiary.created_at).toLocaleDateString()
-                      : "Unknown"}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Last Updated</Label>
-                  <p className="text-sm">
-                    {viewingSubsidiary.updated_at
-                      ? new Date(viewingSubsidiary.updated_at).toLocaleDateString()
-                      : "Unknown"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowViewSubsidiaryDialog(false)}>
-              Close
-            </Button>
-            <Button
-              onClick={() => {
-                setShowViewSubsidiaryDialog(false)
-                if (viewingSubsidiary) {
-                  handleEditSubsidiary(viewingSubsidiary)
-                }
-              }}
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Subsidiary
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+    <div>
+      <p className="text-muted-foreground">Divisions:</p>
+      <p className="font-medium">{subsidiary.divisions_count || 0}</p>
     </div>
   )
 }
