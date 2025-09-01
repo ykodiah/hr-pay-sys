@@ -263,21 +263,53 @@ export default function SettingsPage() {
 
       if (error) {
         console.error("Company data error:", error)
-        // Set default values if no company data exists
+        // Create a default company if none exists
+        const { data: newCompany, error: createError } = await supabase
+          .from("companies")
+          .insert({
+            name: "Your Company Name",
+            email_address: "info@yourcompany.com",
+            tax_id: "",
+            ssnit_number: "",
+            industry: "",
+            address: "",
+            phone_number: "",
+          })
+          .select()
+          .single()
+
+        if (createError) {
+          console.error("Failed to create company:", createError)
+          setCompanyData({
+            id: null,
+            name: "Your Company Name",
+            email: "info@yourcompany.com",
+            tax_id: "",
+            ssnit_number: "",
+            industry: "",
+            status: "active",
+            address: "",
+            phone: "",
+          })
+          return
+        }
+
         setCompanyData({
-          name: "Your Company Name",
-          email: "info@yourcompany.com",
-          tax_id: "",
-          ssnit_number: "",
-          industry: "",
+          id: newCompany.id,
+          name: newCompany.name || "",
+          email: newCompany.email_address || "",
+          tax_id: newCompany.tax_id || "",
+          ssnit_number: newCompany.ssnit_number || "",
+          industry: newCompany.industry || "",
           status: "active",
-          address: "",
-          phone: "",
+          address: newCompany.address || "",
+          phone: newCompany.phone_number || "",
         })
         return
       }
 
       setCompanyData({
+        id: data.id,
         name: data.name || "",
         email: data.email_address || "",
         tax_id: data.tax_id || "",
@@ -570,44 +602,76 @@ IT Support Team
       return
     }
 
+    // Check if we have a valid company ID
+    if (!companyData?.id) {
+      toast({
+        title: "Error",
+        description: "Company data not loaded. Please refresh the page and try again.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       const reader = new FileReader()
       reader.onload = async (e) => {
-        const base64Data = e.target?.result as string
-        console.log("[v0] File read successfully, uploading to database...")
+        try {
+          const base64Data = e.target?.result as string
+          console.log("[v0] File read successfully, uploading to database...")
 
-        const supabase = createClient()
+          const supabase = createClient()
 
-        const { data, error } = await supabase
-          .from("company_files")
-          .insert({
-            company_id: companyData?.id || "default-company-id",
-            file_name: file.name,
-            file_type: file.type,
-            file_size: file.size,
-            file_data: base64Data,
-            file_category: "logo",
-          })
-          .select()
-          .single()
+          const { data, error } = await supabase
+            .from("company_files")
+            .insert({
+              company_id: companyData.id,
+              file_name: file.name,
+              file_type: file.type,
+              file_size: file.size,
+              file_data: base64Data,
+              file_category: "logo",
+            })
+            .select()
+            .single()
 
-        if (error) {
-          console.log("[v0] Database error:", error)
-          throw error
-        }
+          if (error) {
+            console.log("[v0] Database error:", error.message)
+            toast({
+              title: "Error",
+              description: `Failed to upload logo: ${error.message}`,
+              variant: "destructive",
+            })
+            return
+          }
 
-        console.log("[v0] Logo uploaded successfully:", data)
-        setUploadedFileName(file.name)
-        setLogoPreview(base64Data)
+          console.log("[v0] Logo uploaded successfully:", data)
+          setUploadedFileName(file.name)
+          setLogoPreview(base64Data)
 
-        if (companyData) {
+          // Update company with logo file reference
+          const { error: updateError } = await supabase
+            .from("companies")
+            .update({ logo_file_id: data.id })
+            .eq("id", companyData.id)
+
+          if (updateError) {
+            console.log("[v0] Failed to update company logo reference:", updateError.message)
+          }
+
           setCompanyData({ ...companyData, logo_file_id: data.id })
-        }
 
-        toast({
-          title: "Success",
-          description: "Logo uploaded successfully.",
-        })
+          toast({
+            title: "Success",
+            description: "Logo uploaded successfully.",
+          })
+        } catch (uploadError) {
+          console.error("[v0] Upload error:", uploadError)
+          toast({
+            title: "Error",
+            description: "Failed to upload logo. Please try again.",
+            variant: "destructive",
+          })
+        }
       }
 
       reader.onerror = () => {
@@ -620,10 +684,10 @@ IT Support Team
 
       reader.readAsDataURL(file)
     } catch (error) {
-      console.log("[v0] Upload error:", error)
+      console.error("[v0] Logo upload error:", error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to upload logo.",
+        description: "Failed to upload logo. Please try again.",
         variant: "destructive",
       })
     }
