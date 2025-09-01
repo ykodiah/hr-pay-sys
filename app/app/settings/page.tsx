@@ -97,17 +97,6 @@ interface PayrollConfig {
   overtime_weekend_multiplier: number
   currency_code: string
   currency_symbol: string
-  created_at?: string
-  updated_at?: string
-}
-
-interface PayrollUIState {
-  pay_frequency: string
-  cutoff_day: number
-  processing_day: number
-  auto_calculate_paye: boolean
-  auto_calculate_ssnit: boolean
-  auto_calculate_provident: boolean
 }
 
 interface Employee {
@@ -202,12 +191,12 @@ export default function SettingsPage() {
   const [payrollConfig, setPayrollConfig] = useState<PayrollConfig>({
     minimum_wage: 18.15,
     overtime_weekday_multiplier: 1.5,
-    overtime_weekend_multiplier: 2.0,
+    overtime_weekend_multiplier: 2,
     currency_code: "GHS",
     currency_symbol: "₵",
   })
 
-  const [payrollUIState, setPayrollUIState] = useState<PayrollUIState>({
+  const [payrollSettings, setPayrollSettings] = useState({
     pay_frequency: "Monthly",
     cutoff_day: 25,
     processing_day: 28,
@@ -592,37 +581,22 @@ IT Support Team
       // Load payroll configuration
       const { data: configData, error: configError } = await supabase.from("payroll_configuration").select("*").single()
 
-      if (configData && !configError) {
-        setPayrollConfig({
-          id: configData.id,
-          company_id: configData.company_id,
-          minimum_wage: configData.minimum_wage || 18.15,
-          overtime_weekday_multiplier: configData.overtime_weekday_multiplier || 1.5,
-          overtime_weekend_multiplier: configData.overtime_weekend_multiplier || 2.0,
-          currency_code: configData.currency_code || "GHS",
-          currency_symbol: configData.currency_symbol || "₵",
-        })
+      if (configData) {
+        setPayrollConfig(configData)
       }
 
       // Load allowances
       const { data: allowancesData, error: allowancesError } = await supabase.from("payroll_allowances").select("*")
 
-      if (allowancesData && !allowancesError) {
+      if (allowancesData) {
         setPayrollAllowances(allowancesData)
       }
 
       // Load deductions
       const { data: deductionsData, error: deductionsError } = await supabase.from("payroll_deductions").select("*")
 
-      if (deductionsData && !deductionsError) {
+      if (deductionsData) {
         setPayrollDeductions(deductionsData)
-      }
-
-      // Load loan settings
-      const { data: loanData, error: loanError } = await supabase.from("loan_settings").select("*")
-
-      if (loanData && !loanError) {
-        setLoanSettings(loanData)
       }
     } catch (error) {
       console.error("Error loading payroll config:", error)
@@ -1198,15 +1172,9 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     try {
       const supabase = createClient()
 
-      // Ensure we have a valid company ID
-      if (!companyData.id) {
-        toast({ title: "Error", description: "Company ID not found" })
-        return
-      }
-
-      // Save payroll configuration - only fields that exist in database
-      const configToSave = {
-        company_id: Number.parseInt(companyData.id),
+      // Save payroll configuration with only fields that exist in the database
+      const configData = {
+        company_id: Number.parseInt(companyData.id) || 1,
         minimum_wage: payrollConfig.minimum_wage,
         overtime_weekday_multiplier: payrollConfig.overtime_weekday_multiplier,
         overtime_weekend_multiplier: payrollConfig.overtime_weekend_multiplier,
@@ -1215,7 +1183,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         updated_at: new Date().toISOString(),
       }
 
-      const { error: configError } = await supabase.from("payroll_configuration").upsert(configToSave)
+      const { error: configError } = await supabase.from("payroll_configuration").upsert(configData)
 
       if (configError) throw configError
 
@@ -1880,8 +1848,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                     <div className="space-y-2">
                       <Label>Pay Frequency</Label>
                       <Select
-                        value={payrollUIState.pay_frequency}
-                        onValueChange={(value) => setPayrollUIState({ ...payrollUIState, pay_frequency: value })}
+                        value={payrollSettings.pay_frequency}
+                        onValueChange={(value) => setPayrollSettings({ ...payrollSettings, pay_frequency: value })}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -1959,9 +1927,9 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                         type="number"
                         min="1"
                         max="31"
-                        value={payrollUIState.cutoff_day}
+                        value={payrollSettings.cutoff_day}
                         onChange={(e) =>
-                          setPayrollUIState({ ...payrollUIState, cutoff_day: Number.parseInt(e.target.value) || 0 })
+                          setPayrollSettings({ ...payrollSettings, cutoff_day: Number.parseInt(e.target.value) || 0 })
                         }
                       />
                     </div>
@@ -1973,9 +1941,9 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                       type="number"
                       min="1"
                       max="31"
-                      value={payrollUIState.processing_day}
+                      value={payrollSettings.processing_day}
                       onChange={(e) =>
-                        setPayrollUIState({ ...payrollUIState, processing_day: Number.parseInt(e.target.value) || 0 })
+                        setPayrollSettings({ ...payrollSettings, processing_day: Number.parseInt(e.target.value) || 0 })
                       }
                     />
                   </div>
@@ -1984,27 +1952,27 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                     <div className="flex items-center justify-between">
                       <Label>Auto-calculate PAYE</Label>
                       <Switch
-                        checked={payrollUIState.auto_calculate_paye}
+                        checked={payrollSettings.auto_calculate_paye}
                         onCheckedChange={(checked) =>
-                          setPayrollUIState({ ...payrollUIState, auto_calculate_paye: checked })
+                          setPayrollSettings({ ...payrollSettings, auto_calculate_paye: checked })
                         }
                       />
                     </div>
                     <div className="flex items-center justify-between">
                       <Label>Auto-calculate SSNIT</Label>
                       <Switch
-                        checked={payrollUIState.auto_calculate_ssnit}
+                        checked={payrollSettings.auto_calculate_ssnit}
                         onCheckedChange={(checked) =>
-                          setPayrollUIState({ ...payrollUIState, auto_calculate_ssnit: checked })
+                          setPayrollSettings({ ...payrollSettings, auto_calculate_ssnit: checked })
                         }
                       />
                     </div>
                     <div className="flex items-center justify-between">
                       <Label>Auto-calculate Provident Fund (Tier 3)</Label>
                       <Switch
-                        checked={payrollUIState.auto_calculate_provident}
+                        checked={payrollSettings.auto_calculate_provident}
                         onCheckedChange={(checked) =>
-                          setPayrollUIState({ ...payrollUIState, auto_calculate_provident: checked })
+                          setPayrollSettings({ ...payrollSettings, auto_calculate_provident: checked })
                         }
                       />
                     </div>
