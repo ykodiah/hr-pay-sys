@@ -37,6 +37,7 @@ import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Switch } from "@/components/ui/switch"
 import SubsidiaryForm from "@/components/forms/subsidiary-form"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface Company {
   id: string
@@ -142,6 +143,8 @@ export default function SettingsPage() {
   const [showSubsidiaryDialog, setShowSubsidiaryDialog] = useState(false)
   const [editingSubsidiary, setEditingSubsidiary] = useState<Subsidiary | null>(null)
   const [subsidiaryFunction, setSubsidiaryFunction] = useState(false)
+
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false)
 
   const [companyData, setCompanyData] = useState({
     name: "",
@@ -1009,6 +1012,28 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     toast({ title: "Info", description: `Viewing subsidiary: ${subsidiary.name}` })
   }
 
+  const handleSubsidiaryFunctionChange = (checked: boolean) => {
+    if (!checked && subsidiaryFunction) {
+      // Show confirmation modal when trying to deactivate
+      setShowDeactivateModal(true)
+    } else {
+      setSubsidiaryFunction(checked)
+    }
+  }
+
+  const handleConfirmDeactivation = () => {
+    setSubsidiaryFunction(false)
+    setShowDeactivateModal(false)
+    toast({
+      title: "Subsidiary Function Deactivated",
+      description: "All subsidiary management features have been hidden.",
+    })
+  }
+
+  const handleCancelDeactivation = () => {
+    setShowDeactivateModal(false)
+  }
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -1321,13 +1346,13 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <Checkbox
                     id="subsidiary-function"
                     checked={subsidiaryFunction}
-                    onCheckedChange={setSubsidiaryFunction}
+                    onCheckedChange={handleSubsidiaryFunctionChange}
                   />
                   <Label htmlFor="subsidiary-function" className="font-medium">
                     Activate Subsidiary Function
                   </Label>
                   <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    Active
+                    {subsidiaryFunction ? "Active" : "Inactive"}
                   </Badge>
                 </div>
               </CardContent>
@@ -1934,6 +1959,35 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           }}
         />
       )}
+
+      <Dialog open={showDeactivateModal} onOpenChange={setShowDeactivateModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">Deactivate Subsidiary Function</DialogTitle>
+            <button
+              onClick={handleCancelDeactivation}
+              className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </button>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to deactivate the subsidiary function? This will hide all subsidiary management
+              features.
+            </p>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={handleCancelDeactivation}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDeactivation}>
+              Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
