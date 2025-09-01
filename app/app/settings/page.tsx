@@ -4,12 +4,39 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { useCurrency } from "@/lib/currency-context"
 import { createClient } from "@/lib/supabase/client"
-import { Building2, Shield, Users, DollarSign, Bell } from "lucide-react"
+import {
+  Building2,
+  Shield,
+  Users,
+  DollarSign,
+  Bell,
+  Upload,
+  X,
+  Plus,
+  MoreVertical,
+  Eye,
+  Edit,
+  Ban,
+  Key,
+  Download,
+  Settings,
+  Mail,
+  Calendar,
+} from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Switch } from "@/components/ui/switch"
+import SubsidiaryForm from "@/components/forms/subsidiary-form"
 
 interface Company {
   id: string
@@ -855,7 +882,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     }
   }
 
-  const handleSaveMultiCompanySettings = async () => {
+  const handleSaveMultiCompany = async () => {
     try {
       const supabase = createClient()
 
@@ -878,6 +905,11 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       console.error("Error saving multi-company settings:", error)
       toast({ title: "Error", description: "Failed to save settings" })
     }
+  }
+
+  const handleViewSubsidiary = (subsidiary: Subsidiary) => {
+    // TODO: Implement view subsidiary functionality
+    toast({ title: "Info", description: `Viewing subsidiary: ${subsidiary.name}` })
   }
 
   return (
@@ -928,150 +960,856 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           </TabsTrigger>
         </TabsList>
 
-        {/* Company Tab */}
         {activeTab === "company" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Company Information</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Company Information
+                </CardTitle>
               </CardHeader>
-              <CardContent>{/* Form fields for company data */}</CardContent>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="company-name">Company Name *</Label>
+                    <Input
+                      id="company-name"
+                      value={companyData.name}
+                      onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tax-id">Tax ID / TIN *</Label>
+                    <Input
+                      id="tax-id"
+                      value={companyData.tax_id}
+                      onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="ssnit-number">SSNIT Employer Number *</Label>
+                    <Input
+                      id="ssnit-number"
+                      value={companyData.ssnit_number}
+                      onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="industry">Industry</Label>
+                    <Select
+                      value={companyData.industry}
+                      onValueChange={(value) => setCompanyData({ ...companyData, industry: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Technology">Technology</SelectItem>
+                        <SelectItem value="Healthcare">Healthcare</SelectItem>
+                        <SelectItem value="Finance">Finance</SelectItem>
+                        <SelectItem value="Education">Education</SelectItem>
+                        <SelectItem value="Manufacturing">Manufacturing</SelectItem>
+                        <SelectItem value="Retail">Retail</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-address">Company Address</Label>
+                  <Textarea
+                    id="company-address"
+                    placeholder="123 Liberation Road, Labome, Accra, Ghana"
+                    className="min-h-[80px]"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="phone-number">Phone Number</Label>
+                    <Input id="phone-number" placeholder="+233 30 123 4567" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email-address">Email Address</Label>
+                    <Input
+                      id="email-address"
+                      type="email"
+                      value={companyData.email}
+                      onChange={(e) => setCompanyData({ ...companyData, email: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Division / Branch</Label>
+                    <div className="space-y-2">
+                      {divisions.map((division, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Input value={division} readOnly />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDivisions(divisions.filter((_, i) => i !== index))}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button variant="outline" size="sm" onClick={() => setDivisions([...divisions, "New Division"])}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Division
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Department</Label>
+                    <div className="space-y-2">
+                      {departments.map((department, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Input value={department} readOnly />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDepartments(departments.filter((_, i) => i !== index))}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDepartments([...departments, "New Department"])}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Department
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Location</Label>
+                    <div className="space-y-2">
+                      {locations.map((location, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Input value={location} readOnly />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setLocations(locations.filter((_, i) => i !== index))}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button variant="outline" size="sm" onClick={() => setLocations([...locations, "New Location"])}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Location
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
             </Card>
+
             <Card>
               <CardHeader>
-                <CardTitle>Logo Upload</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Company Logo
+                </CardTitle>
               </CardHeader>
-              <CardContent>{/* Logo upload form */}</CardContent>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                    {logoPreview ? (
+                      <img
+                        src={logoPreview || "/placeholder.svg"}
+                        alt="Company Logo"
+                        className="w-full h-full object-contain rounded-lg"
+                      />
+                    ) : (
+                      <Upload className="h-8 w-8 text-gray-400" />
+                    )}
+                  </div>
+                  <div className="text-center">
+                    <input
+                      type="file"
+                      id="logo-upload"
+                      accept="image/png,image/jpeg"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                    />
+                    <Button asChild variant="outline">
+                      <label htmlFor="logo-upload" className="cursor-pointer">
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload Logo
+                      </label>
+                    </Button>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      PNG, JPG up to 2MB
+                      <br />
+                      Recommended: 200×200px
+                    </p>
+                  </div>
+                  {uploadedFileName && <p className="text-sm text-green-600">Uploaded: {uploadedFileName}</p>}
+                </div>
+              </CardContent>
             </Card>
           </div>
         )}
 
-        {/* Multi-Company Tab */}
         {activeTab === "multi-company" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold">Multi-Company Management</h2>
+              <p className="text-muted-foreground">Manage multiple companies and subsidiaries</p>
+            </div>
+
             <Card>
-              <CardHeader>
-                <CardTitle>Multi-Company Settings</CardTitle>
-              </CardHeader>
-              <CardContent>{/* Form fields for multi-company settings */}</CardContent>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <Building2 className="h-6 w-6 text-blue-600" />
+                    <div>
+                      <h3 className="font-semibold text-lg">{companyData.name}</h3>
+                      <p className="text-sm text-muted-foreground">{companyData.email}</p>
+                    </div>
+                  </div>
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                    active
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-3 gap-6 mb-6">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Tax ID</p>
+                    <p className="font-medium">{companyData.tax_id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">SSNIT Number</p>
+                    <p className="font-medium">{companyData.ssnit_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Industry</p>
+                    <p className="font-medium">{companyData.industry}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 mb-6">
+                  <Checkbox
+                    id="subsidiary-function"
+                    checked={subsidiaryFunction}
+                    onCheckedChange={setSubsidiaryFunction}
+                  />
+                  <Label htmlFor="subsidiary-function" className="font-medium">
+                    Activate Subsidiary Function
+                  </Label>
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                    Active
+                  </Badge>
+                </div>
+              </CardContent>
             </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Subsidiaries</CardTitle>
-              </CardHeader>
-              <CardContent>{/* Subsidiaries table and actions */}</CardContent>
-            </Card>
+
+            {subsidiaryFunction && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Subsidiaries ({subsidiaries.length})</CardTitle>
+                    <Button onClick={() => setShowSubsidiaryDialog(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Subsidiary
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {subsidiaries.map((subsidiary) => (
+                      <Card key={subsidiary.id} className="border-l-4 border-l-green-500">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <h4 className="font-semibold">{subsidiary.name}</h4>
+                              <p className="text-sm text-muted-foreground">{subsidiary.email}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                {subsidiary.status}
+                              </Badge>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                  <DropdownMenuItem onClick={() => handleViewSubsidiary(subsidiary)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleEditSubsidiary(subsidiary)}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDeactivateSubsidiary(subsidiary.id)}>
+                                    <Ban className="h-4 w-4 mr-2" />
+                                    Deactivate
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p className="text-muted-foreground">Tax ID:</p>
+                              <p className="font-medium">{subsidiary.tax_id}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">SSNIT:</p>
+                              <p className="font-medium">{subsidiary.ssnit_number}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Divisions:</p>
+                              <p className="font-medium">{subsidiary.divisions_count}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Departments:</p>
+                              <p className="font-medium">{subsidiary.departments_count}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Locations:</p>
+                              <p className="font-medium">{subsidiary.locations_count}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="flex justify-end">
+              <Button onClick={handleSaveMultiCompany} disabled={isLoading}>
+                {isLoading ? "Saving..." : "Save Multi-Company Settings"}
+              </Button>
+            </div>
           </div>
         )}
 
-        {/* Roles & Access Tab */}
         {activeTab === "roles" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Roles</CardTitle>
+                <CardTitle>Roles & Access Control</CardTitle>
+                <CardDescription>Manage user roles and permissions</CardDescription>
               </CardHeader>
-              <CardContent>{/* Roles table and actions */}</CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Permissions</CardTitle>
-              </CardHeader>
-              <CardContent>{/* Permissions table and actions */}</CardContent>
+              <CardContent>
+                <div className="space-y-4">
+                  {roles.map((role) => (
+                    <div key={role.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Shield className="h-5 w-5 text-blue-600" />
+                        <div>
+                          <h4 className="font-semibold">{role.name}</h4>
+                          <p className="text-sm text-muted-foreground">{role.description}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-semibold">{role.user_count} users</p>
+                          <p className="text-sm text-muted-foreground">permissions</p>
+                        </div>
+                        <Button variant="outline" size="sm">
+                          Edit
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
             </Card>
           </div>
         )}
 
-        {/* Users Tab */}
         {activeTab === "users" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Users</CardTitle>
+                <CardTitle>User Management</CardTitle>
+                <CardDescription>Manage system users and their access</CardDescription>
               </CardHeader>
-              <CardContent>{/* Users table and actions */}</CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>User Roles</CardTitle>
-              </CardHeader>
-              <CardContent>{/* User roles table and actions */}</CardContent>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
+                        A
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">Admin User</h4>
+                        <p className="text-sm text-muted-foreground">admin@akwaabatech.com</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Badge>Super Admin</Badge>
+                      <p className="text-sm text-muted-foreground">Last login: 2024-01-15 09:30</p>
+                      <Badge variant="secondary">Active</Badge>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-semibold">
+                        H
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">HR Manager</h4>
+                        <p className="text-sm text-muted-foreground">hr@akwaabatech.com</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Badge variant="outline">HR Manager</Badge>
+                      <p className="text-sm text-muted-foreground">Last login: 2024-01-15 08:45</p>
+                      <Badge variant="secondary">Active</Badge>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
             </Card>
           </div>
         )}
 
-        {/* Payroll Tab */}
         {activeTab === "payroll" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Payroll Configuration</CardTitle>
               </CardHeader>
-              <CardContent>{/* Payroll configuration form */}</CardContent>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Pay Frequency</Label>
+                    <Select defaultValue="monthly">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Currency</Label>
+                    <Select defaultValue="ghs">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ghs">Ghana Cedis (GHS)</SelectItem>
+                        <SelectItem value="usd">US Dollar (USD)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label>Auto-calculate PAYE</Label>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label>Auto-calculate SSNIT</Label>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label>Auto-calculate Provident Fund (Tier 3)</Label>
+                    <Switch defaultChecked />
+                  </div>
+                </div>
+              </CardContent>
             </Card>
+
             <Card>
               <CardHeader>
-                <CardTitle>Salary Grades</CardTitle>
+                <CardTitle>Tax Configuration</CardTitle>
               </CardHeader>
-              <CardContent>{/* Salary grades table and actions */}</CardContent>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold mb-2">PAYE Tax Bands</h4>
+                    <div className="space-y-2">
+                      {taxBands.map((band, index) => (
+                        <div key={index} className="flex items-center justify-between text-sm">
+                          <span>
+                            {band.rate}% on {band.description}
+                          </span>
+                          <span>GH₵ {band.threshold.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2">SSNIT Rates</h4>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>Employee:</span>
+                        <span>5.5%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Employer:</span>
+                        <span>13%</span>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <span>Total:</span>
+                        <span>18.5%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
             </Card>
           </div>
         )}
 
-        {/* HR Tab */}
         {activeTab === "hr" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>HR Settings</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Leave Policies
+                  </CardTitle>
+                  <Button size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Policy
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent>{/* HR settings form */}</CardContent>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold">Annual Leave</h4>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem>Edit</DropdownMenuItem>
+                          <DropdownMenuItem>Remove</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <p>1.75 days per month</p>
+                      <p>5 days</p>
+                      <p>2 weeks</p>
+                    </div>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold">Sick Leave</h4>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem>Edit</DropdownMenuItem>
+                          <DropdownMenuItem>Remove</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <p>Medical certificate after 3 days</p>
+                      <p>30 days max consecutive</p>
+                      <p>100% paid for first 10 days</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
             </Card>
+
             <Card>
               <CardHeader>
-                <CardTitle>Leave Types</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Salary Grades & Notches
+                  </CardTitle>
+                  <Button size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Grade
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent>{/* Leave types table and actions */}</CardContent>
+              <CardContent>
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5].map((grade) => (
+                    <div key={grade} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <h4 className="font-semibold">Grade {grade}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Salary Range: GH₵{(grade * 200).toLocaleString()} - GH₵{(grade * 400).toLocaleString()}
+                        </p>
+                        <p className="text-sm text-muted-foreground">Steps: 5</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-red-600">
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
             </Card>
           </div>
         )}
 
-        {/* Security Tab */}
         {activeTab === "security" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Security Settings</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Security Settings
+                </CardTitle>
               </CardHeader>
-              <CardContent>{/* Security settings form */}</CardContent>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Two-Factor Authentication</h4>
+                      <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
+                    </div>
+                    <Switch
+                      checked={securitySettings.twoFactorAuth}
+                      onCheckedChange={(checked) =>
+                        setSecuritySettings({ ...securitySettings, twoFactorAuth: checked })
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Auto Session Timeout</h4>
+                      <p className="text-sm text-muted-foreground">Automatically log out inactive users</p>
+                    </div>
+                    <Switch
+                      checked={securitySettings.autoSessionTimeout}
+                      onCheckedChange={(checked) =>
+                        setSecuritySettings({ ...securitySettings, autoSessionTimeout: checked })
+                      }
+                    />
+                  </div>
+                  {securitySettings.autoSessionTimeout && (
+                    <div className="ml-4 space-y-2">
+                      <Label>Timeout Duration (minutes)</Label>
+                      <Select
+                        value={securitySettings.timeoutDuration.toString()}
+                        onValueChange={(value) =>
+                          setSecuritySettings({ ...securitySettings, timeoutDuration: Number.parseInt(value) })
+                        }
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1 minute</SelectItem>
+                          <SelectItem value="3">3 minutes</SelectItem>
+                          <SelectItem value="5">5 minutes</SelectItem>
+                          <SelectItem value="10">10 minutes</SelectItem>
+                          <SelectItem value="15">15 minutes</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Audit Logging</h4>
+                      <p className="text-sm text-muted-foreground">Track all system activities</p>
+                    </div>
+                    <Switch
+                      checked={securitySettings.auditLogging}
+                      onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, auditLogging: checked })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <Button variant="outline" className="w-full justify-start bg-transparent">
+                    <Key className="h-4 w-4 mr-2" />
+                    Change Admin Password
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start bg-transparent">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Security Report
+                  </Button>
+                </div>
+              </CardContent>
             </Card>
+
             <Card>
               <CardHeader>
-                <CardTitle>Password Policy</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Key className="h-5 w-5" />
+                  Password Policy
+                </CardTitle>
               </CardHeader>
-              <CardContent>{/* Password policy form */}</CardContent>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Minimum Length</Label>
+                  <Input
+                    type="number"
+                    value={passwordPolicy.minLength}
+                    onChange={(e) =>
+                      setPasswordPolicy({ ...passwordPolicy, minLength: Number.parseInt(e.target.value) })
+                    }
+                    className="w-20"
+                  />
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Require Uppercase Letters</Label>
+                    <Switch
+                      checked={passwordPolicy.requireUppercase}
+                      onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireUppercase: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label>Require Numbers</Label>
+                    <Switch
+                      checked={passwordPolicy.requireNumbers}
+                      onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireNumbers: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label>Require Symbols</Label>
+                    <Switch
+                      checked={passwordPolicy.requireSymbols}
+                      onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireSymbols: checked })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Password Strength Preview</Label>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-green-600 h-2 rounded-full" style={{ width: "85%" }}></div>
+                  </div>
+                  <p className="text-sm text-green-600">Strong password policy</p>
+                </div>
+              </CardContent>
             </Card>
           </div>
         )}
 
-        {/* Notifications Tab */}
         {activeTab === "notifications" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Email Templates</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Notification Settings
+                </CardTitle>
               </CardHeader>
-              <CardContent>{/* Email templates table and actions */}</CardContent>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Payroll Processing Alerts</h4>
+                      <p className="text-sm text-muted-foreground">Get notified about payroll status</p>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Leave Request Alerts</h4>
+                      <p className="text-sm text-muted-foreground">New leave requests and approvals</p>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Employee Updates</h4>
+                      <p className="text-sm text-muted-foreground">New employees and profile changes</p>
+                    </div>
+                    <Switch />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">System Maintenance</h4>
+                      <p className="text-sm text-muted-foreground">Scheduled maintenance and updates</p>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Notification Email</Label>
+                  <Input defaultValue="admin@akwaabatech.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Webhook URL (Optional)</Label>
+                  <Input placeholder="https://your-app.com/webhook" />
+                </div>
+              </CardContent>
             </Card>
+
             <Card>
               <CardHeader>
-                <CardTitle>Notification Settings</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Mail className="h-5 w-5" />
+                    Email Templates
+                  </CardTitle>
+                </div>
               </CardHeader>
-              <CardContent>{/* Notification settings form */}</CardContent>
+              <CardContent>
+                <div className="space-y-4">
+                  {emailTemplates.slice(0, 4).map((template) => (
+                    <div key={template.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <h4 className="font-semibold">{template.name}</h4>
+                        <p className="text-sm text-muted-foreground">{template.description}</p>
+                      </div>
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                    </div>
+                  ))}
+                  <Button variant="outline" className="w-full bg-transparent">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Custom Template
+                  </Button>
+                </div>
+              </CardContent>
             </Card>
           </div>
         )}
       </Tabs>
+
+      {showSubsidiaryDialog && (
+        <SubsidiaryForm
+          subsidiary={editingSubsidiary}
+          onSave={handleSaveSubsidiary}
+          onCancel={() => {
+            setShowSubsidiaryDialog(false)
+            setEditingSubsidiary(null)
+          }}
+        />
+      )}
     </div>
   )
 }
