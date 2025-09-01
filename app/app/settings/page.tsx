@@ -7,39 +7,6 @@ import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrency } from "@/lib/currency-context"
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Progress } from "@/components/ui/progress"
-import {
-  Building2,
-  Shield,
-  Bell,
-  Download,
-  Eye,
-  EyeOff,
-  Save,
-  CheckCircle,
-  Database,
-  FileText,
-  Key,
-  Activity,
-} from "lucide-react"
-
 interface Company {
   id: string
   name: string
@@ -1779,566 +1746,636 @@ SYSTEM METRICS:
     }
   }
 
+  useEffect(() => {
+    loadSettingsFromDatabase()
+    loadSubsidiaries()
+  }, [])
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
             <p className="text-gray-600 mt-1">Manage your system configuration and preferences</p>
           </div>
-          <Button
+          <button
             onClick={handleSaveSettings}
-            disabled={isLoading || !hasUnsavedChanges}
-            className="bg-gray-900 hover:bg-gray-800"
+            disabled={isLoading}
+            className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2"
           >
-            <Save className="w-4 h-4 mr-2" />
-            Save Changes
-          </Button>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12"
+              />
+            </svg>
+            {isLoading ? "Saving..." : "Save Changes"}
+          </button>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8 bg-teal-100">
-            <TabsTrigger value="company" className="data-[state=active]:bg-white">
-              <Building2 className="w-4 h-4 mr-2" />
-              Company
-            </TabsTrigger>
-            <TabsTrigger value="multi-company" className="data-[state=active]:bg-white">
-              Multi-Company
-            </TabsTrigger>
-            <TabsTrigger value="roles" className="data-[state=active]:bg-white">
-              Roles & Access
-            </TabsTrigger>
-            <TabsTrigger value="users" className="data-[state=active]:bg-white">
-              Users
-            </TabsTrigger>
-            <TabsTrigger value="payroll" className="data-[state=active]:bg-white">
-              Payroll
-            </TabsTrigger>
-            <TabsTrigger value="hr" className="data-[state=active]:bg-white">
-              HR
-            </TabsTrigger>
-            <TabsTrigger value="security" className="data-[state=active]:bg-white">
-              <Shield className="w-4 h-4 mr-2" />
-              Security
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="data-[state=active]:bg-white">
-              <Bell className="w-4 h-4 mr-2" />
-              Notifications
-            </TabsTrigger>
-          </TabsList>
+        {/* Tab Navigation */}
+        <div className="bg-white rounded-lg shadow-sm mb-6">
+          <div className="flex overflow-x-auto">
+            {[
+              { id: "company", label: "Company" },
+              { id: "multi-company", label: "Multi-Company" },
+              { id: "roles", label: "Roles & Access" },
+              { id: "users", label: "Users" },
+              { id: "payroll", label: "Payroll" },
+              { id: "hr", label: "HR" },
+              { id: "security", label: "Security" },
+              { id: "notifications", label: "Notifications" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  activeTab === tab.id
+                    ? "border-teal-500 text-teal-600 bg-teal-50"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-          {/* ... existing tab content ... */}
-
+        {/* Tab Content */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
           {activeTab === "security" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5" />
-                    Security Settings
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base font-medium">Two-Factor Authentication</Label>
-                      <p className="text-sm text-gray-600">Add an extra layer of security</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.twoFactor}
-                      onCheckedChange={(checked) => updateSecuritySettings("twoFactor", checked)}
-                    />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Security Settings */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                      />
+                    </svg>
                   </div>
+                  <h2 className="text-xl font-semibold text-gray-900">Security Settings</h2>
+                </div>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base font-medium">Auto Session Timeout</Label>
-                      <p className="text-sm text-gray-600">Automatically log out inactive users</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.sessionTimeout}
-                      onCheckedChange={(checked) => updateSecuritySettings("sessionTimeout", checked)}
-                    />
-                  </div>
-
-                  {securitySettings.sessionTimeout && (
-                    <div className="ml-6">
-                      <Label className="text-sm font-medium">Timeout Duration (minutes)</Label>
-                      <Select
-                        value={securitySettings.timeoutDuration.toString()}
-                        onValueChange={(value) => updateSecuritySettings("timeoutDuration", Number.parseInt(value))}
-                      >
-                        <SelectTrigger className="w-full mt-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">1 minute</SelectItem>
-                          <SelectItem value="3">3 minutes</SelectItem>
-                          <SelectItem value="5">5 minutes</SelectItem>
-                          <SelectItem value="10">10 minutes</SelectItem>
-                          <SelectItem value="15">15 minutes</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base font-medium">Audit Logging</Label>
-                      <p className="text-sm text-gray-600">Track all system activities</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.auditLog}
-                      onCheckedChange={(checked) => updateSecuritySettings("auditLog", checked)}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base font-medium">Automated Backups</Label>
-                      <p className="text-sm text-gray-600">Regular system data backups</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.backupEnabled}
-                      onCheckedChange={(checked) => updateSecuritySettings("backupEnabled", checked)}
-                    />
-                  </div>
-
-                  {securitySettings.backupEnabled && (
-                    <div className="ml-6">
-                      <Label className="text-sm font-medium">Backup Frequency</Label>
-                      <Select
-                        value={securitySettings.backupFrequency}
-                        onValueChange={(value) => updateSecuritySettings("backupFrequency", value)}
-                      >
-                        <SelectTrigger className="w-full mt-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="daily">Daily</SelectItem>
-                          <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  <div className="space-y-3 pt-4 border-t">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start bg-transparent"
-                      onClick={handleChangeAdminPassword}
-                    >
-                      <Key className="w-4 h-4 mr-2" />
-                      Change Admin Password
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start bg-transparent"
-                      onClick={handleDownloadSecurityReport}
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download Security Report
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start bg-transparent"
-                      onClick={handleBackupNow}
-                      disabled={isBackingUp}
-                    >
-                      <Database className="w-4 h-4 mr-2" />
-                      {isBackingUp ? "Backing Up..." : "Backup Now"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Key className="w-5 h-5" />
-                    Password Policy
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                {/* Two-Factor Authentication */}
+                <div className="flex items-center justify-between py-4">
                   <div>
-                    <Label className="text-sm font-medium">Minimum Length</Label>
-                    <Input
+                    <h3 className="font-medium text-gray-900">Two-Factor Authentication</h3>
+                    <p className="text-sm text-gray-500">Add an extra layer of security</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={securitySettings.twoFactor}
+                      onChange={(e) => updateSecuritySettings("twoFactor", e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                  </label>
+                </div>
+
+                {/* Auto Session Timeout */}
+                <div className="flex items-center justify-between py-4">
+                  <div>
+                    <h3 className="font-medium text-gray-900">Auto Session Timeout</h3>
+                    <p className="text-sm text-gray-500">Automatically log out inactive users</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={securitySettings.sessionTimeout}
+                      onChange={(e) => updateSecuritySettings("sessionTimeout", e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                  </label>
+                </div>
+
+                {securitySettings.sessionTimeout && (
+                  <div className="ml-6 mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Timeout Duration (minutes)</label>
+                    <select
+                      value={securitySettings.timeoutDuration}
+                      onChange={(e) => updateSecuritySettings("timeoutDuration", Number.parseInt(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    >
+                      <option value={1}>1 minute</option>
+                      <option value={3}>3 minutes</option>
+                      <option value={5}>5 minutes</option>
+                      <option value={10}>10 minutes</option>
+                      <option value={15}>15 minutes</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Audit Logging */}
+                <div className="flex items-center justify-between py-4">
+                  <div>
+                    <h3 className="font-medium text-gray-900">Audit Logging</h3>
+                    <p className="text-sm text-gray-500">Track all system activities</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={securitySettings.auditLog}
+                      onChange={(e) => updateSecuritySettings("auditLog", e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                  </label>
+                </div>
+
+                {/* Automated Backups */}
+                <div className="flex items-center justify-between py-4">
+                  <div>
+                    <h3 className="font-medium text-gray-900">Automated Backups</h3>
+                    <p className="text-sm text-gray-500">Regular system data backups</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={securitySettings.backupEnabled}
+                      onChange={(e) => updateSecuritySettings("backupEnabled", e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                  </label>
+                </div>
+
+                {securitySettings.backupEnabled && (
+                  <div className="ml-6 mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Backup Frequency</label>
+                    <select
+                      value={securitySettings.backupFrequency}
+                      onChange={(e) => updateSecuritySettings("backupFrequency", e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="space-y-3 pt-6 border-t">
+                  <button
+                    onClick={handleChangeAdminPassword}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-3a1 1 0 011-1h2.586l6.414-6.414a6 6 0 017.743-5.743z"
+                      />
+                    </svg>
+                    Change Admin Password
+                  </button>
+
+                  <button
+                    onClick={handleDownloadSecurityReport}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    Download Security Report
+                  </button>
+
+                  <button
+                    onClick={handleBackupNow}
+                    disabled={isBackingUp}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
+                      />
+                    </svg>
+                    {isBackingUp ? "Backing Up..." : "Backup Now"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Password Policy */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-3a1 1 0 011-1h2.586l6.414-6.414a6 6 0 017.743-5.743z"
+                      />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-semibold text-gray-900">Password Policy</h2>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Minimum Length</label>
+                    <input
                       type="number"
+                      min="6"
+                      max="32"
                       value={securitySettings.passwordPolicy.minLength}
                       onChange={(e) =>
                         updateSecuritySettings("passwordPolicy", {
                           ...securitySettings.passwordPolicy,
-                          minLength: Number.parseInt(e.target.value) || 8,
+                          minLength: Number.parseInt(e.target.value),
                         })
                       }
-                      className="mt-1"
-                      min="6"
-                      max="20"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Require Uppercase Letters</Label>
-                    <Switch
-                      checked={securitySettings.passwordPolicy.requireUppercase}
-                      onCheckedChange={(checked) =>
-                        updateSecuritySettings("passwordPolicy", {
-                          ...securitySettings.passwordPolicy,
-                          requireUppercase: checked,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Require Numbers</Label>
-                    <Switch
-                      checked={securitySettings.passwordPolicy.requireNumbers}
-                      onCheckedChange={(checked) =>
-                        updateSecuritySettings("passwordPolicy", {
-                          ...securitySettings.passwordPolicy,
-                          requireNumbers: checked,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Require Symbols</Label>
-                    <Switch
-                      checked={securitySettings.passwordPolicy.requireSymbols}
-                      onCheckedChange={(checked) =>
-                        updateSecuritySettings("passwordPolicy", {
-                          ...securitySettings.passwordPolicy,
-                          requireSymbols: checked,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="pt-4 border-t">
-                    <Label className="text-sm font-medium">Password Strength Preview</Label>
-                    <div className="mt-2">
-                      {(() => {
-                        const { score, strength, color, feedback } = calculatePasswordStrength(
-                          securitySettings.passwordPolicy,
-                        )
-                        return (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-600">{strength} password policy</span>
-                              <span className="text-sm text-gray-500">{score}/100</span>
-                            </div>
-                            <Progress value={score} className="h-2" />
-                            {feedback.length > 0 && (
-                              <p className="text-xs text-gray-500">Missing: {feedback.join(", ")}</p>
-                            )}
-                          </div>
-                        )
-                      })()}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="w-5 h-5" />
-                    Audit Trail & Compliance
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label className="text-base font-medium">Audit Trail</Label>
-                        <p className="text-sm text-gray-600">Detailed activity logging</p>
-                      </div>
-                      <Switch
-                        checked={securitySettings.auditTrail}
-                        onCheckedChange={(checked) => updateSecuritySettings("auditTrail", checked)}
-                      />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm font-medium">Retention Period (days)</Label>
-                      <Input
-                        type="number"
-                        value={securitySettings.auditRetentionDays}
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm font-medium text-gray-700">Require Uppercase Letters</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={securitySettings.passwordPolicy.requireUppercase}
                         onChange={(e) =>
-                          updateSecuritySettings("auditRetentionDays", Number.parseInt(e.target.value) || 90)
+                          updateSecuritySettings("passwordPolicy", {
+                            ...securitySettings.passwordPolicy,
+                            requireUppercase: e.target.checked,
+                          })
                         }
-                        className="mt-1"
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm font-medium text-gray-700">Require Numbers</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={securitySettings.passwordPolicy.requireNumbers}
+                        onChange={(e) =>
+                          updateSecuritySettings("passwordPolicy", {
+                            ...securitySettings.passwordPolicy,
+                            requireNumbers: e.target.checked,
+                          })
+                        }
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-sm font-medium text-gray-700">Require Symbols</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={securitySettings.passwordPolicy.requireSymbols}
+                        onChange={(e) =>
+                          updateSecuritySettings("passwordPolicy", {
+                            ...securitySettings.passwordPolicy,
+                            requireSymbols: e.target.checked,
+                          })
+                        }
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                    </label>
+                  </div>
+
+                  {/* Password Strength Preview */}
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Password Strength Preview</span>
+                      <span className="text-sm text-gray-500">
+                        {calculatePasswordStrength(securitySettings.passwordPolicy).strength} password policy
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-300 ${calculatePasswordStrength(securitySettings.passwordPolicy).color}`}
+                        style={{ width: `${calculatePasswordStrength(securitySettings.passwordPolicy).score}%` }}
+                      ></div>
+                    </div>
+                    {calculatePasswordStrength(securitySettings.passwordPolicy).feedback.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Missing: {calculatePasswordStrength(securitySettings.passwordPolicy).feedback.join(", ")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Audit Trail & Compliance */}
+                <div className="mt-8 pt-6 border-t">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900">Audit Trail & Compliance</h3>
+                  </div>
+
+                  <div className="flex items-center justify-between py-4">
+                    <div>
+                      <h4 className="font-medium text-gray-900">Audit Trail</h4>
+                      <p className="text-sm text-gray-500">Detailed activity logging</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={securitySettings.auditTrail}
+                        onChange={(e) => updateSecuritySettings("auditTrail", e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Retention Period (days)</label>
+                      <input
+                        type="number"
                         min="30"
                         max="365"
+                        value={securitySettings.auditRetentionDays}
+                        onChange={(e) => updateSecuritySettings("auditRetentionDays", Number.parseInt(e.target.value))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       />
                     </div>
                   </div>
 
-                  <div className="flex gap-4 pt-4 border-t">
-                    <Button variant="outline" onClick={handleDownloadAuditTrail} className="flex-1 bg-transparent">
-                      <FileText className="w-4 h-4 mr-2" />
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleDownloadAuditTrail}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
                       Download Audit Trail
-                    </Button>
+                    </button>
 
-                    <Button variant="outline" onClick={handleViewActivityLog} className="flex-1 bg-transparent">
-                      <Eye className="w-4 h-4 mr-2" />
+                    <button
+                      onClick={handleViewActivityLog}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
+                      </svg>
                       View Activity Log
-                    </Button>
+                    </button>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* ... existing tab content ... */}
-        </Tabs>
+          {/* Other tab content would go here */}
+          {activeTab !== "security" && (
+            <div className="text-center py-12">
+              <p className="text-gray-500">Content for {activeTab} tab coming soon...</p>
+            </div>
+          )}
+        </div>
       </div>
 
-      <Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Change Admin Password</DialogTitle>
-            <DialogDescription>
-              Enter your new password. Make sure it meets the current password policy requirements.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="new-password">New Password</Label>
-              <div className="relative">
-                <Input
-                  id="new-password"
-                  type={showPassword ? "text" : "password"}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="pr-10"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
+      {/* Password Change Dialog */}
+      {showPasswordChangeDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Change Admin Password</h3>
+              <button onClick={() => setShowPasswordChangeDialog(false)} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <div>
-              <Label htmlFor="confirm-password">Confirm Password</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-            </div>
-            {(() => {
-              const { feedback } = calculatePasswordStrength(securitySettings.passwordPolicy)
-              const passwordMeetsPolicy =
-                newPassword.length >= securitySettings.passwordPolicy.minLength &&
-                (!securitySettings.passwordPolicy.requireUppercase || /[A-Z]/.test(newPassword)) &&
-                (!securitySettings.passwordPolicy.requireNumbers || /\d/.test(newPassword)) &&
-                (!securitySettings.passwordPolicy.requireSymbols || /[!@#$%^&*(),.?":{}|<>]/.test(newPassword))
 
-              return (
-                <div className="text-sm">
-                  <p className={`${passwordMeetsPolicy ? "text-green-600" : "text-red-600"}`}>
-                    {passwordMeetsPolicy
-                      ? "✓ Password meets policy requirements"
-                      : "✗ Password does not meet policy requirements"}
-                  </p>
-                  {!passwordMeetsPolicy && feedback.length > 0 && (
-                    <p className="text-gray-500 mt-1">Required: {feedback.join(", ")}</p>
-                  )}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent pr-10"
+                    placeholder="Enter new password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  >
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {showPassword ? (
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+                        />
+                      ) : (
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
+                      )}
+                    </svg>
+                  </button>
                 </div>
-              )
-            })()}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPasswordChangeDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handlePasswordChange} disabled={!newPassword || !confirmPassword}>
-              Update Password
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              </div>
 
-      <Dialog open={showActivityLog} onOpenChange={setShowActivityLog}>
-        <DialogContent className="sm:max-w-4xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>Activity Log</DialogTitle>
-            <DialogDescription>Recent system activities and user actions</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex gap-4">
-              <Select defaultValue="all">
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Filter by user" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Users</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="hr">HR Manager</SelectItem>
-                  <SelectItem value="payroll">Payroll Manager</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select defaultValue="all">
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Filter by action" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Actions</SelectItem>
-                  <SelectItem value="login">Login</SelectItem>
-                  <SelectItem value="update">Updates</SelectItem>
-                  <SelectItem value="delete">Deletions</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  placeholder="Confirm new password"
+                />
+              </div>
 
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Timestamp</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Details</TableHead>
-                    <TableHead>IP Address</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell className="font-mono text-sm">{new Date().toLocaleString()}</TableCell>
-                    <TableCell>admin@company.com</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">Login</Badge>
-                    </TableCell>
-                    <TableCell>Successful login</TableCell>
-                    <TableCell className="font-mono text-sm">192.168.1.100</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-mono text-sm">
-                      {new Date(Date.now() - 3600000).toLocaleString()}
-                    </TableCell>
-                    <TableCell>hr@company.com</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">Update</Badge>
-                    </TableCell>
-                    <TableCell>Updated employee salary</TableCell>
-                    <TableCell className="font-mono text-sm">192.168.1.101</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-mono text-sm">
-                      {new Date(Date.now() - 7200000).toLocaleString()}
-                    </TableCell>
-                    <TableCell>admin@company.com</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">Settings</Badge>
-                    </TableCell>
-                    <TableCell>Updated password policy</TableCell>
-                    <TableCell className="font-mono text-sm">192.168.1.100</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-mono text-sm">
-                      {new Date(Date.now() - 10800000).toLocaleString()}
-                    </TableCell>
-                    <TableCell>payroll@company.com</TableCell>
-                    <TableCell>
-                      <Badge variant="default">Payroll</Badge>
-                    </TableCell>
-                    <TableCell>Processed monthly payroll</TableCell>
-                    <TableCell className="font-mono text-sm">192.168.1.102</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-mono text-sm">
-                      {new Date(Date.now() - 14400000).toLocaleString()}
-                    </TableCell>
-                    <TableCell>hr@company.com</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">Approval</Badge>
-                    </TableCell>
-                    <TableCell>Approved annual leave request</TableCell>
-                    <TableCell className="font-mono text-sm">192.168.1.101</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-
-            <div className="flex items-center justify-between text-sm text-gray-500">
-              <span>Showing 5 of 247 activities</span>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled>
-                  Previous
-                </Button>
-                <Button variant="outline" size="sm">
-                  Next
-                </Button>
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setShowPasswordChangeDialog(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePasswordChange}
+                  className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                >
+                  Update Password
+                </button>
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowActivityLog(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      <Dialog open={showBackupSuccessModal} onOpenChange={setShowBackupSuccessModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              Backup Successful
-            </DialogTitle>
-            <DialogDescription>Your system backup has been completed successfully.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Database className="w-4 h-4 text-green-600" />
-                <span className="font-medium text-green-800">Backup Details</span>
-              </div>
-              <div className="space-y-1 text-sm text-green-700">
-                <p>
-                  <strong>Time:</strong> {lastBackupTime?.toLocaleString()}
-                </p>
-                <p>
-                  <strong>Type:</strong> Full System Backup
-                </p>
-                <p>
-                  <strong>Status:</strong> Completed Successfully
-                </p>
-                <p>
-                  <strong>Size:</strong> ~2.4 GB
-                </p>
-              </div>
+      {/* Activity Log Dialog */}
+      {showActivityLog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Activity Log</h3>
+              <button onClick={() => setShowActivityLog(false)} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <div className="text-sm text-gray-600">
-              <p>
-                All your data including employee records, payroll information, and system settings have been securely
-                backed up.
-              </p>
+
+            <div className="overflow-y-auto max-h-96">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-gray-900">Timestamp</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-900">User</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-900">Action</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-900">Details</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {[
+                    {
+                      timestamp: new Date().toLocaleString(),
+                      user: "admin@company.com",
+                      action: "Login",
+                      details: "Successful login from 192.168.1.100",
+                    },
+                    {
+                      timestamp: new Date(Date.now() - 3600000).toLocaleString(),
+                      user: "hr@company.com",
+                      action: "Employee Update",
+                      details: "Updated employee salary for John Doe",
+                    },
+                    {
+                      timestamp: new Date(Date.now() - 7200000).toLocaleString(),
+                      user: "admin@company.com",
+                      action: "Settings Change",
+                      details: "Updated password policy requirements",
+                    },
+                  ].map((entry, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-gray-900">{entry.timestamp}</td>
+                      <td className="px-4 py-3 text-gray-600">{entry.user}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                          {entry.action}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{entry.details}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <button
+                onClick={handleDownloadAuditTrail}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Export CSV
+              </button>
+              <button
+                onClick={() => setShowActivityLog(false)}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
-          <DialogFooter>
-            <Button onClick={() => setShowBackupSuccessModal(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
+
+      {/* Backup Success Modal */}
+      {showBackupSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Backup Completed Successfully!</h3>
+              <p className="text-gray-600 mb-4">Your system backup has been completed and stored securely.</p>
+              <div className="bg-gray-50 rounded-lg p-4 mb-4 text-left">
+                <div className="text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Backup Time:</span>
+                    <span className="font-medium">{lastBackupTime?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Backup Type:</span>
+                    <span className="font-medium">Full System Backup</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Status:</span>
+                    <span className="font-medium text-green-600">Completed</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBackupSuccessModal(false)}
+                className="w-full px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
