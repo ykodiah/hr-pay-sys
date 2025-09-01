@@ -397,9 +397,27 @@ export default function SettingsPage() {
 
   const [payrollAllowances, setPayrollAllowancesState] = useState<any[]>([])
   const [payrollDeductions, setPayrollDeductionsState] = useState<any[]>([])
-  const [loanSettings, setLoanSettingsState] = useState<any[]>([])
+  const [loanSettingsState, setLoanSettingsState] = useState<any[]>([])
   const [leaveTypes, setLeaveTypesState] = useState<any[]>([])
   const [salaryGrades, setSalaryGradesState] = useState<any[]>([])
+
+  const [loanSettings, setLoanSettings] = useState<any[]>([])
+
+  const loadLoanSettings = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("loan_settings")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .order("type")
+
+      if (error) throw error
+      setLoanSettings(data || [])
+    } catch (error) {
+      console.error("Error loading loan settings:", error)
+    }
+  }
 
   const dateSSNITRates = (field: "employee" | "employer", value: number) => {
     const newSsnit = { ...ssnit, [field]: value }
@@ -682,6 +700,54 @@ export default function SettingsPage() {
     }
   }
 
+  const handleSaveLoanSetting = async () => {
+    try {
+      const supabase = createClient()
+
+      if (editingIndex >= 0) {
+        // Update existing
+        if (editingItem.id) {
+          const { error } = await supabase.from("loan_settings").update(editingItem).eq("id", editingItem.id)
+          if (error) throw error
+        }
+        const newLoanSettings = [...loanSettings]
+        newLoanSettings[editingIndex] = editingItem
+        setLoanSettings(newLoanSettings)
+      } else {
+        // Add new
+        const { data, error } = await supabase
+          .from("loan_settings")
+          .insert([
+            {
+              ...editingItem,
+              company_id: companyData.id,
+            },
+          ])
+          .select()
+          .single()
+
+        if (error) throw error
+
+        if (data) {
+          setLoanSettings([...loanSettings, data])
+        }
+      }
+
+      setShowLoanDialog(false)
+      toast({
+        title: "Success",
+        description: "Loan setting saved successfully",
+      })
+    } catch (error) {
+      console.error("Error saving loan setting:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save loan setting",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleSaveLoan = async () => {
     try {
       const supabase = createClient()
@@ -743,6 +809,7 @@ export default function SettingsPage() {
           loadPayrollConfig(),
           loadPayrollAllowances(),
           loadPayrollDeductions(),
+          loadLoanSettings(),
           loadRoles(),
           loadEmailTemplates(),
           loadSecuritySettings(),
