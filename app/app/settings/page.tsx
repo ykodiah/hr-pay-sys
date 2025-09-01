@@ -24,6 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast"
 import { useCurrency } from "@/lib/currency-context"
 import { createClient as createBrowserClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/server"
 import {
   Building2,
   Shield,
@@ -44,7 +45,12 @@ import {
   Minus,
   MoreHorizontal,
   X,
+  MoreVertical,
+  Save,
 } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Checkbox } from "@/components/ui/checkbox"
+import SubsidiaryForm from "@/components/subsidiary-form"
 
 interface Company {
   id: string
@@ -114,6 +120,12 @@ interface Subsidiary {
   ssnit_number: string
   industry: string
   status: string
+  email_address: string
+  phone_number: string
+  address: string
+  divisions: string[]
+  departments: string[]
+  locations: string[]
 }
 
 interface Role {
@@ -141,7 +153,18 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("company")
   const [isLoading, setIsLoading] = useState(false)
 
-  const [companyData, setCompanyData] = useState<Company | null>(null)
+  const [showSubsidiaryDialog, setShowSubsidiaryDialog] = useState(false)
+  const [editingSubsidiary, setEditingSubsidiary] = useState<Subsidiary | null>(null)
+  const [subsidiaryFunction, setSubsidiaryFunction] = useState(true)
+  const [companyData, setCompanyData] = useState({
+    name: "Akwaaba Technologies Ltd",
+    email: "info@akwaabatech.com",
+    tax_id: "C0012345678",
+    ssnit_number: "1234567890",
+    industry: "Technology",
+    status: "active",
+  })
+
   const [uploadedFileName, setUploadedFileName] = useState("")
   const [logoPreview, setLogoPreview] = useState("")
   const [divisions, setDivisions] = useState(["Head Office", "Regional Office"])
@@ -796,6 +819,107 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
   }
 
   const passwordStrength = calculatePasswordStrength()
+
+  const handleAddSubsidiary = () => {
+    setEditingSubsidiary(null)
+    setShowSubsidiaryDialog(true)
+  }
+
+  const handleEditSubsidiary = (subsidiary: Subsidiary) => {
+    setEditingSubsidiary(subsidiary)
+    setShowSubsidiaryDialog(true)
+  }
+
+  const handleSaveSubsidiary = async (subsidiaryData: any) => {
+    try {
+      const supabase = createClient()
+
+      if (editingSubsidiary) {
+        // Update existing subsidiary
+        const { error } = await supabase
+          .from("subsidiaries")
+          .update({
+            name: subsidiaryData.name,
+            tax_id: subsidiaryData.tax_id,
+            ssnit_number: subsidiaryData.ssnit_number,
+            email_address: subsidiaryData.email,
+            phone_number: subsidiaryData.phone,
+            address: subsidiaryData.address,
+            divisions: subsidiaryData.divisions || [],
+            departments: subsidiaryData.departments || [],
+            locations: subsidiaryData.locations || [],
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingSubsidiary.id)
+
+        if (error) throw error
+        toast({ title: "Success", description: "Subsidiary updated successfully" })
+      } else {
+        // Create new subsidiary
+        const { error } = await supabase.from("subsidiaries").insert({
+          company_id: "1", // Replace with actual company ID
+          name: subsidiaryData.name,
+          tax_id: subsidiaryData.tax_id,
+          ssnit_number: subsidiaryData.ssnit_number,
+          email_address: subsidiaryData.email,
+          phone_number: subsidiaryData.phone,
+          address: subsidiaryData.address,
+          divisions: subsidiaryData.divisions || [],
+          departments: subsidiaryData.departments || [],
+          locations: subsidiaryData.locations || [],
+          status: "active",
+        })
+
+        if (error) throw error
+        toast({ title: "Success", description: "Subsidiary created successfully" })
+      }
+
+      setShowSubsidiaryDialog(false)
+      loadSubsidiaries()
+    } catch (error) {
+      console.error("Error saving subsidiary:", error)
+      toast({ title: "Error", description: "Failed to save subsidiary" })
+    }
+  }
+
+  const handleDeactivateSubsidiary = async (subsidiaryId: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("subsidiaries").update({ status: "inactive" }).eq("id", subsidiaryId)
+
+      if (error) throw error
+      toast({ title: "Success", description: "Subsidiary deactivated successfully" })
+      loadSubsidiaries()
+    } catch (error) {
+      console.error("Error deactivating subsidiary:", error)
+      toast({ title: "Error", description: "Failed to deactivate subsidiary" })
+    }
+  }
+
+  const handleSaveMultiCompanySettings = async () => {
+    try {
+      const supabase = createClient()
+
+      // Update company settings
+      const { error } = await supabase
+        .from("companies")
+        .update({
+          name: companyData.name,
+          email_address: companyData.email,
+          tax_id: companyData.tax_id,
+          ssnit_number: companyData.ssnit_number,
+          industry: companyData.industry,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", "1") // Replace with actual company ID
+
+      if (error) throw error
+      toast({ title: "Success", description: "Multi-company settings saved successfully" })
+    } catch (error) {
+      console.error("Error saving multi-company settings:", error)
+      toast({ title: "Error", description: "Failed to save settings" })
+    }
+  }
 
   return (
     <div className="container mx-auto p-6">
@@ -2045,61 +2169,169 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         {/* Multi-Company Tab */}
         {activeTab === "multi-company" && (
           <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">Multi-Company Management</h2>
+                <p className="text-muted-foreground">Manage multiple companies and subsidiaries</p>
+              </div>
+            </div>
+
+            {/* Main Company Section */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Subsidiary Companies
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-center mb-4">
-                  <p className="text-sm text-muted-foreground">Manage subsidiary companies and their configurations</p>
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Subsidiary
-                  </Button>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Building2 className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">{companyData.name}</h3>
+                      <p className="text-sm text-muted-foreground">{companyData.email}</p>
+                    </div>
+                  </div>
+                  <Badge variant="default" className="bg-green-100 text-green-800">
+                    active
+                  </Badge>
                 </div>
 
-                <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-6 mt-6">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Tax ID</p>
+                    <p className="text-sm">{companyData.tax_id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">SSNIT Number</p>
+                    <p className="text-sm">{companyData.ssnit_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Industry</p>
+                    <p className="text-sm">{companyData.industry}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 mt-6 pt-6 border-t">
+                  <Checkbox
+                    id="subsidiary-function"
+                    checked={subsidiaryFunction}
+                    onCheckedChange={setSubsidiaryFunction}
+                  />
+                  <div>
+                    <Label htmlFor="subsidiary-function" className="font-medium">
+                      Activate Subsidiary Function
+                    </Label>
+                    <Badge variant="default" className="ml-2 bg-green-100 text-green-800">
+                      Active
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Subsidiaries Section */}
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold">Subsidiaries ({subsidiaries.length})</h3>
+                  <div className="flex gap-2">
+                    <Button onClick={handleAddSubsidiary} className="bg-black text-white hover:bg-gray-800">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Subsidiary
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem>Export List</DropdownMenuItem>
+                        <DropdownMenuItem>Import Subsidiaries</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {subsidiaries.length > 0 ? (
                     subsidiaries.map((subsidiary) => (
-                      <Card key={subsidiary.id} className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-semibold">{subsidiary.name}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {subsidiary.industry || "No industry specified"}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Tax ID: {subsidiary.tax_id} | SSNIT: {subsidiary.ssnit_number}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Status:{" "}
-                              <Badge variant={subsidiary.status === "active" ? "default" : "secondary"}>
-                                {subsidiary.status}
+                      <Card key={subsidiary.id} className="border-l-4 border-l-green-500">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h4 className="font-semibold">{subsidiary.name}</h4>
+                              <p className="text-sm text-muted-foreground">{subsidiary.email_address}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="default" className="bg-green-100 text-green-800">
+                                active
                               </Badge>
-                            </p>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                  <DropdownMenuItem onClick={() => handleEditSubsidiary(subsidiary)}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    View
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleEditSubsidiary(subsidiary)}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDeactivateSubsidiary(subsidiary.id)}>
+                                    <X className="mr-2 h-4 w-4" />
+                                    Deactivate
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </div>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <Settings className="h-4 w-4" />
-                            </Button>
+
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Tax ID:</span>
+                              <span>{subsidiary.tax_id}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">SSNIT:</span>
+                              <span>{subsidiary.ssnit_number}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Divisions:</span>
+                              <span>{subsidiary.divisions?.length || 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Departments:</span>
+                              <span>{subsidiary.departments?.length || 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Locations:</span>
+                              <span>{subsidiary.locations?.length || 0}</span>
+                            </div>
                           </div>
-                        </div>
+                        </CardContent>
                       </Card>
                     ))
                   ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No subsidiaries found. Add your first subsidiary to get started.
+                    <div className="col-span-2 text-center py-12 text-muted-foreground">
+                      <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No subsidiaries found</p>
+                      <p className="text-sm">Add your first subsidiary to get started</p>
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
+
+            {/* Save Button */}
+            <div className="flex justify-end">
+              <Button onClick={handleSaveMultiCompanySettings} className="bg-green-600 hover:bg-green-700 text-white">
+                <Save className="mr-2 h-4 w-4" />
+                Save Multi-Company Settings
+              </Button>
+            </div>
           </div>
         )}
       </Tabs>
@@ -2526,6 +2758,20 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
             </Button>
             <Button onClick={handleSaveSalaryGrade}>{editingSalaryGrade ? "Update" : "Create"} Grade</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Subsidiary Dialog */}
+      <Dialog open={showSubsidiaryDialog} onOpenChange={setShowSubsidiaryDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingSubsidiary ? "Edit Subsidiary" : "Add New Subsidiary"}</DialogTitle>
+          </DialogHeader>
+          <SubsidiaryForm
+            subsidiary={editingSubsidiary}
+            onSave={handleSaveSubsidiary}
+            onCancel={() => setShowSubsidiaryDialog(false)}
+          />
         </DialogContent>
       </Dialog>
     </div>
