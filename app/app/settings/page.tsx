@@ -90,18 +90,13 @@ interface SalaryGrade {
 }
 
 interface PayrollConfig {
-  id: string
-  company_id: string
-  pay_frequency: string
-  currency: string
+  id?: number
+  company_id?: number
   minimum_wage: number
   overtime_weekday_multiplier: number
   overtime_weekend_multiplier: number
-  cutoff_day: number
-  processing_day: number
-  auto_calculate_paye: boolean
-  auto_calculate_ssnit: boolean
-  auto_calculate_provident: boolean
+  currency_code: string
+  currency_symbol: string
 }
 
 interface Employee {
@@ -194,18 +189,11 @@ export default function SettingsPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
 
   const [payrollConfig, setPayrollConfig] = useState<PayrollConfig>({
-    id: "",
-    company_id: "",
-    pay_frequency: "Monthly",
-    currency: "Ghana Cedis (GHS)",
     minimum_wage: 18.15,
     overtime_weekday_multiplier: 1.5,
-    overtime_weekend_multiplier: 2.0,
-    cutoff_day: 25,
-    processing_day: 28,
-    auto_calculate_paye: true,
-    auto_calculate_ssnit: true,
-    auto_calculate_provident: true,
+    overtime_weekend_multiplier: 2,
+    currency_code: "GHS",
+    currency_symbol: "₵",
   })
 
   const [taxBands, setTaxBands] = useState([
@@ -1175,12 +1163,18 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     try {
       const supabase = createClient()
 
-      // Save payroll configuration
-      const { error: configError } = await supabase.from("payroll_configuration").upsert({
-        ...payrollConfig,
-        company_id: companyData.id,
+      // Save payroll configuration - only include fields that exist in the database
+      const configData = {
+        company_id: Number.parseInt(companyData.id) || 1, // Convert to integer as per schema
+        minimum_wage: payrollConfig.minimum_wage,
+        overtime_weekday_multiplier: payrollConfig.overtime_weekday_multiplier,
+        overtime_weekend_multiplier: payrollConfig.overtime_weekend_multiplier,
+        currency_code: payrollConfig.currency_code,
+        currency_symbol: payrollConfig.currency_symbol,
         updated_at: new Date().toISOString(),
-      })
+      }
+
+      const { error: configError } = await supabase.from("payroll_configuration").upsert(configData)
 
       if (configError) throw configError
 
