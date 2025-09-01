@@ -402,6 +402,11 @@ IT Support Team
       setCompanyData(data)
     } catch (error) {
       console.error("Error loading company data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load company data. Please check your connection.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -414,6 +419,11 @@ IT Support Team
       setLeaveTypes(data || [])
     } catch (error) {
       console.error("Error loading leave types:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load leave types. Please check your connection.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -426,6 +436,11 @@ IT Support Team
       setSalaryGrades(data || [])
     } catch (error) {
       console.error("Error loading salary grades:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load salary grades. Please check your connection.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -520,17 +535,6 @@ IT Support Team
         console.log("[v0] File read successfully, uploading to database...")
 
         const supabase = createBrowserClient()
-
-        // Check if we have a real Supabase client
-        const testQuery = await supabase.from("companies").select("id").limit(1)
-        if (testQuery.error && testQuery.error.message?.includes("Mock client")) {
-          toast({
-            title: "Configuration Error",
-            description: "Database connection not available. Please check your Supabase configuration.",
-            variant: "destructive",
-          })
-          return
-        }
 
         const { data, error } = await supabase
           .from("company_files")
