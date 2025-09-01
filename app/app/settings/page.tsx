@@ -216,8 +216,7 @@ export default function SettingsPage() {
   const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState(false)
   const [showActivityLog, setShowActivityLog] = useState(false)
   const [showBackupSuccess, setShowBackupSuccess] = useState(false)
-  const [showEmailTemplateDialog, setShowEmailTemplateDialog] = useState(false)
-  const [showCustomTemplateDialog, setShowCustomTemplateDialog] = useState(false)
+  const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
   const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
   const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
   const [isBackingUp, setIsBackingUp] = useState(false)
@@ -564,25 +563,20 @@ IT Support Team
   const loadSubsidiaries = async () => {
     try {
       const supabase = createClient()
-      const { data, error } = await supabase.from("subsidiaries").select(`
-          *,
-          divisions:divisions(count),
-          departments:departments(count),
-          locations:locations(count)
-        `)
+      const { data, error } = await supabase.from("subsidiaries").select("*")
 
       if (error) {
         console.error("Subsidiaries loading error:", error)
         return
       }
 
-      // Transform data to include counts
+      // Transform data to include counts from JSONB fields
       const subsidiariesWithCounts =
         data?.map((subsidiary) => ({
           ...subsidiary,
-          divisions_count: subsidiary.divisions?.[0]?.count || 0,
-          departments_count: subsidiary.departments?.[0]?.count || 0,
-          locations_count: subsidiary.locations?.[0]?.count || 0,
+          divisions_count: Array.isArray(subsidiary.divisions) ? subsidiary.divisions.length : 0,
+          departments_count: Array.isArray(subsidiary.departments) ? subsidiary.departments.length : 0,
+          locations_count: Array.isArray(subsidiary.locations) ? subsidiary.locations.length : 0,
         })) || []
 
       setSubsidiaries(subsidiariesWithCounts)
