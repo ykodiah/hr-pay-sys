@@ -134,56 +134,41 @@ interface EmailTemplate {
 
 export default function SettingsPage() {
   const { toast } = useToast()
-  const { currency, currencySymbol, setCurrency: setSystemCurrency, formatAmount } = useCurrency()
+  const { currency, formatCurrency } = useCurrency()
 
   const [activeTab, setActiveTab] = useState("company")
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   const [showSubsidiaryDialog, setShowSubsidiaryDialog] = useState(false)
   const [editingSubsidiary, setEditingSubsidiary] = useState<Subsidiary | null>(null)
-  const [subsidiaryFunction, setSubsidiaryFunction] = useState(true)
+  const [subsidiaryFunction, setSubsidiaryFunction] = useState(false)
+
   const [companyData, setCompanyData] = useState({
-    name: "Akwaaba Technologies Ltd",
-    email: "info@akwaabatech.com",
-    tax_id: "C0012345678",
-    ssnit_number: "1234567890",
-    industry: "Technology",
+    name: "",
+    email: "",
+    tax_id: "",
+    ssnit_number: "",
+    industry: "",
     status: "active",
-    address: "123 Liberation Road, Labome, Accra, Ghana",
-    phone: "+233 30 123 4567",
+    address: "",
+    phone: "",
   })
 
   const [uploadedFileName, setUploadedFileName] = useState("")
   const [logoPreview, setLogoPreview] = useState("")
-  const [divisions, setDivisions] = useState(["Head Office", "Regional Office"])
-  const [departments, setDepartments] = useState([
-    "Technology",
-    "Human Resources",
-    "Finance",
-    "Marketing",
-    "Sales",
-    "Operations",
-  ])
-  const [locations, setLocations] = useState(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+
+  const [divisions, setDivisions] = useState<string[]>([])
+  const [departments, setDepartments] = useState<string[]>([])
+  const [locations, setLocations] = useState<string[]>([])
 
   const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([])
-  const [roles, setRoles] = useState<Role[]>([
-    { id: "1", name: "Super Admin", description: "Full system access", permissions: ["all"], user_count: 1 },
-    { id: "2", name: "HR Manager", description: "HR operations management", permissions: ["hr"], user_count: 3 },
-    { id: "3", name: "Payroll Manager", description: "Payroll processing", permissions: ["payroll"], user_count: 2 },
-    { id: "4", name: "Employee", description: "Self-service access", permissions: ["self"], user_count: 45 },
-  ])
+
+  const [roles, setRoles] = useState<Role[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
 
   const [payrollConfig, setPayrollConfig] = useState<PayrollConfig | null>(null)
-  const [taxBands, setTaxBands] = useState([
-    { rate: 0, threshold: 4380, description: "first GH₵" },
-    { rate: 5, threshold: 1000, description: "next GH₵" },
-    { rate: 10, threshold: 2000, description: "next GH₵" },
-    { rate: 17.5, threshold: 20000, description: "next GH₵" },
-    { rate: 25, threshold: 20000, description: "next GH₵" },
-    { rate: 30, threshold: 0, description: "remaining amount" },
-  ])
+
+  const [taxBands, setTaxBands] = useState<any[]>([])
   const [payrollAllowances, setPayrollAllowances] = useState([])
   const [payrollDeductions, setPayrollDeductions] = useState([])
 
@@ -206,166 +191,7 @@ export default function SettingsPage() {
     requireSymbols: false,
   })
 
-  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([
-    {
-      id: 1,
-      name: "Welcome Email",
-      subject: "Welcome to {{company_name}} - Your Journey Begins Here",
-      description: "Sent to new employees",
-      content: `Dear {{employee_name}},
-
-We are delighted to welcome you to {{company_name}}! On behalf of the entire team, I would like to extend our warmest congratulations on joining our organization.
-
-Your first day is scheduled for {{start_date}} at {{start_time}}. Please report to the HR department located at {{office_address}} where you will meet with {{hr_contact}} for your orientation.
-
-What to expect on your first day:
-• Complete onboarding documentation
-• Receive your employee handbook and company policies
-• Meet your team members and direct supervisor
-• Set up your workspace and IT equipment
-• Complete mandatory training sessions
-
-We have prepared a comprehensive orientation program to help you settle in quickly and understand our company culture, values, and expectations. Your direct supervisor, {{supervisor_name}}, will be available to guide you through your initial weeks.
-
-Please bring the following documents on your first day:
-• Valid identification (passport or national ID)
-• Educational certificates and transcripts
-• Previous employment references
-• Bank account details for payroll setup
-• Emergency contact information
-
-If you have any questions before your start date, please don't hesitate to contact our HR department at {{hr_email}} or {{hr_phone}}.
-
-Once again, welcome to the {{company_name}} family. We look forward to working with you and supporting your professional growth.
-
-Best regards,
-{{hr_manager_name}}
-Human Resources Manager
-{{company_name}}`,
-      isActive: true,
-      lastModified: new Date().toISOString(),
-    },
-    {
-      id: 2,
-      name: "Payslip Notification",
-      subject: "Your Payslip for {{pay_period}} is Ready",
-      description: "Monthly payslip availability",
-      content: `Dear {{employee_name}},
-
-Your payslip for the period {{pay_period}} is now available for download through the employee self-service portal.
-
-Payslip Details:
-• Pay Period: {{pay_period}}
-• Payment Date: {{payment_date}}
-• Gross Salary: {{gross_salary}}
-• Net Salary: {{net_salary}}
-
-To access your payslip:
-1. Log into the employee portal at {{portal_url}}
-2. Navigate to "Payroll" section
-3. Select "View Payslips"
-4. Download your payslip for {{pay_period}}
-
-Please review your payslip carefully and contact the Payroll department at {{payroll_email}} if you have any questions or notice any discrepancies.
-
-Important reminders:
-• Keep your payslips for tax and record-keeping purposes
-• Update your personal information if there are any changes
-• Report any payroll discrepancies within 5 working days
-
-Thank you.
-
-Best regards,
-Payroll Department
-{{company_name}}`,
-      isActive: true,
-      lastModified: new Date().toISOString(),
-    },
-    {
-      id: 3,
-      name: "Leave Approval",
-      subject: "Leave Request {{status}} - {{leave_type}}",
-      description: "Leave request status updates",
-      content: `Dear {{employee_name}},
-
-Your leave request has been {{status}}.
-
-Leave Request Details:
-• Leave Type: {{leave_type}}
-• Start Date: {{start_date}}
-• End Date: {{end_date}}
-• Duration: {{duration}} days
-• Reason: {{reason}}
-• Status: {{status}}
-{{#if approved_by}}• Approved by: {{approved_by}}{{/if}}
-{{#if rejection_reason}}• Reason for rejection: {{rejection_reason}}{{/if}}
-
-{{#if status == "approved"}}
-Your leave has been approved. Please ensure proper handover of your responsibilities before your leave begins. Contact your supervisor if you need to make any changes to your approved leave.
-{{/if}}
-
-{{#if status == "rejected"}}
-Unfortunately, your leave request could not be approved at this time. Please contact your supervisor or HR department to discuss alternative arrangements.
-{{/if}}
-
-{{#if status == "pending"}}
-Your leave request is currently under review. You will be notified once a decision has been made. Please ensure you have sufficient leave balance and have completed all necessary documentation.
-{{/if}}
-
-For any questions regarding your leave request, please contact:
-• Your direct supervisor: {{supervisor_email}}
-• HR Department: {{hr_email}}
-
-Best regards,
-Human Resources Department
-{{company_name}}`,
-      isActive: true,
-      lastModified: new Date().toISOString(),
-    },
-    {
-      id: 4,
-      name: "Password Reset",
-      subject: "Password Reset Instructions for {{company_name}}",
-      description: "Password reset instructions",
-      content: `Dear {{employee_name}},
-
-We received a request to reset your password for your {{company_name}} account. If you did not make this request, please ignore this email and contact our IT support team immediately.
-
-To reset your password, please follow these steps:
-
-1. Click on the following secure link: {{reset_link}}
-2. The link will take you to a secure password reset page
-3. Enter your new password (must meet security requirements)
-4. Confirm your new password
-5. Click "Reset Password" to complete the process
-
-Password Requirements:
-• Minimum 8 characters long
-• At least one uppercase letter
-• At least one lowercase letter
-• At least one number
-• At least one special character (!@#$%^&*)
-
-Important Security Information:
-• This link will expire in 24 hours for security purposes
-• You can only use this link once
-• Never share your password with anyone
-• Use a unique password that you don't use for other accounts
-
-If you continue to experience issues accessing your account, please contact our IT support team:
-• Email: {{it_support_email}}
-• Phone: {{it_support_phone}}
-• Help Desk: {{help_desk_url}}
-
-For your security, please log out of all devices and log back in with your new password once the reset is complete.
-
-Best regards,
-IT Support Team
-{{company_name}}`,
-      isActive: true,
-      lastModified: new Date().toISOString(),
-    },
-  ])
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([])
 
   // Dialog states
   const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState(false)
@@ -393,15 +219,41 @@ IT Support Team
     confirm: false,
   })
 
+  const [notificationSettings, setNotificationSettings] = useState({
+    email: "",
+    webhookUrl: "",
+  })
+
   useEffect(() => {
-    loadCompanyData()
-    loadLeaveTypes()
-    loadSalaryGrades()
-    loadEmployees()
-    loadSubsidiaries()
-    loadPayrollConfig()
-    loadPayrollAllowances()
-    loadPayrollDeductions()
+    const loadAllData = async () => {
+      setIsLoading(true)
+      try {
+        await Promise.all([
+          loadCompanyData(),
+          loadLeaveTypes(),
+          loadSalaryGrades(),
+          loadEmployees(),
+          loadSubsidiaries(),
+          loadPayrollConfig(),
+          loadPayrollAllowances(),
+          loadPayrollDeductions(),
+          loadRoles(),
+          loadEmailTemplates(),
+          loadSecuritySettings(),
+        ])
+      } catch (error) {
+        console.error("Error loading settings data:", error)
+        toast({
+          title: "Error",
+          description: "Some settings data failed to load. Please refresh the page.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadAllData()
   }, [])
 
   const loadCompanyData = async () => {
@@ -409,15 +261,206 @@ IT Support Team
       const supabase = createClient()
       const { data, error } = await supabase.from("companies").select("*").single()
 
-      if (error) throw error
-      setCompanyData(data)
+      if (error) {
+        console.error("Company data error:", error)
+        // Set default values if no company data exists
+        setCompanyData({
+          name: "Your Company Name",
+          email: "info@yourcompany.com",
+          tax_id: "",
+          ssnit_number: "",
+          industry: "",
+          status: "active",
+          address: "",
+          phone: "",
+        })
+        return
+      }
+
+      setCompanyData({
+        name: data.name || "",
+        email: data.email_address || "",
+        tax_id: data.tax_id || "",
+        ssnit_number: data.ssnit_number || "",
+        industry: data.industry || "",
+        status: "active",
+        address: data.address || "",
+        phone: data.phone_number || "",
+      })
+
+      // Load company structure data
+      if (data.divisions) setDivisions(Array.isArray(data.divisions) ? data.divisions : [])
+      if (data.departments) setDepartments(Array.isArray(data.departments) ? data.departments : [])
+      if (data.locations) setLocations(Array.isArray(data.locations) ? data.locations : [])
+
+      // Load logo if exists
+      if (data.logo_url) setLogoPreview(data.logo_url)
     } catch (error) {
       console.error("Error loading company data:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load company data. Please check your connection.",
-        variant: "destructive",
-      })
+    }
+  }
+
+  const loadRoles = async () => {
+    try {
+      const supabase = createClient()
+      // For now, use hardcoded roles since there's no roles table in the schema
+      setRoles([
+        { id: "1", name: "Super Admin", description: "Full system access", permissions: ["all"], user_count: 1 },
+        { id: "2", name: "HR Manager", description: "HR operations management", permissions: ["hr"], user_count: 3 },
+        {
+          id: "3",
+          name: "Payroll Manager",
+          description: "Payroll processing",
+          permissions: ["payroll"],
+          user_count: 2,
+        },
+        { id: "4", name: "Employee", description: "Self-service access", permissions: ["self"], user_count: 45 },
+      ])
+    } catch (error) {
+      console.error("Error loading roles:", error)
+    }
+  }
+
+  const loadEmailTemplates = async () => {
+    try {
+      // For now, use default templates since there's no email_templates table in the schema
+      setEmailTemplates([
+        {
+          id: 1,
+          name: "Welcome Email",
+          subject: "Welcome to {{company_name}} - Your Journey Begins Here",
+          description: "Sent to new employees",
+          content: `Dear {{employee_name}},
+
+We are delighted to welcome you to {{company_name}}! On behalf of the entire team, I would like to extend our warmest congratulations on joining our organization.
+
+Your first day is scheduled for {{start_date}} at {{start_time}}. Please report to the HR department located at {{office_address}} where you will meet with {{hr_contact}} for your orientation.
+
+We look forward to working with you and wish you great success in your new role.
+
+Best regards,
+{{hr_manager_name}}
+Human Resources Department`,
+          isActive: true,
+        },
+        {
+          id: 2,
+          name: "Payslip Notification",
+          subject: "Your Payslip for {{month}} {{year}} is Ready",
+          description: "Monthly payslip availability",
+          content: `Dear {{employee_name}},
+
+Your payslip for {{month}} {{year}} is now available for download in your employee portal.
+
+Gross Salary: {{gross_salary}}
+Net Salary: {{net_salary}}
+Pay Date: {{pay_date}}
+
+Please log in to your account to view and download your detailed payslip.
+
+If you have any questions regarding your payslip, please contact the HR department.
+
+Best regards,
+Payroll Department`,
+          isActive: true,
+        },
+        {
+          id: 3,
+          name: "Leave Approval",
+          subject: "Leave Request {{status}} - {{leave_type}}",
+          description: "Leave request status updates",
+          content: `Dear {{employee_name}},
+
+Your leave request has been {{status}}.
+
+Leave Type: {{leave_type}}
+Start Date: {{start_date}}
+End Date: {{end_date}}
+Duration: {{duration}} days
+
+{{#if approved}}
+Your leave has been approved. Please ensure all pending tasks are completed or handed over before your leave begins.
+{{else}}
+Reason for rejection: {{rejection_reason}}
+{{/if}}
+
+For any questions, please contact your supervisor or HR department.
+
+Best regards,
+{{approver_name}}`,
+          isActive: true,
+        },
+        {
+          id: 4,
+          name: "Password Reset",
+          subject: "Password Reset Instructions for {{company_name}}",
+          description: "Password reset instructions",
+          content: `Dear {{employee_name}},
+
+You have requested to reset your password for your {{company_name}} account.
+
+Please click the link below to reset your password:
+{{reset_link}}
+
+This link will expire in 24 hours for security reasons.
+
+If you did not request this password reset, please ignore this email and contact IT support immediately.
+
+Best regards,
+IT Support Team
+{{company_name}}`,
+          isActive: true,
+        },
+      ])
+    } catch (error) {
+      console.error("Error loading email templates:", error)
+    }
+  }
+
+  const loadSecuritySettings = async () => {
+    try {
+      // Load security settings from database or use defaults
+      // For now, keeping the default values since there's no security_settings table
+    } catch (error) {
+      console.error("Error loading security settings:", error)
+    }
+  }
+
+  const loadPayrollConfig = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.from("payroll_configuration").select("*").single()
+
+      if (error) {
+        console.error("Payroll config error:", error)
+        // Set default payroll config
+        setPayrollConfig({
+          id: 1,
+          company_id: 1,
+          minimum_wage: 18.15,
+          overtime_weekday_multiplier: 1.5,
+          overtime_weekend_multiplier: 2.0,
+          currency_code: "GHS",
+          currency_symbol: "GH₵",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        return
+      }
+
+      setPayrollConfig(data)
+
+      // Set default tax bands for Ghana
+      setTaxBands([
+        { rate: 0, threshold: 4380, description: "first GH₵" },
+        { rate: 5, threshold: 1000, description: "next GH₵" },
+        { rate: 10, threshold: 2000, description: "next GH₵" },
+        { rate: 17.5, threshold: 20000, description: "next GH₵" },
+        { rate: 25, threshold: 20000, description: "next GH₵" },
+        { rate: 30, threshold: 0, description: "remaining amount" },
+      ])
+    } catch (error) {
+      console.error("Error loading payroll config:", error)
     }
   }
 
@@ -476,18 +519,6 @@ IT Support Team
       setSubsidiaries(data || [])
     } catch (error) {
       console.error("Error loading subsidiaries:", error)
-    }
-  }
-
-  const loadPayrollConfig = async () => {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("payroll_configuration").select("*").single()
-
-      if (error) throw error
-      setPayrollConfig(data)
-    } catch (error) {
-      console.error("Error loading payroll config:", error)
     }
   }
 
@@ -914,10 +945,18 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     toast({ title: "Info", description: `Viewing subsidiary: ${subsidiary.name}` })
   }
 
-  const [notificationSettings, setNotificationSettings] = useState({
-    email: "admin@akwaabatech.com",
-    webhookUrl: "",
-  })
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading settings...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto p-6">
