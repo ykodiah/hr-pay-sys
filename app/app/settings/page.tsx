@@ -22,16 +22,12 @@ import {
   Eye,
   Edit,
   Ban,
-  Key,
-  Download,
-  Settings,
-  Mail,
-  Calendar,
   Save,
   Calculator,
   Receipt,
   Minus,
   MoreHorizontal,
+  Trash2,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -41,7 +37,6 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Switch } from "@/components/ui/switch"
-import SubsidiaryForm from "@/components/forms/subsidiary-form"
 import {
   Dialog,
   DialogContent,
@@ -149,6 +144,120 @@ interface EmailTemplate {
   lastModified: string
 }
 
+interface SubsidiaryFormProps {
+  subsidiary: Subsidiary | null
+  onSave: (data: any) => void
+  onCancel: () => void
+}
+
+const SubsidiaryForm: React.FC<SubsidiaryFormProps> = ({ subsidiary, onSave, onCancel }) => {
+  const [name, setName] = useState(subsidiary?.name || "")
+  const [taxId, setTaxId] = useState(subsidiary?.tax_id || "")
+  const [ssnitNumber, setSsnitNumber] = useState(subsidiary?.ssnit_number || "")
+  const [email, setEmail] = useState(subsidiary?.email_address || "")
+  const [phone, setPhone] = useState(subsidiary?.phone_number || "")
+  const [address, setAddress] = useState(subsidiary?.address || "")
+  const [divisions, setDivisions] = useState(subsidiary?.divisions || [])
+  const [departments, setDepartments] = useState(subsidiary?.departments || [])
+  const [locations, setLocations] = useState(subsidiary?.locations || [])
+
+  const handleSubmit = () => {
+    const subsidiaryData = {
+      name,
+      tax_id: taxId,
+      ssnit_number: ssnitNumber,
+      email,
+      phone,
+      address,
+      divisions,
+      departments,
+      locations,
+    }
+    onSave(subsidiaryData)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="name">Name</Label>
+        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="taxId">Tax ID</Label>
+        <Input id="taxId" value={taxId} onChange={(e) => setTaxId(e.target.value)} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="ssnitNumber">SSNIT Number</Label>
+        <Input id="ssnitNumber" value={ssnitNumber} onChange={(e) => setSsnitNumber(e.target.value)} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="phone">Phone</Label>
+        <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="address">Address</Label>
+        <Textarea id="address" value={address} onChange={(e) => setAddress(e.target.value)} />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Divisions</Label>
+        {divisions.map((division: string, index: number) => (
+          <div key={index} className="flex items-center space-x-2">
+            <Input value={division} readOnly />
+            <Button variant="ghost" size="sm" onClick={() => setDivisions(divisions.filter((_, i) => i !== index))}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        <Button variant="outline" size="sm" onClick={() => setDivisions([...divisions, "New Division"])}>
+          Add Division
+        </Button>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Departments</Label>
+        {departments.map((department: string, index: number) => (
+          <div key={index} className="flex items-center space-x-2">
+            <Input value={department} readOnly />
+            <Button variant="ghost" size="sm" onClick={() => setDepartments(departments.filter((_, i) => i !== index))}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        <Button variant="outline" size="sm" onClick={() => setDepartments([...departments, "New Department"])}>
+          Add Department
+        </Button>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Locations</Label>
+        {locations.map((location: string, index: number) => (
+          <div key={index} className="flex items-center space-x-2">
+            <Input value={location} readOnly />
+            <Button variant="ghost" size="sm" onClick={() => setLocations(locations.filter((_, i) => i !== index))}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        <Button variant="outline" size="sm" onClick={() => setLocations([...locations, "New Location"])}>
+          Add Location
+        </Button>
+      </div>
+
+      <div className="flex justify-end space-x-2">
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button onClick={handleSubmit}>Save</Button>
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const { toast } = useToast()
   const { currency, formatCurrency } = useCurrency()
@@ -214,6 +323,12 @@ export default function SettingsPage() {
     { rate: 30, threshold: 0, description: "remaining amount" },
   ])
 
+  const [showAllowanceDialog, setShowAllowanceDialog] = useState(false)
+  const [showDeductionDialog, setShowDeductionDialog] = useState(false)
+  const [showLoanDialog, setShowLoanDialog] = useState(false)
+  const [editingItem, setEditingItem] = useState<any>(null)
+  const [editingIndex, setEditingIndex] = useState<number>(-1)
+
   const [ssnit, setSsnit] = useState({
     employee: 5.5,
     employer: 13,
@@ -231,66 +346,6 @@ export default function SettingsPage() {
     employer: 5,
     total: 10.0,
   })
-
-  const [payrollAllowances, setPayrollAllowances] = useState([
-    {
-      code: "TRANS",
-      description: "Transport Allowance",
-      taxable: true,
-      recurring: true,
-      amount: 0,
-      percentage: 0,
-      type: "FIXED",
-    },
-    {
-      code: "HOUSE",
-      description: "Housing Allowance",
-      taxable: true,
-      recurring: true,
-      amount: 0,
-      percentage: 0,
-      type: "FIXED",
-    },
-    {
-      code: "MED",
-      description: "Medical Allowance",
-      taxable: false,
-      recurring: true,
-      amount: 0,
-      percentage: 0,
-      type: "FIXED",
-    },
-  ])
-
-  const [payrollDeductions, setPayrollDeductions] = useState([
-    { code: "TAX", description: "Tax Deduction", recurring: true, amount: 0, percentage: 0, type: "VARIABLE" },
-    { code: "SSNIT", description: "SSNIT Deduction", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE" },
-    { code: "LOAN", description: "Loan Deduction", recurring: true, amount: 0, percentage: 0, type: "FIXED" },
-  ])
-
-  const [loanSettings, setLoanSettings] = useState([
-    {
-      code: "PERSON",
-      description: "Personal Loan",
-      maxAmount: 50000,
-      interestRate: 10,
-      rateMethod: "Reducing Balance",
-      adminCharge: 500,
-      tenure: 12,
-    },
-    {
-      code: "EMERGE",
-      description: "Emergency Loan",
-      maxAmount: 10000,
-      interestRate: 5,
-      rateMethod: "Straight Line Meth",
-      adminCharge: 200,
-      tenure: 6,
-    },
-  ])
-
-  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([])
-  const [salaryGrades, setSalaryGrades] = useState<SalaryGrade[]>([])
 
   const [securitySettings, setSecuritySettings] = useState({
     twoFactorAuth: false,
@@ -339,6 +394,341 @@ export default function SettingsPage() {
     email: "",
     webhookUrl: "",
   })
+
+  const [payrollAllowances, setPayrollAllowancesState] = useState<any[]>([])
+  const [payrollDeductions, setPayrollDeductionsState] = useState<any[]>([])
+  const [loanSettings, setLoanSettingsState] = useState<any[]>([])
+  const [leaveTypes, setLeaveTypesState] = useState<any[]>([])
+  const [salaryGrades, setSalaryGradesState] = useState<any[]>([])
+
+  const dateSSNITRates = (field: "employee" | "employer", value: number) => {
+    const newSsnit = { ...ssnit, [field]: value }
+    newSsnit.total = newSsnit.employee + newSsnit.employer
+    setSsnit(newSsnit)
+  }
+
+  const updateTier2Rates = (field: "employee" | "employer", value: number) => {
+    const newTier2 = { ...tier2, [field]: value }
+    newTier2.total = newTier2.employee + newTier2.employer
+    setTier2(newTier2)
+  }
+
+  const updateTier3Rates = (field: "employee" | "employer", value: number) => {
+    const newTier3 = { ...tier3, [field]: value }
+    newTier3.total = newTier3.employee + newTier3.employer
+    setTier3(newTier3)
+  }
+
+  const handleCurrencyChange = (newCurrency: string) => {
+    const currencyMap: Record<string, { symbol: string; name: string }> = {
+      GHS: { symbol: "₵", name: "Ghana Cedis (GHS)" },
+      USD: { symbol: "$", name: "US Dollar (USD)" },
+      EUR: { symbol: "€", name: "Euro (EUR)" },
+    }
+
+    const currency = currencyMap[newCurrency]
+    if (currency) {
+      setPayrollConfig({
+        ...payrollConfig,
+        currency_code: newCurrency,
+        currency_symbol: currency.symbol,
+      })
+
+      // Update tax bands currency display
+      setTaxBands(
+        taxBands.map((band) => ({
+          ...band,
+          currency: newCurrency,
+        })),
+      )
+
+      toast({
+        title: "Currency Updated",
+        description: `System currency changed to ${currency.name}`,
+      })
+    }
+  }
+
+  const handleAddAllowance = () => {
+    setEditingItem({
+      code: "",
+      description: "",
+      taxable: false,
+      recurring: false,
+      amount: 0,
+      percentage: 0,
+      type: "FIXED",
+    })
+    setEditingIndex(-1)
+    setShowAllowanceDialog(true)
+  }
+
+  const handleAddDeduction = () => {
+    setEditingItem({
+      code: "",
+      description: "",
+      recurring: false,
+      amount: 0,
+      percentage: 0,
+      type: "FIXED",
+    })
+    setEditingIndex(-1)
+    setShowDeductionDialog(true)
+  }
+
+  const handleAddLoan = () => {
+    setEditingItem({
+      code: "",
+      description: "",
+      maxAmount: 0,
+      interestRate: 0,
+      rateMethod: "Reducing Balance",
+      adminCharge: 0,
+      tenure: 12,
+    })
+    setEditingIndex(-1)
+    setShowLoanDialog(true)
+  }
+
+  const handleEditAllowance = (index: number) => {
+    setEditingItem({ ...payrollAllowances[index] })
+    setEditingIndex(index)
+    setShowAllowanceDialog(true)
+  }
+
+  const handleDeleteAllowance = async (index: number) => {
+    try {
+      const supabase = createClient()
+      const allowance = payrollAllowances[index]
+      if (allowance.id) {
+        const { error } = await supabase.from("payroll_allowances").delete().eq("id", allowance.id)
+        if (error) throw error
+      }
+
+      const newAllowances = payrollAllowances.filter((_, i) => i !== index)
+      setPayrollAllowancesState(newAllowances)
+
+      toast({
+        title: "Success",
+        description: "Allowance deleted successfully",
+      })
+    } catch (error) {
+      console.error("Error deleting allowance:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete allowance",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleEditDeduction = (index: number) => {
+    setEditingItem({ ...payrollDeductions[index] })
+    setEditingIndex(index)
+    setShowDeductionDialog(true)
+  }
+
+  const handleDeleteDeduction = async (index: number) => {
+    try {
+      const supabase = createClient()
+      const deduction = payrollDeductions[index]
+      if (deduction.id) {
+        const { error } = await supabase.from("payroll_deductions").delete().eq("id", deduction.id)
+        if (error) throw error
+      }
+
+      const newDeductions = payrollDeductions.filter((_, i) => i !== index)
+      setPayrollDeductionsState(newDeductions)
+
+      toast({
+        title: "Success",
+        description: "Deduction deleted successfully",
+      })
+    } catch (error) {
+      console.error("Error deleting deduction:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete deduction",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleEditLoan = (index: number) => {
+    setEditingItem({ ...loanSettings[index] })
+    setEditingIndex(index)
+    setShowLoanDialog(true)
+  }
+
+  const handleDeleteLoan = async (index: number) => {
+    try {
+      const supabase = createClient()
+      const loan = loanSettings[index]
+      if (loan.id) {
+        const { error } = await supabase.from("loan_settings").delete().eq("id", loan.id)
+        if (error) throw error
+      }
+
+      const newLoans = loanSettings.filter((_, i) => i !== index)
+      setLoanSettingsState(newLoans)
+
+      toast({
+        title: "Success",
+        description: "Loan setting deleted successfully",
+      })
+    } catch (error) {
+      console.error("Error deleting loan setting:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete loan setting",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSaveAllowance = async () => {
+    try {
+      const supabase = createClient()
+
+      if (editingIndex >= 0) {
+        // Update existing
+        if (editingItem.id) {
+          const { error } = await supabase.from("payroll_allowances").update(editingItem).eq("id", editingItem.id)
+          if (error) throw error
+        }
+        const newAllowances = [...payrollAllowances]
+        newAllowances[editingIndex] = editingItem
+        setPayrollAllowancesState(newAllowances)
+      } else {
+        // Add new
+        const { data, error } = await supabase
+          .from("payroll_allowances")
+          .insert([
+            {
+              ...editingItem,
+              company_id: companyData.id,
+            },
+          ])
+          .select()
+          .single()
+
+        if (error) throw error
+
+        if (data) {
+          setPayrollAllowancesState([...payrollAllowances, data])
+        }
+      }
+
+      setShowAllowanceDialog(false)
+      toast({
+        title: "Success",
+        description: "Allowance saved successfully",
+      })
+    } catch (error) {
+      console.error("Error saving allowance:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save allowance",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSaveDeduction = async () => {
+    try {
+      const supabase = createClient()
+
+      if (editingIndex >= 0) {
+        // Update existing
+        if (editingItem.id) {
+          const { error } = await supabase.from("payroll_deductions").update(editingItem).eq("id", editingItem.id)
+          if (error) throw error
+        }
+        const newDeductions = [...payrollDeductions]
+        newDeductions[editingIndex] = editingItem
+        setPayrollDeductionsState(newDeductions)
+      } else {
+        // Add new
+        const { data, error } = await supabase
+          .from("payroll_deductions")
+          .insert([
+            {
+              ...editingItem,
+              company_id: companyData.id,
+            },
+          ])
+          .select()
+          .single()
+
+        if (error) throw error
+
+        if (data) {
+          setPayrollDeductionsState([...payrollDeductions, data])
+        }
+      }
+
+      setShowDeductionDialog(false)
+      toast({
+        title: "Success",
+        description: "Deduction saved successfully",
+      })
+    } catch (error) {
+      console.error("Error saving deduction:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save deduction",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSaveLoan = async () => {
+    try {
+      const supabase = createClient()
+
+      if (editingIndex >= 0) {
+        // Update existing
+        if (editingItem.id) {
+          const { error } = await supabase.from("loan_settings").update(editingItem).eq("id", editingItem.id)
+          if (error) throw error
+        }
+        const newLoans = [...loanSettings]
+        newLoans[editingIndex] = editingItem
+        setLoanSettingsState(newLoans)
+      } else {
+        // Add new
+        const { data, error } = await supabase
+          .from("loan_settings")
+          .insert([
+            {
+              ...editingItem,
+              company_id: companyData.id,
+            },
+          ])
+          .select()
+          .single()
+
+        if (error) throw error
+
+        if (data) {
+          setLoanSettingsState([...loanSettings, data])
+        }
+      }
+
+      setShowLoanDialog(false)
+      toast({
+        title: "Success",
+        description: "Loan setting saved successfully",
+      })
+    } catch (error) {
+      console.error("Error saving loan setting:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save loan setting",
+        variant: "destructive",
+      })
+    }
+  }
 
   useEffect(() => {
     const loadAllData = async () => {
@@ -589,14 +979,14 @@ IT Support Team
       const { data: allowancesData, error: allowancesError } = await supabase.from("payroll_allowances").select("*")
 
       if (allowancesData) {
-        setPayrollAllowances(allowancesData)
+        setPayrollAllowancesState(allowancesData)
       }
 
       // Load deductions
       const { data: deductionsData, error: deductionsError } = await supabase.from("payroll_deductions").select("*")
 
       if (deductionsData) {
-        setPayrollDeductions(deductionsData)
+        setPayrollDeductionsState(deductionsData)
       }
     } catch (error) {
       console.error("Error loading payroll config:", error)
@@ -609,7 +999,7 @@ IT Support Team
       const { data, error } = await supabase.from("leave_types").select("*").order("name")
 
       if (error) throw error
-      setLeaveTypes(data || [])
+      setLeaveTypesState(data || [])
     } catch (error) {
       console.error("Error loading leave types:", error)
       toast({
@@ -626,7 +1016,7 @@ IT Support Team
       const { data, error } = await supabase.from("salary_grades").select("*").order("grade_level")
 
       if (error) throw error
-      setSalaryGrades(data || [])
+      setSalaryGradesState(data || [])
     } catch (error) {
       console.error("Error loading salary grades:", error)
       toast({
@@ -680,7 +1070,7 @@ IT Support Team
       const { data, error } = await supabase.from("payroll_allowances").select("*").order("type")
 
       if (error) throw error
-      setPayrollAllowances(data || [])
+      setPayrollAllowancesState(data || [])
     } catch (error) {
       console.error("Error loading payroll allowances:", error)
     }
@@ -692,7 +1082,7 @@ IT Support Team
       const { data, error } = await supabase.from("payroll_deductions").select("*").order("type")
 
       if (error) throw error
-      setPayrollDeductions(data || [])
+      setPayrollDeductionsState(data || [])
     } catch (error) {
       console.error("Error loading payroll deductions:", error)
     }
@@ -1863,10 +2253,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                     </div>
                     <div className="space-y-2">
                       <Label>Currency</Label>
-                      <Select
-                        value={payrollConfig.currency_code}
-                        onValueChange={(value) => setPayrollConfig({ ...payrollConfig, currency_code: value })}
-                      >
+                      <Select value={payrollConfig.currency_code} onValueChange={handleCurrencyChange}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -1881,7 +2268,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Minimum Wage (GHS)</Label>
+                      <Label>Minimum Wage ({payrollConfig.currency_code})</Label>
                       <Input
                         type="number"
                         value={payrollConfig.minimum_wage}
@@ -1991,19 +2378,55 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="font-semibold">PAYE Tax Bands</h4>
-                      <Button size="sm" variant="outline">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const newBand = {
+                            rate: 0,
+                            description: "next",
+                            threshold: 0,
+                            currency: payrollConfig.currency_code,
+                          }
+                          setTaxBands([...taxBands, newBand])
+                        }}
+                      >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
                     <div className="space-y-2">
                       {taxBands.map((band, index) => (
                         <div key={index} className="flex items-center gap-2 text-sm">
-                          <Input className="w-16" value={band.rate} readOnly />
+                          <Input
+                            className="w-16"
+                            value={band.rate}
+                            onChange={(e) => {
+                              const newBands = [...taxBands]
+                              newBands[index].rate = Number.parseFloat(e.target.value) || 0
+                              setTaxBands(newBands)
+                            }}
+                          />
                           <span>% on</span>
                           <span className="text-blue-600">{band.description}</span>
-                          <span>GHS</span>
-                          <Input className="w-20" value={band.threshold} readOnly />
-                          <Button size="sm" variant="ghost" className="text-red-500">
+                          <span>{payrollConfig.currency_code}</span>
+                          <Input
+                            className="w-20"
+                            value={band.threshold}
+                            onChange={(e) => {
+                              const newBands = [...taxBands]
+                              newBands[index].threshold = Number.parseFloat(e.target.value) || 0
+                              setTaxBands(newBands)
+                            }}
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-500"
+                            onClick={() => {
+                              const newBands = taxBands.filter((_, i) => i !== index)
+                              setTaxBands(newBands)
+                            }}
+                          >
                             <Minus className="h-4 w-4" />
                           </Button>
                         </div>
@@ -2014,17 +2437,35 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <div>
                     <h4 className="font-semibold mb-3">SSNIT Rates</h4>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span>Employee:</span>
-                        <span>{ssnit.employee}%</span>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            className="w-16 h-6 text-xs"
+                            type="number"
+                            step="0.1"
+                            value={ssnit.employee}
+                            onChange={(e) => dateSSNITRates("employee", Number.parseFloat(e.target.value) || 0)}
+                          />
+                          <span>%</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span>Employer:</span>
-                        <span>{ssnit.employer}%</span>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            className="w-16 h-6 text-xs"
+                            type="number"
+                            step="0.1"
+                            value={ssnit.employer}
+                            onChange={(e) => dateSSNITRates("employer", Number.parseFloat(e.target.value) || 0)}
+                          />
+                          <span>%</span>
+                        </div>
                       </div>
                       <div className="flex justify-between font-semibold">
                         <span>Total:</span>
-                        <span>{ssnit.total}%</span>
+                        <span>{ssnit.total.toFixed(1)}%</span>
                       </div>
                     </div>
                   </div>
@@ -2032,17 +2473,35 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <div>
                     <h4 className="font-semibold mb-3">Tier 2 Rates</h4>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span>Employee:</span>
-                        <span>{tier2.employee}%</span>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            className="w-16 h-6 text-xs"
+                            type="number"
+                            step="0.1"
+                            value={tier2.employee}
+                            onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value) || 0)}
+                          />
+                          <span>%</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span>Employer:</span>
-                        <span>{tier2.employer}%</span>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            className="w-16 h-6 text-xs"
+                            type="number"
+                            step="0.1"
+                            value={tier2.employer}
+                            onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value) || 0)}
+                          />
+                          <span>%</span>
+                        </div>
                       </div>
                       <div className="flex justify-between font-semibold">
                         <span>Total:</span>
-                        <span>{tier2.total}%</span>
+                        <span>{tier2.total.toFixed(1)}%</span>
                       </div>
                     </div>
                   </div>
@@ -2050,17 +2509,35 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <div>
                     <h4 className="font-semibold mb-3">Tier 3 Rates</h4>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span>Employee:</span>
-                        <span>{tier3.employee}%</span>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            className="w-16 h-6 text-xs"
+                            type="number"
+                            step="0.1"
+                            value={tier3.employee}
+                            onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value) || 0)}
+                          />
+                          <span>%</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span>Employer:</span>
-                        <span>{tier3.employer}%</span>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            className="w-16 h-6 text-xs"
+                            type="number"
+                            step="0.1"
+                            value={tier3.employer}
+                            onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value) || 0)}
+                          />
+                          <span>%</span>
+                        </div>
                       </div>
                       <div className="flex justify-between font-semibold">
                         <span>Total:</span>
-                        <span>{tier3.total}%</span>
+                        <span>{tier3.total.toFixed(1)}%</span>
                       </div>
                     </div>
                   </div>
@@ -2072,7 +2549,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>Allowances</span>
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={handleAddAllowance}>
                     <Plus className="h-4 w-4 mr-1" />
                     Add
                   </Button>
@@ -2108,9 +2585,23 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                           <td className="p-2 text-center">{allowance.percentage}</td>
                           <td className="p-2 text-center">{allowance.type}</td>
                           <td className="p-2 text-center">
-                            <Button size="sm" variant="ghost">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => handleEditAllowance(index)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteAllowance(index)} className="text-red-600">
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </td>
                         </tr>
                       ))}
@@ -2124,7 +2615,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>Deductions</span>
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={handleAddDeduction}>
                     <Plus className="h-4 w-4 mr-1" />
                     Add
                   </Button>
@@ -2156,9 +2647,23 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                           <td className="p-2 text-center">{deduction.percentage}</td>
                           <td className="p-2 text-center">{deduction.type}</td>
                           <td className="p-2 text-center">
-                            <Button size="sm" variant="ghost">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => handleEditDeduction(index)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteDeduction(index)} className="text-red-600">
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </td>
                         </tr>
                       ))}
@@ -2172,7 +2677,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>Loan Settings</span>
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={handleAddLoan}>
                     <Plus className="h-4 w-4 mr-1" />
                     Add
                   </Button>
@@ -2204,9 +2709,23 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                           <td className="p-2 text-center">{loan.adminCharge}</td>
                           <td className="p-2 text-center">{loan.tenure}</td>
                           <td className="p-2 text-center">
-                            <Button size="sm" variant="ghost">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => handleEditLoan(index)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteLoan(index)} className="text-red-600">
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </td>
                         </tr>
                       ))}
@@ -2226,399 +2745,58 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         )}
 
         {activeTab === "hr" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Leave Policies
-                  </CardTitle>
-                  <Button size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Policy
-                  </Button>
-                </div>
+                <CardTitle>HR Settings</CardTitle>
+                <CardDescription>Manage leave types, salary grades, and HR policies</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="p-4 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold">Annual Leave</h4>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem>Edit</DropdownMenuItem>
-                          <DropdownMenuItem>Remove</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <p>1.75 days per month</p>
-                      <p>5 days</p>
-                      <p>2 weeks</p>
-                    </div>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold">Sick Leave</h4>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem>Edit</DropdownMenuItem>
-                          <DropdownMenuItem>Remove</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <p>Medical certificate after 3 days</p>
-                      <p>30 days max consecutive</p>
-                      <p>100% paid for first 10 days</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-
-              <div className="flex justify-end mt-6">
-                <Button onClick={handleSaveHRSettings} className="bg-green-600 hover:bg-green-700">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save HR Settings
-                </Button>
-              </div>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5" />
-                    Salary Grades & Notches
-                  </CardTitle>
-                  <Button size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Grade
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {[1, 2, 3, 4, 5].map((grade) => (
-                    <div key={grade} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <h4 className="font-semibold">Grade {grade}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Salary Range: GH₵{(grade * 200).toLocaleString()} - GH₵{(grade * 400).toLocaleString()}
-                        </p>
-                        <p className="text-sm text-muted-foreground">Steps: 5</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-red-600">
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <p className="text-muted-foreground">HR settings content will be implemented here.</p>
               </CardContent>
             </Card>
           </div>
         )}
 
         {activeTab === "security" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Security Settings
-                </CardTitle>
+                <CardTitle>Security Settings</CardTitle>
+                <CardDescription>Configure security policies and access controls</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Two-Factor Authentication</h4>
-                      <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.twoFactorAuth}
-                      onCheckedChange={(checked) =>
-                        setSecuritySettings({ ...securitySettings, twoFactorAuth: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Auto Session Timeout</h4>
-                      <p className="text-sm text-muted-foreground">Automatically log out inactive users</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.autoSessionTimeout}
-                      onCheckedChange={(checked) =>
-                        setSecuritySettings({ ...securitySettings, autoSessionTimeout: checked })
-                      }
-                    />
-                  </div>
-                  {securitySettings.autoSessionTimeout && (
-                    <div className="ml-4 space-y-2">
-                      <Label>Timeout Duration (minutes)</Label>
-                      <Select
-                        value={securitySettings.timeoutDuration.toString()}
-                        onValueChange={(value) => {
-                          const numValue = Number.parseInt(value)
-                          setSecuritySettings({
-                            ...securitySettings,
-                            timeoutDuration: isNaN(numValue) ? 15 : numValue,
-                          })
-                        }}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">1 minute</SelectItem>
-                          <SelectItem value="3">3 minutes</SelectItem>
-                          <SelectItem value="5">5 minutes</SelectItem>
-                          <SelectItem value="10">10 minutes</SelectItem>
-                          <SelectItem value="15">15 minutes</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Audit Logging</h4>
-                      <p className="text-sm text-muted-foreground">Track all system activities</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.auditLogging}
-                      onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, auditLogging: checked })}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <Button variant="outline" className="w-full justify-start bg-transparent">
-                    <Key className="h-4 w-4 mr-2" />
-                    Change Admin Password
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start bg-transparent">
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Security Report
-                  </Button>
-                </div>
-
-                <div className="flex justify-end mt-6">
-                  <Button onClick={handleSaveSecuritySettings} className="bg-green-600 hover:bg-green-700">
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Security Settings
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="h-5 w-5" />
-                  Password Policy
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Minimum Length</Label>
-                  <Input
-                    type="number"
-                    value={passwordPolicy.minLength.toString()}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      const numValue = value === "" ? 8 : Number.parseInt(value)
-                      setPasswordPolicy({ ...passwordPolicy, minLength: isNaN(numValue) ? 8 : numValue })
-                    }}
-                    className="w-20"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>Require Uppercase Letters</Label>
-                    <Switch
-                      checked={passwordPolicy.requireUppercase}
-                      onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireUppercase: checked })}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Require Numbers</Label>
-                    <Switch
-                      checked={passwordPolicy.requireNumbers}
-                      onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireNumbers: checked })}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Require Symbols</Label>
-                    <Switch
-                      checked={passwordPolicy.requireSymbols}
-                      onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireSymbols: checked })}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Password Strength Preview</Label>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-green-600 h-2 rounded-full" style={{ width: "85%" }}></div>
-                  </div>
-                  <p className="text-sm text-green-600">Strong password policy</p>
-                </div>
+              <CardContent>
+                <p className="text-muted-foreground">Security settings content will be implemented here.</p>
               </CardContent>
             </Card>
           </div>
         )}
 
         {activeTab === "notifications" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  Notification Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Payroll Processing Alerts</h4>
-                      <p className="text-sm text-muted-foreground">Get notified about payroll status</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Leave Request Alerts</h4>
-                      <p className="text-sm text-muted-foreground">New leave requests and approvals</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Employee Updates</h4>
-                      <p className="text-sm text-muted-foreground">New employees and profile changes</p>
-                    </div>
-                    <Switch />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">System Maintenance</h4>
-                      <p className="text-sm text-muted-foreground">Scheduled maintenance and updates</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Notification Email</Label>
-                  <Input
-                    value={notificationSettings.email}
-                    onChange={(e) => setNotificationSettings({ ...notificationSettings, email: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Webhook URL (Optional)</Label>
-                  <Input
-                    value={notificationSettings.webhookUrl}
-                    onChange={(e) => setNotificationSettings({ ...notificationSettings, webhookUrl: e.target.value })}
-                    placeholder="https://your-app.com/webhook"
-                  />
-                </div>
-
-                <div className="flex justify-end mt-6">
-                  <Button onClick={handleSaveNotificationSettings} className="bg-green-600 hover:bg-green-700">
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Notification Settings
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Mail className="h-5 w-5" />
-                    Email Templates
-                  </CardTitle>
-                </div>
+                <CardTitle>Notification Settings</CardTitle>
+                <CardDescription>Configure email templates and notification preferences</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {emailTemplates.slice(0, 4).map((template) => (
-                    <div key={template.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <h4 className="font-semibold">{template.name}</h4>
-                        <p className="text-sm text-muted-foreground">{template.description}</p>
-                      </div>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </Button>
-                    </div>
-                  ))}
-                  <Button variant="outline" className="w-full bg-transparent">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Custom Template
-                  </Button>
-                </div>
+                <p className="text-muted-foreground">Notification settings content will be implemented here.</p>
               </CardContent>
             </Card>
           </div>
         )}
       </Tabs>
 
-      {showSubsidiaryDialog && (
-        <SubsidiaryForm
-          subsidiary={editingSubsidiary}
-          onSave={handleSaveSubsidiary}
-          onCancel={() => {
-            setShowSubsidiaryDialog(false)
-            setEditingSubsidiary(null)
-          }}
-        />
-      )}
-
-      <Dialog open={showDeactivateModal} onOpenChange={setShowDeactivateModal}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={showSubsidiaryDialog} onOpenChange={setShowSubsidiaryDialog}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">Deactivate Subsidiary Function</DialogTitle>
-            <button
-              onClick={handleCancelDeactivation}
-              className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </button>
+            <DialogTitle>{editingSubsidiary ? "Edit Subsidiary" : "Add Subsidiary"}</DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground">
-              Are you sure you want to deactivate the subsidiary function? This will hide all subsidiary management
-              features.
-            </p>
-          </div>
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={handleCancelDeactivation}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleConfirmDeactivation}>
-              Deactivate
-            </Button>
-          </DialogFooter>
+          <SubsidiaryForm
+            subsidiary={editingSubsidiary}
+            onSave={handleSaveSubsidiary}
+            onCancel={() => setShowSubsidiaryDialog(false)}
+          />
         </DialogContent>
       </Dialog>
 
@@ -2626,93 +2804,57 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Subsidiary Details</DialogTitle>
-            <DialogDescription>View detailed information about {viewingSubsidiary?.name}</DialogDescription>
           </DialogHeader>
           {viewingSubsidiary && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Company Name</Label>
-                  <p className="text-sm font-medium">{viewingSubsidiary.name}</p>
+                  <Label className="text-sm font-medium text-muted-foreground">Name</Label>
+                  <p className="font-medium">{viewingSubsidiary.name}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Status</Label>
-                  <Badge variant="secondary" className="bg-green-100 text-green-800 ml-2">
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
                     {viewingSubsidiary.status}
                   </Badge>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Email</Label>
-                  <p className="text-sm">{viewingSubsidiary.email}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
-                  <p className="text-sm">{viewingSubsidiary.phone || "Not provided"}</p>
-                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Tax ID</Label>
-                  <p className="text-sm">{viewingSubsidiary.tax_id}</p>
+                  <p className="font-medium">{viewingSubsidiary.tax_id}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">SSNIT Number</Label>
-                  <p className="text-sm">{viewingSubsidiary.ssnit_number}</p>
+                  <p className="font-medium">{viewingSubsidiary.ssnit_number}</p>
                 </div>
               </div>
-
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Email</Label>
+                  <p className="font-medium">{viewingSubsidiary.email_address}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
+                  <p className="font-medium">{viewingSubsidiary.phone_number}</p>
+                </div>
+              </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Address</Label>
-                <p className="text-sm mt-1">{viewingSubsidiary.address || "Not provided"}</p>
+                <p className="font-medium">{viewingSubsidiary.address}</p>
               </div>
-
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Divisions</Label>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {viewingSubsidiary.divisions?.map((division, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {division}
-                      </Badge>
-                    )) || <span className="text-xs text-muted-foreground">None</span>}
-                  </div>
+                  <p className="font-medium">{viewingSubsidiary.divisions_count || 0}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Departments</Label>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {viewingSubsidiary.departments?.map((dept, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {dept}
-                      </Badge>
-                    )) || <span className="text-xs text-muted-foreground">None</span>}
-                  </div>
+                  <p className="font-medium">{viewingSubsidiary.departments_count || 0}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Locations</Label>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {viewingSubsidiary.locations?.map((location, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {location}
-                      </Badge>
-                    )) || <span className="text-xs text-muted-foreground">None</span>}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Created</Label>
-                  <p className="text-sm">
-                    {viewingSubsidiary.created_at
-                      ? new Date(viewingSubsidiary.created_at).toLocaleDateString()
-                      : "Unknown"}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Last Updated</Label>
-                  <p className="text-sm">
-                    {viewingSubsidiary.updated_at
-                      ? new Date(viewingSubsidiary.updated_at).toLocaleDateString()
-                      : "Unknown"}
-                  </p>
+                  <p className="font-medium">{viewingSubsidiary.locations_count || 0}</p>
                 </div>
               </div>
             </div>
@@ -2729,9 +2871,275 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 }
               }}
             >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Subsidiary
+              Edit
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeactivateModal} onOpenChange={setShowDeactivateModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deactivate Subsidiary Function</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate the subsidiary function? This will hide all subsidiary management
+              features.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelDeactivation}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDeactivation}>
+              Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAllowanceDialog} onOpenChange={setShowAllowanceDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingIndex >= 0 ? "Edit Allowance" : "Add Allowance"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Code</Label>
+                <Input
+                  value={editingItem?.code || ""}
+                  onChange={(e) => setEditingItem({ ...editingItem, code: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Input
+                  value={editingItem?.description || ""}
+                  onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  checked={editingItem?.taxable || false}
+                  onCheckedChange={(checked) => setEditingItem({ ...editingItem, taxable: checked })}
+                />
+                <Label>Taxable</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  checked={editingItem?.recurring || false}
+                  onCheckedChange={(checked) => setEditingItem({ ...editingItem, recurring: checked })}
+                />
+                <Label>Recurring</Label>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Amount</Label>
+                <Input
+                  type="number"
+                  value={editingItem?.amount || 0}
+                  onChange={(e) => setEditingItem({ ...editingItem, amount: Number.parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Percentage</Label>
+                <Input
+                  type="number"
+                  value={editingItem?.percentage || 0}
+                  onChange={(e) =>
+                    setEditingItem({ ...editingItem, percentage: Number.parseFloat(e.target.value) || 0 })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select
+                  value={editingItem?.type || "FIXED"}
+                  onValueChange={(value) => setEditingItem({ ...editingItem, type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FIXED">FIXED</SelectItem>
+                    <SelectItem value="VARIABLE">VARIABLE</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAllowanceDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveAllowance}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeductionDialog} onOpenChange={setShowDeductionDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingIndex >= 0 ? "Edit Deduction" : "Add Deduction"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Code</Label>
+                <Input
+                  value={editingItem?.code || ""}
+                  onChange={(e) => setEditingItem({ ...editingItem, code: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Input
+                  value={editingItem?.description || ""}
+                  onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                checked={editingItem?.recurring || false}
+                onCheckedChange={(checked) => setEditingItem({ ...editingItem, recurring: checked })}
+              />
+              <Label>Recurring</Label>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Amount</Label>
+                <Input
+                  type="number"
+                  value={editingItem?.amount || 0}
+                  onChange={(e) => setEditingItem({ ...editingItem, amount: Number.parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Percentage</Label>
+                <Input
+                  type="number"
+                  value={editingItem?.percentage || 0}
+                  onChange={(e) =>
+                    setEditingItem({ ...editingItem, percentage: Number.parseFloat(e.target.value) || 0 })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select
+                  value={editingItem?.type || "FIXED"}
+                  onValueChange={(value) => setEditingItem({ ...editingItem, type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FIXED">FIXED</SelectItem>
+                    <SelectItem value="VARIABLE">VARIABLE</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeductionDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveDeduction}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showLoanDialog} onOpenChange={setShowLoanDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingIndex >= 0 ? "Edit Loan Setting" : "Add Loan Setting"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Code</Label>
+                <Input
+                  value={editingItem?.code || ""}
+                  onChange={(e) => setEditingItem({ ...editingItem, code: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Input
+                  value={editingItem?.description || ""}
+                  onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Maximum Amount</Label>
+                <Input
+                  type="number"
+                  value={editingItem?.maxAmount || 0}
+                  onChange={(e) =>
+                    setEditingItem({ ...editingItem, maxAmount: Number.parseFloat(e.target.value) || 0 })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Interest Rate (%)</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={editingItem?.interestRate || 0}
+                  onChange={(e) =>
+                    setEditingItem({ ...editingItem, interestRate: Number.parseFloat(e.target.value) || 0 })
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Rate Method</Label>
+                <Select
+                  value={editingItem?.rateMethod || "Reducing Balance"}
+                  onValueChange={(value) => setEditingItem({ ...editingItem, rateMethod: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Reducing Balance">Reducing Balance</SelectItem>
+                    <SelectItem value="Straight Line Meet">Straight Line Meet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Admin Charge</Label>
+                <Input
+                  type="number"
+                  value={editingItem?.adminCharge || 0}
+                  onChange={(e) =>
+                    setEditingItem({ ...editingItem, adminCharge: Number.parseFloat(e.target.value) || 0 })
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Loan Tenure (months)</Label>
+              <Input
+                type="number"
+                value={editingItem?.tenure || 12}
+                onChange={(e) => setEditingItem({ ...editingItem, tenure: Number.parseInt(e.target.value) || 12 })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLoanDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveLoan}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
