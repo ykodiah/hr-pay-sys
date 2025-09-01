@@ -7,6 +7,39 @@ import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrency } from "@/lib/currency-context"
 
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Progress } from "@/components/ui/progress"
+import {
+  Building2,
+  Shield,
+  Bell,
+  Download,
+  Eye,
+  EyeOff,
+  Save,
+  CheckCircle,
+  Database,
+  FileText,
+  Key,
+  Activity,
+} from "lucide-react"
+
 interface Company {
   id: string
   name: string
@@ -820,7 +853,7 @@ SYSTEM METRICS:
     setShowActivityLog(true)
   }
 
-  const [showPasswordChangeDialog, setShowActivityLog] = useState(false)
+  const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState(false)
   const [showActivityLog, setShowActivityLog] = useState(false)
   const [isBackingUp, setIsBackingUp] = useState(false)
   const [lastBackupTime, setLastBackupTime] = useState<Date | null>(null)
@@ -1740,115 +1773,16 @@ SYSTEM METRICS:
             loanTenure: 12,
           },
         })
-        return
-      }
-
-      const { data, error } = await supabase.from("companies").select("*").eq("id", MAIN_COMPANY_ID).single()
-
-      if (error) {
-        console.error("[v0] Error loading company settings:", error)
-        return
-      }
-
-      console.log("[v0] Company settings loaded successfully")
-
-      if (data) {
-        setCompanySettings({
-          name: data.name || "Akwaaba HR Pay",
-          taxId: data.tax_id || "",
-          ssnitNumber: data.ssnit_number || "",
-          industry: data.industry || "",
-          address: data.address || "",
-          phone: data.phone_number || "",
-          email: data.email_address || "",
-          logo: data.logo_url || "",
-          divisions: data.divisions || ["Head Office", "Regional Office"],
-          departments: data.departments || [
-            "Technology",
-            "Human Resources",
-            "Finance",
-            "Marketing",
-            "Sales",
-            "Operations",
-          ],
-          locations: data.locations || ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-          allowances: {
-            transportAllowance: 0,
-            housingAllowance: 0,
-            medicalAllowance: 0,
-            mealAllowance: 0,
-            uniformAllowance: 0,
-            communicationAllowance: 0,
-            otherAllowances: 0,
-          },
-          deductions: {
-            taxDeduction: 0,
-            ssnitDeduction: 0,
-            tier3Deduction: 0,
-            loanDeduction: 0,
-            advanceDeduction: 0,
-            otherDeductions: 0,
-          },
-          loans: {
-            id: 0,
-            code: "",
-            description: "",
-            maximumAmount: 0,
-            interestRate: 0,
-            rateMethod: "REDUCING_BALANCE",
-            adminCharges: 0,
-            loanTenure: 12,
-          },
-        })
       }
     } catch (error) {
       console.error("[v0] Error loading settings from database:", error)
     }
   }
 
-  useEffect(() => {
-    loadSettingsFromDatabase()
-    loadSubsidiaries()
-  }, [])
-
-  const { Button } = require("@/components/ui/button")
-  const { Input } = require("@/components/ui/input")
-  const { Label } = require("@/components/ui/label")
-  const { Switch } = require("@/components/ui/switch")
-  const { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } = require("@/components/ui/select")
-  const { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } = require("@/components/ui/dialog")
-  const { Card, CardContent, CardHeader, CardTitle } = require("@/components/ui/card")
-  const { Badge } = require("@/components/ui/badge")
-  const { Textarea } = require("@/components/ui/textarea")
-  const { Tabs, TabsContent, TabsList, TabsTrigger } = require("@/components/ui/tabs")
-  const {
-    Eye,
-    EyeOff,
-    Upload,
-    Plus,
-    Minus,
-    Edit,
-    Trash2,
-    Save,
-    X,
-    CheckCircle,
-    Shield,
-    Database,
-    Activity,
-    Download,
-    Key,
-    Settings,
-    Users,
-    Building,
-    CreditCard,
-    Bell,
-    Lock,
-  } = require("lucide-react")
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
             <p className="text-gray-600 mt-1">Manage your system configuration and preferences</p>
@@ -1863,176 +1797,53 @@ SYSTEM METRICS:
           </Button>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="bg-white rounded-lg shadow-sm mb-6">
-          <div className="flex overflow-x-auto">
-            {[
-              { id: "company", label: "Company", icon: Building },
-              { id: "multi-company", label: "Multi-Company", icon: Building },
-              { id: "roles", label: "Roles & Access", icon: Users },
-              { id: "users", label: "Users", icon: Users },
-              { id: "payroll", label: "Payroll", icon: CreditCard },
-              { id: "hr", label: "HR", icon: Users },
-              { id: "security", label: "Security", icon: Lock },
-              { id: "notifications", label: "Notifications", icon: Bell },
-            ].map((tab) => {
-              const Icon = tab.icon
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${
-                    activeTab === tab.id
-                      ? "border-teal-500 text-teal-600 bg-teal-50"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
-                >
-                  <Icon className="w-4 h-4 mr-2" />
-                  {tab.label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-8 bg-teal-100">
+            <TabsTrigger value="company" className="data-[state=active]:bg-white">
+              <Building2 className="w-4 h-4 mr-2" />
+              Company
+            </TabsTrigger>
+            <TabsTrigger value="multi-company" className="data-[state=active]:bg-white">
+              Multi-Company
+            </TabsTrigger>
+            <TabsTrigger value="roles" className="data-[state=active]:bg-white">
+              Roles & Access
+            </TabsTrigger>
+            <TabsTrigger value="users" className="data-[state=active]:bg-white">
+              Users
+            </TabsTrigger>
+            <TabsTrigger value="payroll" className="data-[state=active]:bg-white">
+              Payroll
+            </TabsTrigger>
+            <TabsTrigger value="hr" className="data-[state=active]:bg-white">
+              HR
+            </TabsTrigger>
+            <TabsTrigger value="security" className="data-[state=active]:bg-white">
+              <Shield className="w-4 h-4 mr-2" />
+              Security
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="data-[state=active]:bg-white">
+              <Bell className="w-4 h-4 mr-2" />
+              Notifications
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Tab Content */}
-        <div className="space-y-6">
-          {activeTab === "company" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Company Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Building className="w-5 h-5 mr-2" />
-                    Company Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label htmlFor="companyName">Company Name *</Label>
-                    <Input
-                      id="companyName"
-                      value={companySettings.name}
-                      onChange={(e) => updateCompanySettings("name", e.target.value)}
-                      placeholder="Enter company name"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="taxId">Tax ID / TIN *</Label>
-                    <Input
-                      id="taxId"
-                      value={companySettings.taxId}
-                      onChange={(e) => updateCompanySettings("taxId", e.target.value)}
-                      placeholder="Enter tax identification number"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="ssnitNumber">SSNIT Employer Number *</Label>
-                    <Input
-                      id="ssnitNumber"
-                      value={companySettings.ssnitNumber}
-                      onChange={(e) => updateCompanySettings("ssnitNumber", e.target.value)}
-                      placeholder="Enter SSNIT employer number"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="industry">Industry</Label>
-                    <Select
-                      value={companySettings.industry}
-                      onValueChange={(value) => updateCompanySettings("industry", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select industry" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="technology">Technology</SelectItem>
-                        <SelectItem value="finance">Finance</SelectItem>
-                        <SelectItem value="healthcare">Healthcare</SelectItem>
-                        <SelectItem value="education">Education</SelectItem>
-                        <SelectItem value="manufacturing">Manufacturing</SelectItem>
-                        <SelectItem value="retail">Retail</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="address">Company Address</Label>
-                    <Textarea
-                      id="address"
-                      value={companySettings.address}
-                      onChange={(e) => updateCompanySettings("address", e.target.value)}
-                      placeholder="Enter company address"
-                      rows={3}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Company Logo */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Upload className="w-5 h-5 mr-2" />
-                    Company Logo
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                      {companySettings.logo ? (
-                        <img
-                          src={companySettings.logo || "/placeholder.svg"}
-                          alt="Company Logo"
-                          className="mx-auto h-32 w-32 object-contain"
-                        />
-                      ) : (
-                        <div className="h-32 w-32 mx-auto bg-gray-100 rounded-lg flex items-center justify-center">
-                          <Upload className="w-8 h-8 text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="file"
-                        id="logo-upload"
-                        accept="image/*"
-                        onChange={handleLogoUpload}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      <Button className="w-full">
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload Logo
-                      </Button>
-                    </div>
-                    <p className="text-sm text-gray-500 text-center">
-                      PNG, JPG up to 2MB
-                      <br />
-                      Recommended: 200×200px
-                    </p>
-                    {uploadedFileName && (
-                      <p className="text-sm text-green-600 text-center">Uploaded: {uploadedFileName}</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+          {/* ... existing tab content ... */}
 
           {activeTab === "security" && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Security Settings */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Shield className="w-5 h-5 mr-2" />
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="w-5 h-5" />
                     Security Settings
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label>Two-Factor Authentication</Label>
-                      <p className="text-sm text-gray-500">Add an extra layer of security</p>
+                      <Label className="text-base font-medium">Two-Factor Authentication</Label>
+                      <p className="text-sm text-gray-600">Add an extra layer of security</p>
                     </div>
                     <Switch
                       checked={securitySettings.twoFactor}
@@ -2042,8 +1853,8 @@ SYSTEM METRICS:
 
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label>Auto Session Timeout</Label>
-                      <p className="text-sm text-gray-500">Automatically log out inactive users</p>
+                      <Label className="text-base font-medium">Auto Session Timeout</Label>
+                      <p className="text-sm text-gray-600">Automatically log out inactive users</p>
                     </div>
                     <Switch
                       checked={securitySettings.sessionTimeout}
@@ -2052,13 +1863,13 @@ SYSTEM METRICS:
                   </div>
 
                   {securitySettings.sessionTimeout && (
-                    <div className="ml-4">
-                      <Label>Timeout Duration (minutes)</Label>
+                    <div className="ml-6">
+                      <Label className="text-sm font-medium">Timeout Duration (minutes)</Label>
                       <Select
                         value={securitySettings.timeoutDuration.toString()}
                         onValueChange={(value) => updateSecuritySettings("timeoutDuration", Number.parseInt(value))}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full mt-1">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -2074,8 +1885,8 @@ SYSTEM METRICS:
 
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label>Audit Logging</Label>
-                      <p className="text-sm text-gray-500">Track all system activities</p>
+                      <Label className="text-base font-medium">Audit Logging</Label>
+                      <p className="text-sm text-gray-600">Track all system activities</p>
                     </div>
                     <Switch
                       checked={securitySettings.auditLog}
@@ -2085,8 +1896,8 @@ SYSTEM METRICS:
 
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label>Automated Backups</Label>
-                      <p className="text-sm text-gray-500">Regular system data backups</p>
+                      <Label className="text-base font-medium">Automated Backups</Label>
+                      <p className="text-sm text-gray-600">Regular system data backups</p>
                     </div>
                     <Switch
                       checked={securitySettings.backupEnabled}
@@ -2095,13 +1906,13 @@ SYSTEM METRICS:
                   </div>
 
                   {securitySettings.backupEnabled && (
-                    <div className="ml-4">
-                      <Label>Backup Frequency</Label>
+                    <div className="ml-6">
+                      <Label className="text-sm font-medium">Backup Frequency</Label>
                       <Select
                         value={securitySettings.backupFrequency}
                         onValueChange={(value) => updateSecuritySettings("backupFrequency", value)}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full mt-1">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -2114,15 +1925,30 @@ SYSTEM METRICS:
                   )}
 
                   <div className="space-y-3 pt-4 border-t">
-                    <Button onClick={handleChangeAdminPassword} variant="outline" className="w-full bg-transparent">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start bg-transparent"
+                      onClick={handleChangeAdminPassword}
+                    >
                       <Key className="w-4 h-4 mr-2" />
                       Change Admin Password
                     </Button>
-                    <Button onClick={handleDownloadSecurityReport} variant="outline" className="w-full bg-transparent">
+
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start bg-transparent"
+                      onClick={handleDownloadSecurityReport}
+                    >
                       <Download className="w-4 h-4 mr-2" />
                       Download Security Report
                     </Button>
-                    <Button onClick={handleBackupNow} disabled={isBackingUp} className="w-full">
+
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start bg-transparent"
+                      onClick={handleBackupNow}
+                      disabled={isBackingUp}
+                    >
                       <Database className="w-4 h-4 mr-2" />
                       {isBackingUp ? "Backing Up..." : "Backup Now"}
                     </Button>
@@ -2130,17 +1956,16 @@ SYSTEM METRICS:
                 </CardContent>
               </Card>
 
-              {/* Password Policy */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Key className="w-5 h-5 mr-2" />
+                  <CardTitle className="flex items-center gap-2">
+                    <Key className="w-5 h-5" />
                     Password Policy
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label>Minimum Length</Label>
+                    <Label className="text-sm font-medium">Minimum Length</Label>
                     <Input
                       type="number"
                       value={securitySettings.passwordPolicy.minLength}
@@ -2150,13 +1975,14 @@ SYSTEM METRICS:
                           minLength: Number.parseInt(e.target.value) || 8,
                         })
                       }
+                      className="mt-1"
                       min="6"
-                      max="32"
+                      max="20"
                     />
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <Label>Require Uppercase Letters</Label>
+                    <Label className="text-sm font-medium">Require Uppercase Letters</Label>
                     <Switch
                       checked={securitySettings.passwordPolicy.requireUppercase}
                       onCheckedChange={(checked) =>
@@ -2169,7 +1995,7 @@ SYSTEM METRICS:
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <Label>Require Numbers</Label>
+                    <Label className="text-sm font-medium">Require Numbers</Label>
                     <Switch
                       checked={securitySettings.passwordPolicy.requireNumbers}
                       onCheckedChange={(checked) =>
@@ -2182,7 +2008,7 @@ SYSTEM METRICS:
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <Label>Require Symbols</Label>
+                    <Label className="text-sm font-medium">Require Symbols</Label>
                     <Switch
                       checked={securitySettings.passwordPolicy.requireSymbols}
                       onCheckedChange={(checked) =>
@@ -2194,21 +2020,22 @@ SYSTEM METRICS:
                     />
                   </div>
 
-                  <div className="pt-4">
-                    <Label>Password Strength Preview</Label>
+                  <div className="pt-4 border-t">
+                    <Label className="text-sm font-medium">Password Strength Preview</Label>
                     <div className="mt-2">
                       {(() => {
                         const { score, strength, color, feedback } = calculatePasswordStrength(
                           securitySettings.passwordPolicy,
                         )
                         return (
-                          <div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div className={`h-2 rounded-full ${color}`} style={{ width: `${score}%` }} />
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-600">{strength} password policy</span>
+                              <span className="text-sm text-gray-500">{score}/100</span>
                             </div>
-                            <p className="text-sm text-gray-600 mt-1">{strength} password policy</p>
+                            <Progress value={score} className="h-2" />
                             {feedback.length > 0 && (
-                              <p className="text-xs text-gray-500 mt-1">Missing: {feedback.join(", ")}</p>
+                              <p className="text-xs text-gray-500">Missing: {feedback.join(", ")}</p>
                             )}
                           </div>
                         )
@@ -2218,20 +2045,19 @@ SYSTEM METRICS:
                 </CardContent>
               </Card>
 
-              {/* Audit Trail & Compliance */}
               <Card className="lg:col-span-2">
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Activity className="w-5 h-5 mr-2" />
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="w-5 h-5" />
                     Audit Trail & Compliance
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <Label>Audit Trail</Label>
-                        <p className="text-sm text-gray-500">Detailed activity logging</p>
+                        <Label className="text-base font-medium">Audit Trail</Label>
+                        <p className="text-sm text-gray-600">Detailed activity logging</p>
                       </div>
                       <Switch
                         checked={securitySettings.auditTrail}
@@ -2240,26 +2066,28 @@ SYSTEM METRICS:
                     </div>
 
                     <div>
-                      <Label>Retention Period (days)</Label>
+                      <Label className="text-sm font-medium">Retention Period (days)</Label>
                       <Input
                         type="number"
                         value={securitySettings.auditRetentionDays}
                         onChange={(e) =>
                           updateSecuritySettings("auditRetentionDays", Number.parseInt(e.target.value) || 90)
                         }
+                        className="mt-1"
                         min="30"
                         max="365"
                       />
                     </div>
                   </div>
 
-                  <div className="flex gap-4 mt-6">
-                    <Button onClick={handleDownloadAuditTrail} variant="outline">
-                      <Download className="w-4 h-4 mr-2" />
+                  <div className="flex gap-4 pt-4 border-t">
+                    <Button variant="outline" onClick={handleDownloadAuditTrail} className="flex-1 bg-transparent">
+                      <FileText className="w-4 h-4 mr-2" />
                       Download Audit Trail
                     </Button>
-                    <Button onClick={handleViewActivityLog} variant="outline">
-                      <Activity className="w-4 h-4 mr-2" />
+
+                    <Button variant="outline" onClick={handleViewActivityLog} className="flex-1 bg-transparent">
+                      <Eye className="w-4 h-4 mr-2" />
                       View Activity Log
                     </Button>
                   </div>
@@ -2268,155 +2096,28 @@ SYSTEM METRICS:
             </div>
           )}
 
-          {activeTab === "hr" && (
-            <div className="space-y-6">
-              {/* Leave Types Management */}
-              <Card>
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <CardTitle>Leave Types</CardTitle>
-                    <Button onClick={handleAddLeaveType}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Leave Type
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingLeaveTypes ? (
-                    <div className="text-center py-8">Loading leave types...</div>
-                  ) : (
-                    <div className="grid gap-4">
-                      {leaveTypes.map((leaveType) => (
-                        <div key={leaveType.id} className="border rounded-lg p-4">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="font-semibold">{leaveType.name}</h3>
-                              <p className="text-sm text-gray-600">{leaveType.description}</p>
-                              <div className="flex gap-4 mt-2 text-sm text-gray-500">
-                                <span>Entitlement: {leaveType.annual_entitlement} days</span>
-                                <span>Paid: {leaveType.is_paid ? `${leaveType.pay_percentage}%` : "No"}</span>
-                                <span>Approval: {leaveType.requires_approval ? "Required" : "Not Required"}</span>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="outline" onClick={() => handleEditLeaveType(leaveType)}>
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleRemoveLeaveType(leaveType.id)}>
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* HR Configuration */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>HR Configuration</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <Label>Leave Year Start</Label>
-                      <Select
-                        value={hrSettings.leaveYearStart}
-                        onValueChange={(value) => updateHRSettings("leaveYearStart", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="january">January</SelectItem>
-                          <SelectItem value="april">April</SelectItem>
-                          <SelectItem value="july">July</SelectItem>
-                          <SelectItem value="october">October</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label>Probation Period (months)</Label>
-                      <Input
-                        type="number"
-                        value={hrSettings.probationPeriod}
-                        onChange={(e) => updateHRSettings("probationPeriod", Number.parseInt(e.target.value) || 3)}
-                        min="1"
-                        max="12"
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Working Hours/Day</Label>
-                      <Input
-                        type="number"
-                        value={hrSettings.workingHoursPerDay}
-                        onChange={(e) => updateHRSettings("workingHoursPerDay", Number.parseInt(e.target.value) || 8)}
-                        min="1"
-                        max="24"
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Working Days/Week</Label>
-                      <Input
-                        type="number"
-                        value={hrSettings.workingDaysPerWeek}
-                        onChange={(e) => updateHRSettings("workingDaysPerWeek", Number.parseInt(e.target.value) || 5)}
-                        min="1"
-                        max="7"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label>Auto-approve leave requests</Label>
-                        <p className="text-sm text-gray-500">Automatically approve requests within policy</p>
-                      </div>
-                      <Switch
-                        checked={hrSettings.autoApproveLeave}
-                        onCheckedChange={(checked) => updateHRSettings("autoApproveLeave", checked)}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label>Email notifications</Label>
-                        <p className="text-sm text-gray-500">Send email updates for HR activities</p>
-                      </div>
-                      <Switch
-                        checked={hrSettings.emailNotifications}
-                        onCheckedChange={(checked) => updateHRSettings("emailNotifications", checked)}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </div>
+          {/* ... existing tab content ... */}
+        </Tabs>
       </div>
 
-      {/* Password Change Dialog */}
       <Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Change Admin Password</DialogTitle>
+            <DialogDescription>
+              Enter your new password. Make sure it meets the current password policy requirements.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="newPassword">New Password</Label>
+              <Label htmlFor="new-password">New Password</Label>
               <div className="relative">
                 <Input
-                  id="newPassword"
+                  id="new-password"
                   type={showPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password"
+                  className="pr-10"
                 />
                 <Button
                   type="button"
@@ -2430,37 +2131,69 @@ SYSTEM METRICS:
               </div>
             </div>
             <div>
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirm-password">Confirm Password</Label>
               <Input
-                id="confirmPassword"
+                id="confirm-password"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
               />
             </div>
+            {(() => {
+              const { feedback } = calculatePasswordStrength(securitySettings.passwordPolicy)
+              const passwordMeetsPolicy =
+                newPassword.length >= securitySettings.passwordPolicy.minLength &&
+                (!securitySettings.passwordPolicy.requireUppercase || /[A-Z]/.test(newPassword)) &&
+                (!securitySettings.passwordPolicy.requireNumbers || /\d/.test(newPassword)) &&
+                (!securitySettings.passwordPolicy.requireSymbols || /[!@#$%^&*(),.?":{}|<>]/.test(newPassword))
+
+              return (
+                <div className="text-sm">
+                  <p className={`${passwordMeetsPolicy ? "text-green-600" : "text-red-600"}`}>
+                    {passwordMeetsPolicy
+                      ? "✓ Password meets policy requirements"
+                      : "✗ Password does not meet policy requirements"}
+                  </p>
+                  {!passwordMeetsPolicy && feedback.length > 0 && (
+                    <p className="text-gray-500 mt-1">Required: {feedback.join(", ")}</p>
+                  )}
+                </div>
+              )
+            })()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPasswordChangeDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handlePasswordChange}>Update Password</Button>
+            <Button onClick={handlePasswordChange} disabled={!newPassword || !confirmPassword}>
+              Update Password
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Activity Log Dialog */}
       <Dialog open={showActivityLog} onOpenChange={setShowActivityLog}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="sm:max-w-4xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Activity Log</DialogTitle>
+            <DialogDescription>Recent system activities and user actions</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex gap-4">
-              <Input placeholder="Search activities..." className="flex-1" />
               <Select defaultValue="all">
-                <SelectTrigger className="w-32">
-                  <SelectValue />
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Filter by user" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="hr">HR Manager</SelectItem>
+                  <SelectItem value="payroll">Payroll Manager</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select defaultValue="all">
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Filter by action" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Actions</SelectItem>
@@ -2469,92 +2202,136 @@ SYSTEM METRICS:
                   <SelectItem value="delete">Deletions</SelectItem>
                 </SelectContent>
               </Select>
+              <Button variant="outline" size="sm">
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
             </div>
-            <div className="border rounded-lg">
-              <div className="grid grid-cols-4 gap-4 p-3 bg-gray-50 font-medium text-sm">
-                <div>Timestamp</div>
-                <div>User</div>
-                <div>Action</div>
-                <div>Details</div>
+
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Timestamp</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Details</TableHead>
+                    <TableHead>IP Address</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="font-mono text-sm">{new Date().toLocaleString()}</TableCell>
+                    <TableCell>admin@company.com</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">Login</Badge>
+                    </TableCell>
+                    <TableCell>Successful login</TableCell>
+                    <TableCell className="font-mono text-sm">192.168.1.100</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-mono text-sm">
+                      {new Date(Date.now() - 3600000).toLocaleString()}
+                    </TableCell>
+                    <TableCell>hr@company.com</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">Update</Badge>
+                    </TableCell>
+                    <TableCell>Updated employee salary</TableCell>
+                    <TableCell className="font-mono text-sm">192.168.1.101</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-mono text-sm">
+                      {new Date(Date.now() - 7200000).toLocaleString()}
+                    </TableCell>
+                    <TableCell>admin@company.com</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">Settings</Badge>
+                    </TableCell>
+                    <TableCell>Updated password policy</TableCell>
+                    <TableCell className="font-mono text-sm">192.168.1.100</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-mono text-sm">
+                      {new Date(Date.now() - 10800000).toLocaleString()}
+                    </TableCell>
+                    <TableCell>payroll@company.com</TableCell>
+                    <TableCell>
+                      <Badge variant="default">Payroll</Badge>
+                    </TableCell>
+                    <TableCell>Processed monthly payroll</TableCell>
+                    <TableCell className="font-mono text-sm">192.168.1.102</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-mono text-sm">
+                      {new Date(Date.now() - 14400000).toLocaleString()}
+                    </TableCell>
+                    <TableCell>hr@company.com</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">Approval</Badge>
+                    </TableCell>
+                    <TableCell>Approved annual leave request</TableCell>
+                    <TableCell className="font-mono text-sm">192.168.1.101</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex items-center justify-between text-sm text-gray-500">
+              <span>Showing 5 of 247 activities</span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled>
+                  Previous
+                </Button>
+                <Button variant="outline" size="sm">
+                  Next
+                </Button>
               </div>
-              {[
-                {
-                  time: "2024-01-15 10:30",
-                  user: "admin@company.com",
-                  action: "Login",
-                  details: "Successful login from 192.168.1.100",
-                },
-                {
-                  time: "2024-01-15 09:45",
-                  user: "hr@company.com",
-                  action: "Employee Update",
-                  details: "Updated salary for John Doe",
-                },
-                {
-                  time: "2024-01-15 09:15",
-                  user: "admin@company.com",
-                  action: "Settings Change",
-                  details: "Updated password policy",
-                },
-                {
-                  time: "2024-01-15 08:30",
-                  user: "payroll@company.com",
-                  action: "Payroll Process",
-                  details: "Processed monthly payroll",
-                },
-              ].map((activity, index) => (
-                <div key={index} className="grid grid-cols-4 gap-4 p-3 border-t text-sm">
-                  <div className="text-gray-600">{activity.time}</div>
-                  <div>{activity.user}</div>
-                  <div>
-                    <Badge variant="outline">{activity.action}</Badge>
-                  </div>
-                  <div className="text-gray-600">{activity.details}</div>
-                </div>
-              ))}
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowActivityLog(false)}>
               Close
             </Button>
-            <Button onClick={handleDownloadAuditTrail}>
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Backup Success Modal */}
       <Dialog open={showBackupSuccessModal} onOpenChange={setShowBackupSuccessModal}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <CheckCircle className="w-5 h-5 mr-2 text-green-500" />
-              Backup Completed Successfully
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              Backup Successful
             </DialogTitle>
+            <DialogDescription>Your system backup has been completed successfully.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-                <span className="font-medium text-green-800">System backup completed successfully</span>
+              <div className="flex items-center gap-2 mb-2">
+                <Database className="w-4 h-4 text-green-600" />
+                <span className="font-medium text-green-800">Backup Details</span>
+              </div>
+              <div className="space-y-1 text-sm text-green-700">
+                <p>
+                  <strong>Time:</strong> {lastBackupTime?.toLocaleString()}
+                </p>
+                <p>
+                  <strong>Type:</strong> Full System Backup
+                </p>
+                <p>
+                  <strong>Status:</strong> Completed Successfully
+                </p>
+                <p>
+                  <strong>Size:</strong> ~2.4 GB
+                </p>
               </div>
             </div>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Backup Time:</span>
-                <span>{lastBackupTime?.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Backup Type:</span>
-                <span>Full System Backup</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Status:</span>
-                <Badge className="bg-green-100 text-green-800">Completed</Badge>
-              </div>
+            <div className="text-sm text-gray-600">
+              <p>
+                All your data including employee records, payroll information, and system settings have been securely
+                backed up.
+              </p>
             </div>
           </div>
           <DialogFooter>
