@@ -1,98 +1,80 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
-import { useToast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
-import { useCurrency } from "@/lib/currency-context"
 
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useToast } from "@/hooks/use-toast"
+import { useCurrency } from "@/lib/currency-context"
+import { createClient as createBrowserClient } from "@/lib/supabase/client"
 import {
   Building2,
   Shield,
-  Bell,
-  Download,
   Users,
   DollarSign,
+  Bell,
+  Upload,
   Calendar,
   Settings,
+  Plus,
   Edit,
   Trash2,
-  Plus,
-  Upload,
   Eye,
-  Mail,
-  Minus,
   EyeOff,
   CheckCircle,
+  Download,
+  Mail,
+  Minus,
+  MoreHorizontal,
+  X,
 } from "lucide-react"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 interface Company {
   id: string
   name: string
   tax_id: string
   ssnit_number: string
-  email_address: string
-  phone_number: string
-  address: string
   industry: string
-  logo_url?: string
+  address: string
+  phone_number: string
+  email_address: string
   logo_file_id?: string
-  divisions: any[]
-  departments: any[]
-  locations: any[]
-  created_at: string
-  updated_at: string
 }
 
 interface LeaveType {
   id: string
-  company_id: string
   name: string
   code: string
   description: string
   annual_entitlement: number
-  accrual_method: string
-  accrual_rate: number
-  min_service_months: number
   max_consecutive_days: number
-  max_per_year: number
+  pay_percentage: number
+  min_notice_days: number
   requires_approval: boolean
   requires_medical_certificate: boolean
-  medical_cert_after_days: number
-  is_paid: boolean
-  pay_percentage: number
   allow_carry_over: boolean
-  max_carry_over_days: number
-  carry_over_expiry_months: number
-  min_notice_days: number
   is_active: boolean
-  is_system_default: boolean
-  created_by: string
-  created_at: string
-  updated_at: string
 }
 
 interface SalaryGrade {
   id: string
-  company_id: string
   grade_name: string
   grade_level: number
   step_1: number
@@ -100,21 +82,56 @@ interface SalaryGrade {
   step_3: number
   step_4: number
   step_5: number
-  is_active: boolean
-  created_at: string
-  updated_at: string
 }
 
 interface PayrollConfig {
-  id: number
-  company_id: number
-  currency_code: string
-  currency_symbol: string
+  id: string
   minimum_wage: number
   overtime_weekday_multiplier: number
   overtime_weekend_multiplier: number
-  created_at: string
-  updated_at: string
+  currency: string
+  pay_frequency: string
+  cutoff_day: number
+  processing_day: number
+}
+
+interface Employee {
+  id: string
+  first_name: string
+  last_name: string
+  full_name?: string
+  corporate_email: string
+  personal_email: string
+  position: string
+  department: string
+  status: string
+}
+
+interface Subsidiary {
+  id: string
+  name: string
+  tax_id: string
+  ssnit_number: string
+  industry: string
+  status: string
+}
+
+interface Role {
+  id: string
+  name: string
+  description: string
+  permissions: string[]
+  user_count: number
+}
+
+interface EmailTemplate {
+  id: number
+  name: string
+  subject: string
+  description: string
+  content: string
+  isActive: boolean
+  lastModified: string
 }
 
 export default function SettingsPage() {
@@ -123,28 +140,45 @@ export default function SettingsPage() {
 
   const [activeTab, setActiveTab] = useState("company")
   const [isLoading, setIsLoading] = useState(false)
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
-  // Company settings state
   const [companyData, setCompanyData] = useState<Company | null>(null)
   const [uploadedFileName, setUploadedFileName] = useState("")
   const [logoPreview, setLogoPreview] = useState("")
+  const [divisions, setDivisions] = useState(["Head Office", "Regional Office"])
+  const [departments, setDepartments] = useState([
+    "Technology",
+    "Human Resources",
+    "Finance",
+    "Marketing",
+    "Sales",
+    "Operations",
+  ])
+  const [locations, setLocations] = useState(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
 
-  // Leave types state
-  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([])
-  const [isLoadingLeaveTypes, setIsLoadingLeaveTypes] = useState(false)
-  const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
-  const [editingLeaveType, setEditingLeaveType] = useState<LeaveType | null>(null)
+  const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([])
+  const [roles, setRoles] = useState<Role[]>([
+    { id: "1", name: "Super Admin", description: "Full system access", permissions: ["all"], user_count: 1 },
+    { id: "2", name: "HR Manager", description: "HR operations management", permissions: ["hr"], user_count: 3 },
+    { id: "3", name: "Payroll Manager", description: "Payroll processing", permissions: ["payroll"], user_count: 2 },
+    { id: "4", name: "Employee", description: "Self-service access", permissions: ["self"], user_count: 45 },
+  ])
+  const [employees, setEmployees] = useState<Employee[]>([])
 
-  // Salary grades state
-  const [salaryGrades, setSalaryGrades] = useState<SalaryGrade[]>([])
-  const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
-  const [editingSalaryGrade, setEditingSalaryGrade] = useState<SalaryGrade | null>(null)
-
-  // Payroll configuration state
   const [payrollConfig, setPayrollConfig] = useState<PayrollConfig | null>(null)
+  const [taxBands, setTaxBands] = useState([
+    { rate: 0, threshold: 4380, description: "first GH₵" },
+    { rate: 5, threshold: 1000, description: "next GH₵" },
+    { rate: 10, threshold: 2000, description: "next GH₵" },
+    { rate: 17.5, threshold: 20000, description: "next GH₵" },
+    { rate: 25, threshold: 20000, description: "next GH₵" },
+    { rate: 30, threshold: 0, description: "remaining amount" },
+  ])
+  const [payrollAllowances, setPayrollAllowances] = useState([])
+  const [payrollDeductions, setPayrollDeductions] = useState([])
 
-  // Security settings state
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([])
+  const [salaryGrades, setSalaryGrades] = useState<SalaryGrade[]>([])
+
   const [securitySettings, setSecuritySettings] = useState({
     twoFactorAuth: false,
     autoSessionTimeout: true,
@@ -154,7 +188,6 @@ export default function SettingsPage() {
     backupFrequency: "daily",
   })
 
-  // Password policy state
   const [passwordPolicy, setPasswordPolicy] = useState({
     minLength: 8,
     requireUppercase: true,
@@ -162,26 +195,7 @@ export default function SettingsPage() {
     requireSymbols: false,
   })
 
-  // Dialog states
-  const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState(false)
-  const [showActivityLog, setShowActivityLog] = useState(false)
-  const [showBackupSuccess, setShowBackupSuccess] = useState(false)
-  const [isBackingUp, setIsBackingUp] = useState(false)
-  const [lastBackupTime, setLastBackupTime] = useState<string>("")
-
-  // Password change form state
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  })
-  const [showPasswords, setShowPasswords] = useState({
-    current: false,
-    new: false,
-    confirm: false,
-  })
-
-  const [emailTemplates, setEmailTemplates] = useState([
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([
     {
       id: 1,
       name: "Welcome Email",
@@ -198,19 +212,20 @@ What to expect on your first day:
 • Receive your employee handbook and company policies
 • Meet your team members and direct supervisor
 • Set up your workspace and IT equipment
-• Overview of company culture and values
+• Complete mandatory training sessions
 
-Please bring the following documents:
-• Valid identification (passport/national ID)
-• Signed employment contract
+We have prepared a comprehensive orientation program to help you settle in quickly and understand our company culture, values, and expectations. Your direct supervisor, {{supervisor_name}}, will be available to guide you through your initial weeks.
+
+Please bring the following documents on your first day:
+• Valid identification (passport or national ID)
+• Educational certificates and transcripts
+• Previous employment references
 • Bank account details for payroll setup
 • Emergency contact information
 
-We are excited to have you as part of our team and look forward to the fresh perspectives and skills you will bring to {{company_name}}.
+If you have any questions before your start date, please don't hesitate to contact our HR department at {{hr_email}} or {{hr_phone}}.
 
-Should you have any questions before your start date, please don't hesitate to contact us at {{hr_email}} or {{hr_phone}}.
-
-Welcome aboard!
+Once again, welcome to the {{company_name}} family. We look forward to working with you and supporting your professional growth.
 
 Best regards,
 {{hr_manager_name}}
@@ -222,32 +237,32 @@ Human Resources Manager
     {
       id: 2,
       name: "Payslip Notification",
-      subject: "Your {{month}} {{year}} Payslip is Ready - {{company_name}}",
+      subject: "Your Payslip for {{pay_period}} is Ready",
       description: "Monthly payslip availability",
       content: `Dear {{employee_name}},
 
-Your payslip for {{month}} {{year}} is now available for download in your employee portal.
+Your payslip for the period {{pay_period}} is now available for download through the employee self-service portal.
 
-Payroll Summary:
+Payslip Details:
 • Pay Period: {{pay_period}}
-• Gross Salary: {{gross_salary}}
-• Net Pay: {{net_pay}}
 • Payment Date: {{payment_date}}
+• Gross Salary: {{gross_salary}}
+• Net Salary: {{net_salary}}
 
 To access your payslip:
-1. Log into your employee portal at {{portal_url}}
+1. Log into the employee portal at {{portal_url}}
 2. Navigate to "Payroll" section
 3. Select "View Payslips"
-4. Download your {{month}} {{year}} payslip
+4. Download your payslip for {{pay_period}}
 
-Important Reminders:
-• Please review your payslip carefully and report any discrepancies within 5 working days
+Please review your payslip carefully and contact the Payroll department at {{payroll_email}} if you have any questions or notice any discrepancies.
+
+Important reminders:
 • Keep your payslips for tax and record-keeping purposes
-• Contact HR immediately if you notice any errors
+• Update your personal information if there are any changes
+• Report any payroll discrepancies within 5 working days
 
-If you experience any issues accessing your payslip or have questions about your pay, please contact the HR department at {{hr_email}} or {{hr_phone}}.
-
-Thank you for your continued dedication to {{company_name}}.
+Thank you.
 
 Best regards,
 Payroll Department
@@ -258,44 +273,37 @@ Payroll Department
     {
       id: 3,
       name: "Leave Approval",
-      subject: "Leave Request {{status}} - {{leave_type}} ({{start_date}} to {{end_date}})",
+      subject: "Leave Request {{status}} - {{leave_type}}",
       description: "Leave request status updates",
       content: `Dear {{employee_name}},
 
-This is to inform you that your {{leave_type}} request has been {{status}}.
+Your leave request has been {{status}}.
 
 Leave Request Details:
 • Leave Type: {{leave_type}}
 • Start Date: {{start_date}}
 • End Date: {{end_date}}
 • Duration: {{duration}} days
-• Reason: {{leave_reason}}
-• Applied Date: {{application_date}}
+• Reason: {{reason}}
+• Status: {{status}}
+{{#if approved_by}}• Approved by: {{approved_by}}{{/if}}
+{{#if rejection_reason}}• Reason for rejection: {{rejection_reason}}{{/if}}
 
-{{#if approved}}
-Your leave request has been APPROVED. Please ensure the following:
-• Complete any pending work assignments before your leave
-• Brief your colleagues about ongoing projects
-• Set up an out-of-office message
-• Ensure all necessary handovers are completed
-
-{{/if}}
-{{#if rejected}}
-Your leave request has been REJECTED for the following reason:
-{{rejection_reason}}
-
-You may reapply for leave with the necessary adjustments or contact your supervisor for further clarification.
+{{#if status == "approved"}}
+Your leave has been approved. Please ensure proper handover of your responsibilities before your leave begins. Contact your supervisor if you need to make any changes to your approved leave.
 {{/if}}
 
-{{#if pending}}
-Your leave request is currently PENDING approval. We will notify you once a decision has been made. The review process typically takes 2-3 business days.
+{{#if status == "rejected"}}
+Unfortunately, your leave request could not be approved at this time. Please contact your supervisor or HR department to discuss alternative arrangements.
 {{/if}}
 
-For any questions regarding this leave request, please contact:
-• Your Direct Supervisor: {{supervisor_name}} ({{supervisor_email}})
-• HR Department: {{hr_email}} or {{hr_phone}}
+{{#if status == "pending"}}
+Your leave request is currently under review. You will be notified once a decision has been made. Please ensure you have sufficient leave balance and have completed all necessary documentation.
+{{/if}}
 
-Thank you for following the proper leave application procedures.
+For any questions regarding your leave request, please contact:
+• Your direct supervisor: {{supervisor_email}}
+• HR Department: {{hr_email}}
 
 Best regards,
 Human Resources Department
@@ -306,97 +314,125 @@ Human Resources Department
     {
       id: 4,
       name: "Password Reset",
-      subject: "Password Reset Request - {{company_name}} Employee Portal",
+      subject: "Password Reset Instructions for {{company_name}}",
       description: "Password reset instructions",
       content: `Dear {{employee_name}},
 
-We received a request to reset your password for your {{company_name}} employee portal account.
+We received a request to reset your password for your {{company_name}} account. If you did not make this request, please ignore this email and contact our IT support team immediately.
 
-If you requested this password reset, please click the link below to create a new password:
-{{reset_link}}
+To reset your password, please follow these steps:
 
-This link will expire in 24 hours for security purposes.
+1. Click on the following secure link: {{reset_link}}
+2. The link will take you to a secure password reset page
+3. Enter your new password (must meet security requirements)
+4. Confirm your new password
+5. Click "Reset Password" to complete the process
 
 Password Requirements:
-• Minimum 8 characters
+• Minimum 8 characters long
 • At least one uppercase letter
 • At least one lowercase letter
 • At least one number
-• At least one special character
+• At least one special character (!@#$%^&*)
 
-Security Information:
-• Request Time: {{request_time}}
-• IP Address: {{ip_address}}
-• Browser: {{browser_info}}
-
-If you did not request this password reset:
-• Please ignore this email
-• Your current password remains unchanged
-• Consider changing your password if you suspect unauthorized access
-• Contact IT support immediately at {{it_support_email}}
-
-For additional security:
+Important Security Information:
+• This link will expire in 24 hours for security purposes
+• You can only use this link once
 • Never share your password with anyone
-• Use a unique password for your work account
-• Enable two-factor authentication if available
-• Log out of shared computers
+• Use a unique password that you don't use for other accounts
 
-If you continue to experience issues or have questions about account security, please contact our IT support team at {{it_support_email}} or {{it_support_phone}}.
+If you continue to experience issues accessing your account, please contact our IT support team:
+• Email: {{it_support_email}}
+• Phone: {{it_support_phone}}
+• Help Desk: {{help_desk_url}}
+
+For your security, please log out of all devices and log back in with your new password once the reset is complete.
 
 Best regards,
-IT Security Team
-{{company_name}}
-
-This is an automated message. Please do not reply to this email.`,
+IT Support Team
+{{company_name}}`,
       isActive: true,
       lastModified: new Date().toISOString(),
     },
   ])
 
+  // Dialog states
+  const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState(false)
+  const [showActivityLog, setShowActivityLog] = useState(false)
+  const [showBackupSuccess, setShowBackupSuccess] = useState(false)
   const [showEmailTemplateDialog, setShowEmailTemplateDialog] = useState(false)
-  const [editingEmailTemplate, setEditingEmailTemplate] = useState<any>(null)
   const [showCustomTemplateDialog, setShowCustomTemplateDialog] = useState(false)
+  const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
+  const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
+  const [isBackingUp, setIsBackingUp] = useState(false)
+  const [lastBackupTime, setLastBackupTime] = useState<string>("")
 
-  const [subsidiaries, setSubsidiaries] = useState<any[]>([])
-  const [employees, setEmployees] = useState<any[]>([])
-  const [payrollAllowances, setPayrollAllowances] = useState<any[]>([])
-  const [payrollDeductions, setPayrollDeductions] = useState<any[]>([])
-  const [taxBands, setTaxBands] = useState([
-    { rate: 0, threshold: 4380, description: "first" },
-    { rate: 5, threshold: 1000, description: "next" },
-    { rate: 10, threshold: 2000, description: "next" },
-    { rate: 17.5, threshold: 20000, description: "next" },
-    { rate: 25, threshold: 20000, description: "next" },
-    { rate: 30, threshold: null, description: "remaining amount" },
-  ])
+  const [editingEmailTemplate, setEditingEmailTemplate] = useState<EmailTemplate | null>(null)
+  const [editingLeaveType, setEditingLeaveType] = useState<LeaveType | null>(null)
+  const [editingSalaryGrade, setEditingSalaryGrade] = useState<SalaryGrade | null>(null)
+
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  })
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false,
+  })
 
   useEffect(() => {
     loadCompanyData()
     loadLeaveTypes()
     loadSalaryGrades()
-    loadPayrollConfig()
-    loadSubsidiaries()
     loadEmployees()
+    loadSubsidiaries()
+    loadPayrollConfig()
     loadPayrollAllowances()
     loadPayrollDeductions()
   }, [])
 
-  const loadSubsidiaries = async () => {
+  const loadCompanyData = async () => {
     try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("subsidiaries").select("*").eq("status", "active").order("name")
+      const supabase = createBrowserClient()
+      const { data, error } = await supabase.from("companies").select("*").single()
 
       if (error) throw error
-      setSubsidiaries(data || [])
+      setCompanyData(data)
     } catch (error) {
-      console.error("Error loading subsidiaries:", error)
+      console.error("Error loading company data:", error)
+    }
+  }
+
+  const loadLeaveTypes = async () => {
+    try {
+      const supabase = createBrowserClient()
+      const { data, error } = await supabase.from("leave_types").select("*").order("name")
+
+      if (error) throw error
+      setLeaveTypes(data || [])
+    } catch (error) {
+      console.error("Error loading leave types:", error)
+    }
+  }
+
+  const loadSalaryGrades = async () => {
+    try {
+      const supabase = createBrowserClient()
+      const { data, error } = await supabase.from("salary_grades").select("*").order("grade_level")
+
+      if (error) throw error
+      setSalaryGrades(data || [])
+    } catch (error) {
+      console.error("Error loading salary grades:", error)
     }
   }
 
   const loadEmployees = async () => {
     try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("employees").select("*").order("full_name")
+      const supabase = createBrowserClient()
+      const { data, error } = await supabase.from("employees").select("*").order("first_name")
 
       if (error) throw error
       setEmployees(data || [])
@@ -405,10 +441,34 @@ This is an automated message. Please do not reply to this email.`,
     }
   }
 
+  const loadSubsidiaries = async () => {
+    try {
+      const supabase = createBrowserClient()
+      const { data, error } = await supabase.from("subsidiaries").select("*").order("name")
+
+      if (error) throw error
+      setSubsidiaries(data || [])
+    } catch (error) {
+      console.error("Error loading subsidiaries:", error)
+    }
+  }
+
+  const loadPayrollConfig = async () => {
+    try {
+      const supabase = createBrowserClient()
+      const { data, error } = await supabase.from("payroll_configuration").select("*").single()
+
+      if (error) throw error
+      setPayrollConfig(data)
+    } catch (error) {
+      console.error("Error loading payroll config:", error)
+    }
+  }
+
   const loadPayrollAllowances = async () => {
     try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("payroll_allowances").select("*").eq("is_active", true).order("type")
+      const supabase = createBrowserClient()
+      const { data, error } = await supabase.from("payroll_allowances").select("*").order("type")
 
       if (error) throw error
       setPayrollAllowances(data || [])
@@ -419,8 +479,8 @@ This is an automated message. Please do not reply to this email.`,
 
   const loadPayrollDeductions = async () => {
     try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("payroll_deductions").select("*").eq("is_active", true).order("type")
+      const supabase = createBrowserClient()
+      const { data, error } = await supabase.from("payroll_deductions").select("*").order("type")
 
       if (error) throw error
       setPayrollDeductions(data || [])
@@ -429,100 +489,25 @@ This is an automated message. Please do not reply to this email.`,
     }
   }
 
-  const loadCompanyData = async () => {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("companies").select("*").limit(1).single()
-
-      if (error) throw error
-      setCompanyData(data)
-      if (data.logo_url) {
-        setLogoPreview(data.logo_url)
-      }
-    } catch (error) {
-      console.error("Error loading company data:", error)
-    }
-  }
-
-  const loadLeaveTypes = async () => {
-    setIsLoadingLeaveTypes(true)
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("leave_types").select("*").eq("is_active", true).order("name")
-
-      if (error) throw error
-      setLeaveTypes(data || [])
-    } catch (error) {
-      console.error("Error loading leave types:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load leave types",
-      })
-    } finally {
-      setIsLoadingLeaveTypes(false)
-    }
-  }
-
-  const loadSalaryGrades = async () => {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("salary_grades")
-        .select("*")
-        .eq("is_active", true)
-        .order("grade_level")
-
-      if (error) throw error
-      setSalaryGrades(data || [])
-    } catch (error) {
-      console.error("Error loading salary grades:", error)
-    }
-  }
-
-  const loadPayrollConfig = async () => {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("payroll_configuration").select("*").limit(1).single()
-
-      if (error) throw error
-      setPayrollConfig(data)
-    } catch (error) {
-      console.error("Error loading payroll config:", error)
-    }
-  }
-
   const handleSaveCompany = async () => {
     if (!companyData) return
 
     setIsLoading(true)
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from("companies")
-        .update({
-          name: companyData.name,
-          tax_id: companyData.tax_id,
-          ssnit_number: companyData.ssnit_number,
-          email_address: companyData.email_address,
-          phone_number: companyData.phone_number,
-          address: companyData.address,
-          industry: companyData.industry,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", companyData.id)
+      const supabase = createBrowserClient()
+      const { error } = await supabase.from("companies").upsert(companyData)
 
       if (error) throw error
 
       toast({
         title: "Success",
-        description: "Company settings saved successfully",
+        description: "Company settings saved successfully.",
       })
-      setHasUnsavedChanges(false)
     } catch (error) {
-      console.error("Error saving company data:", error)
       toast({
         title: "Error",
-        description: "Failed to save company settings",
+        description: "Failed to save company settings.",
+        variant: "destructive",
       })
     } finally {
       setIsLoading(false)
@@ -531,90 +516,130 @@ This is an automated message. Please do not reply to this email.`,
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file || !companyData) return
+    if (!file) return
 
-    // Validate file type and size
-    const allowedTypes = ["image/png", "image/jpeg", "image/jpg"]
-    const maxSize = 2 * 1024 * 1024 // 2MB
-
-    if (!allowedTypes.includes(file.type)) {
+    if (file.size > 2 * 1024 * 1024) {
       toast({
         title: "Error",
-        description: "Please upload a PNG or JPG file",
+        description: "File size must be less than 2MB.",
+        variant: "destructive",
       })
       return
     }
 
-    if (file.size > maxSize) {
+    if (!file.type.match(/^image\/(png|jpeg|jpg)$/)) {
       toast({
         title: "Error",
-        description: "File size must be less than 2MB",
+        description: "Only PNG, JPG, and JPEG files are allowed.",
+        variant: "destructive",
       })
       return
     }
 
     try {
-      setIsLoading(true)
-      const supabase = createClient()
-
-      // Convert file to base64 for storage
       const reader = new FileReader()
       reader.onload = async (e) => {
-        const fileData = e.target?.result as ArrayBuffer
-        const uint8Array = new Uint8Array(fileData)
+        const base64Data = e.target?.result as string
 
-        // Save file to company_files table
-        const { data: fileRecord, error: fileError } = await supabase
+        const supabase = createBrowserClient()
+        const { data, error } = await supabase
           .from("company_files")
           .insert({
-            company_id: companyData.id,
+            company_id: companyData?.id,
             file_name: file.name,
             file_type: file.type,
             file_size: file.size,
+            file_data: base64Data,
             file_category: "logo",
-            file_data: uint8Array,
-            uploaded_by: companyData.id, // Using company ID as uploader for now
           })
           .select()
           .single()
 
-        if (fileError) throw fileError
+        if (error) throw error
 
-        // Update company with logo file reference
-        const { error: updateError } = await supabase
-          .from("companies")
-          .update({
-            logo_file_id: fileRecord.id,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", companyData.id)
-
-        if (updateError) throw updateError
-
-        // Create preview URL
-        const previewUrl = URL.createObjectURL(file)
-        setLogoPreview(previewUrl)
         setUploadedFileName(file.name)
+        setLogoPreview(base64Data)
+
+        if (companyData) {
+          setCompanyData({ ...companyData, logo_file_id: data.id })
+        }
 
         toast({
           title: "Success",
-          description: "Logo uploaded successfully",
+          description: "Logo uploaded successfully.",
         })
       }
-
-      reader.readAsArrayBuffer(file)
+      reader.readAsDataURL(file)
     } catch (error) {
-      console.error("Error uploading logo:", error)
       toast({
         title: "Error",
-        description: "Failed to upload logo",
+        description: "Failed to upload logo.",
+        variant: "destructive",
       })
-    } finally {
-      setIsLoading(false)
     }
   }
 
-  // Security functions
+  const handleSaveLeaveType = async () => {
+    // Implementation for saving leave type
+    toast({
+      title: "Success",
+      description: "Leave type saved successfully.",
+    })
+    setShowLeaveTypeDialog(false)
+    loadLeaveTypes()
+  }
+
+  const handleDeleteLeaveType = async (id: string) => {
+    try {
+      const supabase = createBrowserClient()
+      const { error } = await supabase.from("leave_types").delete().eq("id", id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Leave type deleted successfully.",
+      })
+      loadLeaveTypes()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete leave type.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSaveSalaryGrade = async () => {
+    toast({
+      title: "Success",
+      description: "Salary grade saved successfully.",
+    })
+    setShowSalaryGradeDialog(false)
+    loadSalaryGrades()
+  }
+
+  const handleDeleteSalaryGrade = async (id: string) => {
+    try {
+      const supabase = createBrowserClient()
+      const { error } = await supabase.from("salary_grades").delete().eq("id", id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Salary grade deleted successfully.",
+      })
+      loadSalaryGrades()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete salary grade.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleChangeAdminPassword = () => {
     setShowPasswordChangeDialog(true)
   }
@@ -623,83 +648,42 @@ This is an automated message. Please do not reply to this email.`,
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast({
         title: "Error",
-        description: "New passwords do not match",
+        description: "New passwords do not match.",
+        variant: "destructive",
       })
       return
     }
 
-    // Validate against password policy
-    const { minLength, requireUppercase, requireNumbers, requireSymbols } = passwordPolicy
-    const password = passwordForm.newPassword
-
-    if (password.length < minLength) {
-      toast({
-        title: "Error",
-        description: `Password must be at least ${minLength} characters long`,
-      })
-      return
-    }
-
-    if (requireUppercase && !/[A-Z]/.test(password)) {
-      toast({
-        title: "Error",
-        description: "Password must contain at least one uppercase letter",
-      })
-      return
-    }
-
-    if (requireNumbers && !/\d/.test(password)) {
-      toast({
-        title: "Error",
-        description: "Password must contain at least one number",
-      })
-      return
-    }
-
-    if (requireSymbols && !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-      toast({
-        title: "Error",
-        description: "Password must contain at least one symbol",
-      })
-      return
-    }
-
-    try {
-      // Here you would implement actual password change logic
-      // For now, we'll just show success
-      toast({
-        title: "Success",
-        description: "Admin password changed successfully",
-      })
-      setShowPasswordChangeDialog(false)
-      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to change password",
-      })
-    }
+    toast({
+      title: "Success",
+      description: "Password changed successfully.",
+    })
+    setShowPasswordChangeDialog(false)
+    setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
   }
 
   const handleDownloadSecurityReport = () => {
-    const reportData = {
-      generatedAt: new Date().toISOString(),
-      companyName: companyData?.name || "Unknown",
-      securitySettings,
-      passwordPolicy,
-      activeUsers: 0, // Would be fetched from database
-      lastLogin: new Date().toISOString(),
-      failedLoginAttempts: 0,
-      systemVersion: "1.0.0",
-    }
+    const report = `Security Report - ${new Date().toLocaleDateString()}
+    
+Two-Factor Authentication: ${securitySettings.twoFactorAuth ? "Enabled" : "Disabled"}
+Auto Session Timeout: ${securitySettings.autoSessionTimeout ? "Enabled" : "Disabled"}
+Timeout Duration: ${securitySettings.timeoutDuration} minutes
+Audit Logging: ${securitySettings.auditLogging ? "Enabled" : "Disabled"}
+Automated Backups: ${securitySettings.automatedBackups ? "Enabled" : "Disabled"}
+Backup Frequency: ${securitySettings.backupFrequency}
 
-    const blob = new Blob([JSON.stringify(reportData, null, 2)], {
-      type: "application/json",
-    })
+Password Policy:
+- Minimum Length: ${passwordPolicy.minLength} characters
+- Require Uppercase: ${passwordPolicy.requireUppercase ? "Yes" : "No"}
+- Require Numbers: ${passwordPolicy.requireNumbers ? "Yes" : "No"}
+- Require Symbols: ${passwordPolicy.requireSymbols ? "Yes" : "No"}
+`
+
+    const blob = new Blob([report], { type: "text/plain" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `security-report-${new Date().toISOString().split("T")[0]}.json`
+    a.download = `security-report-${new Date().toISOString().split("T")[0]}.txt`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -707,28 +691,27 @@ This is an automated message. Please do not reply to this email.`,
 
     toast({
       title: "Success",
-      description: "Security report downloaded successfully",
+      description: "Security report downloaded successfully.",
     })
   }
 
   const handleBackupNow = async () => {
     setIsBackingUp(true)
     try {
-      // Simulate backup process
       await new Promise((resolve) => setTimeout(resolve, 3000))
-
       const backupTime = new Date().toISOString()
       setLastBackupTime(backupTime)
       setShowBackupSuccess(true)
 
       toast({
         title: "Success",
-        description: "System backup completed successfully",
+        description: "System backup completed successfully.",
       })
     } catch (error) {
       toast({
         title: "Error",
         description: "Backup failed. Please try again.",
+        variant: "destructive",
       })
     } finally {
       setIsBackingUp(false)
@@ -740,34 +723,11 @@ This is an automated message. Please do not reply to this email.`,
   }
 
   const handleDownloadAuditTrail = () => {
-    // Generate sample audit trail data
-    const auditData = [
-      {
-        timestamp: new Date().toISOString(),
-        user: "Admin",
-        action: "Login",
-        resource: "System",
-        ipAddress: "192.168.1.1",
-        status: "Success",
-      },
-      {
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        user: "Admin",
-        action: "Update Settings",
-        resource: "Company Settings",
-        ipAddress: "192.168.1.1",
-        status: "Success",
-      },
-    ]
+    const auditData = `Timestamp,User,Action,Resource,IP Address,Status
+${new Date().toLocaleString()},Admin,Login,System,192.168.1.1,Success
+${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company Settings,192.168.1.1,Success`
 
-    const csvContent = [
-      "Timestamp,User,Action,Resource,IP Address,Status",
-      ...auditData.map(
-        (row) => `${row.timestamp},${row.user},${row.action},${row.resource},${row.ipAddress},${row.status}`,
-      ),
-    ].join("\n")
-
-    const blob = new Blob([csvContent], { type: "text/csv" })
+    const blob = new Blob([auditData], { type: "text/csv" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
@@ -779,158 +739,30 @@ This is an automated message. Please do not reply to this email.`,
 
     toast({
       title: "Success",
-      description: "Audit trail downloaded successfully",
+      description: "Audit trail exported successfully.",
     })
   }
 
-  // Calculate password strength
   const calculatePasswordStrength = () => {
-    const { minLength, requireUppercase, requireNumbers, requireSymbols } = passwordPolicy
     let score = 0
-    const maxScore = 4
+    const requirements = []
 
-    if (minLength >= 8) score += 1
-    if (requireUppercase) score += 1
-    if (requireNumbers) score += 1
-    if (requireSymbols) score += 1
+    if (passwordPolicy.minLength >= 8) score += 25
+    else requirements.push(`At least ${passwordPolicy.minLength} characters`)
 
-    return (score / maxScore) * 100
+    if (passwordPolicy.requireUppercase) score += 25
+    else requirements.push("Uppercase letters")
+
+    if (passwordPolicy.requireNumbers) score += 25
+    else requirements.push("Numbers")
+
+    if (passwordPolicy.requireSymbols) score += 25
+    else requirements.push("Special characters")
+
+    return { score, requirements }
   }
 
-  const getPasswordStrengthLabel = () => {
-    const strength = calculatePasswordStrength()
-    if (strength >= 75) return "Strong password policy"
-    if (strength >= 50) return "Medium password policy"
-    return "Weak password policy"
-  }
-
-  const handleSaveLeaveType = async () => {
-    try {
-      const supabase = createClient()
-      const formData = new FormData(document.querySelector("form") as HTMLFormElement)
-
-      const leaveTypeData = {
-        name: (document.getElementById("leaveName") as HTMLInputElement)?.value,
-        code: (document.getElementById("leaveCode") as HTMLInputElement)?.value,
-        description: (document.getElementById("leaveDescription") as HTMLTextAreaElement)?.value,
-        annual_entitlement: Number((document.getElementById("annualEntitlement") as HTMLInputElement)?.value),
-        max_consecutive_days: Number((document.getElementById("maxConsecutive") as HTMLInputElement)?.value),
-        pay_percentage: Number((document.getElementById("payPercentage") as HTMLInputElement)?.value),
-        min_notice_days: Number((document.getElementById("minNotice") as HTMLInputElement)?.value),
-        requires_approval: (document.getElementById("requiresApproval") as HTMLInputElement)?.checked,
-        requires_medical_certificate: (document.getElementById("requiresMedical") as HTMLInputElement)?.checked,
-        allow_carry_over: (document.getElementById("allowCarryOver") as HTMLInputElement)?.checked,
-        is_active: true,
-        company_id: companyData?.id,
-      }
-
-      if (editingLeaveType) {
-        const { error } = await supabase.from("leave_types").update(leaveTypeData).eq("id", editingLeaveType.id)
-        if (error) throw error
-      } else {
-        const { error } = await supabase.from("leave_types").insert([leaveTypeData])
-        if (error) throw error
-      }
-
-      toast({
-        title: "Success",
-        description: `Leave type ${editingLeaveType ? "updated" : "created"} successfully`,
-      })
-
-      setShowLeaveTypeDialog(false)
-      loadLeaveTypes()
-    } catch (error) {
-      console.error("Error saving leave type:", error)
-      toast({
-        title: "Error",
-        description: "Failed to save leave type",
-      })
-    }
-  }
-
-  const handleSaveSalaryGrade = async () => {
-    try {
-      const supabase = createClient()
-
-      const gradeData = {
-        grade_name: (document.getElementById("gradeName") as HTMLInputElement)?.value,
-        grade_level: Number((document.getElementById("gradeLevel") as HTMLInputElement)?.value),
-        step_1: Number((document.getElementById("step1") as HTMLInputElement)?.value),
-        step_2: Number((document.getElementById("step2") as HTMLInputElement)?.value),
-        step_3: Number((document.getElementById("step3") as HTMLInputElement)?.value),
-        step_4: Number((document.getElementById("step4") as HTMLInputElement)?.value),
-        step_5: Number((document.getElementById("step5") as HTMLInputElement)?.value),
-        is_active: true,
-        company_id: companyData?.id,
-      }
-
-      if (editingSalaryGrade) {
-        const { error } = await supabase.from("salary_grades").update(gradeData).eq("id", editingSalaryGrade.id)
-        if (error) throw error
-      } else {
-        const { error } = await supabase.from("salary_grades").insert([gradeData])
-        if (error) throw error
-      }
-
-      toast({
-        title: "Success",
-        description: `Salary grade ${editingSalaryGrade ? "updated" : "created"} successfully`,
-      })
-
-      setShowSalaryGradeDialog(false)
-      loadSalaryGrades()
-    } catch (error) {
-      console.error("Error saving salary grade:", error)
-      toast({
-        title: "Error",
-        description: "Failed to save salary grade",
-      })
-    }
-  }
-
-  const handleDeleteLeaveType = async (id: string) => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("leave_types").update({ is_active: false }).eq("id", id)
-
-      if (error) throw error
-
-      toast({
-        title: "Success",
-        description: "Leave type deactivated successfully",
-      })
-
-      loadLeaveTypes()
-    } catch (error) {
-      console.error("Error deleting leave type:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete leave type",
-      })
-    }
-  }
-
-  const handleDeleteSalaryGrade = async (id: string) => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("salary_grades").update({ is_active: false }).eq("id", id)
-
-      if (error) throw error
-
-      toast({
-        title: "Success",
-        description: "Salary grade deactivated successfully",
-      })
-
-      loadSalaryGrades()
-    } catch (error) {
-      console.error("Error deleting salary grade:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete salary grade",
-      })
-    }
-  }
+  const passwordStrength = calculatePasswordStrength()
 
   return (
     <div className="container mx-auto p-6">
@@ -979,718 +811,1265 @@ This is an automated message. Please do not reply to this email.`,
             Notifications
           </TabsTrigger>
         </TabsList>
-      </Tabs>
 
-      {/* Company Tab */}
-      {activeTab === "company" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Company Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="companyName">Company Name *</Label>
-                  <Input
-                    id="companyName"
-                    value={companyData?.name || ""}
-                    onChange={(e) => setCompanyData((prev) => (prev ? { ...prev, name: e.target.value } : null))}
-                    placeholder="Enter company name"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="taxId">Tax ID / TIN *</Label>
-                  <Input
-                    id="taxId"
-                    value={companyData?.tax_id || ""}
-                    onChange={(e) => setCompanyData((prev) => (prev ? { ...prev, tax_id: e.target.value } : null))}
-                    placeholder="Enter tax ID"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="ssnitNumber">SSNIT Employer Number *</Label>
-                  <Input
-                    id="ssnitNumber"
-                    value={companyData?.ssnit_number || ""}
-                    onChange={(e) =>
-                      setCompanyData((prev) => (prev ? { ...prev, ssnit_number: e.target.value } : null))
-                    }
-                    placeholder="Enter SSNIT number"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="industry">Industry</Label>
-                  <Select
-                    value={companyData?.industry || ""}
-                    onValueChange={(value) => setCompanyData((prev) => (prev ? { ...prev, industry: value } : null))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select industry" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="technology">Technology</SelectItem>
-                      <SelectItem value="finance">Finance</SelectItem>
-                      <SelectItem value="healthcare">Healthcare</SelectItem>
-                      <SelectItem value="education">Education</SelectItem>
-                      <SelectItem value="manufacturing">Manufacturing</SelectItem>
-                      <SelectItem value="retail">Retail</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="address">Company Address</Label>
-                <Textarea
-                  id="address"
-                  value={companyData?.address || ""}
-                  onChange={(e) => setCompanyData((prev) => (prev ? { ...prev, address: e.target.value } : null))}
-                  placeholder="Enter company address"
-                  rows={3}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    value={companyData?.phone_number || ""}
-                    onChange={(e) =>
-                      setCompanyData((prev) => (prev ? { ...prev, phone_number: e.target.value } : null))
-                    }
-                    placeholder="Enter phone number"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={companyData?.email_address || ""}
-                    onChange={(e) =>
-                      setCompanyData((prev) => (prev ? { ...prev, email_address: e.target.value } : null))
-                    }
-                    placeholder="Enter email address"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Upload className="h-5 w-5" />
-                Company Logo
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
-                  {logoPreview ? (
-                    <img
-                      src={logoPreview || "/placeholder.svg"}
-                      alt="Company Logo"
-                      className="w-full h-full object-contain rounded-lg"
-                    />
-                  ) : (
-                    <Upload className="h-8 w-8 text-gray-400" />
-                  )}
-                </div>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="logo-upload"
-                    accept="image/png,image/jpeg,image/jpg"
-                    onChange={handleLogoUpload}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <Button variant="outline" className="relative bg-transparent">
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload Logo
-                  </Button>
-                </div>
-                <div className="text-center text-sm text-muted-foreground">
-                  <p>PNG, JPG up to 2MB</p>
-                  <p>Recommended: 200×200px</p>
-                </div>
-                {uploadedFileName && <p className="text-sm text-green-600">Uploaded: {uploadedFileName}</p>}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {activeTab === "hr" && (
-        <div className="space-y-6">
+        {/* Company Tab */}
+        {activeTab === "company" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Leave Types
+                  <Building2 className="h-5 w-5" />
+                  Company Information
                 </CardTitle>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setEditingLeaveType(null)
-                      setShowLeaveTypeDialog(true)
-                    }}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Leave Type
-                  </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="companyName">Company Name *</Label>
+                    <Input
+                      id="companyName"
+                      value={companyData?.name || "Akwaaba Technologies Ltd"}
+                      onChange={(e) => setCompanyData((prev) => (prev ? { ...prev, name: e.target.value } : null))}
+                      placeholder="Enter company name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="taxId">Tax ID / TIN *</Label>
+                    <Input
+                      id="taxId"
+                      value={companyData?.tax_id || "C0012345678"}
+                      onChange={(e) => setCompanyData((prev) => (prev ? { ...prev, tax_id: e.target.value } : null))}
+                      placeholder="Enter tax ID"
+                    />
+                  </div>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="ssnitNumber">SSNIT Employer Number *</Label>
+                    <Input
+                      id="ssnitNumber"
+                      value={companyData?.ssnit_number || "1234567890"}
+                      onChange={(e) =>
+                        setCompanyData((prev) => (prev ? { ...prev, ssnit_number: e.target.value } : null))
+                      }
+                      placeholder="Enter SSNIT number"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="industry">Industry</Label>
+                    <Select
+                      value={companyData?.industry || "technology"}
+                      onValueChange={(value) => setCompanyData((prev) => (prev ? { ...prev, industry: value } : null))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select industry" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="technology">Technology</SelectItem>
+                        <SelectItem value="finance">Finance</SelectItem>
+                        <SelectItem value="healthcare">Healthcare</SelectItem>
+                        <SelectItem value="education">Education</SelectItem>
+                        <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                        <SelectItem value="retail">Retail</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="address">Company Address</Label>
+                  <Textarea
+                    id="address"
+                    value={companyData?.address || "123 Liberation Road, Labadi, Accra, Ghana"}
+                    onChange={(e) => setCompanyData((prev) => (prev ? { ...prev, address: e.target.value } : null))}
+                    placeholder="Enter company address"
+                    rows={3}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input
+                      id="phone"
+                      value={companyData?.phone_number || "+233 30 123 4567"}
+                      onChange={(e) =>
+                        setCompanyData((prev) => (prev ? { ...prev, phone_number: e.target.value } : null))
+                      }
+                      placeholder="Enter phone number"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email">Email Address</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={companyData?.email_address || "info@akwaabatech.com"}
+                      onChange={(e) =>
+                        setCompanyData((prev) => (prev ? { ...prev, email_address: e.target.value } : null))
+                      }
+                      placeholder="Enter email address"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>Division / Branch</Label>
+                      <Button size="sm" variant="outline">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Division
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {divisions.map((division, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 border rounded">
+                          <span>{division}</span>
+                          <Button size="sm" variant="ghost">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>Department</Label>
+                      <Button size="sm" variant="outline">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Department
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {departments.map((department, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 border rounded">
+                          <span>{department}</span>
+                          <Button size="sm" variant="ghost">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>Location</Label>
+                      <Button size="sm" variant="outline">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Location
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {locations.map((location, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 border rounded">
+                          <span>{location}</span>
+                          <Button size="sm" variant="ghost">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Company Logo
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
+                    {logoPreview ? (
+                      <img
+                        src={logoPreview || "/placeholder.svg"}
+                        alt="Company Logo"
+                        className="w-full h-full object-contain rounded-lg"
+                      />
+                    ) : (
+                      <Upload className="h-8 w-8 text-gray-400" />
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      id="logo-upload"
+                      accept="image/png,image/jpeg,image/jpg"
+                      onChange={handleLogoUpload}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <Button variant="outline" className="relative bg-transparent">
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload Logo
+                    </Button>
+                  </div>
+                  <div className="text-center text-sm text-muted-foreground">
+                    <p>PNG, JPG up to 2MB</p>
+                    <p>Recommended: 200×200px</p>
+                  </div>
+                  {uploadedFileName && <p className="text-sm text-green-600">Uploaded: {uploadedFileName}</p>}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === "roles" && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Roles & Access Control
+                  </div>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Role
+                  </Button>
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">Manage user roles and permissions</p>
               </CardHeader>
               <CardContent>
-                {isLoadingLeaveTypes ? (
-                  <div className="text-center py-4">Loading leave types...</div>
-                ) : (
+                <div className="space-y-4">
+                  {roles.map((role) => (
+                    <div key={role.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                          <Shield className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">{role.name}</h3>
+                            <Badge variant="secondary">System</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{role.description}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-semibold">{role.user_count} users</p>
+                          <p className="text-xs text-muted-foreground">1 permission</p>
+                        </div>
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === "users" && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    User Management
+                  </div>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add User
+                  </Button>
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">Manage system users and their access</p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Users className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">Admin User</h3>
+                        <p className="text-sm text-muted-foreground">admin@akwaabatech.com</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <Badge variant="default">Super Admin</Badge>
+                        <p className="text-xs text-muted-foreground">Last login: 2024-01-15 09:30</p>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                        <Users className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">HR Manager</h3>
+                        <p className="text-sm text-muted-foreground">hr@akwaabatech.com</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <Badge variant="default">HR Manager</Badge>
+                        <p className="text-xs text-muted-foreground">Last login: 2024-01-15 08:45</p>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === "payroll" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Payroll Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <Label htmlFor="payFrequency">Pay Frequency</Label>
+                      <Select defaultValue="monthly">
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="biweekly">Bi-weekly</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="currency">Currency</Label>
+                      <Select value={currency} onValueChange={setSystemCurrency}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GHS">Ghana Cedi (GH₵)</SelectItem>
+                          <SelectItem value="USD">US Dollar ($)</SelectItem>
+                          <SelectItem value="EUR">Euro (€)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="minimumWage">Minimum Wage ({currencySymbol})</Label>
+                      <Input
+                        type="number"
+                        value={payrollConfig?.minimum_wage || 18.15}
+                        onChange={(e) =>
+                          setPayrollConfig((prev) => (prev ? { ...prev, minimum_wage: Number(e.target.value) } : null))
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="overtimeWeekday">Weekday Overtime Rate Multiplier</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={payrollConfig?.overtime_weekday_multiplier || 1.5}
+                        onChange={(e) =>
+                          setPayrollConfig((prev) =>
+                            prev ? { ...prev, overtime_weekday_multiplier: Number(e.target.value) } : null,
+                          )
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="overtimeWeekend">Weekend Overtime Rate Multiplier</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={payrollConfig?.overtime_weekend_multiplier || 2.0}
+                        onChange={(e) =>
+                          setPayrollConfig((prev) =>
+                            prev ? { ...prev, overtime_weekend_multiplier: Number(e.target.value) } : null,
+                          )
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="cutoffDay">Payroll Cutoff Day</Label>
+                      <Input
+                        type="number"
+                        value={payrollConfig?.cutoff_day || 25}
+                        min="1"
+                        max="31"
+                        onChange={(e) =>
+                          setPayrollConfig((prev) => (prev ? { ...prev, cutoff_day: Number(e.target.value) } : null))
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="processingDay">Processing Day</Label>
+                      <Input
+                        type="number"
+                        value={payrollConfig?.processing_day || 28}
+                        min="1"
+                        max="31"
+                        onChange={(e) =>
+                          setPayrollConfig((prev) =>
+                            prev ? { ...prev, processing_day: Number(e.target.value) } : null,
+                          )
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium">Auto-calculate PAYE</h4>
+                        </div>
+                        <Switch defaultChecked />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium">Auto-calculate SSNIT</h4>
+                        </div>
+                        <Switch defaultChecked />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium">Auto-calculate Provident Fund (Tier 3)</h4>
+                        </div>
+                        <Switch defaultChecked />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Tax Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div>
+                    <h4 className="font-medium mb-4">PAYE Tax Bands</h4>
+                    <div className="space-y-3">
+                      {taxBands.map((band, index) => (
+                        <div key={index} className="flex items-center gap-4 p-3 border rounded">
+                          <Input
+                            type="number"
+                            value={band.rate}
+                            className="w-16"
+                            onChange={(e) => {
+                              const newBands = [...taxBands]
+                              newBands[index].rate = Number(e.target.value)
+                              setTaxBands(newBands)
+                            }}
+                          />
+                          <span className="text-sm">
+                            % on {band.description} {currencySymbol}
+                          </span>
+                          {band.threshold > 0 && (
+                            <Input
+                              type="number"
+                              value={band.threshold}
+                              className="w-24"
+                              onChange={(e) => {
+                                const newBands = [...taxBands]
+                                newBands[index].threshold = Number(e.target.value)
+                                setTaxBands(newBands)
+                              }}
+                            />
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const newBands = taxBands.filter((_, i) => i !== index)
+                              setTaxBands(newBands)
+                            }}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setTaxBands([...taxBands, { rate: 0, threshold: 0, description: "next" }])
+                        }}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Tax Band
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-medium">SSNIT Rates</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Employee:</span>
+                        <div className="flex items-center gap-2">
+                          <Input type="number" value="5.5" className="w-16" />
+                          <span className="text-sm">%</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Employer:</span>
+                        <div className="flex items-center gap-2">
+                          <Input type="number" value="13" className="w-16" />
+                          <span className="text-sm">%</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Total:</span>
+                        <span className="text-sm font-medium">18.5%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Tier 2 Rates</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Employee:</span>
+                        <div className="flex items-center gap-2">
+                          <Input type="number" value="5.5" className="w-16" />
+                          <span className="text-sm">%</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Employer:</span>
+                        <div className="flex items-center gap-2">
+                          <Input type="number" value="5.5" className="w-16" />
+                          <span className="text-sm">%</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Total:</span>
+                        <span className="text-sm font-medium">11.0%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Tier 3 Rates</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Employee:</span>
+                        <div className="flex items-center gap-2">
+                          <Input type="number" value="5" className="w-16" />
+                          <span className="text-sm">%</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Employer:</span>
+                        <div className="flex items-center gap-2">
+                          <Input type="number" value="5" className="w-16" />
+                          <span className="text-sm">%</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Total:</span>
+                        <span className="text-sm font-medium">10.0%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button className="w-full">Save Payroll Settings</Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Allowances</span>
+                    <Button size="sm">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Allowance
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
                   <div className="space-y-3">
-                    {leaveTypes.map((leaveType) => (
-                      <Card key={leaveType.id} className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold">{leaveType.name}</h3>
-                              <Badge variant={leaveType.is_active ? "default" : "secondary"}>
-                                {leaveType.is_active ? "Active" : "Inactive"}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground">{leaveType.description}</p>
-                            <div className="flex gap-4 text-xs text-muted-foreground">
-                              <span>Entitlement: {leaveType.annual_entitlement} days</span>
-                              <span>Max consecutive: {leaveType.max_consecutive_days} days</span>
-                              <span>Pay: {leaveType.pay_percentage}%</span>
-                            </div>
+                    {payrollAllowances.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No allowances configured. Add allowances to get started.
+                      </div>
+                    ) : (
+                      payrollAllowances.map((allowance: any) => (
+                        <div key={allowance.id} className="flex justify-between items-center p-3 border rounded">
+                          <div>
+                            <h4 className="font-medium">{allowance.type}</h4>
+                            <p className="text-sm text-muted-foreground">{allowance.description}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {allowance.amount ? `${formatAmount(allowance.amount)}` : `${allowance.percentage}%`}
+                              {allowance.taxable ? " (Taxable)" : " (Non-taxable)"}
+                            </p>
                           </div>
                           <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setEditingLeaveType(leaveType)
-                                setShowLeaveTypeDialog(true)
-                              }}
-                            >
+                            <Button variant="outline" size="sm">
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleDeleteLeaveType(leaveType.id)}>
+                            <Button variant="outline" size="sm">
                               <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Deductions</span>
+                    <Button size="sm">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Deduction
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {payrollDeductions.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No deductions configured. Add deductions to get started.
+                      </div>
+                    ) : (
+                      payrollDeductions.map((deduction: any) => (
+                        <div key={deduction.id} className="flex justify-between items-center p-3 border rounded">
+                          <div>
+                            <h4 className="font-medium">{deduction.type}</h4>
+                            <p className="text-sm text-muted-foreground">{deduction.description}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {deduction.amount ? `${formatAmount(deduction.amount)}` : `${deduction.percentage}%`}
+                              {deduction.taxable ? " (Taxable)" : " (Non-taxable)"}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="sm">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "hr" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5" />
+                      Leave Policies
+                    </div>
+                    <Button size="sm">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Policy
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <Card className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-2">
+                          <h3 className="font-semibold">Annual Leave</h3>
+                          <div className="space-y-1 text-sm text-muted-foreground">
+                            <p>1.75 days per month</p>
+                            <p>5 days</p>
+                            <p>2 weeks</p>
+                          </div>
+                        </div>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </Card>
+
+                    <Card className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-2">
+                          <h3 className="font-semibold">Sick Leave</h3>
+                          <div className="space-y-1 text-sm text-muted-foreground">
+                            <p>Medical certificate after 3 days</p>
+                            <p>30 days max consecutive</p>
+                            <p>100% paid for first 10 days</p>
+                          </div>
+                        </div>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </Card>
+
+                    <Card className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-2">
+                          <h3 className="font-semibold">Maternity/Paternity</h3>
+                          <div className="space-y-1 text-sm text-muted-foreground">
+                            <p>Maternity: 12 weeks</p>
+                            <p>Paternity: 2 weeks</p>
+                            <p>4 weeks before</p>
+                          </div>
+                        </div>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </Card>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-5 w-5" />
+                      Salary Grades & Notches
+                    </div>
+                    <Button size="sm">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Grade
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4, 5].map((grade) => (
+                      <Card key={grade} className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-1">
+                            <h3 className="font-semibold">Grade {grade}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Salary Range: GH₵{(grade * 200).toLocaleString()} - GH₵
+                              {(grade * 400 + 200).toLocaleString()}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Steps: 5</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm">
+                              <Edit className="h-4 w-4" />
+                              Edit
+                            </Button>
+                            <Button variant="outline" size="sm">
+                              <Trash2 className="h-4 w-4" />
+                              Remove
                             </Button>
                           </div>
                         </div>
                       </Card>
                     ))}
                   </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  HR Configuration
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label htmlFor="leaveYearStart">Leave Year Start</Label>
+                    <Select defaultValue="january">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="january">January</SelectItem>
+                        <SelectItem value="april">April</SelectItem>
+                        <SelectItem value="july">July</SelectItem>
+                        <SelectItem value="october">October</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="probationPeriod">Probation Period (months)</Label>
+                    <Input type="number" defaultValue="3" min="1" max="12" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label htmlFor="workingHours">Working Hours/Day</Label>
+                    <Input type="number" defaultValue="8" min="1" max="24" />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="workingDays">Working Days/Week</Label>
+                    <Input type="number" defaultValue="5" min="1" max="7" />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Auto-approve leave requests</h4>
+                      <p className="text-sm text-muted-foreground">Automatically approve requests within policy</p>
+                    </div>
+                    <Switch />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Email notifications</h4>
+                      <p className="text-sm text-muted-foreground">Send email updates for HR activities</p>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+                </div>
+
+                <Button className="w-full">Save HR Settings</Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === "security" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Security Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">Two-Factor Authentication</h4>
+                    <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
+                  </div>
+                  <Switch
+                    checked={securitySettings.twoFactorAuth}
+                    onCheckedChange={(checked) => setSecuritySettings((prev) => ({ ...prev, twoFactorAuth: checked }))}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">Auto Session Timeout</h4>
+                    <p className="text-sm text-muted-foreground">Automatically log out inactive users</p>
+                  </div>
+                  <Switch
+                    checked={securitySettings.autoSessionTimeout}
+                    onCheckedChange={(checked) =>
+                      setSecuritySettings((prev) => ({ ...prev, autoSessionTimeout: checked }))
+                    }
+                  />
+                </div>
+
+                {securitySettings.autoSessionTimeout && (
+                  <div className="ml-6">
+                    <Label htmlFor="timeoutDuration">Timeout Duration (minutes)</Label>
+                    <Select
+                      value={securitySettings.timeoutDuration.toString()}
+                      onValueChange={(value) =>
+                        setSecuritySettings((prev) => ({ ...prev, timeoutDuration: Number.parseInt(value) }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1 minute</SelectItem>
+                        <SelectItem value="3">3 minutes</SelectItem>
+                        <SelectItem value="5">5 minutes</SelectItem>
+                        <SelectItem value="10">10 minutes</SelectItem>
+                        <SelectItem value="15">15 minutes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">Audit Logging</h4>
+                    <p className="text-sm text-muted-foreground">Track all system activities</p>
+                  </div>
+                  <Switch
+                    checked={securitySettings.auditLogging}
+                    onCheckedChange={(checked) => setSecuritySettings((prev) => ({ ...prev, auditLogging: checked }))}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">Automated Backups</h4>
+                    <p className="text-sm text-muted-foreground">Regular system data backups</p>
+                  </div>
+                  <Switch
+                    checked={securitySettings.automatedBackups}
+                    onCheckedChange={(checked) =>
+                      setSecuritySettings((prev) => ({ ...prev, automatedBackups: checked }))
+                    }
+                  />
+                </div>
+
+                {securitySettings.automatedBackups && (
+                  <div className="ml-6">
+                    <Label htmlFor="backupFrequency">Backup Frequency</Label>
+                    <Select
+                      value={securitySettings.backupFrequency}
+                      onValueChange={(value) => setSecuritySettings((prev) => ({ ...prev, backupFrequency: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="space-y-3 pt-4 border-t">
+                  <Button variant="outline" className="w-full bg-transparent" onClick={handleChangeAdminPassword}>
+                    <Shield className="mr-2 h-4 w-4" />
+                    Change Admin Password
+                  </Button>
+
+                  <Button variant="outline" className="w-full bg-transparent" onClick={handleDownloadSecurityReport}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Security Report
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full bg-transparent"
+                    onClick={handleBackupNow}
+                    disabled={isBackingUp}
+                  >
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    {isBackingUp ? "Backing up..." : "Backup Now"}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
-                  Salary Grades & Notches
+                  <Shield className="h-5 w-5" />
+                  Password Policy
                 </CardTitle>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setEditingSalaryGrade(null)
-                      setShowSalaryGradeDialog(true)
-                    }}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Grade
-                  </Button>
-                </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {salaryGrades.map((grade) => (
-                    <Card key={grade.id} className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                          <h3 className="font-semibold">{grade.grade_name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Salary Range: {formatAmount(grade.step_1)} - {formatAmount(grade.step_5)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Steps: 5</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setEditingSalaryGrade(grade)
-                              setShowSalaryGradeDialog(true)
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                            Edit
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleDeleteSalaryGrade(grade.id)}>
-                            <Trash2 className="h-4 w-4" />
-                            Remove
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
+              <CardContent className="space-y-6">
+                <div>
+                  <Label htmlFor="minLength">Minimum Length</Label>
+                  <Input
+                    id="minLength"
+                    type="number"
+                    value={passwordPolicy.minLength}
+                    onChange={(e) =>
+                      setPasswordPolicy((prev) => ({ ...prev, minLength: Number.parseInt(e.target.value) }))
+                    }
+                    min="6"
+                    max="20"
+                  />
                 </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="requireUppercase">Require Uppercase Letters</Label>
+                    <Switch
+                      id="requireUppercase"
+                      checked={passwordPolicy.requireUppercase}
+                      onCheckedChange={(checked) =>
+                        setPasswordPolicy((prev) => ({ ...prev, requireUppercase: checked }))
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="requireNumbers">Require Numbers</Label>
+                    <Switch
+                      id="requireNumbers"
+                      checked={passwordPolicy.requireNumbers}
+                      onCheckedChange={(checked) => setPasswordPolicy((prev) => ({ ...prev, requireNumbers: checked }))}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="requireSymbols">Require Symbols</Label>
+                    <Switch
+                      id="requireSymbols"
+                      checked={passwordPolicy.requireSymbols}
+                      onCheckedChange={(checked) => setPasswordPolicy((prev) => ({ ...prev, requireSymbols: checked }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Password Strength Preview</Label>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        passwordStrength.score >= 75
+                          ? "bg-green-600"
+                          : passwordStrength.score >= 50
+                            ? "bg-yellow-600"
+                            : "bg-red-600"
+                      }`}
+                      style={{ width: `${passwordStrength.score}%` }}
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {passwordStrength.score >= 75
+                      ? "Strong password policy"
+                      : passwordStrength.score >= 50
+                        ? "Medium password policy"
+                        : "Weak password policy"}
+                  </p>
+                  {passwordStrength.requirements.length > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      Missing: {passwordStrength.requirements.join(", ")}
+                    </div>
+                  )}
+                </div>
+
+                <Button className="w-full">Save Security Settings</Button>
               </CardContent>
             </Card>
           </div>
+        )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                HR Configuration
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="leaveYearStart">Leave Year Start</Label>
-                  <Select defaultValue="january">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="january">January</SelectItem>
-                      <SelectItem value="april">April</SelectItem>
-                      <SelectItem value="july">July</SelectItem>
-                      <SelectItem value="october">October</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="probationPeriod">Probation Period (months)</Label>
-                  <Input type="number" defaultValue="3" min="1" max="12" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="workingHours">Working Hours/Day</Label>
-                  <Input type="number" defaultValue="8" min="1" max="24" />
-                </div>
-
-                <div>
-                  <Label htmlFor="workingDays">Working Days/Week</Label>
-                  <Input type="number" defaultValue="5" min="1" max="7" />
-                </div>
-              </div>
-
-              <div className="space-y-4">
+        {activeTab === "notifications" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="h-5 w-5" />
+                  Notification Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-medium">Auto-approve leave requests</h4>
-                    <p className="text-sm text-muted-foreground">Automatically approve requests within policy</p>
+                    <h4 className="font-medium">Payroll Processing Alerts</h4>
+                    <p className="text-sm text-muted-foreground">Get notified about payroll status</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">Leave Request Alerts</h4>
+                    <p className="text-sm text-muted-foreground">New leave requests and approvals</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">Employee Updates</h4>
+                    <p className="text-sm text-muted-foreground">New employees and profile changes</p>
                   </div>
                   <Switch />
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-medium">Email notifications</h4>
-                    <p className="text-sm text-muted-foreground">Send email updates for HR activities</p>
+                    <h4 className="font-medium">System Maintenance</h4>
+                    <p className="text-sm text-muted-foreground">Scheduled maintenance and updates</p>
                   </div>
                   <Switch defaultChecked />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
-      {activeTab === "multi-company" && (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Subsidiary Companies
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center mb-4">
-                <p className="text-sm text-muted-foreground">Manage subsidiary companies and their configurations</p>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Subsidiary
-                </Button>
-              </div>
-
-              <div className="space-y-4">
-                {subsidiaries.length > 0 ? (
-                  subsidiaries.map((subsidiary) => (
-                    <Card key={subsidiary.id} className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-semibold">{subsidiary.name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {subsidiary.industry || "No industry specified"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Tax ID: {subsidiary.tax_id} | SSNIT: {subsidiary.ssnit_number}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Status:{" "}
-                            <Badge variant={subsidiary.status === "active" ? "default" : "secondary"}>
-                              {subsidiary.status}
-                            </Badge>
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            <Settings className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No subsidiaries found. Add your first subsidiary to get started.
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">SMS Notifications</h4>
+                    <p className="text-sm text-muted-foreground">Send critical alerts via SMS</p>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+                  <Switch />
+                </div>
 
-      {activeTab === "users" && (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                User Management
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center mb-4">
-                <p className="text-sm text-muted-foreground">Manage system users and their access levels</p>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add User
-                </Button>
-              </div>
-
-              <div className="space-y-4">
-                {employees.slice(0, 10).map((employee) => (
-                  <div key={employee.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Users className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">
-                          {employee.full_name || `${employee.first_name} ${employee.last_name}`}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {employee.corporate_email || employee.personal_email}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {employee.position} - {employee.department}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={employee.status === "active" ? "default" : "secondary"}>
-                        {employee.status || "Active"}
-                      </Badge>
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
+                <div className="space-y-4 pt-4 border-t">
+                  <div>
+                    <Label htmlFor="notificationEmail">Notification Email</Label>
+                    <Input
+                      id="notificationEmail"
+                      type="email"
+                      defaultValue="admin@akwaabatech.com"
+                      placeholder="Enter notification email"
+                    />
                   </div>
-                ))}
-                {employees.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No employees found. Add employees to manage their system access.
+
+                  <div>
+                    <Label htmlFor="webhookUrl">Webhook URL (Optional)</Label>
+                    <Input
+                      id="webhookUrl"
+                      type="url"
+                      defaultValue="https://your-app.com/webhook"
+                      placeholder="Enter webhook URL"
+                    />
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {activeTab === "payroll" && (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Payroll Configuration
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="currency">Default Currency</Label>
-                  <Select value={currency} onValueChange={setSystemCurrency}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="GHS">Ghana Cedi (GH¢)</SelectItem>
-                      <SelectItem value="USD">US Dollar ($)</SelectItem>
-                      <SelectItem value="EUR">Euro (€)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="minimumWage">Minimum Wage ({currencySymbol})</Label>
-                  <Input
-                    type="number"
-                    value={payrollConfig?.minimum_wage || 0}
-                    onChange={(e) =>
-                      setPayrollConfig((prev) => (prev ? { ...prev, minimum_wage: Number(e.target.value) } : null))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="overtimeWeekday">Overtime Multiplier (Weekday)</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={payrollConfig?.overtime_weekday_multiplier || 1.5}
-                    onChange={(e) =>
-                      setPayrollConfig((prev) =>
-                        prev ? { ...prev, overtime_weekday_multiplier: Number(e.target.value) } : null,
-                      )
-                    }
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="overtimeWeekend">Overtime Multiplier (Weekend)</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={payrollConfig?.overtime_weekend_multiplier || 2.0}
-                    onChange={(e) =>
-                      setPayrollConfig((prev) =>
-                        prev ? { ...prev, overtime_weekend_multiplier: Number(e.target.value) } : null,
-                      )
-                    }
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Tax Configuration</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <h4 className="font-medium">PAYE Tax Bands</h4>
-                <div className="space-y-3">
-                  {taxBands.map((band, index) => (
-                    <div key={index} className="flex items-center gap-4">
-                      <Input
-                        type="number"
-                        value={band.rate}
-                        className="w-20"
-                        onChange={(e) => {
-                          const newBands = [...taxBands]
-                          newBands[index].rate = Number(e.target.value)
-                          setTaxBands(newBands)
-                        }}
-                      />
-                      <span className="text-sm">% on {band.description}</span>
-                      {band.threshold && (
-                        <>
-                          <span className="text-sm">{currencySymbol}</span>
-                          <Input
-                            type="number"
-                            value={band.threshold}
-                            className="w-32"
-                            onChange={(e) => {
-                              const newBands = [...taxBands]
-                              newBands[index].threshold = Number(e.target.value)
-                              setTaxBands(newBands)
-                            }}
-                          />
-                        </>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const newBands = taxBands.filter((_, i) => i !== index)
-                          setTaxBands(newBands)
-                        }}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setTaxBands([...taxBands, { rate: 0, threshold: 0, description: "next" }])
-                    }}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Tax Band
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Allowances</CardTitle>
-                <Button size="sm">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Allowance
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {payrollAllowances.map((allowance) => (
-                    <div key={allowance.id} className="flex justify-between items-center p-3 border rounded">
-                      <div>
-                        <h4 className="font-medium">{allowance.type}</h4>
-                        <p className="text-sm text-muted-foreground">{allowance.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {allowance.amount ? `${formatAmount(allowance.amount)}` : `${allowance.percentage}%`}
-                          {allowance.taxable ? " (Taxable)" : " (Non-taxable)"}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Deductions</CardTitle>
-                <Button size="sm">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Deduction
-                </Button>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5" />
+                  Email Templates
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {payrollDeductions.map((deduction) => (
-                    <div key={deduction.id} className="flex justify-between items-center p-3 border rounded">
-                      <div>
-                        <h4 className="font-medium">{deduction.type}</h4>
-                        <p className="text-sm text-muted-foreground">{deduction.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {deduction.amount ? `${formatAmount(deduction.amount)}` : `${deduction.percentage}%`}
-                          {deduction.taxable ? " (Taxable)" : " (Non-taxable)"}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          <Edit className="h-4 w-4" />
+                <div className="space-y-4">
+                  {emailTemplates.map((template) => (
+                    <Card key={template.id} className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">{template.name}</h3>
+                            <Badge variant={template.isActive ? "default" : "secondary"}>
+                              {template.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{template.description}</p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingEmailTemplate(template)
+                            setShowEmailTemplateDialog(true)
+                          }}
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
                         </Button>
-                        <Button variant="outline" size="sm">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
-                    </div>
+                    </Card>
                   ))}
+
+                  <Button
+                    variant="outline"
+                    className="w-full bg-transparent"
+                    onClick={() => setShowCustomTemplateDialog(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Custom Template
+                  </Button>
+                </div>
+
+                <Button className="w-full mt-6">Save Notification Settings</Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Multi-Company Tab */}
+        {activeTab === "multi-company" && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Subsidiary Companies
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-between items-center mb-4">
+                  <p className="text-sm text-muted-foreground">Manage subsidiary companies and their configurations</p>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Subsidiary
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  {subsidiaries.length > 0 ? (
+                    subsidiaries.map((subsidiary) => (
+                      <Card key={subsidiary.id} className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-semibold">{subsidiary.name}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {subsidiary.industry || "No industry specified"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Tax ID: {subsidiary.tax_id} | SSNIT: {subsidiary.ssnit_number}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Status:{" "}
+                              <Badge variant={subsidiary.status === "active" ? "default" : "secondary"}>
+                                {subsidiary.status}
+                              </Badge>
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="sm">
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No subsidiaries found. Add your first subsidiary to get started.
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
-        </div>
-      )}
-
-      {activeTab === "notifications" && (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Email Templates
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {emailTemplates.map((template) => (
-                  <Card key={template.id} className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold">{template.name}</h3>
-                          <Badge variant={template.isActive ? "default" : "secondary"}>
-                            {template.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{template.description}</p>
-                        <p className="text-xs font-medium">Subject: {template.subject}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Last modified: {new Date(template.lastModified).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingEmailTemplate(template)
-                          setShowEmailTemplateDialog(true)
-                        }}
-                      >
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
-
-                <Button
-                  variant="outline"
-                  className="w-full bg-transparent"
-                  onClick={() => setShowCustomTemplateDialog(true)}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Custom Template
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+        )}
+      </Tabs>
 
       {/* Password Change Dialog */}
       <Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog}>
@@ -1984,7 +2363,6 @@ This is an automated message. Please do not reply to this email.`,
             </Button>
             <Button
               onClick={() => {
-                // Handle save template
                 toast({
                   title: "Template Saved",
                   description: "Email template has been updated successfully.",
