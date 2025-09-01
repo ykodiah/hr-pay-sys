@@ -37,7 +37,14 @@ import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Switch } from "@/components/ui/switch"
 import SubsidiaryForm from "@/components/forms/subsidiary-form"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 
 interface Company {
   id: string
@@ -113,6 +120,8 @@ interface Subsidiary {
   divisions: string[]
   departments: string[]
   locations: string[]
+  created_at?: string
+  updated_at?: string
 }
 
 interface Role {
@@ -165,6 +174,8 @@ export default function SettingsPage() {
   const [locations, setLocations] = useState<string[]>([])
 
   const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([])
+  const [showViewSubsidiaryDialog, setShowViewSubsidiaryDialog] = useState(false)
+  const [viewingSubsidiary, setViewingSubsidiary] = useState<Subsidiary | null>(null)
 
   const [roles, setRoles] = useState<Role[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -817,7 +828,7 @@ Backup Frequency: ${securitySettings.backupFrequency}
 Password Policy:
 - Minimum Length: ${passwordPolicy.minLength} characters
 - Require Uppercase: ${passwordPolicy.requireUppercase ? "Yes" : "No"}
-- Require Numbers: ${passwordPolicy.requireNumbers ? "Yes" : "No"}
+- Require Numbers: ${passwordPolicy.requireNumbers} ? "Yes" : "No"}
 - Require Symbols: ${passwordPolicy.requireSymbols ? "Yes" : "No"}
 `
 
@@ -1008,8 +1019,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
   }
 
   const handleViewSubsidiary = (subsidiary: Subsidiary) => {
-    // TODO: Implement view subsidiary functionality
-    toast({ title: "Info", description: `Viewing subsidiary: ${subsidiary.name}` })
+    setViewingSubsidiary(subsidiary)
+    setShowViewSubsidiaryDialog(true)
   }
 
   const handleSubsidiaryFunctionChange = (checked: boolean) => {
@@ -1984,6 +1995,120 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
             </Button>
             <Button variant="destructive" onClick={handleConfirmDeactivation}>
               Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showViewSubsidiaryDialog} onOpenChange={setShowViewSubsidiaryDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Subsidiary Details</DialogTitle>
+            <DialogDescription>View detailed information about {viewingSubsidiary?.name}</DialogDescription>
+          </DialogHeader>
+          {viewingSubsidiary && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Company Name</Label>
+                  <p className="text-sm font-medium">{viewingSubsidiary.name}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 ml-2">
+                    {viewingSubsidiary.status}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Email</Label>
+                  <p className="text-sm">{viewingSubsidiary.email}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
+                  <p className="text-sm">{viewingSubsidiary.phone || "Not provided"}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Tax ID</Label>
+                  <p className="text-sm">{viewingSubsidiary.tax_id}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">SSNIT Number</Label>
+                  <p className="text-sm">{viewingSubsidiary.ssnit_number}</p>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Address</Label>
+                <p className="text-sm mt-1">{viewingSubsidiary.address || "Not provided"}</p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Divisions</Label>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {viewingSubsidiary.divisions?.map((division, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        {division}
+                      </Badge>
+                    )) || <span className="text-xs text-muted-foreground">None</span>}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Departments</Label>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {viewingSubsidiary.departments?.map((dept, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        {dept}
+                      </Badge>
+                    )) || <span className="text-xs text-muted-foreground">None</span>}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Locations</Label>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {viewingSubsidiary.locations?.map((location, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        {location}
+                      </Badge>
+                    )) || <span className="text-xs text-muted-foreground">None</span>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Created</Label>
+                  <p className="text-sm">
+                    {viewingSubsidiary.created_at
+                      ? new Date(viewingSubsidiary.created_at).toLocaleDateString()
+                      : "Unknown"}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Last Updated</Label>
+                  <p className="text-sm">
+                    {viewingSubsidiary.updated_at
+                      ? new Date(viewingSubsidiary.updated_at).toLocaleDateString()
+                      : "Unknown"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowViewSubsidiaryDialog(false)}>
+              Close
+            </Button>
+            <Button
+              onClick={() => {
+                setShowViewSubsidiaryDialog(false)
+                if (viewingSubsidiary) {
+                  handleEditSubsidiary(viewingSubsidiary)
+                }
+              }}
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Subsidiary
             </Button>
           </DialogFooter>
         </DialogContent>
