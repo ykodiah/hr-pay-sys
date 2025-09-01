@@ -22,16 +22,12 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Building2,
   Shield,
   Bell,
   Download,
-  Database,
-  FileText,
-  Activity,
   Users,
   DollarSign,
   Calendar,
@@ -361,12 +357,77 @@ This is an automated message. Please do not reply to this email.`,
   const [editingEmailTemplate, setEditingEmailTemplate] = useState<any>(null)
   const [showCustomTemplateDialog, setShowCustomTemplateDialog] = useState(false)
 
+  const [subsidiaries, setSubsidiaries] = useState<any[]>([])
+  const [employees, setEmployees] = useState<any[]>([])
+  const [payrollAllowances, setPayrollAllowances] = useState<any[]>([])
+  const [payrollDeductions, setPayrollDeductions] = useState<any[]>([])
+  const [taxBands, setTaxBands] = useState([
+    { rate: 0, threshold: 4380, description: "first" },
+    { rate: 5, threshold: 1000, description: "next" },
+    { rate: 10, threshold: 2000, description: "next" },
+    { rate: 17.5, threshold: 20000, description: "next" },
+    { rate: 25, threshold: 20000, description: "next" },
+    { rate: 30, threshold: null, description: "remaining amount" },
+  ])
+
   useEffect(() => {
     loadCompanyData()
     loadLeaveTypes()
     loadSalaryGrades()
     loadPayrollConfig()
+    loadSubsidiaries()
+    loadEmployees()
+    loadPayrollAllowances()
+    loadPayrollDeductions()
   }, [])
+
+  const loadSubsidiaries = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.from("subsidiaries").select("*").eq("status", "active").order("name")
+
+      if (error) throw error
+      setSubsidiaries(data || [])
+    } catch (error) {
+      console.error("Error loading subsidiaries:", error)
+    }
+  }
+
+  const loadEmployees = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.from("employees").select("*").order("full_name")
+
+      if (error) throw error
+      setEmployees(data || [])
+    } catch (error) {
+      console.error("Error loading employees:", error)
+    }
+  }
+
+  const loadPayrollAllowances = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.from("payroll_allowances").select("*").eq("is_active", true).order("type")
+
+      if (error) throw error
+      setPayrollAllowances(data || [])
+    } catch (error) {
+      console.error("Error loading payroll allowances:", error)
+    }
+  }
+
+  const loadPayrollDeductions = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.from("payroll_deductions").select("*").eq("is_active", true).order("type")
+
+      if (error) throw error
+      setPayrollDeductions(data || [])
+    } catch (error) {
+      console.error("Error loading payroll deductions:", error)
+    }
+  }
 
   const loadCompanyData = async () => {
     try {
@@ -743,6 +804,134 @@ This is an automated message. Please do not reply to this email.`,
     return "Weak password policy"
   }
 
+  const handleSaveLeaveType = async () => {
+    try {
+      const supabase = createClient()
+      const formData = new FormData(document.querySelector("form") as HTMLFormElement)
+
+      const leaveTypeData = {
+        name: (document.getElementById("leaveName") as HTMLInputElement)?.value,
+        code: (document.getElementById("leaveCode") as HTMLInputElement)?.value,
+        description: (document.getElementById("leaveDescription") as HTMLTextAreaElement)?.value,
+        annual_entitlement: Number((document.getElementById("annualEntitlement") as HTMLInputElement)?.value),
+        max_consecutive_days: Number((document.getElementById("maxConsecutive") as HTMLInputElement)?.value),
+        pay_percentage: Number((document.getElementById("payPercentage") as HTMLInputElement)?.value),
+        min_notice_days: Number((document.getElementById("minNotice") as HTMLInputElement)?.value),
+        requires_approval: (document.getElementById("requiresApproval") as HTMLInputElement)?.checked,
+        requires_medical_certificate: (document.getElementById("requiresMedical") as HTMLInputElement)?.checked,
+        allow_carry_over: (document.getElementById("allowCarryOver") as HTMLInputElement)?.checked,
+        is_active: true,
+        company_id: companyData?.id,
+      }
+
+      if (editingLeaveType) {
+        const { error } = await supabase.from("leave_types").update(leaveTypeData).eq("id", editingLeaveType.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from("leave_types").insert([leaveTypeData])
+        if (error) throw error
+      }
+
+      toast({
+        title: "Success",
+        description: `Leave type ${editingLeaveType ? "updated" : "created"} successfully`,
+      })
+
+      setShowLeaveTypeDialog(false)
+      loadLeaveTypes()
+    } catch (error) {
+      console.error("Error saving leave type:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save leave type",
+      })
+    }
+  }
+
+  const handleSaveSalaryGrade = async () => {
+    try {
+      const supabase = createClient()
+
+      const gradeData = {
+        grade_name: (document.getElementById("gradeName") as HTMLInputElement)?.value,
+        grade_level: Number((document.getElementById("gradeLevel") as HTMLInputElement)?.value),
+        step_1: Number((document.getElementById("step1") as HTMLInputElement)?.value),
+        step_2: Number((document.getElementById("step2") as HTMLInputElement)?.value),
+        step_3: Number((document.getElementById("step3") as HTMLInputElement)?.value),
+        step_4: Number((document.getElementById("step4") as HTMLInputElement)?.value),
+        step_5: Number((document.getElementById("step5") as HTMLInputElement)?.value),
+        is_active: true,
+        company_id: companyData?.id,
+      }
+
+      if (editingSalaryGrade) {
+        const { error } = await supabase.from("salary_grades").update(gradeData).eq("id", editingSalaryGrade.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from("salary_grades").insert([gradeData])
+        if (error) throw error
+      }
+
+      toast({
+        title: "Success",
+        description: `Salary grade ${editingSalaryGrade ? "updated" : "created"} successfully`,
+      })
+
+      setShowSalaryGradeDialog(false)
+      loadSalaryGrades()
+    } catch (error) {
+      console.error("Error saving salary grade:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save salary grade",
+      })
+    }
+  }
+
+  const handleDeleteLeaveType = async (id: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("leave_types").update({ is_active: false }).eq("id", id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Leave type deactivated successfully",
+      })
+
+      loadLeaveTypes()
+    } catch (error) {
+      console.error("Error deleting leave type:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete leave type",
+      })
+    }
+  }
+
+  const handleDeleteSalaryGrade = async (id: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("salary_grades").update({ is_active: false }).eq("id", id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Salary grade deactivated successfully",
+      })
+
+      loadSalaryGrades()
+    } catch (error) {
+      console.error("Error deleting salary grade:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete salary grade",
+      })
+    }
+  }
+
   return (
     <div className="container mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
@@ -938,318 +1127,186 @@ This is an automated message. Please do not reply to this email.`,
         </div>
       )}
 
-      {/* HR Tab */}
       {activeTab === "hr" && (
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Leave Types Management
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center mb-4">
-                <p className="text-sm text-muted-foreground">Manage different types of leave available to employees</p>
-                <Button
-                  onClick={() => {
-                    setEditingLeaveType(null)
-                    setShowLeaveTypeDialog(true)
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Leave Type
-                </Button>
-              </div>
-
-              {isLoadingLeaveTypes ? (
-                <div className="text-center py-8">Loading leave types...</div>
-              ) : (
-                <div className="grid gap-4">
-                  {leaveTypes.map((leaveType) => (
-                    <Card key={leaveType.id} className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">{leaveType.name}</h3>
-                            <Badge variant="secondary">{leaveType.code}</Badge>
-                            {leaveType.is_system_default && <Badge variant="outline">System Default</Badge>}
-                          </div>
-                          <p className="text-sm text-muted-foreground">{leaveType.description}</p>
-                          <div className="flex gap-4 text-sm">
-                            <span>Entitlement: {leaveType.annual_entitlement} days</span>
-                            <span>Max Consecutive: {leaveType.max_consecutive_days} days</span>
-                            <span>Notice: {leaveType.min_notice_days} days</span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Leave Types
+                </CardTitle>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setEditingLeaveType(null)
+                      setShowLeaveTypeDialog(true)
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Leave Type
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingLeaveTypes ? (
+                  <div className="text-center py-4">Loading leave types...</div>
+                ) : (
+                  <div className="space-y-3">
+                    {leaveTypes.map((leaveType) => (
+                      <Card key={leaveType.id} className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold">{leaveType.name}</h3>
+                              <Badge variant={leaveType.is_active ? "default" : "secondary"}>
+                                {leaveType.is_active ? "Active" : "Inactive"}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{leaveType.description}</p>
+                            <div className="flex gap-4 text-xs text-muted-foreground">
+                              <span>Entitlement: {leaveType.annual_entitlement} days</span>
+                              <span>Max consecutive: {leaveType.max_consecutive_days} days</span>
+                              <span>Pay: {leaveType.pay_percentage}%</span>
+                            </div>
                           </div>
                           <div className="flex gap-2">
-                            {leaveType.requires_approval && <Badge variant="outline">Requires Approval</Badge>}
-                            {leaveType.is_paid && <Badge variant="outline">Paid ({leaveType.pay_percentage}%)</Badge>}
-                            {leaveType.allow_carry_over && <Badge variant="outline">Carry Over</Badge>}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditingLeaveType(leaveType)
+                                setShowLeaveTypeDialog(true)
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => handleDeleteLeaveType(leaveType.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Salary Grades & Notches
+                </CardTitle>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setEditingSalaryGrade(null)
+                      setShowSalaryGradeDialog(true)
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Grade
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {salaryGrades.map((grade) => (
+                    <Card key={grade.id} className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                          <h3 className="font-semibold">{grade.grade_name}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Salary Range: {formatAmount(grade.step_1)} - {formatAmount(grade.step_5)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Steps: 5</p>
                         </div>
                         <div className="flex gap-2">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              setEditingLeaveType(leaveType)
-                              setShowLeaveTypeDialog(true)
+                              setEditingSalaryGrade(grade)
+                              setShowSalaryGradeDialog(true)
                             }}
                           >
                             <Edit className="h-4 w-4" />
+                            Edit
                           </Button>
-                          {!leaveType.is_system_default && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                // Handle delete
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
+                          <Button variant="outline" size="sm" onClick={() => handleDeleteSalaryGrade(grade.id)}>
+                            <Trash2 className="h-4 w-4" />
+                            Remove
+                          </Button>
                         </div>
                       </div>
                     </Card>
                   ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Security Tab */}
-      {activeTab === "security" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Security Settings
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium">Two-Factor Authentication</h4>
-                  <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
-                </div>
-                <Switch
-                  checked={securitySettings.twoFactorAuth}
-                  onCheckedChange={(checked) => setSecuritySettings((prev) => ({ ...prev, twoFactorAuth: checked }))}
-                />
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">Auto Session Timeout</h4>
-                    <p className="text-sm text-muted-foreground">Automatically log out inactive users</p>
-                  </div>
-                  <Switch
-                    checked={securitySettings.autoSessionTimeout}
-                    onCheckedChange={(checked) =>
-                      setSecuritySettings((prev) => ({ ...prev, autoSessionTimeout: checked }))
-                    }
-                  />
-                </div>
-                {securitySettings.autoSessionTimeout && (
-                  <div className="ml-4">
-                    <Label htmlFor="timeoutDuration">Timeout Duration (minutes)</Label>
-                    <Select
-                      value={securitySettings.timeoutDuration.toString()}
-                      onValueChange={(value) =>
-                        setSecuritySettings((prev) => ({ ...prev, timeoutDuration: Number.parseInt(value) }))
-                      }
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1 minute</SelectItem>
-                        <SelectItem value="3">3 minutes</SelectItem>
-                        <SelectItem value="5">5 minutes</SelectItem>
-                        <SelectItem value="10">10 minutes</SelectItem>
-                        <SelectItem value="15">15 minutes</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium">Audit Logging</h4>
-                  <p className="text-sm text-muted-foreground">Track all system activities</p>
-                </div>
-                <Switch
-                  checked={securitySettings.auditLogging}
-                  onCheckedChange={(checked) => setSecuritySettings((prev) => ({ ...prev, auditLogging: checked }))}
-                />
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">Automated Backups</h4>
-                    <p className="text-sm text-muted-foreground">Regular system data backups</p>
-                  </div>
-                  <Switch
-                    checked={securitySettings.automatedBackups}
-                    onCheckedChange={(checked) =>
-                      setSecuritySettings((prev) => ({ ...prev, automatedBackups: checked }))
-                    }
-                  />
-                </div>
-                {securitySettings.automatedBackups && (
-                  <div className="ml-4">
-                    <Label htmlFor="backupFrequency">Backup Frequency</Label>
-                    <Select
-                      value={securitySettings.backupFrequency}
-                      onValueChange={(value) => setSecuritySettings((prev) => ({ ...prev, backupFrequency: value }))}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-3 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start bg-transparent"
-                  onClick={handleChangeAdminPassword}
-                >
-                  <Settings className="mr-2 h-4 w-4" />
-                  Change Admin Password
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start bg-transparent"
-                  onClick={handleDownloadSecurityReport}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download Security Report
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start bg-transparent"
-                  onClick={handleBackupNow}
-                  disabled={isBackingUp}
-                >
-                  <Database className="mr-2 h-4 w-4" />
-                  {isBackingUp ? "Backing up..." : "Backup Now"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
-                Password Policy
+                HR Configuration
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div>
-                <Label htmlFor="minLength">Minimum Length</Label>
-                <Input
-                  id="minLength"
-                  type="number"
-                  min="6"
-                  max="20"
-                  value={passwordPolicy.minLength}
-                  onChange={(e) =>
-                    setPasswordPolicy((prev) => ({ ...prev, minLength: Number.parseInt(e.target.value) || 8 }))
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="requireUppercase">Require Uppercase Letters</Label>
-                <Switch
-                  id="requireUppercase"
-                  checked={passwordPolicy.requireUppercase}
-                  onCheckedChange={(checked) => setPasswordPolicy((prev) => ({ ...prev, requireUppercase: checked }))}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="requireNumbers">Require Numbers</Label>
-                <Switch
-                  id="requireNumbers"
-                  checked={passwordPolicy.requireNumbers}
-                  onCheckedChange={(checked) => setPasswordPolicy((prev) => ({ ...prev, requireNumbers: checked }))}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="requireSymbols">Require Symbols</Label>
-                <Switch
-                  id="requireSymbols"
-                  checked={passwordPolicy.requireSymbols}
-                  onCheckedChange={(checked) => setPasswordPolicy((prev) => ({ ...prev, requireSymbols: checked }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Password Strength Preview</Label>
-                <Progress value={calculatePasswordStrength()} className="w-full" />
-                <p className="text-sm text-muted-foreground">{getPasswordStrengthLabel()}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Audit Trail Section */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
-                Audit Trail & Compliance
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Audit Trail</h4>
-                      <p className="text-sm text-muted-foreground">Detailed activity logging</p>
-                    </div>
-                    <Switch checked={true} />
-                  </div>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start bg-transparent"
-                    onClick={handleDownloadAuditTrail}
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    Download Audit Trail
-                  </Button>
+                <div>
+                  <Label htmlFor="leaveYearStart">Leave Year Start</Label>
+                  <Select defaultValue="january">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="january">January</SelectItem>
+                      <SelectItem value="april">April</SelectItem>
+                      <SelectItem value="july">July</SelectItem>
+                      <SelectItem value="october">October</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="space-y-4">
+
+                <div>
+                  <Label htmlFor="probationPeriod">Probation Period (months)</Label>
+                  <Input type="number" defaultValue="3" min="1" max="12" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="workingHours">Working Hours/Day</Label>
+                  <Input type="number" defaultValue="8" min="1" max="24" />
+                </div>
+
+                <div>
+                  <Label htmlFor="workingDays">Working Days/Week</Label>
+                  <Input type="number" defaultValue="5" min="1" max="7" />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
                   <div>
-                    <Label htmlFor="retentionPeriod">Retention Period (days)</Label>
-                    <Input id="retentionPeriod" type="number" defaultValue="90" min="30" max="365" />
+                    <h4 className="font-medium">Auto-approve leave requests</h4>
+                    <p className="text-sm text-muted-foreground">Automatically approve requests within policy</p>
                   </div>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start bg-transparent"
-                    onClick={handleViewActivityLog}
-                  >
-                    <Eye className="mr-2 h-4 w-4" />
-                    View Activity Log
-                  </Button>
+                  <Switch />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">Email notifications</h4>
+                    <p className="text-sm text-muted-foreground">Send email updates for HR activities</p>
+                  </div>
+                  <Switch defaultChecked />
                 </div>
               </div>
             </CardContent>
@@ -1257,89 +1314,118 @@ This is an automated message. Please do not reply to this email.`,
         </div>
       )}
 
-      {activeTab === "notifications" && (
+      {activeTab === "multi-company" && (
         <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Email Templates
+                <Building2 className="h-5 w-5" />
+                Subsidiary Companies
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {emailTemplates.map((template) => (
-                  <Card key={template.id} className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold">{template.name}</h3>
-                          <Badge variant={template.isActive ? "default" : "secondary"}>
-                            {template.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{template.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Last modified: {new Date(template.lastModified).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingEmailTemplate(template)
-                          setShowEmailTemplateDialog(true)
-                        }}
-                      >
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
-
-                <Button
-                  variant="outline"
-                  className="w-full bg-transparent"
-                  onClick={() => setShowCustomTemplateDialog(true)}
-                >
+              <div className="flex justify-between items-center mb-4">
+                <p className="text-sm text-muted-foreground">Manage subsidiary companies and their configurations</p>
+                <Button>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Custom Template
+                  Add Subsidiary
                 </Button>
+              </div>
+
+              <div className="space-y-4">
+                {subsidiaries.length > 0 ? (
+                  subsidiaries.map((subsidiary) => (
+                    <Card key={subsidiary.id} className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-semibold">{subsidiary.name}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {subsidiary.industry || "No industry specified"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Tax ID: {subsidiary.tax_id} | SSNIT: {subsidiary.ssnit_number}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Status:{" "}
+                            <Badge variant={subsidiary.status === "active" ? "default" : "secondary"}>
+                              {subsidiary.status}
+                            </Badge>
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="sm">
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No subsidiaries found. Add your first subsidiary to get started.
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
 
+      {activeTab === "users" && (
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Notification Preferences
+                <Users className="h-5 w-5" />
+                User Management
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium">Email Notifications</h4>
-                  <p className="text-sm text-muted-foreground">Send email notifications for system events</p>
-                </div>
-                <Switch defaultChecked />
+            <CardContent>
+              <div className="flex justify-between items-center mb-4">
+                <p className="text-sm text-muted-foreground">Manage system users and their access levels</p>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add User
+                </Button>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium">SMS Notifications</h4>
-                  <p className="text-sm text-muted-foreground">Send SMS for urgent notifications</p>
-                </div>
-                <Switch />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium">Push Notifications</h4>
-                  <p className="text-sm text-muted-foreground">Browser push notifications</p>
-                </div>
-                <Switch defaultChecked />
+              <div className="space-y-4">
+                {employees.slice(0, 10).map((employee) => (
+                  <div key={employee.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Users className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">
+                          {employee.full_name || `${employee.first_name} ${employee.last_name}`}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {employee.corporate_email || employee.personal_email}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {employee.position} - {employee.department}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={employee.status === "active" ? "default" : "secondary"}>
+                        {employee.status || "Active"}
+                      </Badge>
+                      <Button variant="outline" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {employees.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No employees found. Add employees to manage their system access.
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1372,38 +1458,44 @@ This is an automated message. Please do not reply to this email.`,
                 </div>
 
                 <div>
-                  <Label htmlFor="payPeriod">Pay Period</Label>
-                  <Select defaultValue="monthly">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="minimumWage">Minimum Wage ({currencySymbol})</Label>
+                  <Input
+                    type="number"
+                    value={payrollConfig?.minimum_wage || 0}
+                    onChange={(e) =>
+                      setPayrollConfig((prev) => (prev ? { ...prev, minimum_wage: Number(e.target.value) } : null))
+                    }
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label htmlFor="payDate">Pay Date</Label>
-                  <Select defaultValue="last-day">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="last-day">Last Day of Month</SelectItem>
-                      <SelectItem value="15th">15th of Month</SelectItem>
-                      <SelectItem value="custom">Custom Date</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="overtimeWeekday">Overtime Multiplier (Weekday)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={payrollConfig?.overtime_weekday_multiplier || 1.5}
+                    onChange={(e) =>
+                      setPayrollConfig((prev) =>
+                        prev ? { ...prev, overtime_weekday_multiplier: Number(e.target.value) } : null,
+                      )
+                    }
+                  />
                 </div>
 
                 <div>
-                  <Label htmlFor="workingDays">Working Days per Week</Label>
-                  <Input type="number" defaultValue="5" min="1" max="7" />
+                  <Label htmlFor="overtimeWeekend">Overtime Multiplier (Weekend)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={payrollConfig?.overtime_weekend_multiplier || 2.0}
+                    onChange={(e) =>
+                      setPayrollConfig((prev) =>
+                        prev ? { ...prev, overtime_weekend_multiplier: Number(e.target.value) } : null,
+                      )
+                    }
+                  />
                 </div>
               </div>
             </CardContent>
@@ -1417,184 +1509,183 @@ This is an automated message. Please do not reply to this email.`,
               <div className="space-y-4">
                 <h4 className="font-medium">PAYE Tax Bands</h4>
                 <div className="space-y-3">
-                  {[
-                    { rate: 0, threshold: 4380, description: "first" },
-                    { rate: 5, threshold: 1000, description: "next" },
-                    { rate: 10, threshold: 2000, description: "next" },
-                    { rate: 17.5, threshold: 20000, description: "next" },
-                    { rate: 25, threshold: 20000, description: "next" },
-                    { rate: 30, threshold: null, description: "remaining amount" },
-                  ].map((band, index) => (
+                  {taxBands.map((band, index) => (
                     <div key={index} className="flex items-center gap-4">
-                      <Input type="number" value={band.rate} className="w-20" readOnly />
+                      <Input
+                        type="number"
+                        value={band.rate}
+                        className="w-20"
+                        onChange={(e) => {
+                          const newBands = [...taxBands]
+                          newBands[index].rate = Number(e.target.value)
+                          setTaxBands(newBands)
+                        }}
+                      />
                       <span className="text-sm">% on {band.description}</span>
                       {band.threshold && (
                         <>
                           <span className="text-sm">{currencySymbol}</span>
-                          <Input type="number" value={band.threshold} className="w-32" readOnly />
+                          <Input
+                            type="number"
+                            value={band.threshold}
+                            className="w-32"
+                            onChange={(e) => {
+                              const newBands = [...taxBands]
+                              newBands[index].threshold = Number(e.target.value)
+                              setTaxBands(newBands)
+                            }}
+                          />
                         </>
                       )}
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newBands = taxBands.filter((_, i) => i !== index)
+                          setTaxBands(newBands)
+                        }}
+                      >
                         <Minus className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setTaxBands([...taxBands, { rate: 0, threshold: 0, description: "next" }])
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Tax Band
+                  </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
-        </div>
-      )}
 
-      {activeTab === "multi-company" && (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Subsidiary Companies
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center mb-4">
-                <p className="text-sm text-muted-foreground">Manage subsidiary companies and their configurations</p>
-                <Button>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Allowances</CardTitle>
+                <Button size="sm">
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Subsidiary
+                  Add Allowance
                 </Button>
-              </div>
-
-              <div className="space-y-4">
-                <Card className="p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-semibold">Akwaaba Tech Solutions</h3>
-                      <p className="text-sm text-muted-foreground">Technology Division</p>
-                      <p className="text-xs text-muted-foreground">50 employees</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {activeTab === "users" && (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                User Management
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center mb-4">
-                <p className="text-sm text-muted-foreground">Manage system users and their access levels</p>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add User
-                </Button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Users className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">Admin User</h3>
-                      <p className="text-sm text-muted-foreground">admin@akwaabahrpay.com</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge>Super Admin</Badge>
-                    <Button variant="outline" size="sm">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {activeTab === "roles" && (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Roles & Permissions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center mb-4">
-                <p className="text-sm text-muted-foreground">Define user roles and their system permissions</p>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Role
-                </Button>
-              </div>
-
-              <div className="grid gap-4">
-                {[
-                  {
-                    name: "Super Admin",
-                    description: "Full system access",
-                    users: 1,
-                    color: "bg-red-100 text-red-800",
-                  },
-                  {
-                    name: "HR Manager",
-                    description: "HR operations and employee management",
-                    users: 3,
-                    color: "bg-blue-100 text-blue-800",
-                  },
-                  {
-                    name: "Payroll Officer",
-                    description: "Payroll processing and reports",
-                    users: 2,
-                    color: "bg-green-100 text-green-800",
-                  },
-                  {
-                    name: "Employee",
-                    description: "Basic employee self-service",
-                    users: 45,
-                    color: "bg-gray-100 text-gray-800",
-                  },
-                ].map((role, index) => (
-                  <Card key={index} className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold">{role.name}</h3>
-                          <Badge className={role.color}>{role.users} users</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{role.description}</p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {payrollAllowances.map((allowance) => (
+                    <div key={allowance.id} className="flex justify-between items-center p-3 border rounded">
+                      <div>
+                        <h4 className="font-medium">{allowance.type}</h4>
+                        <p className="text-sm text-muted-foreground">{allowance.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {allowance.amount ? `${formatAmount(allowance.amount)}` : `${allowance.percentage}%`}
+                          {allowance.taxable ? " (Taxable)" : " (Non-taxable)"}
+                        </p>
                       </div>
                       <div className="flex gap-2">
                         <Button variant="outline" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button variant="outline" size="sm">
-                          <Settings className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Deductions</CardTitle>
+                <Button size="sm">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Deduction
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {payrollDeductions.map((deduction) => (
+                    <div key={deduction.id} className="flex justify-between items-center p-3 border rounded">
+                      <div>
+                        <h4 className="font-medium">{deduction.type}</h4>
+                        <p className="text-sm text-muted-foreground">{deduction.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {deduction.amount ? `${formatAmount(deduction.amount)}` : `${deduction.percentage}%`}
+                          {deduction.taxable ? " (Taxable)" : " (Non-taxable)"}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "notifications" && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Email Templates
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {emailTemplates.map((template) => (
+                  <Card key={template.id} className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold">{template.name}</h3>
+                          <Badge variant={template.isActive ? "default" : "secondary"}>
+                            {template.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{template.description}</p>
+                        <p className="text-xs font-medium">Subject: {template.subject}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Last modified: {new Date(template.lastModified).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingEmailTemplate(template)
+                          setShowEmailTemplateDialog(true)
+                        }}
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </Button>
+                    </div>
                   </Card>
                 ))}
+
+                <Button
+                  variant="outline"
+                  className="w-full bg-transparent"
+                  onClick={() => setShowCustomTemplateDialog(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Custom Template
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -1904,6 +1995,126 @@ This is an automated message. Please do not reply to this email.`,
               Save Template
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Leave Type Dialog */}
+      <Dialog open={showLeaveTypeDialog} onOpenChange={setShowLeaveTypeDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingLeaveType ? "Edit Leave Type" : "Add New Leave Type"}</DialogTitle>
+            <DialogDescription>
+              Configure leave type settings including entitlements, approval requirements, and payment policies.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div>
+              <Label htmlFor="leaveName">Leave Type Name</Label>
+              <Input id="leaveName" defaultValue={editingLeaveType?.name || ""} placeholder="e.g., Annual Leave" />
+            </div>
+            <div>
+              <Label htmlFor="leaveCode">Code</Label>
+              <Input id="leaveCode" defaultValue={editingLeaveType?.code || ""} placeholder="e.g., AL" />
+            </div>
+            <div className="col-span-2">
+              <Label htmlFor="leaveDescription">Description</Label>
+              <Textarea
+                id="leaveDescription"
+                defaultValue={editingLeaveType?.description || ""}
+                placeholder="Brief description of this leave type"
+              />
+            </div>
+            <div>
+              <Label htmlFor="annualEntitlement">Annual Entitlement (days)</Label>
+              <Input id="annualEntitlement" type="number" defaultValue={editingLeaveType?.annual_entitlement || 21} />
+            </div>
+            <div>
+              <Label htmlFor="maxConsecutive">Max Consecutive Days</Label>
+              <Input id="maxConsecutive" type="number" defaultValue={editingLeaveType?.max_consecutive_days || 30} />
+            </div>
+            <div>
+              <Label htmlFor="payPercentage">Pay Percentage (%)</Label>
+              <Input
+                id="payPercentage"
+                type="number"
+                defaultValue={editingLeaveType?.pay_percentage || 100}
+                min="0"
+                max="100"
+              />
+            </div>
+            <div>
+              <Label htmlFor="minNotice">Minimum Notice (days)</Label>
+              <Input id="minNotice" type="number" defaultValue={editingLeaveType?.min_notice_days || 7} />
+            </div>
+            <div className="col-span-2 space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch id="requiresApproval" defaultChecked={editingLeaveType?.requires_approval ?? true} />
+                <Label htmlFor="requiresApproval">Requires Approval</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch id="requiresMedical" defaultChecked={editingLeaveType?.requires_medical_certificate ?? false} />
+                <Label htmlFor="requiresMedical">Requires Medical Certificate</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch id="allowCarryOver" defaultChecked={editingLeaveType?.allow_carry_over ?? false} />
+                <Label htmlFor="allowCarryOver">Allow Carry Over</Label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLeaveTypeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveLeaveType}>{editingLeaveType ? "Update" : "Create"} Leave Type</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Salary Grade Dialog */}
+      <Dialog open={showSalaryGradeDialog} onOpenChange={setShowSalaryGradeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingSalaryGrade ? "Edit Salary Grade" : "Add New Salary Grade"}</DialogTitle>
+            <DialogDescription>Configure salary grade with step progression amounts.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="gradeName">Grade Name</Label>
+              <Input id="gradeName" defaultValue={editingSalaryGrade?.grade_name || ""} placeholder="e.g., Grade 1" />
+            </div>
+            <div>
+              <Label htmlFor="gradeLevel">Grade Level</Label>
+              <Input id="gradeLevel" type="number" defaultValue={editingSalaryGrade?.grade_level || 1} min="1" />
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              <div>
+                <Label htmlFor="step1">Step 1 ({currencySymbol})</Label>
+                <Input id="step1" type="number" defaultValue={editingSalaryGrade?.step_1 || 0} />
+              </div>
+              <div>
+                <Label htmlFor="step2">Step 2 ({currencySymbol})</Label>
+                <Input id="step2" type="number" defaultValue={editingSalaryGrade?.step_2 || 0} />
+              </div>
+              <div>
+                <Label htmlFor="step3">Step 3 ({currencySymbol})</Label>
+                <Input id="step3" type="number" defaultValue={editingSalaryGrade?.step_3 || 0} />
+              </div>
+              <div>
+                <Label htmlFor="step4">Step 4 ({currencySymbol})</Label>
+                <Input id="step4" type="number" defaultValue={editingSalaryGrade?.step_4 || 0} />
+              </div>
+              <div>
+                <Label htmlFor="step5">Step 5 ({currencySymbol})</Label>
+                <Input id="step5" type="number" defaultValue={editingSalaryGrade?.step_5 || 0} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSalaryGradeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveSalaryGrade}>{editingSalaryGrade ? "Update" : "Create"} Grade</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
