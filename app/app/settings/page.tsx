@@ -149,6 +149,8 @@ export default function SettingsPage() {
     ssnit_number: "1234567890",
     industry: "Technology",
     status: "active",
+    address: "123 Liberation Road, Labome, Accra, Ghana",
+    phone: "+233 30 123 4567",
   })
 
   const [uploadedFileName, setUploadedFileName] = useState("")
@@ -912,6 +914,11 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     toast({ title: "Info", description: `Viewing subsidiary: ${subsidiary.name}` })
   }
 
+  const [notificationSettings, setNotificationSettings] = useState({
+    email: "admin@akwaabatech.com",
+    webhookUrl: "",
+  })
+
   return (
     <div className="container mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
@@ -1022,6 +1029,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <Label htmlFor="company-address">Company Address</Label>
                   <Textarea
                     id="company-address"
+                    value={companyData.address}
+                    onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
                     placeholder="123 Liberation Road, Labome, Accra, Ghana"
                     className="min-h-[80px]"
                   />
@@ -1029,7 +1038,12 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="phone-number">Phone Number</Label>
-                    <Input id="phone-number" placeholder="+233 30 123 4567" />
+                    <Input
+                      id="phone-number"
+                      value={companyData.phone}
+                      onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })}
+                      placeholder="+233 30 123 4567"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email-address">Email Address</Label>
@@ -1757,11 +1771,18 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 </div>
                 <div className="space-y-2">
                   <Label>Notification Email</Label>
-                  <Input defaultValue="admin@akwaabatech.com" />
+                  <Input
+                    value={notificationSettings.email}
+                    onChange={(e) => setNotificationSettings({ ...notificationSettings, email: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Webhook URL (Optional)</Label>
-                  <Input placeholder="https://your-app.com/webhook" />
+                  <Input
+                    value={notificationSettings.webhookUrl}
+                    onChange={(e) => setNotificationSettings({ ...notificationSettings, webhookUrl: e.target.value })}
+                    placeholder="https://your-app.com/webhook"
+                  />
                 </div>
               </CardContent>
             </Card>
