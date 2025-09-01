@@ -27,6 +27,7 @@ import {
   Settings,
   Mail,
   Calendar,
+  Save,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -122,6 +123,9 @@ interface Subsidiary {
   locations: string[]
   created_at?: string
   updated_at?: string
+  divisions_count?: number
+  departments_count?: number
+  locations_count?: number
 }
 
 interface Role {
@@ -156,6 +160,7 @@ export default function SettingsPage() {
   const [showDeactivateModal, setShowDeactivateModal] = useState(false)
 
   const [companyData, setCompanyData] = useState({
+    id: null as string | null,
     name: "",
     email: "",
     tax_id: "",
@@ -559,10 +564,28 @@ IT Support Team
   const loadSubsidiaries = async () => {
     try {
       const supabase = createClient()
-      const { data, error } = await supabase.from("subsidiaries").select("*").order("name")
+      const { data, error } = await supabase.from("subsidiaries").select(`
+          *,
+          divisions:divisions(count),
+          departments:departments(count),
+          locations:locations(count)
+        `)
 
-      if (error) throw error
-      setSubsidiaries(data || [])
+      if (error) {
+        console.error("Subsidiaries loading error:", error)
+        return
+      }
+
+      // Transform data to include counts
+      const subsidiariesWithCounts =
+        data?.map((subsidiary) => ({
+          ...subsidiary,
+          divisions_count: subsidiary.divisions?.[0]?.count || 0,
+          departments_count: subsidiary.departments?.[0]?.count || 0,
+          locations_count: subsidiary.locations?.[0]?.count || 0,
+        })) || []
+
+      setSubsidiaries(subsidiariesWithCounts)
     } catch (error) {
       console.error("Error loading subsidiaries:", error)
     }
@@ -997,6 +1020,15 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     try {
       const supabase = createClient()
 
+      if (!companyData.id) {
+        toast({
+          title: "Error",
+          description: "Company ID not found. Please refresh the page and try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
       // Update company settings
       const { error } = await supabase
         .from("companies")
@@ -1008,13 +1040,181 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           industry: companyData.industry,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", "1") // Replace with actual company ID
+        .eq("id", companyData.id)
 
       if (error) throw error
       toast({ title: "Success", description: "Multi-company settings saved successfully" })
     } catch (error) {
       console.error("Error saving multi-company settings:", error)
       toast({ title: "Error", description: "Failed to save settings" })
+    }
+  }
+
+  const handleSaveCompanySettings = async () => {
+    try {
+      const supabase = createClient()
+
+      if (!companyData.id) {
+        toast({
+          title: "Error",
+          description: "Company ID not found. Please refresh the page and try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const { error } = await supabase
+        .from("companies")
+        .update({
+          name: companyData.name,
+          email_address: companyData.email,
+          tax_id: companyData.tax_id,
+          ssnit_number: companyData.ssnit_number,
+          industry: companyData.industry,
+          address: companyData.address,
+          phone_number: companyData.phone,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", companyData.id)
+
+      if (error) throw error
+      toast({ title: "Success", description: "Company settings saved successfully" })
+    } catch (error) {
+      console.error("Error saving company settings:", error)
+      toast({ title: "Error", description: "Failed to save company settings" })
+    }
+  }
+
+  const handleSavePayrollSettings = async () => {
+    try {
+      const supabase = createClient()
+
+      // Save payroll configuration
+      const { error: configError } = await supabase.from("payroll_configuration").upsert({
+        company_id: companyData.id,
+        pay_frequency: payrollConfig.pay_frequency,
+        currency: payrollConfig.currency,
+        minimum_wage: payrollConfig.minimum_wage,
+        overtime_rate: payrollConfig.overtime_rate,
+        cutoff_day: payrollConfig.cutoff_day,
+        processing_day: payrollConfig.processing_day,
+        auto_calculate_paye: payrollConfig.auto_calculate_paye,
+        auto_calculate_ssnit: payrollConfig.auto_calculate_ssnit,
+        auto_calculate_provident: payrollConfig.auto_calculate_provident,
+        updated_at: new Date().toISOString(),
+      })
+
+      if (configError) throw configError
+
+      // Save tax bands
+      for (const band of taxBands) {
+        const { error: bandError } = await supabase.from("tax_bands").upsert({
+          company_id: companyData.id,
+          band_name: band.band,
+          rate_percentage: band.rate,
+          min_amount: band.min,
+          max_amount: band.max,
+          updated_at: new Date().toISOString(),
+        })
+
+        if (bandError) throw bandError
+      }
+
+      toast({ title: "Success", description: "Payroll settings saved successfully" })
+    } catch (error) {
+      console.error("Error saving payroll settings:", error)
+      toast({ title: "Error", description: "Failed to save payroll settings" })
+    }
+  }
+
+  const handleSaveHRSettings = async () => {
+    try {
+      const supabase = createClient()
+
+      // Save leave types
+      for (const leaveType of leaveTypes) {
+        const { error } = await supabase.from("leave_types").upsert({
+          id: leaveType.id,
+          company_id: companyData.id,
+          name: leaveType.name,
+          description: leaveType.description,
+          annual_entitlement: leaveType.annual_entitlement,
+          requires_approval: leaveType.requires_approval,
+          is_paid: leaveType.is_paid,
+          updated_at: new Date().toISOString(),
+        })
+
+        if (error) throw error
+      }
+
+      // Save salary grades
+      for (const grade of salaryGrades) {
+        const { error } = await supabase.from("salary_grades").upsert({
+          id: grade.id,
+          company_id: companyData.id,
+          grade_name: grade.name,
+          min_salary: grade.min_salary,
+          max_salary: grade.max_salary,
+          steps: grade.steps,
+          updated_at: new Date().toISOString(),
+        })
+
+        if (error) throw error
+      }
+
+      toast({ title: "Success", description: "HR settings saved successfully" })
+    } catch (error) {
+      console.error("Error saving HR settings:", error)
+      toast({ title: "Error", description: "Failed to save HR settings" })
+    }
+  }
+
+  const handleSaveSecuritySettings = async () => {
+    try {
+      const supabase = createClient()
+
+      const { error } = await supabase.from("security_settings").upsert({
+        company_id: companyData.id,
+        two_factor_enabled: securitySettings.twoFactorAuth,
+        session_timeout_enabled: securitySettings.sessionTimeout,
+        timeout_duration: securitySettings.timeoutDuration,
+        audit_logging_enabled: securitySettings.auditLogging,
+        password_min_length: passwordPolicy.minLength,
+        require_uppercase: passwordPolicy.requireUppercase,
+        require_numbers: passwordPolicy.requireNumbers,
+        require_symbols: passwordPolicy.requireSymbols,
+        updated_at: new Date().toISOString(),
+      })
+
+      if (error) throw error
+      toast({ title: "Success", description: "Security settings saved successfully" })
+    } catch (error) {
+      console.error("Error saving security settings:", error)
+      toast({ title: "Error", description: "Failed to save security settings" })
+    }
+  }
+
+  const handleSaveNotificationSettings = async () => {
+    try {
+      const supabase = createClient()
+
+      const { error } = await supabase.from("notification_settings").upsert({
+        company_id: companyData.id,
+        payroll_alerts: notificationSettings.payrollAlerts,
+        leave_alerts: notificationSettings.leaveAlerts,
+        employee_updates: notificationSettings.employeeUpdates,
+        system_maintenance: notificationSettings.systemMaintenance,
+        sms_notifications: notificationSettings.smsNotifications,
+        notification_email: notificationSettings.email,
+        webhook_url: notificationSettings.webhookUrl,
+        updated_at: new Date().toISOString(),
+      })
+
+      if (error) throw error
+      toast({ title: "Success", description: "Notification settings saved successfully" })
+    } catch (error) {
+      console.error("Error saving notification settings:", error)
+      toast({ title: "Error", description: "Failed to save notification settings" })
     }
   }
 
@@ -1267,6 +1467,13 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   </div>
                 </div>
               </CardContent>
+
+              <div className="flex justify-end mt-6">
+                <Button onClick={handleSaveCompanySettings} className="bg-green-600 hover:bg-green-700">
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
+                </Button>
+              </div>
             </Card>
 
             <Card>
@@ -1586,6 +1793,13 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   </div>
                 </div>
               </CardContent>
+
+              <div className="flex justify-end mt-6">
+                <Button onClick={handleSavePayrollSettings} className="bg-green-600 hover:bg-green-700">
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Payroll Settings
+                </Button>
+              </div>
             </Card>
 
             <Card>
@@ -1691,6 +1905,13 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   </div>
                 </div>
               </CardContent>
+
+              <div className="flex justify-end mt-6">
+                <Button onClick={handleSaveHRSettings} className="bg-green-600 hover:bg-green-700">
+                  <Save className="h-4 w-4 mr-2" />
+                  Save HR Settings
+                </Button>
+              </div>
             </Card>
 
             <Card>
@@ -1811,6 +2032,13 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                     Download Security Report
                   </Button>
                 </div>
+
+                <div className="flex justify-end mt-6">
+                  <Button onClick={handleSaveSecuritySettings} className="bg-green-600 hover:bg-green-700">
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Security Settings
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -1922,6 +2150,13 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                     onChange={(e) => setNotificationSettings({ ...notificationSettings, webhookUrl: e.target.value })}
                     placeholder="https://your-app.com/webhook"
                   />
+                </div>
+
+                <div className="flex justify-end mt-6">
+                  <Button onClick={handleSaveNotificationSettings} className="bg-green-600 hover:bg-green-700">
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Notification Settings
+                  </Button>
                 </div>
               </CardContent>
             </Card>
