@@ -8,8 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { useCurrency } from "@/lib/currency-context"
-import { createClient as createBrowserClient } from "@/lib/supabase/client"
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/client"
 import { Building2, Shield, Users, DollarSign, Bell } from "lucide-react"
 
 interface Company {
@@ -378,7 +377,7 @@ IT Support Team
 
   const loadCompanyData = async () => {
     try {
-      const supabase = createBrowserClient()
+      const supabase = createClient()
       const { data, error } = await supabase.from("companies").select("*").single()
 
       if (error) throw error
@@ -395,7 +394,7 @@ IT Support Team
 
   const loadLeaveTypes = async () => {
     try {
-      const supabase = createBrowserClient()
+      const supabase = createClient()
       const { data, error } = await supabase.from("leave_types").select("*").order("name")
 
       if (error) throw error
@@ -412,7 +411,7 @@ IT Support Team
 
   const loadSalaryGrades = async () => {
     try {
-      const supabase = createBrowserClient()
+      const supabase = createClient()
       const { data, error } = await supabase.from("salary_grades").select("*").order("grade_level")
 
       if (error) throw error
@@ -429,7 +428,7 @@ IT Support Team
 
   const loadEmployees = async () => {
     try {
-      const supabase = createBrowserClient()
+      const supabase = createClient()
       const { data, error } = await supabase.from("employees").select("*").order("first_name")
 
       if (error) throw error
@@ -441,7 +440,7 @@ IT Support Team
 
   const loadSubsidiaries = async () => {
     try {
-      const supabase = createBrowserClient()
+      const supabase = createClient()
       const { data, error } = await supabase.from("subsidiaries").select("*").order("name")
 
       if (error) throw error
@@ -453,7 +452,7 @@ IT Support Team
 
   const loadPayrollConfig = async () => {
     try {
-      const supabase = createBrowserClient()
+      const supabase = createClient()
       const { data, error } = await supabase.from("payroll_configuration").select("*").single()
 
       if (error) throw error
@@ -465,7 +464,7 @@ IT Support Team
 
   const loadPayrollAllowances = async () => {
     try {
-      const supabase = createBrowserClient()
+      const supabase = createClient()
       const { data, error } = await supabase.from("payroll_allowances").select("*").order("type")
 
       if (error) throw error
@@ -477,7 +476,7 @@ IT Support Team
 
   const loadPayrollDeductions = async () => {
     try {
-      const supabase = createBrowserClient()
+      const supabase = createClient()
       const { data, error } = await supabase.from("payroll_deductions").select("*").order("type")
 
       if (error) throw error
@@ -517,7 +516,7 @@ IT Support Team
         const base64Data = e.target?.result as string
         console.log("[v0] File read successfully, uploading to database...")
 
-        const supabase = createBrowserClient()
+        const supabase = createClient()
 
         const { data, error } = await supabase
           .from("company_files")
@@ -575,7 +574,7 @@ IT Support Team
 
     setIsLoading(true)
     try {
-      const supabase = createBrowserClient()
+      const supabase = createClient()
       const { error } = await supabase.from("companies").upsert(companyData)
 
       if (error) throw error
@@ -607,7 +606,7 @@ IT Support Team
 
   const handleDeleteLeaveType = async (id: string) => {
     try {
-      const supabase = createBrowserClient()
+      const supabase = createClient()
       const { error } = await supabase.from("leave_types").delete().eq("id", id)
 
       if (error) throw error
@@ -637,7 +636,7 @@ IT Support Team
 
   const handleDeleteSalaryGrade = async (id: string) => {
     try {
-      const supabase = createBrowserClient()
+      const supabase = createClient()
       const { error } = await supabase.from("salary_grades").delete().eq("id", id)
 
       if (error) throw error
