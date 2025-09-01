@@ -11,9 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { Save, Shield, Key, Download, Database, FileText, Eye } from "lucide-react"
+import { Save, Shield, Key, Download, Database, FileText, Eye, CheckCircle } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface Company {
   id: string
@@ -692,6 +693,8 @@ SYSTEM METRICS:
     }
   }
 
+  const [showBackupSuccessModal, setShowBackupSuccessModal] = useState(false)
+
   const handleBackupNow = async () => {
     try {
       setIsBackingUp(true)
@@ -701,6 +704,8 @@ SYSTEM METRICS:
 
       // Update last backup time
       setLastBackupTime(new Date())
+
+      setShowBackupSuccessModal(true)
 
       toast({
         title: "Backup Successful",
@@ -2044,6 +2049,48 @@ SYSTEM METRICS:
 
         {/* Other tab contents would go here */}
       </div>
+
+      <Dialog open={showBackupSuccessModal} onOpenChange={setShowBackupSuccessModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              Backup Completed Successfully
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle className="h-8 w-8 text-green-500" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Your system backup has been completed successfully and stored securely.
+              </p>
+            </div>
+
+            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Backup Time:</span>
+                <span className="font-medium">{lastBackupTime?.toLocaleString() || "Just now"}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Backup Type:</span>
+                <span className="font-medium">Full System Backup</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Status:</span>
+                <span className="font-medium text-green-600">Completed</span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setShowBackupSuccessModal(false)} className="w-full">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
