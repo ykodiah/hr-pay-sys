@@ -7,6 +7,39 @@ import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrency } from "@/lib/currency-context"
 
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Progress } from "@/components/ui/progress"
+import {
+  Building2,
+  Shield,
+  Bell,
+  Download,
+  Eye,
+  EyeOff,
+  Save,
+  CheckCircle,
+  Database,
+  FileText,
+  Key,
+  Activity,
+} from "lucide-react"
+
 interface Company {
   id: string
   name: string
@@ -174,6 +207,16 @@ interface LeaveType {
   max_carry_over_days: number
   carry_over_expiry_months: number
   is_active: boolean
+}
+
+interface EmailTemplate {
+  id: string
+  name: string
+  subject: string
+  content: string
+  variables: string[]
+  isActive: boolean
+  lastModified: string
 }
 
 const MAIN_COMPANY_ID = "00000000-0000-0000-0000-000000000001" // Fixed UUID for main company
@@ -578,6 +621,179 @@ export default function SettingsPage() {
   const [uploadedFileName, setUploadedFileName] = useState("")
   const [logoFileId, setLogoFileId] = useState<string | null>(null)
 
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([
+    {
+      id: "welcome",
+      name: "Welcome Email",
+      subject: "Welcome to {{company_name}} - Your Journey Begins!",
+      content: `Dear {{employee_name}},
+
+Welcome to {{company_name}}! We are thrilled to have you join our team as a {{position}} in the {{department}} department.
+
+Your employment details:
+- Employee ID: {{employee_id}}
+- Start Date: {{start_date}}
+- Reporting Manager: {{manager_name}}
+- Work Location: {{work_location}}
+- Start Time: {{start_time}}
+
+On your first day, please report to the HR department at {{start_time}} for your orientation session. You will receive your employee handbook, ID card, and access credentials.
+
+What to bring on your first day:
+- Valid identification documents
+- Signed employment contract
+- Bank account details for salary processing
+- Emergency contact information
+
+We look forward to working with you and wish you great success in your new role!
+
+Best regards,
+{{company_name}} HR Team
+{{company_email}} | {{company_phone}}`,
+      variables: [
+        "employee_name",
+        "company_name",
+        "position",
+        "department",
+        "employee_id",
+        "start_date",
+        "manager_name",
+        "work_location",
+        "start_time",
+        "company_email",
+        "company_phone",
+      ],
+      isActive: true,
+      lastModified: new Date().toISOString(),
+    },
+    {
+      id: "payslip",
+      name: "Payslip Notification",
+      subject: "Your {{month}} {{year}} Payslip is Ready",
+      content: `Dear {{employee_name}},
+
+Your payslip for {{month}} {{year}} is now available for download.
+
+Payroll Summary:
+- Gross Salary: {{gross_salary}}
+- Total Deductions: {{total_deductions}}
+- Net Pay: {{net_pay}}
+- Payment Date: {{payment_date}}
+
+To access your payslip:
+1. Log into your employee portal at {{portal_url}}
+2. Navigate to "Payslips" section
+3. Download your {{month}} {{year}} payslip
+
+If you have any questions about your payslip, please contact the Payroll department at {{payroll_email}} or call {{payroll_phone}}.
+
+Thank you,
+{{company_name}} Payroll Team`,
+      variables: [
+        "employee_name",
+        "month",
+        "year",
+        "gross_salary",
+        "total_deductions",
+        "net_pay",
+        "payment_date",
+        "portal_url",
+        "payroll_email",
+        "payroll_phone",
+        "company_name",
+      ],
+      isActive: true,
+      lastModified: new Date().toISOString(),
+    },
+    {
+      id: "leave_approval",
+      name: "Leave Approval",
+      subject: "Leave Request {{status}} - {{leave_type}}",
+      content: `Dear {{employee_name}},
+
+Your {{leave_type}} request has been {{status}}.
+
+Leave Request Details:
+- Leave Type: {{leave_type}}
+- Start Date: {{start_date}}
+- End Date: {{end_date}}
+- Total Days: {{total_days}}
+- Reason: {{reason}}
+- Status: {{status}}
+- {{#if approved_by}}Approved by: {{approved_by}}{{/if}}
+- {{#if rejection_reason}}Rejection Reason: {{rejection_reason}}{{/if}}
+
+{{#if status == "APPROVED"}}
+Please ensure you complete any pending tasks and brief your colleagues before your leave begins. Have a great time off!
+{{else}}
+If you have any questions about this decision, please contact your manager or HR department.
+{{/if}}
+
+For any leave-related queries, contact HR at {{hr_email}} or {{hr_phone}}.
+
+Best regards,
+{{company_name}} HR Team`,
+      variables: [
+        "employee_name",
+        "leave_type",
+        "status",
+        "start_date",
+        "end_date",
+        "total_days",
+        "reason",
+        "approved_by",
+        "rejection_reason",
+        "hr_email",
+        "hr_phone",
+        "company_name",
+      ],
+      isActive: true,
+      lastModified: new Date().toISOString(),
+    },
+    {
+      id: "password_reset",
+      name: "Password Reset",
+      subject: "Password Reset Request - {{company_name}}",
+      content: `Dear {{employee_name}},
+
+We received a request to reset your password for your {{company_name}} employee account.
+
+To reset your password, please click the link below:
+{{reset_link}}
+
+This link will expire in {{expiry_hours}} hours for security reasons.
+
+If you did not request this password reset, please ignore this email and contact IT support immediately at {{it_email}} or {{it_phone}}.
+
+Security Tips:
+- Never share your password with anyone
+- Use a strong password with at least 8 characters
+- Include uppercase, lowercase, numbers, and special characters
+- Don't use the same password for multiple accounts
+
+For security assistance, contact our IT department:
+Email: {{it_email}}
+Phone: {{it_phone}}
+
+Best regards,
+{{company_name}} IT Security Team`,
+      variables: ["employee_name", "company_name", "reset_link", "expiry_hours", "it_email", "it_phone"],
+      isActive: true,
+      lastModified: new Date().toISOString(),
+    },
+  ])
+
+  const [showEmailTemplateDialog, setShowEmailTemplateDialog] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null)
+  const [showCustomTemplateDialog, setShowCustomTemplateDialog] = useState(false)
+  const [customTemplate, setCustomTemplate] = useState<Partial<EmailTemplate>>({
+    name: "",
+    subject: "",
+    content: "",
+    variables: [],
+    isActive: true,
+  })
+
   const calculatePasswordStrength = (policy: SecuritySettings["passwordPolicy"]) => {
     let score = 0
     const feedback = []
@@ -606,6 +822,106 @@ export default function SettingsPage() {
     }
 
     return { score, strength, color, feedback }
+  }
+
+  const handleEditTemplate = (template: EmailTemplate) => {
+    setEditingTemplate({ ...template })
+    setShowEmailTemplateDialog(true)
+  }
+
+  const handleSaveTemplate = async () => {
+    if (!editingTemplate) return
+
+    try {
+      const updatedTemplates = emailTemplates.map((template) =>
+        template.id === editingTemplate.id ? { ...editingTemplate, lastModified: new Date().toISOString() } : template,
+      )
+
+      setEmailTemplates(updatedTemplates)
+      setShowEmailTemplateDialog(false)
+      setEditingTemplate(null)
+
+      toast({
+        title: "Template Updated",
+        description: "Email template has been updated successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Update Failed",
+        description: "Failed to update email template. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleAddCustomTemplate = () => {
+    setCustomTemplate({
+      name: "",
+      subject: "",
+      content: "",
+      variables: [],
+      isActive: true,
+    })
+    setShowCustomTemplateDialog(true)
+  }
+
+  const handleSaveCustomTemplate = async () => {
+    if (!customTemplate.name || !customTemplate.subject || !customTemplate.content) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const newTemplate: EmailTemplate = {
+        id: `custom_${Date.now()}`,
+        name: customTemplate.name!,
+        subject: customTemplate.subject!,
+        content: customTemplate.content!,
+        variables: extractVariablesFromContent(customTemplate.content!),
+        isActive: customTemplate.isActive!,
+        lastModified: new Date().toISOString(),
+      }
+
+      setEmailTemplates([...emailTemplates, newTemplate])
+      setShowCustomTemplateDialog(false)
+      setCustomTemplate({
+        name: "",
+        subject: "",
+        content: "",
+        variables: [],
+        isActive: true,
+      })
+
+      toast({
+        title: "Template Added",
+        description: "Custom email template has been added successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Save Failed",
+        description: "Failed to save custom template. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const extractVariablesFromContent = (content: string): string[] => {
+    const variableRegex = /\{\{([^}]+)\}\}/g
+    const variables: string[] = []
+    let match
+
+    while ((match = variableRegex.exec(content)) !== null) {
+      const variable = match[1].trim()
+      if (!variables.includes(variable)) {
+        variables.push(variable)
+      }
+    }
+
+    return variables
   }
 
   const handleChangeAdminPassword = () => {
@@ -1746,636 +2062,848 @@ SYSTEM METRICS:
     }
   }
 
-  useEffect(() => {
-    loadSettingsFromDatabase()
-    loadSubsidiaries()
-  }, [])
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
             <p className="text-gray-600 mt-1">Manage your system configuration and preferences</p>
           </div>
-          <button
+          <Button
             onClick={handleSaveSettings}
-            disabled={isLoading}
-            className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2"
+            disabled={isLoading || !hasUnsavedChanges}
+            className="bg-gray-900 hover:bg-gray-800"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-            {isLoading ? "Saving..." : "Save Changes"}
-          </button>
+            <Save className="w-4 h-4 mr-2" />
+            Save Changes
+          </Button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="bg-white rounded-lg shadow-sm mb-6">
-          <div className="flex overflow-x-auto">
-            {[
-              { id: "company", label: "Company" },
-              { id: "multi-company", label: "Multi-Company" },
-              { id: "roles", label: "Roles & Access" },
-              { id: "users", label: "Users" },
-              { id: "payroll", label: "Payroll" },
-              { id: "hr", label: "HR" },
-              { id: "security", label: "Security" },
-              { id: "notifications", label: "Notifications" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? "border-teal-500 text-teal-600 bg-teal-50"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-8 bg-teal-100">
+            <TabsTrigger value="company" className="data-[state=active]:bg-white">
+              <Building2 className="w-4 h-4 mr-2" />
+              Company
+            </TabsTrigger>
+            <TabsTrigger value="multi-company" className="data-[state=active]:bg-white">
+              Multi-Company
+            </TabsTrigger>
+            <TabsTrigger value="roles" className="data-[state=active]:bg-white">
+              Roles & Access
+            </TabsTrigger>
+            <TabsTrigger value="users" className="data-[state=active]:bg-white">
+              Users
+            </TabsTrigger>
+            <TabsTrigger value="payroll" className="data-[state=active]:bg-white">
+              Payroll
+            </TabsTrigger>
+            <TabsTrigger value="hr" className="data-[state=active]:bg-white">
+              HR
+            </TabsTrigger>
+            <TabsTrigger value="security" className="data-[state=active]:bg-white">
+              <Shield className="w-4 h-4 mr-2" />
+              Security
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="data-[state=active]:bg-white">
+              <Bell className="w-4 h-4 mr-2" />
+              Notifications
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Tab Content */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
+          {/* ... existing tab content ... */}
+
           {activeTab === "security" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Security Settings */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                      />
-                    </svg>
-                  </div>
-                  <h2 className="text-xl font-semibold text-gray-900">Security Settings</h2>
-                </div>
-
-                {/* Two-Factor Authentication */}
-                <div className="flex items-center justify-between py-4">
-                  <div>
-                    <h3 className="font-medium text-gray-900">Two-Factor Authentication</h3>
-                    <p className="text-sm text-gray-500">Add an extra layer of security</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="w-5 h-5" />
+                    Security Settings
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-base font-medium">Two-Factor Authentication</Label>
+                      <p className="text-sm text-gray-600">Add an extra layer of security</p>
+                    </div>
+                    <Switch
                       checked={securitySettings.twoFactor}
-                      onChange={(e) => updateSecuritySettings("twoFactor", e.target.checked)}
-                      className="sr-only peer"
+                      onCheckedChange={(checked) => updateSecuritySettings("twoFactor", checked)}
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-                  </label>
-                </div>
-
-                {/* Auto Session Timeout */}
-                <div className="flex items-center justify-between py-4">
-                  <div>
-                    <h3 className="font-medium text-gray-900">Auto Session Timeout</h3>
-                    <p className="text-sm text-gray-500">Automatically log out inactive users</p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-base font-medium">Auto Session Timeout</Label>
+                      <p className="text-sm text-gray-600">Automatically log out inactive users</p>
+                    </div>
+                    <Switch
                       checked={securitySettings.sessionTimeout}
-                      onChange={(e) => updateSecuritySettings("sessionTimeout", e.target.checked)}
-                      className="sr-only peer"
+                      onCheckedChange={(checked) => updateSecuritySettings("sessionTimeout", checked)}
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-                  </label>
-                </div>
-
-                {securitySettings.sessionTimeout && (
-                  <div className="ml-6 mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Timeout Duration (minutes)</label>
-                    <select
-                      value={securitySettings.timeoutDuration}
-                      onChange={(e) => updateSecuritySettings("timeoutDuration", Number.parseInt(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    >
-                      <option value={1}>1 minute</option>
-                      <option value={3}>3 minutes</option>
-                      <option value={5}>5 minutes</option>
-                      <option value={10}>10 minutes</option>
-                      <option value={15}>15 minutes</option>
-                    </select>
                   </div>
-                )}
 
-                {/* Audit Logging */}
-                <div className="flex items-center justify-between py-4">
-                  <div>
-                    <h3 className="font-medium text-gray-900">Audit Logging</h3>
-                    <p className="text-sm text-gray-500">Track all system activities</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
+                  {securitySettings.sessionTimeout && (
+                    <div className="ml-6">
+                      <Label className="text-sm font-medium">Timeout Duration (minutes)</Label>
+                      <Select
+                        value={securitySettings.timeoutDuration.toString()}
+                        onValueChange={(value) => updateSecuritySettings("timeoutDuration", Number.parseInt(value))}
+                      >
+                        <SelectTrigger className="w-full mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1 minute</SelectItem>
+                          <SelectItem value="3">3 minutes</SelectItem>
+                          <SelectItem value="5">5 minutes</SelectItem>
+                          <SelectItem value="10">10 minutes</SelectItem>
+                          <SelectItem value="15">15 minutes</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-base font-medium">Audit Logging</Label>
+                      <p className="text-sm text-gray-600">Track all system activities</p>
+                    </div>
+                    <Switch
                       checked={securitySettings.auditLog}
-                      onChange={(e) => updateSecuritySettings("auditLog", e.target.checked)}
-                      className="sr-only peer"
+                      onCheckedChange={(checked) => updateSecuritySettings("auditLog", checked)}
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-                  </label>
-                </div>
-
-                {/* Automated Backups */}
-                <div className="flex items-center justify-between py-4">
-                  <div>
-                    <h3 className="font-medium text-gray-900">Automated Backups</h3>
-                    <p className="text-sm text-gray-500">Regular system data backups</p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-base font-medium">Automated Backups</Label>
+                      <p className="text-sm text-gray-600">Regular system data backups</p>
+                    </div>
+                    <Switch
                       checked={securitySettings.backupEnabled}
-                      onChange={(e) => updateSecuritySettings("backupEnabled", e.target.checked)}
-                      className="sr-only peer"
+                      onCheckedChange={(checked) => updateSecuritySettings("backupEnabled", checked)}
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-                  </label>
-                </div>
+                  </div>
 
-                {securitySettings.backupEnabled && (
-                  <div className="ml-6 mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Backup Frequency</label>
-                    <select
-                      value={securitySettings.backupFrequency}
-                      onChange={(e) => updateSecuritySettings("backupFrequency", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  {securitySettings.backupEnabled && (
+                    <div className="ml-6">
+                      <Label className="text-sm font-medium">Backup Frequency</Label>
+                      <Select
+                        value={securitySettings.backupFrequency}
+                        onValueChange={(value) => updateSecuritySettings("backupFrequency", value)}
+                      >
+                        <SelectTrigger className="w-full mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="space-y-3 pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start bg-transparent"
+                      onClick={handleChangeAdminPassword}
                     >
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
+                      <Key className="w-4 h-4 mr-2" />
+                      Change Admin Password
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start bg-transparent"
+                      onClick={handleDownloadSecurityReport}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download Security Report
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start bg-transparent"
+                      onClick={handleBackupNow}
+                      disabled={isBackingUp}
+                    >
+                      <Database className="w-4 h-4 mr-2" />
+                      {isBackingUp ? "Backing Up..." : "Backup Now"}
+                    </Button>
                   </div>
-                )}
+                </CardContent>
+              </Card>
 
-                {/* Action Buttons */}
-                <div className="space-y-3 pt-6 border-t">
-                  <button
-                    onClick={handleChangeAdminPassword}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-3a1 1 0 011-1h2.586l6.414-6.414a6 6 0 017.743-5.743z"
-                      />
-                    </svg>
-                    Change Admin Password
-                  </button>
-
-                  <button
-                    onClick={handleDownloadSecurityReport}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                    Download Security Report
-                  </button>
-
-                  <button
-                    onClick={handleBackupNow}
-                    disabled={isBackingUp}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
-                      />
-                    </svg>
-                    {isBackingUp ? "Backing Up..." : "Backup Now"}
-                  </button>
-                </div>
-              </div>
-
-              {/* Password Policy */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-3a1 1 0 011-1h2.586l6.414-6.414a6 6 0 017.743-5.743z"
-                      />
-                    </svg>
-                  </div>
-                  <h2 className="text-xl font-semibold text-gray-900">Password Policy</h2>
-                </div>
-
-                <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Key className="w-5 h-5" />
+                    Password Policy
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Minimum Length</label>
-                    <input
+                    <Label className="text-sm font-medium">Minimum Length</Label>
+                    <Input
                       type="number"
-                      min="6"
-                      max="32"
                       value={securitySettings.passwordPolicy.minLength}
                       onChange={(e) =>
                         updateSecuritySettings("passwordPolicy", {
                           ...securitySettings.passwordPolicy,
-                          minLength: Number.parseInt(e.target.value),
+                          minLength: Number.parseInt(e.target.value) || 8,
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      className="mt-1"
+                      min="6"
+                      max="20"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between py-3">
-                    <span className="text-sm font-medium text-gray-700">Require Uppercase Letters</span>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={securitySettings.passwordPolicy.requireUppercase}
-                        onChange={(e) =>
-                          updateSecuritySettings("passwordPolicy", {
-                            ...securitySettings.passwordPolicy,
-                            requireUppercase: e.target.checked,
-                          })
-                        }
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-                    </label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Require Uppercase Letters</Label>
+                    <Switch
+                      checked={securitySettings.passwordPolicy.requireUppercase}
+                      onCheckedChange={(checked) =>
+                        updateSecuritySettings("passwordPolicy", {
+                          ...securitySettings.passwordPolicy,
+                          requireUppercase: checked,
+                        })
+                      }
+                    />
                   </div>
 
-                  <div className="flex items-center justify-between py-3">
-                    <span className="text-sm font-medium text-gray-700">Require Numbers</span>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={securitySettings.passwordPolicy.requireNumbers}
-                        onChange={(e) =>
-                          updateSecuritySettings("passwordPolicy", {
-                            ...securitySettings.passwordPolicy,
-                            requireNumbers: e.target.checked,
-                          })
-                        }
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-                    </label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Require Numbers</Label>
+                    <Switch
+                      checked={securitySettings.passwordPolicy.requireNumbers}
+                      onCheckedChange={(checked) =>
+                        updateSecuritySettings("passwordPolicy", {
+                          ...securitySettings.passwordPolicy,
+                          requireNumbers: checked,
+                        })
+                      }
+                    />
                   </div>
 
-                  <div className="flex items-center justify-between py-3">
-                    <span className="text-sm font-medium text-gray-700">Require Symbols</span>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={securitySettings.passwordPolicy.requireSymbols}
-                        onChange={(e) =>
-                          updateSecuritySettings("passwordPolicy", {
-                            ...securitySettings.passwordPolicy,
-                            requireSymbols: e.target.checked,
-                          })
-                        }
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-                    </label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Require Symbols</Label>
+                    <Switch
+                      checked={securitySettings.passwordPolicy.requireSymbols}
+                      onCheckedChange={(checked) =>
+                        updateSecuritySettings("passwordPolicy", {
+                          ...securitySettings.passwordPolicy,
+                          requireSymbols: checked,
+                        })
+                      }
+                    />
                   </div>
 
-                  {/* Password Strength Preview */}
-                  <div className="mt-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">Password Strength Preview</span>
-                      <span className="text-sm text-gray-500">
-                        {calculatePasswordStrength(securitySettings.passwordPolicy).strength} password policy
-                      </span>
+                  <div className="pt-4 border-t">
+                    <Label className="text-sm font-medium">Password Strength Preview</Label>
+                    <div className="mt-2">
+                      {(() => {
+                        const { score, strength, color, feedback } = calculatePasswordStrength(
+                          securitySettings.passwordPolicy,
+                        )
+                        return (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-600">{strength} password policy</span>
+                              <span className="text-sm text-gray-500">{score}/100</span>
+                            </div>
+                            <Progress value={score} className="h-2" />
+                            {feedback.length > 0 && (
+                              <p className="text-xs text-gray-500">Missing: {feedback.join(", ")}</p>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full transition-all duration-300 ${calculatePasswordStrength(securitySettings.passwordPolicy).color}`}
-                        style={{ width: `${calculatePasswordStrength(securitySettings.passwordPolicy).score}%` }}
-                      ></div>
-                    </div>
-                    {calculatePasswordStrength(securitySettings.passwordPolicy).feedback.length > 0 && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Missing: {calculatePasswordStrength(securitySettings.passwordPolicy).feedback.join(", ")}
-                      </p>
-                    )}
                   </div>
-                </div>
+                </CardContent>
+              </Card>
 
-                {/* Audit Trail & Compliance */}
-                <div className="mt-8 pt-6 border-t">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900">Audit Trail & Compliance</h3>
-                  </div>
-
-                  <div className="flex items-center justify-between py-4">
-                    <div>
-                      <h4 className="font-medium text-gray-900">Audit Trail</h4>
-                      <p className="text-sm text-gray-500">Detailed activity logging</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="w-5 h-5" />
+                    Audit Trail & Compliance
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-base font-medium">Audit Trail</Label>
+                        <p className="text-sm text-gray-600">Detailed activity logging</p>
+                      </div>
+                      <Switch
                         checked={securitySettings.auditTrail}
-                        onChange={(e) => updateSecuritySettings("auditTrail", e.target.checked)}
-                        className="sr-only peer"
+                        onCheckedChange={(checked) => updateSecuritySettings("auditTrail", checked)}
                       />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-                    </label>
-                  </div>
+                    </div>
 
-                  <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Retention Period (days)</label>
-                      <input
+                      <Label className="text-sm font-medium">Retention Period (days)</Label>
+                      <Input
                         type="number"
+                        value={securitySettings.auditRetentionDays}
+                        onChange={(e) =>
+                          updateSecuritySettings("auditRetentionDays", Number.parseInt(e.target.value) || 90)
+                        }
+                        className="mt-1"
                         min="30"
                         max="365"
-                        value={securitySettings.auditRetentionDays}
-                        onChange={(e) => updateSecuritySettings("auditRetentionDays", Number.parseInt(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       />
                     </div>
                   </div>
 
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleDownloadAuditTrail}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
+                  <div className="flex gap-4 pt-4 border-t">
+                    <Button variant="outline" onClick={handleDownloadAuditTrail} className="flex-1 bg-transparent">
+                      <FileText className="w-4 h-4 mr-2" />
                       Download Audit Trail
-                    </button>
+                    </Button>
 
-                    <button
-                      onClick={handleViewActivityLog}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                      </svg>
+                    <Button variant="outline" onClick={handleViewActivityLog} className="flex-1 bg-transparent">
+                      <Eye className="w-4 h-4 mr-2" />
                       View Activity Log
-                    </button>
+                    </Button>
                   </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
-          {/* Other tab content would go here */}
-          {activeTab !== "security" && (
-            <div className="text-center py-12">
-              <p className="text-gray-500">Content for {activeTab} tab coming soon...</p>
+          {activeTab === "notifications" && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bell className="w-5 h-5" />
+                    Email Templates
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {emailTemplates.map((template) => (
+                    <div key={template.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{template.name}</h4>
+                        <p className="text-sm text-gray-600">
+                          {template.id === "welcome" && "Sent to new employees"}
+                          {template.id === "payslip" && "Monthly payslip availability"}
+                          {template.id === "leave_approval" && "Leave request status updates"}
+                          {template.id === "password_reset" && "Password reset instructions"}
+                          {template.id.startsWith("custom_") && "Custom template"}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditTemplate(template)}
+                        className="flex items-center gap-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Edit
+                      </Button>
+                    </div>
+                  ))}
+
+                  <Button
+                    variant="outline"
+                    onClick={handleAddCustomTemplate}
+                    className="w-full flex items-center gap-2 border-dashed bg-transparent"
+                  >
+                    <Bell className="w-4 h-4" />
+                    Add Custom Template
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Notification Settings</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-base font-medium">Payroll Alerts</Label>
+                        <p className="text-sm text-gray-600">Payroll processing notifications</p>
+                      </div>
+                      <Switch
+                        checked={notificationSettings.payrollAlerts}
+                        onCheckedChange={(checked) => updateNotificationSettings("payrollAlerts", checked)}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-base font-medium">Leave Alerts</Label>
+                        <p className="text-sm text-gray-600">Leave request notifications</p>
+                      </div>
+                      <Switch
+                        checked={notificationSettings.leaveAlerts}
+                        onCheckedChange={(checked) => updateNotificationSettings("leaveAlerts", checked)}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-base font-medium">Employee Alerts</Label>
+                        <p className="text-sm text-gray-600">Employee-related notifications</p>
+                      </div>
+                      <Switch
+                        checked={notificationSettings.employeeAlerts}
+                        onCheckedChange={(checked) => updateNotificationSettings("employeeAlerts", checked)}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-base font-medium">System Alerts</Label>
+                        <p className="text-sm text-gray-600">System maintenance and updates</p>
+                      </div>
+                      <Switch
+                        checked={notificationSettings.systemAlerts}
+                        onCheckedChange={(checked) => updateNotificationSettings("systemAlerts", checked)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                    <div>
+                      <Label htmlFor="notificationEmail">Notification Email</Label>
+                      <Input
+                        id="notificationEmail"
+                        type="email"
+                        value={notificationSettings.notificationEmail}
+                        onChange={(e) => updateNotificationSettings("notificationEmail", e.target.value)}
+                        placeholder="admin@company.com"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-base font-medium">SMS Notifications</Label>
+                        <p className="text-sm text-gray-600">Send notifications via SMS</p>
+                      </div>
+                      <Switch
+                        checked={notificationSettings.smsNotifications}
+                        onCheckedChange={(checked) => updateNotificationSettings("smsNotifications", checked)}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="webhookUrl">Webhook URL (Optional)</Label>
+                    <Input
+                      id="webhookUrl"
+                      type="url"
+                      value={notificationSettings.webhookUrl || ""}
+                      onChange={(e) => updateNotificationSettings("webhookUrl", e.target.value)}
+                      placeholder="https://your-webhook-endpoint.com"
+                    />
+                    <p className="text-sm text-gray-500 mt-1">
+                      Receive notifications via webhook for integration with external systems
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
-        </div>
+
+          {/* ... existing tab content ... */}
+        </Tabs>
       </div>
 
-      {/* Password Change Dialog */}
-      {showPasswordChangeDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Change Admin Password</h3>
-              <button onClick={() => setShowPasswordChangeDialog(false)} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
+      <Dialog open={showEmailTemplateDialog} onOpenChange={setShowEmailTemplateDialog}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Email Template</DialogTitle>
+            <DialogDescription>
+              Customize the email template content and variables. Use {`{{variable_name}}`} for dynamic content.
+            </DialogDescription>
+          </DialogHeader>
+          {editingTemplate && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent pr-10"
-                    placeholder="Enter new password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  >
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      {showPassword ? (
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
-                        />
-                      ) : (
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                      )}
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                  placeholder="Confirm new password"
+                <Label htmlFor="template-name">Template Name</Label>
+                <Input
+                  id="template-name"
+                  value={editingTemplate.name}
+                  onChange={(e) => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
+                  disabled={!editingTemplate.id.startsWith("custom_")}
                 />
               </div>
 
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => setShowPasswordChangeDialog(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handlePasswordChange}
-                  className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-                >
-                  Update Password
-                </button>
+              <div>
+                <Label htmlFor="template-subject">Email Subject</Label>
+                <Input
+                  id="template-subject"
+                  value={editingTemplate.subject}
+                  onChange={(e) => setEditingTemplate({ ...editingTemplate, subject: e.target.value })}
+                  placeholder="Enter email subject with {{variables}}"
+                />
               </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Activity Log Dialog */}
-      {showActivityLog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[80vh] overflow-hidden">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Activity Log</h3>
-              <button onClick={() => setShowActivityLog(false)} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+              <div>
+                <Label htmlFor="template-content">Email Content</Label>
+                <textarea
+                  id="template-content"
+                  value={editingTemplate.content}
+                  onChange={(e) => setEditingTemplate({ ...editingTemplate, content: e.target.value })}
+                  className="w-full h-64 p-3 border rounded-md resize-none font-mono text-sm"
+                  placeholder="Enter email content with {{variables}}"
+                />
+              </div>
 
-            <div className="overflow-y-auto max-h-96">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-900">Timestamp</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-900">User</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-900">Action</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-900">Details</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {[
-                    {
-                      timestamp: new Date().toLocaleString(),
-                      user: "admin@company.com",
-                      action: "Login",
-                      details: "Successful login from 192.168.1.100",
-                    },
-                    {
-                      timestamp: new Date(Date.now() - 3600000).toLocaleString(),
-                      user: "hr@company.com",
-                      action: "Employee Update",
-                      details: "Updated employee salary for John Doe",
-                    },
-                    {
-                      timestamp: new Date(Date.now() - 7200000).toLocaleString(),
-                      user: "admin@company.com",
-                      action: "Settings Change",
-                      details: "Updated password policy requirements",
-                    },
-                  ].map((entry, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-900">{entry.timestamp}</td>
-                      <td className="px-4 py-3 text-gray-600">{entry.user}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                          {entry.action}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">{entry.details}</td>
-                    </tr>
+              <div>
+                <Label>Available Variables</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {editingTemplate.variables.map((variable) => (
+                    <Badge key={variable} variant="secondary" className="text-xs">
+                      {`{{${variable}}}`}
+                    </Badge>
                   ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <button
-                onClick={handleDownloadAuditTrail}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Export CSV
-              </button>
-              <button
-                onClick={() => setShowActivityLog(false)}
-                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Backup Success Modal */}
-      {showBackupSuccessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Backup Completed Successfully!</h3>
-              <p className="text-gray-600 mb-4">Your system backup has been completed and stored securely.</p>
-              <div className="bg-gray-50 rounded-lg p-4 mb-4 text-left">
-                <div className="text-sm space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Backup Time:</span>
-                    <span className="font-medium">{lastBackupTime?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Backup Type:</span>
-                    <span className="font-medium">Full System Backup</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Status:</span>
-                    <span className="font-medium text-green-600">Completed</span>
-                  </div>
                 </div>
               </div>
-              <button
-                onClick={() => setShowBackupSuccessModal(false)}
-                className="w-full px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-              >
-                Close
-              </button>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="template-active"
+                  checked={editingTemplate.isActive}
+                  onCheckedChange={(checked) => setEditingTemplate({ ...editingTemplate, isActive: checked })}
+                />
+                <Label htmlFor="template-active">Template Active</Label>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEmailTemplateDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveTemplate}>Update Template</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCustomTemplateDialog} onOpenChange={setShowCustomTemplateDialog}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Custom Email Template</DialogTitle>
+            <DialogDescription>
+              Create a new email template for your organization. Use {`{{variable_name}}`} for dynamic content.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="custom-name">Template Name *</Label>
+              <Input
+                id="custom-name"
+                value={customTemplate.name || ""}
+                onChange={(e) => setCustomTemplate({ ...customTemplate, name: e.target.value })}
+                placeholder="Enter template name"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="custom-subject">Email Subject *</Label>
+              <Input
+                id="custom-subject"
+                value={customTemplate.subject || ""}
+                onChange={(e) => setCustomTemplate({ ...customTemplate, subject: e.target.value })}
+                placeholder="Enter email subject with {{variables}}"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="custom-content">Email Content *</Label>
+              <textarea
+                id="custom-content"
+                value={customTemplate.content || ""}
+                onChange={(e) => setCustomTemplate({ ...customTemplate, content: e.target.value })}
+                className="w-full h-64 p-3 border rounded-md resize-none font-mono text-sm"
+                placeholder="Enter email content with {{variables}}"
+              />
+            </div>
+
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h4 className="font-medium text-blue-800 mb-2">Common Variables:</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm text-blue-700">
+                <span>{`{{employee_name}}`}</span>
+                <span>{`{{company_name}}`}</span>
+                <span>{`{{employee_id}}`}</span>
+                <span>{`{{department}}`}</span>
+                <span>{`{{position}}`}</span>
+                <span>{`{{manager_name}}`}</span>
+                <span>{`{{start_date}}`}</span>
+                <span>{`{{company_email}}`}</span>
+                <span>{`{{company_phone}}`}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="custom-active"
+                checked={customTemplate.isActive || false}
+                onCheckedChange={(checked) => setCustomTemplate({ ...customTemplate, isActive: checked })}
+              />
+              <Label htmlFor="custom-active">Template Active</Label>
             </div>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCustomTemplateDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveCustomTemplate}>Add Template</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Admin Password</DialogTitle>
+            <DialogDescription>
+              Enter your new password. Make sure it meets the current password policy requirements.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="new-password">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="new-password"
+                  type={showPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+            {(() => {
+              const { feedback } = calculatePasswordStrength(securitySettings.passwordPolicy)
+              const passwordMeetsPolicy =
+                newPassword.length >= securitySettings.passwordPolicy.minLength &&
+                (!securitySettings.passwordPolicy.requireUppercase || /[A-Z]/.test(newPassword)) &&
+                (!securitySettings.passwordPolicy.requireNumbers || /\d/.test(newPassword)) &&
+                (!securitySettings.passwordPolicy.requireSymbols || /[!@#$%^&*(),.?":{}|<>]/.test(newPassword))
+
+              return (
+                <div className="text-sm">
+                  <p className={`${passwordMeetsPolicy ? "text-green-600" : "text-red-600"}`}>
+                    {passwordMeetsPolicy
+                      ? "✓ Password meets policy requirements"
+                      : "✗ Password does not meet policy requirements"}
+                  </p>
+                  {!passwordMeetsPolicy && feedback.length > 0 && (
+                    <p className="text-gray-500 mt-1">Required: {feedback.join(", ")}</p>
+                  )}
+                </div>
+              )
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordChangeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handlePasswordChange} disabled={!newPassword || !confirmPassword}>
+              Update Password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showActivityLog} onOpenChange={setShowActivityLog}>
+        <DialogContent className="sm:max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Activity Log</DialogTitle>
+            <DialogDescription>Recent system activities and user actions</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-4">
+              <Select defaultValue="all">
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Filter by user" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="hr">HR Manager</SelectItem>
+                  <SelectItem value="payroll">Payroll Manager</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select defaultValue="all">
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Filter by action" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Actions</SelectItem>
+                  <SelectItem value="login">Login</SelectItem>
+                  <SelectItem value="update">Updates</SelectItem>
+                  <SelectItem value="delete">Deletions</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm">
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
+            </div>
+
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Timestamp</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Details</TableHead>
+                    <TableHead>IP Address</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="font-mono text-sm">{new Date().toLocaleString()}</TableCell>
+                    <TableCell>admin@company.com</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">Login</Badge>
+                    </TableCell>
+                    <TableCell>Successful login</TableCell>
+                    <TableCell className="font-mono text-sm">192.168.1.100</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-mono text-sm">
+                      {new Date(Date.now() - 3600000).toLocaleString()}
+                    </TableCell>
+                    <TableCell>hr@company.com</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">Update</Badge>
+                    </TableCell>
+                    <TableCell>Updated employee salary</TableCell>
+                    <TableCell className="font-mono text-sm">192.168.1.101</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-mono text-sm">
+                      {new Date(Date.now() - 7200000).toLocaleString()}
+                    </TableCell>
+                    <TableCell>admin@company.com</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">Settings</Badge>
+                    </TableCell>
+                    <TableCell>Updated password policy</TableCell>
+                    <TableCell className="font-mono text-sm">192.168.1.100</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-mono text-sm">
+                      {new Date(Date.now() - 10800000).toLocaleString()}
+                    </TableCell>
+                    <TableCell>payroll@company.com</TableCell>
+                    <TableCell>
+                      <Badge variant="default">Payroll</Badge>
+                    </TableCell>
+                    <TableCell>Processed monthly payroll</TableCell>
+                    <TableCell className="font-mono text-sm">192.168.1.102</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-mono text-sm">
+                      {new Date(Date.now() - 14400000).toLocaleString()}
+                    </TableCell>
+                    <TableCell>hr@company.com</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">Approval</Badge>
+                    </TableCell>
+                    <TableCell>Approved annual leave request</TableCell>
+                    <TableCell className="font-mono text-sm">192.168.1.101</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex items-center justify-between text-sm text-gray-500">
+              <span>Showing 5 of 247 activities</span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled>
+                  Previous
+                </Button>
+                <Button variant="outline" size="sm">
+                  Next
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowActivityLog(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBackupSuccessModal} onOpenChange={setShowBackupSuccessModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              Backup Successful
+            </DialogTitle>
+            <DialogDescription>Your system backup has been completed successfully.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Database className="w-4 h-4 text-green-600" />
+                <span className="font-medium text-green-800">Backup Details</span>
+              </div>
+              <div className="space-y-1 text-sm text-green-700">
+                <p>
+                  <strong>Time:</strong> {lastBackupTime?.toLocaleString()}
+                </p>
+                <p>
+                  <strong>Type:</strong> Full System Backup
+                </p>
+                <p>
+                  <strong>Status:</strong> Completed Successfully
+                </p>
+                <p>
+                  <strong>Size:</strong> ~2.4 GB
+                </p>
+              </div>
+            </div>
+            <div className="text-sm text-gray-600">
+              <p>
+                All your data including employee records, payroll information, and system settings have been securely
+                backed up.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowBackupSuccessModal(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
