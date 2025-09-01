@@ -28,6 +28,10 @@ import {
   Mail,
   Calendar,
   Save,
+  Calculator,
+  Receipt,
+  Minus,
+  MoreHorizontal,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -87,13 +91,17 @@ interface SalaryGrade {
 
 interface PayrollConfig {
   id: string
+  company_id: string
+  pay_frequency: string
+  currency: string
   minimum_wage: number
   overtime_weekday_multiplier: number
   overtime_weekend_multiplier: number
-  currency: string
-  pay_frequency: string
   cutoff_day: number
   processing_day: number
+  auto_calculate_paye: boolean
+  auto_calculate_ssnit: boolean
+  auto_calculate_provident: boolean
 }
 
 interface Employee {
@@ -185,11 +193,104 @@ export default function SettingsPage() {
   const [roles, setRoles] = useState<Role[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
 
-  const [payrollConfig, setPayrollConfig] = useState<PayrollConfig | null>(null)
+  const [payrollConfig, setPayrollConfig] = useState<PayrollConfig>({
+    id: "",
+    company_id: "",
+    pay_frequency: "Monthly",
+    currency: "Ghana Cedis (GHS)",
+    minimum_wage: 18.15,
+    overtime_weekday_multiplier: 1.5,
+    overtime_weekend_multiplier: 2.0,
+    cutoff_day: 25,
+    processing_day: 28,
+    auto_calculate_paye: true,
+    auto_calculate_ssnit: true,
+    auto_calculate_provident: true,
+  })
 
-  const [taxBands, setTaxBands] = useState<any[]>([])
-  const [payrollAllowances, setPayrollAllowances] = useState([])
-  const [payrollDeductions, setPayrollDeductions] = useState([])
+  const [taxBands, setTaxBands] = useState([
+    { rate: 0, threshold: 4380, description: "first GHS" },
+    { rate: 5, threshold: 1000, description: "next GHS" },
+    { rate: 10, threshold: 2000, description: "next GHS" },
+    { rate: 17.5, threshold: 20000, description: "next GHS" },
+    { rate: 25, threshold: 20000, description: "next GHS" },
+    { rate: 30, threshold: 0, description: "remaining amount" },
+  ])
+
+  const [ssnit, setSsnit] = useState({
+    employee: 5.5,
+    employer: 13,
+    total: 18.5,
+  })
+
+  const [tier2, setTier2] = useState({
+    employee: 5.5,
+    employer: 5.5,
+    total: 11.0,
+  })
+
+  const [tier3, setTier3] = useState({
+    employee: 5,
+    employer: 5,
+    total: 10.0,
+  })
+
+  const [payrollAllowances, setPayrollAllowances] = useState([
+    {
+      code: "TRANS",
+      description: "Transport Allowance",
+      taxable: true,
+      recurring: true,
+      amount: 0,
+      percentage: 0,
+      type: "FIXED",
+    },
+    {
+      code: "HOUSE",
+      description: "Housing Allowance",
+      taxable: true,
+      recurring: true,
+      amount: 0,
+      percentage: 0,
+      type: "FIXED",
+    },
+    {
+      code: "MED",
+      description: "Medical Allowance",
+      taxable: false,
+      recurring: true,
+      amount: 0,
+      percentage: 0,
+      type: "FIXED",
+    },
+  ])
+
+  const [payrollDeductions, setPayrollDeductions] = useState([
+    { code: "TAX", description: "Tax Deduction", recurring: true, amount: 0, percentage: 0, type: "VARIABLE" },
+    { code: "SSNIT", description: "SSNIT Deduction", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE" },
+    { code: "LOAN", description: "Loan Deduction", recurring: true, amount: 0, percentage: 0, type: "FIXED" },
+  ])
+
+  const [loanSettings, setLoanSettings] = useState([
+    {
+      code: "PERSON",
+      description: "Personal Loan",
+      maxAmount: 50000,
+      interestRate: 10,
+      rateMethod: "Reducing Balance",
+      adminCharge: 500,
+      tenure: 12,
+    },
+    {
+      code: "EMERGE",
+      description: "Emergency Loan",
+      maxAmount: 10000,
+      interestRate: 5,
+      rateMethod: "Straight Line Meth",
+      adminCharge: 200,
+      tenure: 6,
+    },
+  ])
 
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([])
   const [salaryGrades, setSalaryGrades] = useState<SalaryGrade[]>([])
@@ -479,36 +580,27 @@ IT Support Team
   const loadPayrollConfig = async () => {
     try {
       const supabase = createClient()
-      const { data, error } = await supabase.from("payroll_configuration").select("*").single()
 
-      if (error) {
-        console.error("Payroll config error:", error)
-        // Set default payroll config
-        setPayrollConfig({
-          id: 1,
-          company_id: 1,
-          minimum_wage: 18.15,
-          overtime_weekday_multiplier: 1.5,
-          overtime_weekend_multiplier: 2.0,
-          currency_code: "GHS",
-          currency_symbol: "GH₵",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        return
+      // Load payroll configuration
+      const { data: configData, error: configError } = await supabase.from("payroll_configuration").select("*").single()
+
+      if (configData) {
+        setPayrollConfig(configData)
       }
 
-      setPayrollConfig(data)
+      // Load allowances
+      const { data: allowancesData, error: allowancesError } = await supabase.from("payroll_allowances").select("*")
 
-      // Set default tax bands for Ghana
-      setTaxBands([
-        { rate: 0, threshold: 4380, description: "first GH₵" },
-        { rate: 5, threshold: 1000, description: "next GH₵" },
-        { rate: 10, threshold: 2000, description: "next GH₵" },
-        { rate: 17.5, threshold: 20000, description: "next GH₵" },
-        { rate: 25, threshold: 20000, description: "next GH₵" },
-        { rate: 30, threshold: 0, description: "remaining amount" },
-      ])
+      if (allowancesData) {
+        setPayrollAllowances(allowancesData)
+      }
+
+      // Load deductions
+      const { data: deductionsData, error: deductionsError } = await supabase.from("payroll_deductions").select("*")
+
+      if (deductionsData) {
+        setPayrollDeductions(deductionsData)
+      }
     } catch (error) {
       console.error("Error loading payroll config:", error)
     }
@@ -1085,33 +1177,33 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
 
       // Save payroll configuration
       const { error: configError } = await supabase.from("payroll_configuration").upsert({
+        ...payrollConfig,
         company_id: companyData.id,
-        pay_frequency: payrollConfig.pay_frequency,
-        currency: payrollConfig.currency,
-        minimum_wage: payrollConfig.minimum_wage,
-        overtime_rate: payrollConfig.overtime_rate,
-        cutoff_day: payrollConfig.cutoff_day,
-        processing_day: payrollConfig.processing_day,
-        auto_calculate_paye: payrollConfig.auto_calculate_paye,
-        auto_calculate_ssnit: payrollConfig.auto_calculate_ssnit,
-        auto_calculate_provident: payrollConfig.auto_calculate_provident,
         updated_at: new Date().toISOString(),
       })
 
       if (configError) throw configError
 
-      // Save tax bands
-      for (const band of taxBands) {
-        const { error: bandError } = await supabase.from("tax_bands").upsert({
+      // Save allowances
+      for (const allowance of payrollAllowances) {
+        const { error: allowanceError } = await supabase.from("payroll_allowances").upsert({
+          ...allowance,
           company_id: companyData.id,
-          band_name: band.band,
-          rate_percentage: band.rate,
-          min_amount: band.min,
-          max_amount: band.max,
           updated_at: new Date().toISOString(),
         })
 
-        if (bandError) throw bandError
+        if (allowanceError) throw allowanceError
+      }
+
+      // Save deductions
+      for (const deduction of payrollDeductions) {
+        const { error: deductionError } = await supabase.from("payroll_deductions").upsert({
+          ...deduction,
+          company_id: companyData.id,
+          updated_at: new Date().toISOString(),
+        })
+
+        if (deductionError) throw deductionError
       }
 
       toast({ title: "Success", description: "Payroll settings saved successfully" })
@@ -1739,102 +1831,394 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         )}
 
         {activeTab === "payroll" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Payroll Configuration</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Pay Frequency</Label>
-                    <Select defaultValue="monthly">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                      </SelectContent>
-                    </Select>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calculator className="h-5 w-5" />
+                    Payroll Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Pay Frequency</Label>
+                      <Select
+                        value={payrollConfig.pay_frequency}
+                        onValueChange={(value) => setPayrollConfig({ ...payrollConfig, pay_frequency: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Monthly">Monthly</SelectItem>
+                          <SelectItem value="Bi-weekly">Bi-weekly</SelectItem>
+                          <SelectItem value="Weekly">Weekly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Currency</Label>
+                      <Select
+                        value={payrollConfig.currency}
+                        onValueChange={(value) => setPayrollConfig({ ...payrollConfig, currency: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Ghana Cedis (GHS)">Ghana Cedis (GHS)</SelectItem>
+                          <SelectItem value="US Dollar (USD)">US Dollar (USD)</SelectItem>
+                          <SelectItem value="Euro (EUR)">Euro (EUR)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Currency</Label>
-                    <Select defaultValue="ghs">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ghs">Ghana Cedis (GHS)</SelectItem>
-                        <SelectItem value="usd">US Dollar (USD)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>Auto-calculate PAYE</Label>
-                    <Switch defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Auto-calculate SSNIT</Label>
-                    <Switch defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Auto-calculate Provident Fund (Tier 3)</Label>
-                    <Switch defaultChecked />
-                  </div>
-                </div>
-              </CardContent>
 
-              <div className="flex justify-end mt-6">
-                <Button onClick={handleSavePayrollSettings} className="bg-green-600 hover:bg-green-700">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Payroll Settings
-                </Button>
-              </div>
-            </Card>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Minimum Wage (GHS)</Label>
+                      <Input
+                        type="number"
+                        value={payrollConfig.minimum_wage}
+                        onChange={(e) =>
+                          setPayrollConfig({ ...payrollConfig, minimum_wage: Number.parseFloat(e.target.value) || 0 })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Weekday Overtime Rate Multiplier</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={payrollConfig.overtime_weekday_multiplier}
+                        onChange={(e) =>
+                          setPayrollConfig({
+                            ...payrollConfig,
+                            overtime_weekday_multiplier: Number.parseFloat(e.target.value) || 0,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Tax Configuration</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Weekend Overtime Rate Multiplier</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={payrollConfig.overtime_weekend_multiplier}
+                        onChange={(e) =>
+                          setPayrollConfig({
+                            ...payrollConfig,
+                            overtime_weekend_multiplier: Number.parseFloat(e.target.value) || 0,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Payroll Cutoff Day</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="31"
+                        value={payrollConfig.cutoff_day}
+                        onChange={(e) =>
+                          setPayrollConfig({ ...payrollConfig, cutoff_day: Number.parseInt(e.target.value) || 0 })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Processing Day</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={payrollConfig.processing_day}
+                      onChange={(e) =>
+                        setPayrollConfig({ ...payrollConfig, processing_day: Number.parseInt(e.target.value) || 0 })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label>Auto-calculate PAYE</Label>
+                      <Switch
+                        checked={payrollConfig.auto_calculate_paye}
+                        onCheckedChange={(checked) =>
+                          setPayrollConfig({ ...payrollConfig, auto_calculate_paye: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>Auto-calculate SSNIT</Label>
+                      <Switch
+                        checked={payrollConfig.auto_calculate_ssnit}
+                        onCheckedChange={(checked) =>
+                          setPayrollConfig({ ...payrollConfig, auto_calculate_ssnit: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>Auto-calculate Provident Fund (Tier 3)</Label>
+                      <Switch
+                        checked={payrollConfig.auto_calculate_provident}
+                        onCheckedChange={(checked) =>
+                          setPayrollConfig({ ...payrollConfig, auto_calculate_provident: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Receipt className="h-5 w-5" />
+                    Tax Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
                   <div>
-                    <h4 className="font-semibold mb-2">PAYE Tax Bands</h4>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold">PAYE Tax Bands</h4>
+                      <Button size="sm" variant="outline">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                     <div className="space-y-2">
                       {taxBands.map((band, index) => (
-                        <div key={index} className="flex items-center justify-between text-sm">
-                          <span>
-                            {band.rate}% on {band.description}
-                          </span>
-                          <span>GH₵ {band.threshold.toLocaleString()}</span>
+                        <div key={index} className="flex items-center gap-2 text-sm">
+                          <Input className="w-16" value={band.rate} readOnly />
+                          <span>% on</span>
+                          <span className="text-blue-600">{band.description}</span>
+                          <span>GHS</span>
+                          <Input className="w-20" value={band.threshold} readOnly />
+                          <Button size="sm" variant="ghost" className="text-red-500">
+                            <Minus className="h-4 w-4" />
+                          </Button>
                         </div>
                       ))}
                     </div>
                   </div>
+
                   <div>
-                    <h4 className="font-semibold mb-2">SSNIT Rates</h4>
-                    <div className="space-y-1 text-sm">
+                    <h4 className="font-semibold mb-3">SSNIT Rates</h4>
+                    <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span>Employee:</span>
-                        <span>5.5%</span>
+                        <span>{ssnit.employee}%</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Employer:</span>
-                        <span>13%</span>
+                        <span>{ssnit.employer}%</span>
                       </div>
                       <div className="flex justify-between font-semibold">
                         <span>Total:</span>
-                        <span>18.5%</span>
+                        <span>{ssnit.total}%</span>
                       </div>
                     </div>
                   </div>
+
+                  <div>
+                    <h4 className="font-semibold mb-3">Tier 2 Rates</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Employee:</span>
+                        <span>{tier2.employee}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Employer:</span>
+                        <span>{tier2.employer}%</span>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <span>Total:</span>
+                        <span>{tier2.total}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold mb-3">Tier 3 Rates</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Employee:</span>
+                        <span>{tier3.employee}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Employer:</span>
+                        <span>{tier3.employer}%</span>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <span>Total:</span>
+                        <span>{tier3.total}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Allowances</span>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-2">Code</th>
+                        <th className="text-left p-2">Description</th>
+                        <th className="text-center p-2">Taxable</th>
+                        <th className="text-center p-2">Recurring</th>
+                        <th className="text-center p-2">AMOUNT</th>
+                        <th className="text-center p-2">%</th>
+                        <th className="text-center p-2">FIXED/VARIABLE</th>
+                        <th className="text-center p-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payrollAllowances.map((allowance, index) => (
+                        <tr key={index} className="border-b">
+                          <td className="p-2">{allowance.code}</td>
+                          <td className="p-2">{allowance.description}</td>
+                          <td className="p-2 text-center">
+                            <Switch checked={allowance.taxable} size="sm" />
+                          </td>
+                          <td className="p-2 text-center">
+                            <Switch checked={allowance.recurring} size="sm" />
+                          </td>
+                          <td className="p-2 text-center">{allowance.amount}</td>
+                          <td className="p-2 text-center">{allowance.percentage}</td>
+                          <td className="p-2 text-center">{allowance.type}</td>
+                          <td className="p-2 text-center">
+                            <Button size="sm" variant="ghost">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Deductions</span>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-2">Code</th>
+                        <th className="text-left p-2">Description</th>
+                        <th className="text-center p-2">Recurring</th>
+                        <th className="text-center p-2">AMOUNT</th>
+                        <th className="text-center p-2">%</th>
+                        <th className="text-center p-2">FIXED/VARIABLE</th>
+                        <th className="text-center p-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payrollDeductions.map((deduction, index) => (
+                        <tr key={index} className="border-b">
+                          <td className="p-2">{deduction.code}</td>
+                          <td className="p-2">{deduction.description}</td>
+                          <td className="p-2 text-center">
+                            <Switch checked={deduction.recurring} size="sm" />
+                          </td>
+                          <td className="p-2 text-center">{deduction.amount}</td>
+                          <td className="p-2 text-center">{deduction.percentage}</td>
+                          <td className="p-2 text-center">{deduction.type}</td>
+                          <td className="p-2 text-center">
+                            <Button size="sm" variant="ghost">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Loan Settings</span>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-2">Code</th>
+                        <th className="text-left p-2">Description</th>
+                        <th className="text-center p-2">Maximum Amount</th>
+                        <th className="text-center p-2">Interest Rate (%)</th>
+                        <th className="text-center p-2">Rate Method</th>
+                        <th className="text-center p-2">Admin Charge</th>
+                        <th className="text-center p-2">Loan Tenure (months)</th>
+                        <th className="text-center p-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loanSettings.map((loan, index) => (
+                        <tr key={index} className="border-b">
+                          <td className="p-2">{loan.code}</td>
+                          <td className="p-2">{loan.description}</td>
+                          <td className="p-2 text-center">{loan.maxAmount}</td>
+                          <td className="p-2 text-center">{loan.interestRate}</td>
+                          <td className="p-2 text-center">{loan.rateMethod}</td>
+                          <td className="p-2 text-center">{loan.adminCharge}</td>
+                          <td className="p-2 text-center">{loan.tenure}</td>
+                          <td className="p-2 text-center">
+                            <Button size="sm" variant="ghost">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-end">
+              <Button onClick={handleSavePayrollSettings} className="bg-green-600 hover:bg-green-700">
+                <Save className="h-4 w-4 mr-2" />
+                Save Payroll Settings
+              </Button>
+            </div>
           </div>
         )}
 
