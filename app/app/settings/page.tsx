@@ -489,34 +489,11 @@ IT Support Team
     }
   }
 
-  const handleSaveCompany = async () => {
-    if (!companyData) return
-
-    setIsLoading(true)
-    try {
-      const supabase = createBrowserClient()
-      const { error } = await supabase.from("companies").upsert(companyData)
-
-      if (error) throw error
-
-      toast({
-        title: "Success",
-        description: "Company settings saved successfully.",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save company settings.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
+
+    console.log("[v0] Starting logo upload for file:", file.name)
 
     if (file.size > 2 * 1024 * 1024) {
       toast({
@@ -540,12 +517,25 @@ IT Support Team
       const reader = new FileReader()
       reader.onload = async (e) => {
         const base64Data = e.target?.result as string
+        console.log("[v0] File read successfully, uploading to database...")
 
         const supabase = createBrowserClient()
+
+        // Check if we have a real Supabase client
+        const testQuery = await supabase.from("companies").select("id").limit(1)
+        if (testQuery.error && testQuery.error.message?.includes("Mock client")) {
+          toast({
+            title: "Configuration Error",
+            description: "Database connection not available. Please check your Supabase configuration.",
+            variant: "destructive",
+          })
+          return
+        }
+
         const { data, error } = await supabase
           .from("company_files")
           .insert({
-            company_id: companyData?.id,
+            company_id: companyData?.id || "default-company-id",
             file_name: file.name,
             file_type: file.type,
             file_size: file.size,
@@ -555,8 +545,12 @@ IT Support Team
           .select()
           .single()
 
-        if (error) throw error
+        if (error) {
+          console.log("[v0] Database error:", error)
+          throw error
+        }
 
+        console.log("[v0] Logo uploaded successfully:", data)
         setUploadedFileName(file.name)
         setLogoPreview(base64Data)
 
@@ -569,13 +563,48 @@ IT Support Team
           description: "Logo uploaded successfully.",
         })
       }
+
+      reader.onerror = () => {
+        toast({
+          title: "Error",
+          description: "Failed to read file.",
+          variant: "destructive",
+        })
+      }
+
       reader.readAsDataURL(file)
+    } catch (error) {
+      console.log("[v0] Upload error:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to upload logo.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSaveCompany = async () => {
+    if (!companyData) return
+
+    setIsLoading(true)
+    try {
+      const supabase = createBrowserClient()
+      const { error } = await supabase.from("companies").upsert(companyData)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Company settings saved successfully.",
+      })
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to upload logo.",
+        description: "Failed to save company settings.",
         variant: "destructive",
       })
+    } finally {
+      setIsLoading(false)
     }
   }
 
