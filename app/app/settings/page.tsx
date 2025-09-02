@@ -732,6 +732,12 @@ export default function SettingsPage() {
 
   const loadLoanSettings = async () => {
     try {
+      // Don't attempt to load if company ID is not available
+      if (!companyData.id) {
+        console.log("[v0] Skipping loan settings load - no company ID available")
+        return
+      }
+
       const supabase = createClient()
       const { data, error } = await supabase
         .from("loan_settings")
@@ -750,8 +756,10 @@ export default function SettingsPage() {
     const loadAllData = async () => {
       setIsLoading(true)
       try {
+        await loadCompanyData()
+
+        // Load all other data that depends on company data
         await Promise.all([
-          loadCompanyData(),
           loadLeaveTypes(),
           loadSalaryGrades(),
           loadEmployees(),
@@ -759,7 +767,7 @@ export default function SettingsPage() {
           loadPayrollConfig(),
           loadPayrollAllowances(),
           loadPayrollDeductions(),
-          loadLoanSettings(), // Add loan settings loading to the Promise.all
+          loadLoanSettings(), // Now safe to load after company data is available
           loadRoles(),
           loadEmailTemplates(),
           loadSecuritySettings(),
