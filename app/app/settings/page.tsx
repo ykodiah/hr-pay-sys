@@ -393,6 +393,11 @@ export default function SettingsPage() {
   })
 
   const [notificationSettings, setNotificationSettings] = useState({
+    payrollAlerts: true,
+    leaveAlerts: true,
+    employeeUpdates: true,
+    systemMaintenance: true,
+    smsNotifications: false,
     email: "",
     webhookUrl: "",
   })
@@ -1568,7 +1573,7 @@ Backup Frequency: ${securitySettings.backupFrequency}
 Password Policy:
 - Minimum Length: ${passwordPolicy.minLength} characters
 - Require Uppercase: ${passwordPolicy.requireUppercase ? "Yes" : "No"}
-- Require Numbers: ${passwordPolicy.requireNumbers} ? "Yes" : "No"}
+- Require Numbers: ${passwordPolicy.requireNumbers ? "Yes" : "No"}
 - Require Symbols: ${passwordPolicy.requireSymbols ? "Yes" : "No"}
 `
 
@@ -1945,15 +1950,36 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     try {
       const supabase = createClient()
 
-      const { error } = await supabase.from("notification_settings").upsert({
-        company_id: companyData.id,
-        payroll_alerts: notificationSettings.payrollAlerts,
-        leave_alerts: notificationSettings.leaveAlerts,
-        employee_updates: notificationSettings.employeeUpdates,
-        system_maintenance: notificationSettings.systemMaintenance,
-        sms_notifications: notificationSettings.smsNotifications,
-        notification_email: notificationSettings.email,
-        webhook_url: notificationSettings.webhookUrl,
+      // Check if company ID exists
+      if (!companyData.id) {
+        toast({ title: "Error", description: "Company ID not available. Please refresh the page." })
+        return
+      }
+
+      // Save notification settings to company_settings table
+      const { error } = await supabase.from("company_settings").upsert({
+        id: companyData.id,
+        name: companyData.name,
+        email: companyData.email,
+        phone: companyData.phone,
+        address: companyData.address,
+        industry: companyData.industry,
+        tax_id: companyData.tax_id,
+        ssnit_number: companyData.ssnit_number,
+        divisions: companyData.divisions || [],
+        departments: companyData.departments || [],
+        locations: companyData.locations || [],
+        logo: companyData.logo_file_id || "",
+        // Add notification settings as JSON fields
+        notification_settings: {
+          payroll_alerts: notificationSettings.payrollAlerts,
+          leave_alerts: notificationSettings.leaveAlerts,
+          employee_updates: notificationSettings.employeeUpdates,
+          system_maintenance: notificationSettings.systemMaintenance,
+          sms_notifications: notificationSettings.smsNotifications,
+          notification_email: notificationSettings.email,
+          webhook_url: notificationSettings.webhookUrl,
+        },
         updated_at: new Date().toISOString(),
       })
 
