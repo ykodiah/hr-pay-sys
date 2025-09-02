@@ -11,7 +11,6 @@ import { X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Edit } from "lucide-react"
 
 interface Company {
   id: string
@@ -1648,242 +1647,176 @@ IT Support Team
   }
 
   return (
-    
+    <>
       {/* Leave Types Section */}
 
-  \
-                Leave Types
-              
-              
-                Manage different types of leave available to employees
-              
-            
-          
-          
-            Add Leave Type
-  leaveTypes.length === 0 ? (
-    <>No leave types found. Add leave types to get started.</>
-  ) : (
-    (
-      leaveTypes.map((leaveType) => (
-                
-                  
-                    \
-                      {leaveType.name} ({leaveType.code})
-                    
-                    \
-                      {leaveType.description}
-                    
-                    
-                      \
-                        Annual Entitlement: {leaveType.annual_entitlement} days\
-                        Pay: {leaveType.pay_percentage}%\
-                        Max Consecutive: {leaveType.max_consecutive_days} days
-                      
-                    
-                  
-                  
-                    
-                      
-                        
-                          Edit\
-                        
-                        \
-                          Manage Approvers
-                        
-                        \
-                          Manage Eligibility
-                        
-                        \
-                          Deactivate
-                        
-                      
-                    
-                  
-                
-              )
-    )
-  )
-  )
-  \
-          
+      <div>
+        <div>
+          <div>Leave Types</div>
+          <div>Manage different types of leave available to employees</div>
+        </div>
+        <div>
+          <div>Add Leave Type</div>
+          {leaveTypes.length === 0 ? (
+            <>No leave types found. Add leave types to get started.</>
+          ) : (
+            leaveTypes.map((leaveType) => (
+              <div key={leaveType.id}>
+                <div>
+                  <div>
+                    {leaveType.name} ({leaveType.code})
+                  </div>
+                  <div>{leaveType.description}</div>
+                  <div>
+                    <div>
+                      Annual Entitlement: {leaveType.annual_entitlement} days Pay: {leaveType.pay_percentage}% Max
+                      Consecutive: {leaveType.max_consecutive_days} days
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div>
+                    <div>
+                      <div>Edit</div>
+                      <div>Manage Approvers</div>
+                      <div>Manage Eligibility</div>
+                      <div>Deactivate</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
-  
-                Leave Policies
-              
-              
-                Manage company leave policies and entitlements
-              
-            
-          
-          
-            Add Leave Policy
-  leavePolicies.length === 0 ? (
-    <>No leave policies found. Add policies to get started.</>
-  ) : (
-    (
-      leavePolicies.map((policy) => (
-                
-                  
-                    \
-                      {policy.policy_name}
-                    
-                    \
-                      {policy.description}
-                    
-                    
-                      \
-                        Max Days: {policy.max_days}\
-                        Carry Over: {policy.carry_over_days} days\
-                        Notice: {policy.notice_period_days} days
-                      
-                    
-                  
-                  
-                    
-                      
-                        
-                          Edit\
-                        
-                        \
-                          Deactivate
-                        
-                      
-                    
-                  
-                
-              )
-    )
-  )
-  )
-  \
-          
+      <div>
+        <div>
+          <div>Leave Policies</div>
+          <div>Manage company leave policies and entitlements</div>
+        </div>
+        <div>
+          <div>Add Leave Policy</div>
+          {leavePolicies.length === 0 ? (
+            <>No leave policies found. Add policies to get started.</>
+          ) : (
+            leavePolicies.map((policy) => (
+              <div key={policy.id}>
+                <div>
+                  <div>{policy.policy_name}</div>
+                  <div>{policy.description}</div>
+                  <div>
+                    <div>
+                      Max Days: {policy.max_days}
+                      Carry Over: {policy.carry_over_days} days Notice: {policy.notice_period_days} days
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div>
+                    <div>
+                      <div>Edit</div>
+                      <div>Deactivate</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
-  
-                Leave Approvers
-              
-              \
-                Manage approval workflows
-  for different leave types
-  \
-              
-            
-          
-          
-            Add Approver
-  leaveApprovers.length === 0 ? (
-    <>No approvers configured. Set up approval workflows.</>
-  ) : (
-    (
-      leaveApprovers.map((approver) => (
-                
-                  
-                    \
-                      Level {approver.approval_level}: {approver.approver_role}
-                    
-                    \
-                      {approver.is_required ? 'Required' : \'Optional\'} approval step
-                    
-                  
-                  
-                    
-                      
-                        
-                          Edit\
-                        
-                        \
-                          Remove
-                        
-                      
-                    
-                  
-                
-              )
-    )
-  )
-  )
-  \
-          
+      <div>
+        <div>
+          <div>Leave Approvers</div>
+          <div>Manage approval workflows for different leave types</div>
+        </div>
+        <div>
+          <div>Add Approver</div>
+          {leaveApprovers.length === 0 ? (
+            <>No approvers configured. Set up approval workflows.</>
+          ) : (
+            leaveApprovers.map((approver) => (
+              <div key={approver.id}>
+                <div>
+                  <div>
+                    Level {approver.approval_level}: {approver.approver_role}
+                  </div>
+                  <div>{approver.is_required ? "Required" : "Optional"} approval step</div>
+                </div>
+                <div>
+                  <div>
+                    <div>
+                      <div>Edit</div>
+                      <div>Remove</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
-  Leave Eligibility Rules
-\
-  Define who is eligible
-  for different leave types
-  \
-              
-            
-          
-          
-            Add Eligibility Rule
-  leaveEligibility.length === 0 ? (
-              <>No eligibility rules configured. Set up eligibility criteria.</>
-            ) : (
-              leaveEligibility.map((rule) => (
-                
-                  Eligibility Rule
-                  
-                    Type: {rule.employee_type}
-                    Gender: {rule.gender}
-                    Age: {rule.min_age}-{rule.max_age}
-                  
-                  
-                    
-                      
-                        
-                          Edit
-                        
-                        
-                          Remove
-                        
-                      
-                    
-                  
-                
-              ))
-  )
+      <div>
+        <div>Leave Eligibility Rules</div>
+        <div>Define who is eligible for different leave types</div>
+        <div>
+          <div>Add Eligibility Rule</div>
+          {leaveEligibility.length === 0 ? (
+            <>No eligibility rules configured. Set up eligibility criteria.</>
+          ) : (
+            leaveEligibility.map((rule) => (
+              <div key={rule.id}>
+                <div>Eligibility Rule</div>
+                <div>
+                  Type: {rule.employee_type}
+                  Gender: {rule.gender}
+                  Age: {rule.min_age}-{rule.max_age}
+                </div>
+                <div>
+                  <div>
+                    <div>
+                      <div>Edit</div>
+                      <div>Remove</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
-  Salary
-  Grades & Notches
-
-  Manage
-  salary
-  grades
-  and
-  step
-  progressions
-
-  Add
-  Grade
-  salaryGrades.length === 0 ? (
-              <>No salary grades found. Add grades to get started.</>
-            ) : (
-              salaryGrades.map((grade) => (
-                
-                  
-                    
-                      {grade.grade_name}
-                    
-                    
-                      Salary Range: GH¢{grade.step_1?.toLocaleString()} - GH¢{grade.step_5?.toLocaleString()}
-                    
-                    Steps: 5
-                  
-                  
-                    
-                      
-                        
-                          Edit
-                        
-                        
-                          Remove
-                        
-                      
-                    
-                  
-                
-              ))
-  )
-
+      <div>
+        <div>Salary Grades & Notches</div>
+        <div>Manage salary grades and step progressions</div>
+        <div>Add Grade</div>
+        {salaryGrades.length === 0 ? (
+          <>No salary grades found. Add grades to get started.</>
+        ) : (
+          salaryGrades.map((grade) => (
+            <div key={grade.id}>
+              <div>
+                <div>{grade.grade_name}</div>
+                <div>
+                  Salary Range: GH¢{grade.step_1?.toLocaleString()} - GH¢{grade.step_5?.toLocaleString()}
+                </div>
+                <div>Steps: 5</div>
+              </div>
+              <div>
+                <div>
+                  <div>
+                    <div>Edit</div>
+                    <div>Remove</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </>
   )
 
   const handleEditLeaveType = (leaveType: LeaveType) => {
@@ -2003,19 +1936,18 @@ IT Support Team
     }
   }
 
-  const handleRemoveSalaryGrade = async (id: string) => {
+  const handleRemoveSalaryGrade = async (gradeId: string) => {
     try {
       const supabase = createClient()
-      const { error } = await supabase.from("salary_grades").update({ is_active: false }).eq("id", id)
+      const { error } = await supabase.from("salary_grades").delete().eq("id", gradeId)
 
       if (error) throw error
 
+      setSalaryGradesState((prev) => prev.filter((grade) => grade.id !== gradeId))
       toast({
         title: "Success",
         description: "Salary grade removed successfully",
       })
-
-      loadSalaryGrades()
     } catch (error) {
       console.error("Error removing salary grade:", error)
       toast({
