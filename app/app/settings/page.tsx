@@ -1661,61 +1661,54 @@ IT Support Team
           
           
             Add Leave Type
-  leaveTypes.length === 0 ? (\
-           No
-  leave
-  types
-  found.Add
-  leave
-  types
-  to
-  get
-  started.
-  \
-        ) : (\
-  leaveTypes.map((leaveType) => (
-               
-                 
-                   \
-                     {leaveType.name} ({leaveType.code})
-                   
-                   \
-                     {leaveType.description}
-                   
-                   
-                     \
-                       Annual Entitlement: {leaveType.annual_entitlement} days\
-                       Pay: {leaveType.pay_percentage}%\
-                       Max Consecutive: {leaveType.max_consecutive_days} days
-                     
-                   
-                 
-                 
-                   
-                     
-                       
-                         Edit\
-                       
-                       \
-                         Manage Approvers
-                       
-                       \
-                         Manage Eligibility
-                       
-                       \
-                         Deactivate
-                       
-                     
-                   
-                 
-               
-             )
+  leaveTypes.length === 0 ? (
+    <>No leave types found. Add leave types to get started.</>
+  ) : (
+    (
+      leaveTypes.map((leaveType) => (
+                
+                  
+                    \
+                      {leaveType.name} ({leaveType.code})
+                    
+                    \
+                      {leaveType.description}
+                    
+                    
+                      \
+                        Annual Entitlement: {leaveType.annual_entitlement} days\
+                        Pay: {leaveType.pay_percentage}%\
+                        Max Consecutive: {leaveType.max_consecutive_days} days
+                      
+                    
+                  
+                  
+                    
+                      
+                        
+                          Edit\
+                        
+                        \
+                          Manage Approvers
+                        
+                        \
+                          Manage Eligibility
+                        
+                        \
+                          Deactivate
+                        
+                      
+                    
+                  
+                
+              )
+    )
+  )
   )
   \
-           
-        )
+          
 
-  \
+  
                 Leave Policies
               
               
@@ -1725,54 +1718,48 @@ IT Support Team
           
           
             Add Leave Policy
-  leavePolicies.length === 0 ? (\
-           No
-  leave
-  policies
-  found.Add
-  policies
-  to
-  get
-  started.
-  \
-        ) : (\
-  leavePolicies.map((policy) => (
-               
-                 
-                   \
-                     {policy.policy_name}
-                   
-                   \
-                     {policy.description}
-                   
-                   
-                     \
-                       Max Days: {policy.max_days}\
-                       Carry Over: {policy.carry_over_days} days\
-                       Notice: {policy.notice_period_days} days
-                     
-                   
-                 
-                 
-                   
-                     
-                       
-                         Edit\
-                       
-                       \
-                         Deactivate
-                       
-                     
-                   
-                 
-               
-             )
+  leavePolicies.length === 0 ? (
+    <>No leave policies found. Add policies to get started.</>
+  ) : (
+    (
+      leavePolicies.map((policy) => (
+                
+                  
+                    \
+                      {policy.policy_name}
+                    
+                    \
+                      {policy.description}
+                    
+                    
+                      \
+                        Max Days: {policy.max_days}\
+                        Carry Over: {policy.carry_over_days} days\
+                        Notice: {policy.notice_period_days} days
+                      
+                    
+                  
+                  
+                    
+                      
+                        
+                          Edit\
+                        
+                        \
+                          Deactivate
+                        
+                      
+                    
+                  
+                
+              )
+    )
+  )
   )
   \
-           
-        )
+          
 
-  \
+  
                 Leave Approvers
               
               \
@@ -1784,92 +1771,75 @@ IT Support Team
           
           
             Add Approver
-  leaveApprovers.length === 0 ? (\
-           No
-  approvers
-  configured.Set
-  up
-  approval
-  workflows.
+  leaveApprovers.length === 0 ? (
+    <>No approvers configured. Set up approval workflows.</>
   ) : (
-  leaveApprovers.map((approver) => (
-               
-                 
-                   
-                     Level {approver.approval_level}: {approver.approver_role}
-                   
-                   
-                     {approver.is_required ? 'Required' : 'Optional'} approval step
-                   
-                 
-                 
-                   
-                     
-                       
-                         Edit
-                       
-                       
-                         Remove
-                       
-                     
-                   
-                 
-               
-             )
+    (
+      leaveApprovers.map((approver) => (
+                
+                  
+                    \
+                      Level {approver.approval_level}: {approver.approver_role}
+                    
+                    \
+                      {approver.is_required ? 'Required' : \'Optional\'} approval step
+                    
+                  
+                  
+                    
+                      
+                        
+                          Edit\
+                        
+                        \
+                          Remove
+                        
+                      
+                    
+                  
+                
+              )
+    )
   )
-
   )
+  \
+          
 
-  Leave
-  Eligibility
-  Rules
-
-  Define
-  who
-  is
-  eligible
+  Leave Eligibility Rules
+\
+  Define who is eligible
   for different leave types
+  \
               
             
           
           
-            Add
-  Eligibility
-  Rule
+            Add Eligibility Rule
   leaveEligibility.length === 0 ? (
-           No eligibility
-  rules
-  configured.Set
-  up
-  eligibility
-  criteria.
-  ) : (
-  leaveEligibility.map((rule) => (
-               
-                 
-                   Eligibility Rule
-                   
-                     Type: {rule.employee_type}
-                     Gender: {rule.gender}
-                     Age: {rule.min_age}-{rule.max_age}
-                   
-                 
-                 
-                   
-                     
-                       
-                         Edit
-                       
-                       
-                         Remove
-                       
-                     
-                   
-                 
-               
-             )
-  )
-
+              <>No eligibility rules configured. Set up eligibility criteria.</>
+            ) : (
+              leaveEligibility.map((rule) => (
+                
+                  Eligibility Rule
+                  
+                    Type: {rule.employee_type}
+                    Gender: {rule.gender}
+                    Age: {rule.min_age}-{rule.max_age}
+                  
+                  
+                    
+                      
+                        
+                          Edit
+                        
+                        
+                          Remove
+                        
+                      
+                    
+                  
+                
+              ))
   )
 
   Salary
@@ -1885,41 +1855,33 @@ IT Support Team
   Add
   Grade
   salaryGrades.length === 0 ? (
-           No salary
-  grades
-  found.Add
-  grades
-  to
-  get
-  started.
-  ) : (
-  salaryGrades.map((grade) => (
-               
-                 
-                   
-                     {grade.grade_name}
-                   
-                   
-                     Salary Range: GH¢{grade.step_1?.toLocaleString()} - GH¢{grade.step_5?.toLocaleString()}
-                   
-                   Steps: 5
-                 
-                 
-                   
-                     
-                       
-                         Edit
-                       
-                       
-                         Remove
-                       
-                     
-                   
-                 
-               
-             )
-  )
-
+              <>No salary grades found. Add grades to get started.</>
+            ) : (
+              salaryGrades.map((grade) => (
+                
+                  
+                    
+                      {grade.grade_name}
+                    
+                    
+                      Salary Range: GH¢{grade.step_1?.toLocaleString()} - GH¢{grade.step_5?.toLocaleString()}
+                    
+                    Steps: 5
+                  
+                  
+                    
+                      
+                        
+                          Edit
+                        
+                        
+                          Remove
+                        
+                      
+                    
+                  
+                
+              ))
   )
 
   )
