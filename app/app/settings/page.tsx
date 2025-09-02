@@ -815,20 +815,21 @@ export default function SettingsPage() {
 
   const loadLoanSettings = async () => {
     try {
-      // Don't attempt to load if company ID is not available
-      if (!companyData.id) {
+      if (!companyData.id || companyData.id.trim() === "") {
         console.log("[v0] Skipping loan settings load - no company ID available")
         return
       }
 
+      console.log("[v0] Loading loan settings for company:", companyData.id)
       const supabase = createClient()
       const { data, error } = await supabase
         .from("loan_settings")
         .select("*")
         .eq("company_id", companyData.id)
-        .order("type")
+        .order("code")
 
       if (error) throw error
+      console.log("[v0] Loaded loan settings:", data)
       setLoanSettingsState(data || [])
     } catch (error) {
       console.error("Error loading loan settings:", error)
@@ -841,7 +842,6 @@ export default function SettingsPage() {
       try {
         await loadCompanyData()
 
-        // Load all other data that depends on company data
         await Promise.all([
           loadLeaveTypes(),
           loadSalaryGrades(),
@@ -850,7 +850,7 @@ export default function SettingsPage() {
           loadPayrollConfig(),
           loadPayrollAllowances(),
           loadPayrollDeductions(),
-          loadLoanSettings(), // Now safe to load after company data is available
+          // loadLoanSettings() is now called from loadCompanyData()
           loadRoles(),
           loadEmailTemplates(),
           loadSecuritySettings(),
@@ -877,7 +877,6 @@ export default function SettingsPage() {
 
       if (error) {
         console.error("Company data error:", error)
-        // Create a default company if none exists
         const { data: newCompany, error: createError } = await supabase
           .from("companies")
           .insert({
@@ -894,8 +893,9 @@ export default function SettingsPage() {
 
         if (createError) {
           console.error("Failed to create company:", createError)
+          const tempId = crypto.randomUUID()
           setCompanyData({
-            id: "",
+            id: tempId,
             name: "Your Company Name",
             email: "info@yourcompany.com",
             tax_id: "",
@@ -941,6 +941,9 @@ export default function SettingsPage() {
 
       // Load logo if exists
       if (data.logo_url) setLogoPreview(data.logo_url)
+
+      console.log("[v0] Company data loaded, ID:", data.id)
+      await loadLoanSettings()
     } catch (error) {
       console.error("Error loading company data:", error)
     }
@@ -1668,48 +1671,73 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
 
   const handleSavePayrollSettings = async () => {
     try {
+      if (!companyData.id || companyData.id.trim() === "") {
+        toast({
+          title: "Error",
+          description: "Company information not loaded. Please refresh the page.",
+          variant: "destructive",
+        })
+        return
+      }
+
       const supabase = createClient()
 
-      // Save payroll configuration with only fields that exist in the database
       const configData = {
-        company_id: Number.parseInt(companyData.id) || 1,
+        company_id: companyData.id, // Use string UUID instead of parseInt
         minimum_wage: payrollConfig.minimum_wage,
         overtime_weekday_multiplier: payrollConfig.overtime_weekday_multiplier,
+        overtime_weekend_multiplier: payrollConfig.overtime_weekend_multiplier,
         currency_code: payrollConfig.currency_code,
         currency_symbol: payrollConfig.currency_symbol,
         updated_at: new Date().toISOString(),
       }
 
+      console.log("[v0] Saving payroll config:", configData)
       const { error: configError } = await supabase.from("payroll_configuration").upsert(configData)
 
       if (configError) throw configError
 
-      // Save allowances
       for (const allowance of payrollAllowances) {
-        const { error: allowanceError } = await supabase.from("payroll_allowances").upsert({
-          ...allowance,
-          company_id: companyData.id,
-          updated_at: new Date().toISOString(),
-        })
-
-        if (allowanceError) throw allowanceError
+        if (allowance.id) {
+          const { error: allowanceError } = await supabase.from("payroll_allowances").upsert({
+            ...allowance,
+            company_id: companyData.id,
+            updated_at: new Date().toISOString(),
+          })
+          if (allowanceError) throw allowanceError
+        }
       }
 
-      // Save deductions
       for (const deduction of payrollDeductions) {
-        const { error: deductionError } = await supabase.from("payroll_deductions").upsert({
-          ...deduction,
-          company_id: companyData.id,
-          updated_at: new Date().toISOString(),
-        })
+        if (deduction.id) {
+          const { error: deductionError } = await supabase.from("payroll_deductions").upsert({
+            ...deduction,
+            company_id: companyData.id,
+            updated_at: new Date().toISOString(),
+          })
+          if (deductionError) throw deductionError
+        }
+      }
 
-        if (deductionError) throw deductionError
+      for (const loan of loanSettings) {
+        if (loan.id) {
+          const { error: loanError } = await supabase.from("loan_settings").upsert({
+            ...loan,
+            company_id: companyData.id,
+            updated_at: new Date().toISOString(),
+          })
+          if (loanError) throw loanError
+        }
       }
 
       toast({ title: "Success", description: "Payroll settings saved successfully" })
     } catch (error) {
       console.error("Error saving payroll settings:", error)
-      toast({ title: "Error", description: "Failed to save payroll settings" })
+      toast({
+        title: "Error",
+        description: `Failed to save payroll settings: ${error.message}`,
+        variant: "destructive",
+      })
     }
   }
 
