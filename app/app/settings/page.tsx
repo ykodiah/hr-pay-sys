@@ -11,6 +11,7 @@ import { X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Edit } from "lucide-react"
 
 interface Company {
   id: string
@@ -1093,52 +1094,38 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false)
 
   const loadAllData = async () => {
-    setLoading(true)
+    setIsLoading(true)
     try {
-      // Load company data first and wait for it to complete
+      // Load company data first
       await loadCompanyData()
 
-      // Wait longer for company data to be properly set in state
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      // Wait for company data to be available
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      // Check if company data was loaded successfully
-      if (!companyData.id || companyData.id.trim() === "") {
-        console.log("[v0] Company data not loaded, retrying...")
-        await loadCompanyData()
-        await new Promise((resolve) => setTimeout(resolve, 300))
-      }
-
-      // Then load all other data that depends on company ID
-      const loadPromises = [
-        loadLeaveTypes(),
-        loadSalaryGrades(),
-        loadEmployees(),
-        loadSubsidiaries(),
+      // Load all other data in parallel after company data is available
+      await Promise.all([
         loadPayrollConfig(),
         loadPayrollAllowances(),
         loadPayrollDeductions(),
-      ]
+        loadLoanSettings(),
+        loadSalaryGrades(),
+        loadLeaveManagementData(),
+        loadSecuritySettings(),
+        loadNotificationSettings(),
+        loadEmployees(),
+        loadSubsidiaries(),
+      ])
 
-      // Only load these if company ID is available
-      if (companyData.id && companyData.id.trim() !== "") {
-        loadPromises.push(
-          loadLoanSettings(),
-          loadSecuritySettings(),
-          loadNotificationSettings(),
-          loadLeaveManagementData(),
-        )
-      }
-
-      await Promise.all(loadPromises)
+      console.log("[v0] All data loaded successfully")
     } catch (error) {
       console.error("Error loading data:", error)
       toast({
-        title: "Loading Error",
-        description: "Some data could not be loaded. Please refresh the page.",
+        title: "Error",
+        description: "Failed to load some data. Please refresh the page.",
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -1657,6 +1644,423 @@ IT Support Team
       setLeaveEligibility(eligibilityData || [])
     } catch (error) {
       console.error("Error loading leave management data:", error)
+    }
+  }
+
+  return (
+    
+      {/* Leave Types Section */}
+
+  \
+                Leave Types
+              
+              
+                Manage different types of leave available to employees
+              
+            
+          
+          
+            Add Leave Type
+  leaveTypes.length === 0 ? (\
+           No
+  leave
+  types
+  found.Add
+  leave
+  types
+  to
+  get
+  started.
+  \
+        ) : (\
+  leaveTypes.map((leaveType) => (
+               
+                 
+                   \
+                     {leaveType.name} ({leaveType.code})
+                   
+                   \
+                     {leaveType.description}
+                   
+                   
+                     \
+                       Annual Entitlement: {leaveType.annual_entitlement} days\
+                       Pay: {leaveType.pay_percentage}%\
+                       Max Consecutive: {leaveType.max_consecutive_days} days
+                     
+                   
+                 
+                 
+                   
+                     
+                       
+                         Edit\
+                       
+                       \
+                         Manage Approvers
+                       
+                       \
+                         Manage Eligibility
+                       
+                       \
+                         Deactivate
+                       
+                     
+                   
+                 
+               
+             )
+  )
+  \
+           
+        )
+
+  \
+                Leave Policies
+              
+              
+                Manage company leave policies and entitlements
+              
+            
+          
+          
+            Add Leave Policy
+  leavePolicies.length === 0 ? (\
+           No
+  leave
+  policies
+  found.Add
+  policies
+  to
+  get
+  started.
+  \
+        ) : (\
+  leavePolicies.map((policy) => (
+               
+                 
+                   \
+                     {policy.policy_name}
+                   
+                   \
+                     {policy.description}
+                   
+                   
+                     \
+                       Max Days: {policy.max_days}\
+                       Carry Over: {policy.carry_over_days} days\
+                       Notice: {policy.notice_period_days} days
+                     
+                   
+                 
+                 
+                   
+                     
+                       
+                         Edit\
+                       
+                       \
+                         Deactivate
+                       
+                     
+                   
+                 
+               
+             )
+  )
+  \
+           
+        )
+
+  \
+                Leave Approvers
+              
+              \
+                Manage approval workflows
+  for different leave types
+  \
+              
+            
+          
+          
+            Add Approver
+  leaveApprovers.length === 0 ? (\
+           No
+  approvers
+  configured.Set
+  up
+  approval
+  workflows.
+  ) : (
+  leaveApprovers.map((approver) => (
+               
+                 
+                   
+                     Level {approver.approval_level}: {approver.approver_role}
+                   
+                   
+                     {approver.is_required ? 'Required' : 'Optional'} approval step
+                   
+                 
+                 
+                   
+                     
+                       
+                         Edit
+                       
+                       
+                         Remove
+                       
+                     
+                   
+                 
+               
+             )
+  )
+
+  )
+
+  Leave
+  Eligibility
+  Rules
+
+  Define
+  who
+  is
+  eligible
+  for different leave types
+              
+            
+          
+          
+            Add
+  Eligibility
+  Rule
+  leaveEligibility.length === 0 ? (
+           No eligibility
+  rules
+  configured.Set
+  up
+  eligibility
+  criteria.
+  ) : (
+  leaveEligibility.map((rule) => (
+               
+                 
+                   Eligibility Rule
+                   
+                     Type: {rule.employee_type}
+                     Gender: {rule.gender}
+                     Age: {rule.min_age}-{rule.max_age}
+                   
+                 
+                 
+                   
+                     
+                       
+                         Edit
+                       
+                       
+                         Remove
+                       
+                     
+                   
+                 
+               
+             )
+  )
+
+  )
+
+  Salary
+  Grades & Notches
+
+  Manage
+  salary
+  grades
+  and
+  step
+  progressions
+
+  Add
+  Grade
+  salaryGrades.length === 0 ? (
+           No salary
+  grades
+  found.Add
+  grades
+  to
+  get
+  started.
+  ) : (
+  salaryGrades.map((grade) => (
+               
+                 
+                   
+                     {grade.grade_name}
+                   
+                   
+                     Salary Range: GH¢{grade.step_1?.toLocaleString()} - GH¢{grade.step_5?.toLocaleString()}
+                   
+                   Steps: 5
+                 
+                 
+                   
+                     
+                       
+                         Edit
+                       
+                       
+                         Remove
+                       
+                     
+                   
+                 
+               
+             )
+  )
+
+  )
+
+  )
+
+  const handleEditLeaveType = (leaveType: LeaveType) => {
+    setSelectedLeaveType(leaveType)
+    setShowLeaveTypeDialog(true)
+  }
+
+  const handleEditLeavePolicy = (policy: LeavePolicy) => {
+    setSelectedLeavePolicy(policy)
+    setShowLeavePolicyDialog(true)
+  }
+
+  const handleEditApprover = (approver: LeaveTypeApprover) => {
+    // Implementation for editing approver
+    setShowApproverDialog(true)
+  }
+
+  const handleEditEligibility = (rule: LeaveTypeEligibility) => {
+    // Implementation for editing eligibility rule
+    setShowEligibilityDialog(true)
+  }
+
+  const handleEditSalaryGrade = (grade: SalaryGrade) => {
+    setEditingSalaryGrade(grade)
+    setShowSalaryGradeDialog(true)
+  }
+
+  const handleDeactivateLeaveType = async (id: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("leave_types").update({ is_active: false }).eq("id", id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Leave type deactivated successfully",
+      })
+
+      loadLeaveManagementData()
+    } catch (error) {
+      console.error("Error deactivating leave type:", error)
+      toast({
+        title: "Error",
+        description: "Failed to deactivate leave type",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeactivateLeavePolicy = async (id: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("leave_policies").update({ is_active: false }).eq("id", id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Leave policy deactivated successfully",
+      })
+
+      loadLeaveManagementData()
+    } catch (error) {
+      console.error("Error deactivating leave policy:", error)
+      toast({
+        title: "Error",
+        description: "Failed to deactivate leave policy",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRemoveApprover = async (id: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("leave_type_approvers").delete().eq("id", id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Approver removed successfully",
+      })
+
+      loadLeaveManagementData()
+    } catch (error) {
+      console.error("Error removing approver:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove approver",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRemoveEligibility = async (id: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("leave_type_eligibility").delete().eq("id", id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Eligibility rule removed successfully",
+      })
+
+      loadLeaveManagementData()
+    } catch (error) {
+      console.error("Error removing eligibility rule:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove eligibility rule",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRemoveSalaryGrade = async (id: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("salary_grades").update({ is_active: false }).eq("id", id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Salary grade removed successfully",
+      })
+
+      loadSalaryGrades()
+    } catch (error) {
+      console.error("Error removing salary grade:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove salary grade",
+        variant: "destructive",
+      })
     }
   }
 }
