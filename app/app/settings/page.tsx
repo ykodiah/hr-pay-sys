@@ -28,6 +28,8 @@ import {
   Minus,
   MoreHorizontal,
   Trash2,
+  Building,
+  Mail,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -836,6 +838,109 @@ export default function SettingsPage() {
     }
   }
 
+  const [leavePolicies, setLeavePolicies] = useState<any[]>([])
+  const [orgCharts, setOrgCharts] = useState<any[]>([])
+
+  const loadHRSettings = async () => {
+    try {
+      const supabase = createClient()
+
+      // Load leave policies
+      const { data: leavePolicies, error: leavePoliciesError } = await supabase
+        .from("leave_policies")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .eq("is_active", true)
+
+      if (leavePoliciesError) throw leavePoliciesError
+
+      // Load organizational charts
+      const { data: orgCharts, error: orgChartsError } = await supabase
+        .from("organizational_charts")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .eq("is_active", true)
+
+      if (orgChartsError) throw orgChartsError
+
+      console.log("[v0] HR settings loaded:", { leavePolicies, orgCharts })
+
+      // Update state with loaded data
+      setLeavePolicies(leavePolicies || [])
+      setOrgCharts(orgCharts || [])
+    } catch (error) {
+      console.error("Error loading HR settings:", error)
+    }
+  }
+
+  const loadSecuritySettings = async () => {
+    try {
+      const supabase = createClient()
+
+      // Since there's no security_settings table in the schema, we'll use company_settings
+      // or create default security settings
+      const { data: companySettings, error } = await supabase
+        .from("company_settings")
+        .select("*")
+        .eq("id", companyData.id)
+        .single()
+
+      if (error && error.code !== "PGRST116") throw error
+
+      console.log("[v0] Security settings loaded:", companySettings)
+
+      // Set security settings from database or keep defaults
+      if (companySettings) {
+        setSecuritySettings((prev) => ({
+          ...prev,
+          // Map any security-related fields from company_settings if they exist
+        }))
+      }
+    } catch (error) {
+      console.error("Error loading security settings:", error)
+    }
+  }
+
+  const loadNotificationSettings = async () => {
+    try {
+      const supabase = createClient()
+
+      // Load AI knowledge base for notification templates
+      const { data: knowledgeBase, error: kbError } = await supabase
+        .from("ai_knowledge_base")
+        .select("*")
+        .eq("category", "email_templates")
+        .eq("is_active", true)
+
+      if (kbError) throw kbError
+
+      // Load communication groups for notification settings
+      const { data: commGroups, error: groupsError } = await supabase
+        .from("communication_groups")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .eq("is_active", true)
+
+      if (groupsError) throw groupsError
+
+      console.log("[v0] Notification settings loaded:", { knowledgeBase, commGroups })
+
+      // Update email templates from knowledge base
+      if (knowledgeBase) {
+        const templates = knowledgeBase.map((kb) => ({
+          id: kb.id,
+          name: kb.topic,
+          subject: kb.topic,
+          content: kb.content,
+          type: kb.category,
+        }))
+        setEmailTemplates(templates)
+      }
+    } catch (error) {
+      console.error("Error loading notification settings:", error)
+    }
+  }
+
   useEffect(() => {
     const loadAllData = async () => {
       setIsLoading(true)
@@ -869,6 +974,37 @@ export default function SettingsPage() {
 
     loadAllData()
   }, [])
+
+  const [loading, setLoading] = useState(false)
+
+  const loadAllData = async () => {
+    setLoading(true)
+    try {
+      // Load company data first
+      await loadCompanyData()
+
+      // Wait for company data to be available
+      if (companyData.id) {
+        await Promise.all([
+          loadSubsidiaries(),
+          loadEmployees(),
+          loadLeaveTypes(),
+          loadSalaryGrades(),
+          loadPayrollConfig(),
+          loadPayrollAllowances(),
+          loadPayrollDeductions(),
+          loadLoanSettings(),
+          loadHRSettings(),
+          loadSecuritySettings(),
+          loadNotificationSettings(),
+        ])
+      }
+    } catch (error) {
+      console.error("Error loading all data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const loadCompanyData = async () => {
     try {
@@ -1016,7 +1152,7 @@ Payroll Department`,
         {
           id: 3,
           name: "Leave Approval",
-          subject: "Leave Request {{status}} - {{leave_type}}",
+          subject: "Your Leave Request {{status}} - {{leave_type}}",
           description: "Leave request status updates",
           content: `Dear {{employee_name}},
 
@@ -1063,15 +1199,6 @@ IT Support Team
       ])
     } catch (error) {
       console.error("Error loading email templates:", error)
-    }
-  }
-
-  const loadSecuritySettings = async () => {
-    try {
-      // Load security settings from database or use defaults
-      // For now, keeping the default values since there's no security_settings table
-    } catch (error) {
-      console.error("Error loading security settings:", error)
     }
   }
 
@@ -2883,11 +3010,91 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>HR Settings</CardTitle>
-                <CardDescription>Manage leave types, salary grades, and HR policies</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Leave Policies
+                </CardTitle>
+                <CardDescription>Manage company leave policies and entitlements</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">HR settings content will be implemented here.</p>
+                <div className="space-y-4">
+                  {leavePolicies.length > 0 ? (
+                    leavePolicies.map((policy) => (
+                      <div key={policy.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div>
+                          <h4 className="font-medium">{policy.policy_name}</h4>
+                          <p className="text-sm text-muted-foreground">{policy.description}</p>
+                          <div className="flex gap-4 mt-2 text-sm">
+                            <span>Max Days: {policy.max_days}</span>
+                            <span>Notice Period: {policy.notice_period_days} days</span>
+                            <span>Paid: {policy.paid_percentage}%</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={policy.is_active ? "default" : "secondary"}>
+                            {policy.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem>Edit Policy</DropdownMenuItem>
+                              <DropdownMenuItem>View Details</DropdownMenuItem>
+                              <DropdownMenuItem className="text-red-600">Deactivate</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground">No leave policies found. Add policies to get started.</p>
+                  )}
+                  <Button onClick={() => setShowLeaveTypeDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Leave Policy
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building className="h-5 w-5" />
+                  Organizational Charts
+                </CardTitle>
+                <CardDescription>View and manage organizational structure</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {orgCharts && orgCharts.length > 0 ? (
+                    orgCharts.map((chart) => (
+                      <div key={chart.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div>
+                          <h4 className="font-medium">{chart.name}</h4>
+                          <p className="text-sm text-muted-foreground">{chart.description}</p>
+                          <div className="flex gap-4 mt-2 text-sm">
+                            <span>Type: {chart.chart_type}</span>
+                            <span>Style: {chart.chart_style}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={chart.is_active ? "default" : "secondary"}>
+                            {chart.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                          <Button variant="outline" size="sm">
+                            View Chart
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground">No organizational charts found.</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -2897,11 +3104,144 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Security Settings</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Security Settings
+                </CardTitle>
                 <CardDescription>Configure security policies and access controls</CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Security settings content will be implemented here.</p>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="two-factor">Two-Factor Authentication</Label>
+                        <p className="text-sm text-muted-foreground">Require 2FA for all users</p>
+                      </div>
+                      <Switch
+                        id="two-factor"
+                        checked={securitySettings.twoFactorAuth}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings((prev) => ({ ...prev, twoFactorAuth: checked }))
+                        }
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="session-timeout">Auto Session Timeout</Label>
+                        <p className="text-sm text-muted-foreground">Automatically log out inactive users</p>
+                      </div>
+                      <Switch
+                        id="session-timeout"
+                        checked={securitySettings.autoSessionTimeout}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings((prev) => ({ ...prev, autoSessionTimeout: checked }))
+                        }
+                      />
+                    </div>
+
+                    {securitySettings.autoSessionTimeout && (
+                      <div>
+                        <Label htmlFor="timeout-duration">Timeout Duration (minutes)</Label>
+                        <Input
+                          id="timeout-duration"
+                          type="number"
+                          value={securitySettings.timeoutDuration}
+                          onChange={(e) =>
+                            setSecuritySettings((prev) => ({
+                              ...prev,
+                              timeoutDuration: Number.parseInt(e.target.value) || 15,
+                            }))
+                          }
+                          className="mt-1"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="audit-logging">Audit Logging</Label>
+                        <p className="text-sm text-muted-foreground">Track user activities and changes</p>
+                      </div>
+                      <Switch
+                        id="audit-logging"
+                        checked={securitySettings.auditLogging}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings((prev) => ({ ...prev, auditLogging: checked }))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-medium">Password Policy</h3>
+
+                    <div>
+                      <Label htmlFor="min-length">Minimum Length</Label>
+                      <Input
+                        id="min-length"
+                        type="number"
+                        value={passwordPolicy.minLength}
+                        onChange={(e) =>
+                          setPasswordPolicy((prev) => ({
+                            ...prev,
+                            minLength: Number.parseInt(e.target.value) || 8,
+                          }))
+                        }
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="require-uppercase"
+                          checked={passwordPolicy.requireUppercase}
+                          onCheckedChange={(checked) =>
+                            setPasswordPolicy((prev) => ({ ...prev, requireUppercase: !!checked }))
+                          }
+                        />
+                        <Label htmlFor="require-uppercase">Require uppercase letters</Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="require-numbers"
+                          checked={passwordPolicy.requireNumbers}
+                          onCheckedChange={(checked) =>
+                            setPasswordPolicy((prev) => ({ ...prev, requireNumbers: !!checked }))
+                          }
+                        />
+                        <Label htmlFor="require-numbers">Require numbers</Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="require-symbols"
+                          checked={passwordPolicy.requireSymbols}
+                          onCheckedChange={(checked) =>
+                            setPasswordPolicy((prev) => ({ ...prev, requireSymbols: !!checked }))
+                          }
+                        />
+                        <Label htmlFor="require-symbols">Require symbols</Label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <Button onClick={handleSaveSecuritySettings}>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Security Settings
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowPasswordChangeDialog(true)}>
+                    Change Admin Password
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowActivityLog(true)}>
+                    View Activity Log
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -2911,11 +3251,131 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Notification Settings</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="h-5 w-5" />
+                  Notification Settings
+                </CardTitle>
                 <CardDescription>Configure email templates and notification preferences</CardDescription>
               </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h3 className="font-medium">Notification Preferences</h3>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>Payroll Processing Alerts</Label>
+                        <p className="text-sm text-muted-foreground">Get notified about payroll status</p>
+                      </div>
+                      <Switch defaultChecked />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>Leave Request Notifications</Label>
+                        <p className="text-sm text-muted-foreground">Alerts for leave requests</p>
+                      </div>
+                      <Switch defaultChecked />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>Employee Updates</Label>
+                        <p className="text-sm text-muted-foreground">Changes to employee records</p>
+                      </div>
+                      <Switch defaultChecked />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>System Maintenance</Label>
+                        <p className="text-sm text-muted-foreground">Scheduled maintenance alerts</p>
+                      </div>
+                      <Switch />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-medium">Contact Settings</h3>
+
+                    <div>
+                      <Label htmlFor="notification-email">Notification Email</Label>
+                      <Input
+                        id="notification-email"
+                        type="email"
+                        value={notificationSettings.email}
+                        onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email: e.target.value }))}
+                        placeholder="admin@company.com"
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="webhook-url">Webhook URL</Label>
+                      <Input
+                        id="webhook-url"
+                        type="url"
+                        value={notificationSettings.webhookUrl}
+                        onChange={(e) => setNotificationSettings((prev) => ({ ...prev, webhookUrl: e.target.value }))}
+                        placeholder="https://your-webhook-url.com"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Mail className="h-5 w-5" />
+                    Email Templates
+                  </span>
+                  <Button onClick={() => setShowCustomTemplateDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Template
+                  </Button>
+                </CardTitle>
+                <CardDescription>Manage email templates for automated communications</CardDescription>
+              </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">Notification settings content will be implemented here.</p>
+                <div className="space-y-4">
+                  {emailTemplates.length > 0 ? (
+                    emailTemplates.map((template) => (
+                      <div key={template.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div>
+                          <h4 className="font-medium">{template.name}</h4>
+                          <p className="text-sm text-muted-foreground">{template.subject}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{template.content?.substring(0, 100)}...</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">{template.type}</Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingEmailTemplate(template)
+                              setShowCustomTemplateDialog(true)
+                            }}
+                          >
+                            Edit
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground">No email templates found. Add templates to get started.</p>
+                  )}
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <Button onClick={handleSaveNotificationSettings}>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Notification Settings
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
