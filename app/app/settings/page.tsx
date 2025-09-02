@@ -26,9 +26,9 @@ import {
   Calculator,
   MoreHorizontal,
   Trash2,
-  Mail,
   Calendar,
   FileText,
+  Minus,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -137,6 +137,7 @@ interface SalaryGrade {
   step_3: number
   step_4: number
   step_5: number
+  is_active: boolean
 }
 
 interface PayrollConfig {
@@ -301,6 +302,80 @@ const SubsidiaryForm: React.FC<SubsidiaryFormProps> = ({ subsidiary, onSave, onC
         <Button variant="outline" size="sm" onClick={() => setLocations([...locations, "New Location"])}>
           Add Location
         </Button>
+      </div>
+
+      <div className="flex justify-end space-x-2">
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button onClick={handleSubmit}>Save</Button>
+      </div>
+    </div>
+  )
+}
+
+interface SalaryGradeFormProps {
+  grade: SalaryGrade | null
+  onSave: (data: any) => void
+  onCancel: () => void
+}
+
+const SalaryGradeForm: React.FC<SalaryGradeFormProps> = ({ grade, onSave, onCancel }) => {
+  const [gradeName, setGradeName] = useState(grade?.grade_name || "")
+  const [gradeLevel, setGradeLevel] = useState(grade?.grade_level || 1)
+  const [step1, setStep1] = useState(grade?.step_1 || 0)
+  const [step2, setStep2] = useState(grade?.step_2 || 0)
+  const [step3, setStep3] = useState(grade?.step_3 || 0)
+  const [step4, setStep4] = useState(grade?.step_4 || 0)
+  const [step5, setStep5] = useState(grade?.step_5 || 0)
+
+  const handleSubmit = () => {
+    const gradeData = {
+      grade_name: gradeName,
+      grade_level: gradeLevel,
+      step_1: step1,
+      step_2: step2,
+      step_3: step3,
+      step_4: step4,
+      step_5: step5,
+    }
+    onSave(gradeData)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="gradeName">Grade Name</Label>
+        <Input id="gradeName" value={gradeName} onChange={(e) => setGradeName(e.target.value)} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="gradeLevel">Grade Level</Label>
+        <Input
+          id="gradeLevel"
+          type="number"
+          value={gradeLevel}
+          onChange={(e) => setGradeLevel(Number(e.target.value))}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="step1">Step 1</Label>
+        <Input id="step1" type="number" value={step1} onChange={(e) => setStep1(Number(e.target.value))} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="step2">Step 2</Label>
+        <Input id="step2" type="number" value={step2} onChange={(e) => setStep2(Number(e.target.value))} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="step3">Step 3</Label>
+        <Input id="step3" type="number" value={step3} onChange={(e) => setStep3(Number(e.target.value))} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="step4">Step 4</Label>
+        <Input id="step4" type="number" value={step4} onChange={(e) => setStep4(Number(e.target.value))} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="step5">Step 5</Label>
+        <Input id="step5" type="number" value={step5} onChange={(e) => setStep5(Number(e.target.value))} />
       </div>
 
       <div className="flex justify-end space-x-2">
@@ -942,6 +1017,92 @@ export default function SettingsPage() {
     }
   }
 
+  const handleAddSalaryGrade = () => {
+    setEditingSalaryGrade(null)
+    setShowSalaryGradeDialog(true)
+  }
+
+  const handleEditSalaryGrade = (grade: SalaryGrade) => {
+    setEditingSalaryGrade(grade)
+    setShowSalaryGradeDialog(true)
+  }
+
+  const handleSaveSalaryGrade = async (gradeData: any) => {
+    try {
+      const supabase = createClient()
+      
+      if (!companyData.id) {
+        toast({
+          title: "Error",
+          description: "Company ID not available. Please refresh the page.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const gradeToSave = {
+        id: editingSalaryGrade?.id || crypto.randomUUID(),
+        company_id: companyData.id,
+        grade_name: gradeData.grade_name,
+        grade_level: gradeData.grade_level,
+        step_1: gradeData.step_1,
+        step_2: gradeData.step_2,
+        step_3: gradeData.step_3,
+        step_4: gradeData.step_4,
+        step_5: gradeData.step_5,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      }
+
+      const { error } = await supabase.from("salary_grades").upsert(gradeToSave)
+
+      if (error) throw error
+
+      await loadSalaryGrades()
+      setShowSalaryGradeDialog(false)
+      setEditingSalaryGrade(null)
+      
+      toast({
+        title: "Success",
+        description: `Salary grade ${editingSalaryGrade ? 'updated' : 'created'} successfully.`,
+      })
+    } catch (error) {
+      console.error("Error saving salary grade:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save salary grade. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRemoveSalaryGrade = async (gradeId: string) => {
+    try {
+      const supabase = createClient()
+      
+      const { error } = await supabase
+        .from("salary_grades")
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq("id", gradeId)
+
+      if (error) throw error
+
+      await loadSalaryGrades()
+      
+      toast({
+        title: "Success",
+        description: "Salary grade deactivated successfully.",
+      })
+    } catch (error) {
+      console.error("Error removing salary grade:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove salary grade. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const loadLoanSettings = async () => {
     try {
       if (!companyData.id || companyData.id.trim() === "") {
@@ -1569,7 +1730,6 @@ IT Support Team
       toast({
         title: "Error",
         description: "Failed to upload logo. Please try again.",
-        variant: "destructive",
       })
     }
   }
@@ -3106,7 +3266,6 @@ IT Support Team
                     <span>Deductions</span>
                     <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={handleAddDeduction}>
                       <Plus className="h-4 w-4 mr-1" />
-                      Add
                     </Button>
                   </CardTitle>
                 </CardHeader>
@@ -3294,7 +3453,7 @@ IT Support Team
                       <Label htmlFor="deduction-type">Type</Label>
                       <Select
                         value={editingItem?.type}
-                        onValueChange={(value) => setEditingItem({ ...editingItem, type: value })}
+                        onChange={(value) => setEditingItem({ ...editingItem, type: value })}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -3724,6 +3883,68 @@ IT Support Team
               </CardContent>
             </Card>
 
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Salary Grades & Notches
+                </CardTitle>
+                <CardDescription>Manage salary grades and step progressions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {salaryGrades.length > 0 ? (
+                    <div className="grid gap-4">
+                      {salaryGrades.map((grade) => (
+                        <div key={grade.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                              <h4 className="font-medium">{grade.grade_name}</h4>
+                              <Badge variant="outline">Level {grade.grade_level}</Badge>
+                              <Badge variant={grade.is_active ? "default" : "secondary"}>
+                                {grade.is_active ? "Active" : "Inactive"}
+                              </Badge>
+                            </div>
+                            <div className="mt-2">
+                              <p className="text-sm text-muted-foreground">
+                                Salary Range: GH¢{grade.step_1?.toLocaleString()} - GH¢{grade.step_5?.toLocaleString()}
+                              </p>
+                              <p className="text-sm text-muted-foreground">Steps: 5</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditSalaryGrade(grade)}
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRemoveSalaryGrade(grade.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Minus className="h-4 w-4 mr-1" />
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">No salary grades found. Add grades to get started.</p>
+                  )}
+                  <Button onClick={handleAddSalaryGrade} className="bg-green-600 hover:bg-green-700">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Grade
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="flex justify-end">
               <Button
                 onClick={async () => {
@@ -3763,9 +3984,7 @@ IT Support Team
                       <Switch
                         id="two-factor"
                         checked={securitySettings.twoFactorAuth}
-                        onCheckedChange={(checked) =>
-                          setSecuritySettings((prev) => ({ ...prev, twoFactorAuth: checked }))
-                        }
+                        onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, twoFactorAuth: checked })}
                       />
                     </div>
 
@@ -3778,25 +3997,24 @@ IT Support Team
                         id="session-timeout"
                         checked={securitySettings.autoSessionTimeout}
                         onCheckedChange={(checked) =>
-                          setSecuritySettings((prev) => ({ ...prev, autoSessionTimeout: checked }))
+                          setSecuritySettings({ ...securitySettings, autoSessionTimeout: checked })
                         }
                       />
                     </div>
 
                     {securitySettings.autoSessionTimeout && (
-                      <div>
+                      <div className="space-y-2 pl-4">
                         <Label htmlFor="timeout-duration">Timeout Duration (minutes)</Label>
                         <Input
                           id="timeout-duration"
                           type="number"
                           value={securitySettings.timeoutDuration}
                           onChange={(e) =>
-                            setSecuritySettings((prev) => ({
-                              ...prev,
-                              timeoutDuration: Number.parseInt(e.target.value) || 15,
-                            }))
+                            setSecuritySettings({
+                              ...securitySettings,
+                              timeoutDuration: Number(e.target.value),
+                            })
                           }
-                          className="mt-1"
                         />
                       </div>
                     )}
@@ -3804,88 +4022,110 @@ IT Support Team
                     <div className="flex items-center justify-between">
                       <div>
                         <Label htmlFor="audit-logging">Audit Logging</Label>
-                        <p className="text-sm text-muted-foreground">Track user activities and changes</p>
+                        <p className="text-sm text-muted-foreground">Track user activity and system changes</p>
                       </div>
                       <Switch
                         id="audit-logging"
                         checked={securitySettings.auditLogging}
                         onCheckedChange={(checked) =>
-                          setSecuritySettings((prev) => ({ ...prev, auditLogging: checked }))
+                          setSecuritySettings({ ...securitySettings, auditLogging: checked })
                         }
                       />
                     </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="automated-backups">Automated Backups</Label>
+                        <p className="text-sm text-muted-foreground">Automatically back up your data</p>
+                      </div>
+                      <Switch
+                        id="automated-backups"
+                        checked={securitySettings.automatedBackups}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, automatedBackups: checked })
+                        }
+                      />
+                    </div>
+
+                    {securitySettings.automatedBackups && (
+                      <div className="space-y-2 pl-4">
+                        <Label htmlFor="backup-frequency">Backup Frequency</Label>
+                        <Select
+                          value={securitySettings.backupFrequency}
+                          onValueChange={(value) =>
+                            setSecuritySettings({ ...securitySettings, backupFrequency: value })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="daily">Daily</SelectItem>
+                            <SelectItem value="weekly">Weekly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="font-medium">Password Policy</h3>
-
-                    <div>
+                    <h3 className="text-lg font-semibold">Password Policy</h3>
+                    <div className="space-y-2">
                       <Label htmlFor="min-length">Minimum Length</Label>
                       <Input
                         id="min-length"
                         type="number"
                         value={passwordPolicy.minLength}
                         onChange={(e) =>
-                          setPasswordPolicy((prev) => ({
-                            ...prev,
-                            minLength: Number.parseInt(e.target.value) || 8,
-                          }))
+                          setPasswordPolicy({ ...passwordPolicy, minLength: Number(e.target.value) })
                         }
-                        className="mt-1"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="require-uppercase"
-                          checked={passwordPolicy.requireUppercase}
-                          onCheckedChange={(checked) =>
-                            setPasswordPolicy((prev) => ({ ...prev, requireUppercase: !!checked }))
-                          }
-                        />
-                        <Label htmlFor="require-uppercase">Require uppercase letters</Label>
-                      </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="require-uppercase">Require Uppercase</Label>
+                      <Switch
+                        id="require-uppercase"
+                        checked={passwordPolicy.requireUppercase}
+                        onCheckedChange={(checked) =>
+                          setPasswordPolicy({ ...passwordPolicy, requireUppercase: checked })
+                        }
+                      />
+                    </div>
 
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="require-numbers"
-                          checked={passwordPolicy.requireNumbers}
-                          onCheckedChange={(checked) =>
-                            setPasswordPolicy((prev) => ({ ...prev, requireNumbers: !!checked }))
-                          }
-                        />
-                        <Label htmlFor="require-numbers">Require numbers</Label>
-                      </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="require-numbers">Require Numbers</Label>
+                      <Switch
+                        id="require-numbers"
+                        checked={passwordPolicy.requireNumbers}
+                        onCheckedChange={(checked) =>
+                          setPasswordPolicy({ ...passwordPolicy, requireNumbers: checked })
+                        }
+                      />
+                    </div>
 
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="require-symbols"
-                          checked={passwordPolicy.requireSymbols}
-                          onCheckedChange={(checked) =>
-                            setPasswordPolicy((prev) => ({ ...prev, requireSymbols: !!checked }))
-                          }
-                        />
-                        <Label htmlFor="require-symbols">Require symbols</Label>
-                      </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="require-symbols">Require Symbols</Label>
+                      <Switch
+                        id="require-symbols"
+                        checked={passwordPolicy.requireSymbols}
+                        onCheckedChange={(checked) =>
+                          setPasswordPolicy({ ...passwordPolicy, requireSymbols: checked })
+                        }
+                      />
                     </div>
                   </div>
                 </div>
-
-                <div className="flex gap-4 pt-4">
-                  <Button onClick={handleSaveSecuritySettings}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Security Settings
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowPasswordChangeDialog(true)}>
-                    Change Admin Password
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowActivityLog(true)}>
-                    View Activity Log
-                  </Button>
-                </div>
               </CardContent>
             </Card>
+
+            <div className="flex justify-end">
+              <Button onClick={handleSaveSecuritySettings} className="bg-green-600 hover:bg-green-700">
+                <Save className="h-4 w-4 mr-2" />
+                Save Security Settings
+              </Button>
+            </div>
           </div>
         )}
 
@@ -3897,70 +4137,91 @@ IT Support Team
                   <Bell className="h-5 w-5" />
                   Notification Settings
                 </CardTitle>
-                <CardDescription>Configure email templates and notification preferences</CardDescription>
+                <CardDescription>Configure system notifications and alerts</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <h3 className="font-medium">Notification Preferences</h3>
-
+                    <h3 className="text-lg font-semibold">System Alerts</h3>
                     <div className="flex items-center justify-between">
-                      <div>
-                        <Label>Payroll Processing Alerts</Label>
-                        <p className="text-sm text-muted-foreground">Get notified about payroll status</p>
-                      </div>
-                      <Switch defaultChecked />
+                      <Label htmlFor="payroll-alerts">Payroll Alerts</Label>
+                      <Switch
+                        id="payroll-alerts"
+                        checked={notificationSettings.payrollAlerts}
+                        onCheckedChange={(checked) =>
+                          setNotificationSettings({ ...notificationSettings, payrollAlerts: checked })
+                        }
+                      />
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <div>
-                        <Label>Leave Request Notifications</Label>
-                        <p className="text-sm text-muted-foreground">Alerts for leave requests</p>
-                      </div>
-                      <Switch defaultChecked />
+                      <Label htmlFor="leave-alerts">Leave Alerts</Label>
+                      <Switch
+                        id="leave-alerts"
+                        checked={notificationSettings.leaveAlerts}
+                        onCheckedChange={(checked) =>
+                          setNotificationSettings({ ...notificationSettings, leaveAlerts: checked })
+                        }
+                      />
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <div>
-                        <Label>Employee Updates</Label>
-                        <p className="text-sm text-muted-foreground">Changes to employee records</p>
-                      </div>
-                      <Switch defaultChecked />
+                      <Label htmlFor="employee-updates">Employee Updates</Label>
+                      <Switch
+                        id="employee-updates"
+                        checked={notificationSettings.employeeUpdates}
+                        onCheckedChange={(checked) =>
+                          setNotificationSettings({ ...notificationSettings, employeeUpdates: checked })
+                        }
+                      />
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <div>
-                        <Label>System Maintenance</Label>
-                        <p className="text-sm text-muted-foreground">Scheduled maintenance alerts</p>
-                      </div>
-                      <Switch />
+                      <Label htmlFor="system-maintenance">System Maintenance</Label>
+                      <Switch
+                        id="system-maintenance"
+                        checked={notificationSettings.systemMaintenance}
+                        onCheckedChange={(checked) =>
+                          setNotificationSettings({ ...notificationSettings, systemMaintenance: checked })
+                        }
+                      />
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="font-medium">Contact Settings</h3>
+                    <h3 className="text-lg font-semibold">Delivery Options</h3>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="sms-notifications">SMS Notifications</Label>
+                      <Switch
+                        id="sms-notifications"
+                        checked={notificationSettings.smsNotifications}
+                        onCheckedChange={(checked) =>
+                          setNotificationSettings({ ...notificationSettings, smsNotifications: checked })
+                        }
+                      />
+                    </div>
 
-                    <div>
-                      <Label htmlFor="notification-email">Notification Email</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="notification-email">Email Address</Label>
                       <Input
                         id="notification-email"
                         type="email"
                         value={notificationSettings.email}
-                        onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email: e.target.value }))}
-                        placeholder="admin@company.com"
-                        className="mt-1"
+                        onChange={(e) =>
+                          setNotificationSettings({ ...notificationSettings, email: e.target.value })
+                        }
                       />
                     </div>
 
-                    <div>
+                    <div className="space-y-2">
                       <Label htmlFor="webhook-url">Webhook URL</Label>
                       <Input
                         id="webhook-url"
                         type="url"
                         value={notificationSettings.webhookUrl}
-                        onChange={(e) => setNotificationSettings((prev) => ({ ...prev, webhookUrl: e.target.value }))}
-                        placeholder="https://your-webhook-url.com"
-                        className="mt-1"
+                        onChange={(e) =>
+                          setNotificationSettings({ ...notificationSettings, webhookUrl: e.target.value })
+                        }
                       />
                     </div>
                   </div>
@@ -3968,62 +4229,17 @@ IT Support Team
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    <Mail className="h-5 w-5" />
-                    Email Templates
-                  </span>
-                  <Button onClick={() => setShowCustomTemplateDialog(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Template
-                  </Button>
-                </CardTitle>
-                <CardDescription>Manage email templates for automated communications</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {emailTemplates.length > 0 ? (
-                    emailTemplates.map((template) => (
-                      <div key={template.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h4 className="font-medium">{template.name}</h4>
-                          <p className="text-sm text-muted-foreground">{template.subject}</p>
-                          <p className="text-xs text-muted-foreground mt-1">{template.content?.substring(0, 100)}...</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">{template.type}</Badge>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setEditingEmailTemplate(template)
-                              setShowCustomTemplateDialog(true)
-                            }}
-                          >
-                            Edit
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-muted-foreground">No email templates found. Add templates to get started.</p>
-                  )}
-                </div>
-
-                <div className="flex gap-4 pt-4">
-                  <Button onClick={handleSaveNotificationSettings}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Notification Settings
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="flex justify-end">
+              <Button onClick={handleSaveNotificationSettings} className="bg-green-600 hover:bg-green-700">
+                <Save className="h-4 w-4 mr-2" />
+                Save Notification Settings
+              </Button>
+            </div>
           </div>
         )}
       </Tabs>
 
+      {/* Subsidiary Dialog */}
       <Dialog open={showSubsidiaryDialog} onOpenChange={setShowSubsidiaryDialog}>
         <DialogContent>
           <DialogHeader>
@@ -4037,62 +4253,37 @@ IT Support Team
         </DialogContent>
       </Dialog>
 
+      {/* View Subsidiary Dialog */}
       <Dialog open={showViewSubsidiaryDialog} onOpenChange={setShowViewSubsidiaryDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Subsidiary Details</DialogTitle>
           </DialogHeader>
           {viewingSubsidiary && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Name</Label>
-                  <p className="font-medium">{viewingSubsidiary.name}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Status</Label>
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    {viewingSubsidiary.status}
-                  </Badge>
-                </div>
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input value={viewingSubsidiary.name} readOnly />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Tax ID</Label>
-                  <p className="font-medium">{viewingSubsidiary.tax_id}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">SSNIT Number</Label>
-                  <p className="font-medium">{viewingSubsidiary.ssnit_number}</p>
-                </div>
+              <div className="space-y-2">
+                <Label>Tax ID</Label>
+                <Input value={viewingSubsidiary.tax_id} readOnly />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Email</Label>
-                  <p className="font-medium">{viewingSubsidiary.email_address}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
-                  <p className="font-medium">{viewingSubsidiary.phone_number}</p>
-                </div>
+              <div className="space-y-2">
+                <Label>SSNIT Number</Label>
+                <Input value={viewingSubsidiary.ssnit_number} readOnly />
               </div>
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Address</Label>
-                <p className="font-medium">{viewingSubsidiary.address}</p>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input value={viewingSubsidiary.email_address} readOnly />
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Divisions</Label>
-                  <p className="font-medium">{viewingSubsidiary.divisions_count || 0}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Departments</Label>
-                  <p className="font-medium">{viewingSubsidiary.departments_count || 0}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Locations</Label>
-                  <p className="font-medium">{viewingSubsidiary.locations_count || 0}</p>
-                </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input value={viewingSubsidiary.phone_number} readOnly />
+              </div>
+              <div className="space-y-2">
+                <Label>Address</Label>
+                <Textarea value={viewingSubsidiary.address} readOnly />
               </div>
             </div>
           )}
@@ -4100,24 +4291,15 @@ IT Support Team
             <Button variant="outline" onClick={() => setShowViewSubsidiaryDialog(false)}>
               Close
             </Button>
-            <Button
-              onClick={() => {
-                setShowViewSubsidiaryDialog(false)
-                if (viewingSubsidiary) {
-                  handleEditSubsidiary(viewingSubsidiary)
-                }
-              }}
-            >
-              Edit
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Deactivate Confirmation Modal */}
       <Dialog open={showDeactivateModal} onOpenChange={setShowDeactivateModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Deactivate Subsidiary Function</DialogTitle>
+            <DialogTitle>Deactivate Subsidiary Function?</DialogTitle>
             <DialogDescription>
               Are you sure you want to deactivate the subsidiary function? This will hide all subsidiary management
               features.
@@ -4127,63 +4309,68 @@ IT Support Team
             <Button variant="outline" onClick={handleCancelDeactivation}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleConfirmDeactivation}>
-              Deactivate
-            </Button>
+            <Button onClick={handleConfirmDeactivation}>Deactivate</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Add Allowance Dialog */}
       <Dialog open={showAllowanceDialog} onOpenChange={setShowAllowanceDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingIndex >= 0 ? "Edit Allowance" : "Add Allowance"}</DialogTitle>
+            <DialogTitle>Add Allowance</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Code</Label>
+              <div>
+                <Label htmlFor="allowance-code">Code</Label>
                 <Input
-                  value={editingItem?.code || ""}
-                  onChange={(e) => setEditingItem({ ...editingItem, code: e.target.value })}
+                  id="allowance-code"
+                  value={newDeduction?.code}
+                  onChange={(e) => setNewDeduction({ ...newDeduction, code: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
+              <div>
+                <Label htmlFor="allowance-description">Description</Label>
                 <Input
-                  value={editingItem?.description || ""}
+                  id="allowance-description"
+                  value={editingItem?.description}
                   onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={editingItem?.taxable || false}
-                  onCheckedChange={(checked) => setEditingItem({ ...editingItem, taxable: checked })}
-                />
-                <Label>Taxable</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={editingItem?.recurring || false}
-                  onCheckedChange={(checked) => setEditingItem({ ...editingItem, recurring: checked })}
-                />
-                <Label>Recurring</Label>
-              </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="allowance-taxable"
+                checked={editingItem?.taxable || false}
+                onCheckedChange={(checked) => setEditingItem({ ...editingItem, taxable: checked })}
+              />
+              <Label htmlFor="allowance-taxable">Taxable</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="allowance-recurring"
+                checked={editingItem?.recurring || false}
+                onCheckedChange={(checked) => setEditingItem({ ...editingItem, recurring: checked })}
+              />
+              <Label htmlFor="allowance-recurring">Recurring</Label>
             </div>
             <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Amount</Label>
+              <div>
+                <Label htmlFor="allowance-amount">Amount</Label>
                 <Input
+                  id="allowance-amount"
                   type="number"
                   value={editingItem?.amount || 0}
-                  onChange={(e) => setEditingItem({ ...editingItem, amount: Number.parseFloat(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setEditingItem({ ...editingItem, amount: Number.parseFloat(e.target.value) || 0 })
+                  }
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Percentage</Label>
+              <div>
+                <Label htmlFor="allowance-percentage">Percentage</Label>
                 <Input
+                  id="allowance-percentage"
                   type="number"
                   value={editingItem?.percentage || 0}
                   onChange={(e) =>
@@ -4191,18 +4378,18 @@ IT Support Team
                   }
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Type</Label>
+              <div>
+                <Label htmlFor="allowance-type">Type</Label>
                 <Select
-                  value={editingItem?.type || "FIXED"}
+                  value={editingItem?.type}
                   onValueChange={(value) => setEditingItem({ ...editingItem, type: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="FIXED">FIXED</SelectItem>
-                    <SelectItem value="VARIABLE">VARIABLE</SelectItem>
+                    <SelectItem value="FIXED">Fixed</SelectItem>
+                    <SelectItem value="VARIABLE">Variable</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -4216,6 +4403,288 @@ IT Support Team
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  )
-}
+
+      <Dialog open={showSalaryGradeDialog} onOpenChange={setShowSalaryGradeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingSalaryGrade ? "Edit Salary Grade" : "Add Salary Grade"}</DialogTitle>
+          </DialogHeader>
+          <SalaryGradeForm
+            grade={editingSalaryGrade}
+            onSave={handleSaveSalaryGrade}
+            onCancel={() => setShowSalaryGradeDialog(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Leave Type Dialog */}
+      <Dialog open={showLeaveTypeDialog} onOpenChange={setShowLeaveTypeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedLeaveType ? "Edit Leave Type" : "Add Leave Type"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="leave-type-name">Name</Label>
+                <Input
+                  id="leave-type-name"
+                  value={newLeaveType.name || ""}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="leave-type-code">Code</Label>
+                <Input
+                  id="leave-type-code"
+                  value={newLeaveType.code || ""}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, code: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="leave-type-description">Description</Label>
+              <Textarea
+                id="leave-type-description"
+                value={newLeaveType.description || ""}
+                onChange={(e) => setNewLeaveType({ ...newLeaveType, description: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="leave-type-entitlement">Annual Entitlement (days)</Label>
+                <Input
+                  id="leave-type-entitlement"
+                  type="number"
+                  value={newLeaveType.annual_entitlement || 0}
+                  onChange={(e) =>
+                    setNewLeaveType({ ...newLeaveType, annual_entitlement: Number(e.target.value) })
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="leave-type-max-consecutive">Max Consecutive Days</Label>
+                <Input
+                  id="leave-type-max-consecutive"
+                  type="number"
+                  value={newLeaveType.max_consecutive_days || 0}
+                  onChange={(e) =>
+                    setNewLeaveType({ ...newLeaveType, max_consecutive_days: Number(e.target.value) })
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="leave-type-pay-percentage">Pay Percentage</Label>
+                <Input
+                  id="leave-type-pay-percentage"
+                  type="number"
+                  value={newLeaveType.pay_percentage || 100}
+                  onChange={(e) =>
+                    setNewLeaveType({ ...newLeaveType, pay_percentage: Number(e.target.value) })
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="leave-type-min-notice">Min Notice Days</Label>
+                <Input
+                  id="leave-type-min-notice"
+                  type="number"
+                  value={newLeaveType.min_notice_days || 1}
+                  onChange={(e) =>
+                    setNewLeaveType({ ...newLeaveType, min_notice_days: Number(e.target.value) })
+                  }
+                />
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="leave-type-requires-approval"
+                checked={newLeaveType.requires_approval || true}
+                onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, requires_approval: checked })}
+              />
+              <Label htmlFor="leave-type-requires-approval">Requires Approval</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="leave-type-requires-medical"
+                checked={newLeaveType.requires_medical_certificate || false}
+                onCheckedChange={(checked) =>
+                  setNewLeaveType({ ...newLeaveType, requires_medical_certificate: checked })
+                }
+              />
+              <Label htmlFor="leave-type-requires-medical">Requires Medical Certificate</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="leave-type-allow-carry-over"
+                checked={newLeaveType.allow_carry_over || false}
+                onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, allow_carry_over: checked })}
+              />
+              <Label htmlFor="leave-type-allow-carry-over">Allow Carry Over</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLeaveTypeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveLeaveType}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Leave Policy Dialog */}
+      <Dialog open={showLeavePolicyDialog} onOpenChange={setShowLeavePolicyDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedLeavePolicy ? "Edit Leave Policy" : "Add Leave Policy"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="leave-policy-name">Policy Name</Label>
+                <Input
+                  id="leave-policy-name"
+                  value={newLeavePolicy.policy_name || ""}
+                  onChange={(e) => setNewLeavePolicy({ ...newLeavePolicy, policy_name: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="leave-policy-type">Policy Type</Label>
+                <Input
+                  id="leave-policy-type"
+                  value={newLeavePolicy.policy_type || ""}
+                  onChange={(e) => setNewLeavePolicy({ ...newLeavePolicy, policy_type: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="leave-policy-description">Description</Label>
+              <Textarea
+                id="leave-policy-description"
+                value={newLeavePolicy.description || ""}
+                onChange={(e) => setNewLeavePolicy({ ...newLeavePolicy, description: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="leave-policy-max-days">Max Days</Label>
+                <Input
+                  id="leave-policy-max-days"
+                  type="number"
+                  value={newLeavePolicy.max_days || 0}
+                  onChange={(e) => setNewLeavePolicy({ ...newLeavePolicy, max_days: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="leave-policy-accrual-rate">Accrual Rate</Label>
+                <Input
+                  id="leave-policy-accrual-rate"
+                  type="number"
+                  value={newLeavePolicy.accrual_rate || 0}
+                  onChange={(e) => setNewLeavePolicy({ ...newLeavePolicy, accrual_rate: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="leave-policy-carry-over">Carry Over Days</Label>
+                <Input
+                  id="leave-policy-carry-over"
+                  type="number"
+                  value={newLeavePolicy.carry_over_days || 0}
+                  onChange={(e) => setNewLeavePolicy({ ...newLeavePolicy, carry_over_days: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="leave-policy-notice-period">Notice Period (days)</Label>
+                <Input
+                  id="leave-policy-notice-period"
+                  type="number"
+                  value={newLeavePolicy.notice_period_days || 1}
+                  onChange={(e) =>
+                    setNewLeavePolicy({ ...newLeavePolicy, notice_period_days: Number(e.target.value) })
+                  }
+                />
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="leave-policy-requires-approval"
+                checked={newLeavePolicy.requires_approval || true}
+                onCheckedChange={(checked) => setNewLeavePolicy({ ...newLeavePolicy, requires_approval: checked })}
+              />
+              <Label htmlFor="leave-policy-requires-approval">Requires Approval</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="leave-policy-medical-certificate"
+                checked={newLeavePolicy.medical_certificate_required || false}
+                onCheckedChange={(checked) =>
+                  setNewLeavePolicy({ ...newLeavePolicy, medical_certificate_required: checked })
+                }
+              />
+              <Label htmlFor="leave-policy-medical-certificate">Medical Certificate Required</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLeavePolicyDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveLeavePolicy}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Approver Dialog */}
+      <Dialog open={showAddApproverDialog} onOpenChange={setShowAddApproverDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Approver</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="approver-role">Approver Role</Label>
+              <Input
+                id="approver-role"
+                value={newApprover.approver_role}
+                onChange={(e) => setNewApprover({ ...newApprover, approver_role: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="approval-level">Approval Level</Label>
+              <Input
+                id="approval-level"
+                type="number"
+                value={newApprover.approval_level}
+                onChange={(e) => setNewApprover({ ...newApprover, approval_level: Number(e.target.value) })}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="is-required"
+                checked={newApprover.is_required}
+                onCheckedChange={(checked) => setNewApprover({ ...newApprover, is_required: checked })}
+              />
+              <Label htmlFor="is-required">Is Required</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddApproverDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveApprover}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Eligibility Dialog */}
+      <Dialog open={showAddEligibilityDialog} onOpenChange={setShowAddEligibilityDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Eligibility Rule</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor=\"employee-
