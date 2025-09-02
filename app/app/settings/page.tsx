@@ -665,6 +665,30 @@ export default function SettingsPage() {
     try {
       const supabase = createClient()
 
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+      if (authError || !user) {
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to perform this action",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (!companyData.id || companyData.id.trim() === "") {
+        toast({
+          title: "Error",
+          description: "Company information not loaded. Please refresh the page.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      console.log("[v0] Saving deduction with user:", user.id, "company:", companyData.id)
+
       if (editingIndex >= 0) {
         // Update existing
         if (editingItem.id) {
@@ -675,17 +699,19 @@ export default function SettingsPage() {
         newDeductions[editingIndex] = editingItem
         setPayrollDeductionsState(newDeductions)
       } else {
-        // Add new
-        const { data, error } = await supabase
-          .from("payroll_deductions")
-          .insert([
-            {
-              ...editingItem,
-              company_id: companyData.id,
-            },
-          ])
-          .select()
-          .single()
+        const deductionData = {
+          ...editingItem,
+          company_id: companyData.id,
+          taxable: editingItem.taxable ?? false,
+          recurring: editingItem.recurring ?? false,
+          is_active: editingItem.is_active ?? true,
+          amount: editingItem.amount ?? 0,
+          percentage: editingItem.percentage ?? 0,
+        }
+
+        console.log("[v0] Inserting deduction data:", deductionData)
+
+        const { data, error } = await supabase.from("payroll_deductions").insert([deductionData]).select().single()
 
         if (error) throw error
 
@@ -703,7 +729,7 @@ export default function SettingsPage() {
       console.error("Error saving deduction:", error)
       toast({
         title: "Error",
-        description: "Failed to save deduction",
+        description: error instanceof Error ? error.message : "Failed to save deduction",
         variant: "destructive",
       })
     }
@@ -712,6 +738,30 @@ export default function SettingsPage() {
   const handleSaveLoan = async () => {
     try {
       const supabase = createClient()
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+      if (authError || !user) {
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to perform this action",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (!companyData.id || companyData.id.trim() === "") {
+        toast({
+          title: "Error",
+          description: "Company information not loaded. Please refresh the page.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      console.log("[v0] Saving loan setting with user:", user.id, "company:", companyData.id)
 
       if (editingIndex >= 0) {
         // Update existing
@@ -723,17 +773,23 @@ export default function SettingsPage() {
         newLoans[editingIndex] = editingItem
         setLoanSettingsState(newLoans)
       } else {
-        // Add new
-        const { data, error } = await supabase
-          .from("loan_settings")
-          .insert([
-            {
-              ...editingItem,
-              company_id: companyData.id,
-            },
-          ])
-          .select()
-          .single()
+        const loanData = {
+          code: editingItem.code || "",
+          description: editingItem.description || "",
+          type: editingItem.type || "PERSONAL",
+          company_id: companyData.id,
+          max_amount: editingItem.maxAmount ?? 0,
+          interest_rate: editingItem.interestRate ?? 0,
+          max_repayment_months: editingItem.tenure ?? 12,
+          taxable: editingItem.taxable ?? false,
+          recurring: editingItem.recurring ?? false,
+          auto_deduct: editingItem.auto_deduct ?? true,
+          is_active: editingItem.is_active ?? true,
+        }
+
+        console.log("[v0] Inserting loan data:", loanData)
+
+        const { data, error } = await supabase.from("loan_settings").insert([loanData]).select().single()
 
         if (error) throw error
 
@@ -751,7 +807,7 @@ export default function SettingsPage() {
       console.error("Error saving loan setting:", error)
       toast({
         title: "Error",
-        description: "Failed to save loan setting",
+        description: error instanceof Error ? error.message : "Failed to save loan setting",
         variant: "destructive",
       })
     }
@@ -1619,7 +1675,6 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         company_id: Number.parseInt(companyData.id) || 1,
         minimum_wage: payrollConfig.minimum_wage,
         overtime_weekday_multiplier: payrollConfig.overtime_weekday_multiplier,
-        overtime_weekend_multiplier: payrollConfig.overtime_weekend_multiplier,
         currency_code: payrollConfig.currency_code,
         currency_symbol: payrollConfig.currency_symbol,
         updated_at: new Date().toISOString(),
