@@ -945,21 +945,26 @@ export default function SettingsPage() {
 
   const loadLoanSettings = async () => {
     try {
-      if (!companyData.id || companyData.id.trim() === "") {
+      // Get the latest company data from state
+      const currentCompanyId = companyData?.id
+      if (!currentCompanyId || currentCompanyId.trim() === "") {
         console.log("[v0] Skipping loan settings load - no company ID available")
         return
       }
 
-      console.log("[v0] Loading loan for company:", companyData.id)
+      console.log("[v0] Loading loan settings for company:", currentCompanyId)
       const supabase = createClient()
       const { data, error } = await supabase
         .from("loan_settings")
         .select("*")
-        .eq("company_id", companyData.id)
+        .eq("company_id", currentCompanyId)
         .order("code")
 
-      if (error) throw error
-      console.log("[v0] Loaded loan settings:", data)
+      if (error) {
+        console.error("Error loading loan settings:", error)
+        return
+      }
+
       setLoanSettingsState(data || [])
     } catch (error) {
       console.error("Error loading loan settings:", error)
@@ -1002,32 +1007,44 @@ export default function SettingsPage() {
 
   const loadSecuritySettings = async () => {
     try {
-      // Validate company ID exists before making database query
-      if (!companyData.id || companyData.id === "") {
+      // Get the latest company data from state
+      const currentCompanyId = companyData?.id
+      if (!currentCompanyId || currentCompanyId === "") {
         console.log("[v0] Skipping security settings load - no company ID available")
         return
       }
 
+      console.log("[v0] Loading security settings for company:", currentCompanyId)
       const supabase = createClient()
 
       // Since there's no security_settings table in the schema, we'll use company_settings
-      // or create default security settings
       const { data: companySettings, error } = await supabase
         .from("company_settings")
         .select("*")
-        .eq("id", companyData.id)
+        .eq("id", currentCompanyId)
         .single()
 
-      if (error && error.code !== "PGRST116") throw error
+      if (error && error.code !== "PGRST116") {
+        console.error("Error loading security settings:", error)
+        return
+      }
 
-      console.log("[v0] Security settings loaded:", companySettings)
-
-      // Set security settings from database or keep defaults
-      if (companySettings) {
-        setSecuritySettings((prev) => ({
-          ...prev,
-          // Map any security-related fields from company_settings if they exist
-        }))
+      // Set default security settings if none exist
+      if (!companySettings?.security_settings) {
+        setSecuritySettings({
+          twoFactorAuth: false,
+          sessionTimeout: 15,
+          auditLogging: true,
+          passwordPolicy: {
+            minLength: 8,
+            requireUppercase: true,
+            requireLowercase: true,
+            requireNumbers: true,
+            requireSymbols: false,
+          },
+        })
+      } else {
+        setSecuritySettings(companySettings.security_settings)
       }
     } catch (error) {
       console.error("Error loading security settings:", error)
@@ -1113,14 +1130,21 @@ export default function SettingsPage() {
   const loadAllData = async () => {
     setLoading(true)
     try {
-      // Load company data first
+      // Load company data first and wait for it to complete
       await loadCompanyData()
 
-      // Wait a bit for company data to be set in state
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      // Wait longer for company data to be properly set in state
+      await new Promise((resolve) => setTimeout(resolve, 500))
+
+      // Check if company data was loaded successfully
+      if (!companyData.id || companyData.id.trim() === "") {
+        console.log("[v0] Company data not loaded, retrying...")
+        await loadCompanyData()
+        await new Promise((resolve) => setTimeout(resolve, 300))
+      }
 
       // Then load all other data that depends on company ID
-      await Promise.all([
+      const loadPromises = [
         loadLeaveTypes(),
         loadSalaryGrades(),
         loadEmployees(),
@@ -1128,13 +1152,26 @@ export default function SettingsPage() {
         loadPayrollConfig(),
         loadPayrollAllowances(),
         loadPayrollDeductions(),
-        loadLoanSettings(),
-        loadSecuritySettings(),
-        loadNotificationSettings(),
-        loadLeaveManagementData(), // Add leave management data loading
-      ])
+      ]
+
+      // Only load these if company ID is available
+      if (companyData.id && companyData.id.trim() !== "") {
+        loadPromises.push(
+          loadLoanSettings(),
+          loadSecuritySettings(),
+          loadNotificationSettings(),
+          loadLeaveManagementData(),
+        )
+      }
+
+      await Promise.all(loadPromises)
     } catch (error) {
       console.error("Error loading data:", error)
+      toast({
+        title: "Loading Error",
+        description: "Some data could not be loaded. Please refresh the page.",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
@@ -3378,7 +3415,7 @@ IT Support Team
                       <Label htmlFor="deduction-type">Type</Label>
                       <Select
                         value={editingItem?.type}
-                        onValueChange={(value) => setEditingItem({ ...editingItem, type: value })}
+                        onChange={(value) => setEditingItem({ ...editingItem, type: value })}
                       >
                         <SelectTrigger>
                           <SelectValue />
