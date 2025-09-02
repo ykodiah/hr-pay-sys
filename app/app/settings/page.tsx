@@ -1781,16 +1781,10 @@ IT Support Team
     setShowLeaveTypeDialog(true)
   }
 
-  const handleEditLeavePolicy = (policy: LeavePolicy) => {
-    setSelectedLeavePolicy(policy)
-    setNewLeavePolicy(policy)
-    setShowLeavePolicyDialog(true)
-  }
-
-  const handleDeleteLeaveType = async (id: string) => {
+  const handleDeleteLeaveType = async (leaveTypeId: string) => {
     try {
       const supabase = createClient()
-      const { error } = await supabase.from("leave_types").update({ is_active: false }).eq("id", id)
+      const { error } = await supabase.from("leave_types").update({ is_active: false }).eq("id", leaveTypeId)
 
       if (error) throw error
 
@@ -1809,10 +1803,16 @@ IT Support Team
     }
   }
 
-  const handleDeleteLeavePolicy = async (id: string) => {
+  const handleEditLeavePolicy = (policy: LeavePolicy) => {
+    setSelectedLeavePolicy(policy)
+    setNewLeavePolicy(policy)
+    setShowLeavePolicyDialog(true)
+  }
+
+  const handleDeleteLeavePolicy = async (policyId: string) => {
     try {
       const supabase = createClient()
-      const { error } = await supabase.from("leave_policies").update({ is_active: false }).eq("id", id)
+      const { error } = await supabase.from("leave_policies").update({ is_active: false }).eq("id", policyId)
 
       if (error) throw error
 
@@ -1830,6 +1830,130 @@ IT Support Team
       })
     }
   }
+
+  const handleManageApprovers = (leaveTypeId: string) => {
+    setSelectedLeaveTypeForApprovers(leaveTypeId)
+    setShowApproverDialog(true)
+  }
+
+  const handleManageEligibility = (leaveTypeId: string) => {
+    setSelectedLeaveTypeForEligibility(leaveTypeId)
+    setShowEligibilityDialog(true)
+  }
+
+  const handleSaveApprover = async () => {
+    if (!selectedLeaveTypeForApprovers) {
+      toast({
+        title: "Error",
+        description: "Please select a leave type first.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const approverData = {
+        leave_type_id: selectedLeaveTypeForApprovers,
+        approver_role: newApprover.approver_role,
+        approval_level: newApprover.approval_level,
+        is_required: newApprover.is_required,
+        created_at: new Date().toISOString(),
+      }
+
+      const { error } = await supabase.from("leave_type_approvers").insert([approverData])
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Approver added successfully.",
+      })
+
+      setShowApproverDialog(false)
+      setNewApprover({
+        approver_role: "",
+        approval_level: 1,
+        is_required: true,
+      })
+      loadLeaveManagementData()
+    } catch (error) {
+      console.error("Error saving approver:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save approver.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSaveEligibility = async () => {
+    if (!selectedLeaveTypeForEligibility) {
+      toast({
+        title: "Error",
+        description: "Please select a leave type first.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const eligibilityData = {
+        leave_type_id: selectedLeaveTypeForEligibility,
+        employee_type: newEligibility.employee_type,
+        gender: newEligibility.gender,
+        min_age: newEligibility.min_age,
+        max_age: newEligibility.max_age,
+        department_id: newEligibility.department_id,
+        location_id: newEligibility.location_id,
+        created_at: new Date().toISOString(),
+      }
+
+      const { error } = await supabase.from("leave_type_eligibility").insert([eligibilityData])
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Eligibility rule added successfully.",
+      })
+
+      setShowEligibilityDialog(false)
+      setNewEligibility({
+        employee_type: "",
+        gender: "",
+        min_age: 0,
+        max_age: 0,
+        department_id: "",
+        location_id: "",
+      })
+      loadLeaveManagementData()
+    } catch (error) {
+      console.error("Error saving eligibility:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save eligibility rule.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const [selectedLeaveTypeForApprovers, setSelectedLeaveTypeForApprovers] = useState<string | null>(null)
+  const [selectedLeaveTypeForEligibility, setSelectedLeaveTypeForEligibility] = useState<string | null>(null)
+  const [newApprover, setNewApprover] = useState({
+    approver_role: "",
+    approval_level: 1,
+    is_required: true,
+  })
+  const [newEligibility, setNewEligibility] = useState({
+    employee_type: "",
+    gender: "",
+    min_age: 0,
+    max_age: 0,
+    department_id: "",
+    location_id: "",
+  })
 
   const handleSaveMultiCompany = async () => {
     try {
@@ -3192,11 +3316,11 @@ IT Support Team
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setShowApproverDialog(true)}>
+                                <DropdownMenuItem onClick={() => handleManageApprovers(leaveType.id)}>
                                   <Users className="h-4 w-4 mr-2" />
                                   Manage Approvers
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setShowEligibilityDialog(true)}>
+                                <DropdownMenuItem onClick={() => handleManageEligibility(leaveType.id)}>
                                   <Shield className="h-4 w-4 mr-2" />
                                   Manage Eligibility
                                 </DropdownMenuItem>
