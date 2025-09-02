@@ -588,6 +588,15 @@ export default function SettingsPage() {
 
   const handleSaveAllowance = async () => {
     try {
+      if (!companyData.id || companyData.id.trim() === "") {
+        toast({
+          title: "Error",
+          description: "Company information not loaded. Please refresh the page.",
+          variant: "destructive",
+        })
+        return
+      }
+
       const supabase = createClient()
 
       if (editingIndex >= 0) {
@@ -628,7 +637,7 @@ export default function SettingsPage() {
       console.error("Error saving allowance:", error)
       toast({
         title: "Error",
-        description: "Failed to save allowance",
+        description: "Failed to save allowance. Please check your permissions.",
         variant: "destructive",
       })
     }
@@ -636,6 +645,15 @@ export default function SettingsPage() {
 
   const handleSaveDeduction = async () => {
     try {
+      if (!companyData.id || companyData.id.trim() === "") {
+        toast({
+          title: "Error",
+          description: "Company information not loaded. Please refresh the page.",
+          variant: "destructive",
+        })
+        return
+      }
+
       const supabase = createClient()
 
       if (editingIndex >= 0) {
@@ -676,7 +694,7 @@ export default function SettingsPage() {
       console.error("Error saving deduction:", error)
       toast({
         title: "Error",
-        description: "Failed to save deduction",
+        description: "Failed to save deduction. Please check your permissions.",
         variant: "destructive",
       })
     }
@@ -684,6 +702,15 @@ export default function SettingsPage() {
 
   const handleSaveLoan = async () => {
     try {
+      if (!companyData.id || companyData.id.trim() === "") {
+        toast({
+          title: "Error",
+          description: "Company information not loaded. Please refresh the page.",
+          variant: "destructive",
+        })
+        return
+      }
+
       const supabase = createClient()
 
       if (editingIndex >= 0) {
@@ -724,7 +751,7 @@ export default function SettingsPage() {
       console.error("Error saving loan setting:", error)
       toast({
         title: "Error",
-        description: "Failed to save loan setting",
+        description: "Failed to save loan setting. Please check your permissions.",
         variant: "destructive",
       })
     }
