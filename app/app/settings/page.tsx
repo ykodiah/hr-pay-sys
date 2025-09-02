@@ -28,8 +28,9 @@ import {
   Minus,
   MoreHorizontal,
   Trash2,
-  Building,
   Mail,
+  Calendar,
+  FileText,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -60,6 +61,47 @@ interface Company {
   logo_file_id?: string
 }
 
+interface LeavePolicy {
+  id: string
+  company_id: string
+  policy_name: string
+  policy_type: string
+  description: string
+  max_days: number
+  accrual_rate: number
+  carry_over_days: number
+  requires_approval: boolean
+  notice_period_days: number
+  medical_certificate_required: boolean
+  medical_certificate_after_days: number
+  max_consecutive_days: number
+  paid_percentage: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+interface LeaveTypeApprover {
+  id: string
+  leave_type_id: string
+  approver_role: string
+  approval_level: number
+  is_required: boolean
+  created_at: string
+}
+
+interface LeaveTypeEligibility {
+  id: string
+  leave_type_id: string
+  employee_type: string
+  gender: string
+  min_age: number
+  max_age: number
+  department_id: string
+  location_id: string
+  created_at: string
+}
+
 interface LeaveType {
   id: string
   name: string
@@ -73,6 +115,19 @@ interface LeaveType {
   requires_medical_certificate: boolean
   allow_carry_over: boolean
   is_active: boolean
+  company_id: string
+  accrual_method: string
+  accrual_rate: number
+  min_service_months: number
+  max_per_year: number
+  max_carry_over_days: number
+  carry_over_expiry_months: number
+  medical_cert_after_days: number
+  is_paid: boolean
+  is_system_default: boolean
+  created_by: string
+  created_at: string
+  updated_at: string
 }
 
 interface SalaryGrade {
@@ -372,13 +427,11 @@ export default function SettingsPage() {
   const [showActivityLog, setShowActivityLog] = useState(false)
   const [showBackupSuccess, setShowBackupSuccess] = useState(false)
   const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
-  const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
   const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
   const [isBackingUp, setIsBackingUp] = useState(false)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
 
   const [editingEmailTemplate, setEditingEmailTemplate] = useState<EmailTemplate | null>(null)
-  const [editingLeaveType, setEditingLeaveType] = useState<LeaveType | null>(null)
   const [editingSalaryGrade, setEditingSalaryGrade] = useState<SalaryGrade | null>(null)
 
   const [passwordForm, setPasswordForm] = useState({
@@ -405,8 +458,57 @@ export default function SettingsPage() {
   const [payrollAllowances, setPayrollAllowancesState] = useState<any[]>([])
   const [payrollDeductions, setPayrollDeductionsState] = useState<any[]>([])
   const [loanSettings, setLoanSettingsState] = useState<any[]>([])
-  const [leaveTypes, setLeaveTypesState] = useState<any[]>([])
   const [salaryGrades, setSalaryGradesState] = useState<any[]>([])
+
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([])
+  const [leavePolicies, setLeavePolicies] = useState<LeavePolicy[]>([])
+  const [leaveApprovers, setLeaveApprovers] = useState<LeaveTypeApprover[]>([])
+  const [leaveEligibility, setLeaveEligibility] = useState<LeaveTypeEligibility[]>([])
+  const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
+  const [showLeavePolicyDialog, setShowLeavePolicyDialog] = useState(false)
+  const [showApproverDialog, setShowApproverDialog] = useState(false)
+  const [showEligibilityDialog, setShowEligibilityDialog] = useState(false)
+  const [selectedLeaveType, setSelectedLeaveType] = useState<LeaveType | null>(null)
+  const [selectedLeavePolicy, setSelectedLeavePolicy] = useState<LeavePolicy | null>(null)
+  const [newLeaveType, setNewLeaveType] = useState<Partial<LeaveType>>({
+    name: "",
+    code: "",
+    description: "",
+    annual_entitlement: 0,
+    max_consecutive_days: 0,
+    pay_percentage: 100,
+    min_notice_days: 1,
+    requires_approval: true,
+    requires_medical_certificate: false,
+    allow_carry_over: false,
+    is_active: true,
+    accrual_method: "annual",
+    accrual_rate: 0,
+    min_service_months: 0,
+    max_per_year: 0,
+    max_carry_over_days: 0,
+    carry_over_expiry_months: 12,
+    medical_cert_after_days: 3,
+    is_paid: true,
+    is_system_default: false,
+  })
+  const [newLeavePolicy, setNewLeavePolicy] = useState<Partial<LeavePolicy>>({
+    policy_name: "",
+    policy_type: "",
+    description: "",
+    max_days: 0,
+    accrual_rate: 0,
+    carry_over_days: 0,
+    requires_approval: true,
+    notice_period_days: 1,
+    medical_certificate_required: false,
+    medical_certificate_after_days: 3,
+    max_consecutive_days: 0,
+    paid_percentage: 100,
+    is_active: true,
+  })
+
+  const [leaveTypesState, setLeaveTypesState] = useState<any[]>([])
 
   const dateSSNITRates = (field: "employee" | "employer", value: number) => {
     const newSsnit = { ...ssnit, [field]: value }
@@ -843,7 +945,6 @@ export default function SettingsPage() {
     }
   }
 
-  const [leavePolicies, setLeavePolicies] = useState<any[]>([])
   const [orgCharts, setOrgCharts] = useState<any[]>([])
 
   const loadHRSettings = async () => {
@@ -1477,264 +1578,256 @@ IT Support Team
     }
   }
 
+  const loadLeaveManagementData = async () => {
+    if (!companyData.id) {
+      console.log("[v0] Skipping leave management load - no company ID available")
+      return
+    }
+
+    try {
+      const supabase = createClient()
+
+      // Load leave types
+      const { data: leaveTypesData, error: leaveTypesError } = await supabase
+        .from("leave_types")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .order("name")
+
+      if (leaveTypesError) throw leaveTypesError
+
+      // Load leave policies
+      const { data: leavePoliciesData, error: leavePoliciesError } = await supabase
+        .from("leave_policies")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .order("policy_name")
+
+      if (leavePoliciesError) throw leavePoliciesError
+
+      // Load leave type approvers
+      const { data: approversData, error: approversError } = await supabase
+        .from("leave_type_approvers")
+        .select("*")
+        .order("approval_level")
+
+      if (approversError) throw approversError
+
+      // Load leave type eligibility
+      const { data: eligibilityData, error: eligibilityError } = await supabase
+        .from("leave_type_eligibility")
+        .select("*")
+
+      if (eligibilityError) throw eligibilityError
+
+      console.log("[v0] Leave management data loaded:", {
+        leaveTypes: leaveTypesData?.length,
+        policies: leavePoliciesData?.length,
+        approvers: approversData?.length,
+        eligibility: eligibilityData?.length,
+      })
+
+      setLeaveTypes(leaveTypesData || [])
+      setLeavePolicies(leavePoliciesData || [])
+      setLeaveApprovers(approversData || [])
+      setLeaveEligibility(eligibilityData || [])
+    } catch (error) {
+      console.error("Error loading leave management data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load leave management data. Please check your connection.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleSaveLeaveType = async () => {
-    // Implementation for saving leave type
-    toast({
-      title: "Success",
-      description: "Leave type saved successfully.",
-    })
-    setShowLeaveTypeDialog(false)
-    loadLeaveTypes()
-  }
-
-  const handleDeleteLeaveType = async (id: string) => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("leave_types").delete().eq("id", id)
-
-      if (error) throw error
-
-      toast({
-        title: "Success",
-        description: "Leave type deleted successfully.",
-      })
-      loadLeaveTypes()
-    } catch (error) {
+    if (!companyData.id) {
       toast({
         title: "Error",
-        description: "Failed to delete leave type.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleSaveSalaryGrade = async () => {
-    toast({
-      title: "Success",
-      description: "Salary grade saved successfully.",
-    })
-    setShowSalaryGradeDialog(false)
-    loadSalaryGrades()
-  }
-
-  const handleDeleteSalaryGrade = async (id: string) => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("salary_grades").delete().eq("id", id)
-
-      if (error) throw error
-
-      toast({
-        title: "Success",
-        description: "Salary grade deleted successfully.",
-      })
-      loadSalaryGrades()
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete salary grade.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleChangeAdminPassword = () => {
-    setShowPasswordChangeDialog(true)
-  }
-
-  const handlePasswordChange = async () => {
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "New passwords do not match.",
+        description: "Company information is required to save leave type.",
         variant: "destructive",
       })
       return
     }
 
-    toast({
-      title: "Success",
-      description: "Password changed successfully.",
-    })
-    setShowPasswordChangeDialog(false)
-    setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
-  }
-
-  const handleDownloadSecurityReport = () => {
-    const report = `Security Report - ${new Date().toLocaleDateString()}
-    
-Two-Factor Authentication: ${securitySettings.twoFactorAuth ? "Enabled" : "Disabled"}
-Auto Session Timeout: ${securitySettings.autoSessionTimeout ? "Enabled" : "Disabled"}
-Timeout Duration: ${securitySettings.timeoutDuration} minutes
-Audit Logging: ${securitySettings.auditLogging ? "Enabled" : "Disabled"}
-Automated Backups: ${securitySettings.automatedBackups ? "Enabled" : "Disabled"}
-Backup Frequency: ${securitySettings.backupFrequency}
-
-Password Policy:
-- Minimum Length: ${passwordPolicy.minLength} characters
-- Require Uppercase: ${passwordPolicy.requireUppercase ? "Yes" : "No"}
-- Require Numbers: ${passwordPolicy.requireNumbers ? "Yes" : "No"}
-- Require Symbols: ${passwordPolicy.requireSymbols ? "Yes" : "No"}
-`
-
-    const blob = new Blob([report], { type: "text/plain" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `security-report-${new Date().toISOString().split("T")[0]}.txt`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-
-    toast({
-      title: "Success",
-      description: "Security report downloaded successfully.",
-    })
-  }
-
-  const handleBackupNow = async () => {
-    setIsBackingUp(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-      const backupTime = new Date().toISOString()
-      setLastBackupTime(backupTime)
-      setShowBackupSuccess(true)
+      const supabase = createClient()
+      const leaveTypeData = {
+        ...newLeaveType,
+        company_id: companyData.id,
+        created_by: companyData.id, // In a real app, this would be the current user ID
+        updated_at: new Date().toISOString(),
+      }
+
+      if (selectedLeaveType) {
+        // Update existing leave type
+        const { error } = await supabase.from("leave_types").update(leaveTypeData).eq("id", selectedLeaveType.id)
+
+        if (error) throw error
+      } else {
+        // Create new leave type
+        const { error } = await supabase.from("leave_types").insert([leaveTypeData])
+
+        if (error) throw error
+      }
 
       toast({
         title: "Success",
-        description: "System backup completed successfully.",
+        description: `Leave type ${selectedLeaveType ? "updated" : "created"} successfully.`,
       })
+
+      setShowLeaveTypeDialog(false)
+      setSelectedLeaveType(null)
+      setNewLeaveType({
+        name: "",
+        code: "",
+        description: "",
+        annual_entitlement: 0,
+        max_consecutive_days: 0,
+        pay_percentage: 100,
+        min_notice_days: 1,
+        requires_approval: true,
+        requires_medical_certificate: false,
+        allow_carry_over: false,
+        is_active: true,
+        accrual_method: "annual",
+        accrual_rate: 0,
+        min_service_months: 0,
+        max_per_year: 0,
+        max_carry_over_days: 0,
+        carry_over_expiry_months: 12,
+        medical_cert_after_days: 3,
+        is_paid: true,
+        is_system_default: false,
+      })
+      loadLeaveManagementData()
     } catch (error) {
+      console.error("Error saving leave type:", error)
       toast({
         title: "Error",
-        description: "Backup failed. Please try again.",
+        description: "Failed to save leave type. Please try again.",
         variant: "destructive",
       })
-    } finally {
-      setIsBackingUp(false)
     }
   }
 
-  const handleViewActivityLog = () => {
-    setShowActivityLog(true)
-  }
+  const handleSaveLeavePolicy = async () => {
+    if (!companyData.id) {
+      toast({
+        title: "Error",
+        description: "Company information is required to save leave policy.",
+        variant: "destructive",
+      })
+      return
+    }
 
-  const handleDownloadAuditTrail = () => {
-    const auditData = `Timestamp,User,Action,Resource,IP Address,Status
-${new Date().toLocaleString()},Admin,Login,System,192.168.1.1,Success
-${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company Settings,192.168.1.1,Success`
-
-    const blob = new Blob([auditData], { type: "text/csv" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `audit-trail-${new Date().toISOString().split("T")[0]}.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-
-    toast({
-      title: "Success",
-      description: "Audit trail exported successfully.",
-    })
-  }
-
-  const calculatePasswordStrength = () => {
-    let score = 0
-    const requirements = []
-
-    if (passwordPolicy.minLength >= 8) score += 25
-    else requirements.push(`At least ${passwordPolicy.minLength} characters`)
-
-    if (passwordPolicy.requireUppercase) score += 25
-    else requirements.push("Uppercase letters")
-
-    if (passwordPolicy.requireNumbers) score += 25
-    else requirements.push("Numbers")
-
-    if (passwordPolicy.requireSymbols) score += 25
-    else requirements.push("Special characters")
-
-    return { score, requirements }
-  }
-
-  const passwordStrength = calculatePasswordStrength()
-
-  const handleAddSubsidiary = () => {
-    setEditingSubsidiary(null)
-    setShowSubsidiaryDialog(true)
-  }
-
-  const handleEditSubsidiary = (subsidiary: Subsidiary) => {
-    setEditingSubsidiary(subsidiary)
-    setShowSubsidiaryDialog(true)
-  }
-
-  const handleSaveSubsidiary = async (subsidiaryData: any) => {
     try {
       const supabase = createClient()
-
-      if (editingSubsidiary) {
-        // Update existing subsidiary
-        const { error } = await supabase
-          .from("subsidiaries")
-          .update({
-            name: subsidiaryData.name,
-            tax_id: subsidiaryData.tax_id,
-            ssnit_number: subsidiaryData.ssnit_number,
-            email_address: subsidiaryData.email,
-            phone_number: subsidiaryData.phone,
-            address: subsidiaryData.address,
-            divisions: subsidiaryData.divisions || [],
-            departments: subsidiaryData.departments || [],
-            locations: subsidiaryData.locations || [],
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", editingSubsidiary.id)
-
-        if (error) throw error
-        toast({ title: "Success", description: "Subsidiary updated successfully" })
-      } else {
-        // Create new subsidiary
-        const { error } = await supabase.from("subsidiaries").insert({
-          company_id: "1", // Replace with actual company ID
-          name: subsidiaryData.name,
-          tax_id: subsidiaryData.tax_id,
-          ssnit_number: subsidiaryData.ssnit_number,
-          email_address: subsidiaryData.email,
-          phone_number: subsidiaryData.phone,
-          address: subsidiaryData.address,
-          divisions: subsidiaryData.divisions || [],
-          departments: subsidiaryData.departments || [],
-          locations: subsidiaryData.locations || [],
-          status: "active",
-        })
-
-        if (error) throw error
-        toast({ title: "Success", description: "Subsidiary created successfully" })
+      const policyData = {
+        ...newLeavePolicy,
+        company_id: companyData.id,
+        updated_at: new Date().toISOString(),
       }
 
-      setShowSubsidiaryDialog(false)
-      loadSubsidiaries()
+      if (selectedLeavePolicy) {
+        // Update existing policy
+        const { error } = await supabase.from("leave_policies").update(policyData).eq("id", selectedLeavePolicy.id)
+
+        if (error) throw error
+      } else {
+        // Create new policy
+        const { error } = await supabase.from("leave_policies").insert([policyData])
+
+        if (error) throw error
+      }
+
+      toast({
+        title: "Success",
+        description: `Leave policy ${selectedLeavePolicy ? "updated" : "created"} successfully.`,
+      })
+
+      setShowLeavePolicyDialog(false)
+      setSelectedLeavePolicy(null)
+      setNewLeavePolicy({
+        policy_name: "",
+        policy_type: "",
+        description: "",
+        max_days: 0,
+        accrual_rate: 0,
+        carry_over_days: 0,
+        requires_approval: true,
+        notice_period_days: 1,
+        medical_certificate_required: false,
+        medical_certificate_after_days: 3,
+        max_consecutive_days: 0,
+        paid_percentage: 100,
+        is_active: true,
+      })
+      loadLeaveManagementData()
     } catch (error) {
-      console.error("Error saving subsidiary:", error)
-      toast({ title: "Error", description: "Failed to save subsidiary" })
+      console.error("Error saving leave policy:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save leave policy. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleDeactivateSubsidiary = async (subsidiaryId: string) => {
+  const handleEditLeaveType = (leaveType: LeaveType) => {
+    setSelectedLeaveType(leaveType)
+    setNewLeaveType(leaveType)
+    setShowLeaveTypeDialog(true)
+  }
+
+  const handleEditLeavePolicy = (policy: LeavePolicy) => {
+    setSelectedLeavePolicy(policy)
+    setNewLeavePolicy(policy)
+    setShowLeavePolicyDialog(true)
+  }
+
+  const handleDeleteLeaveType = async (id: string) => {
     try {
       const supabase = createClient()
-      const { error } = await supabase.from("subsidiaries").update({ status: "inactive" }).eq("id", subsidiaryId)
+      const { error } = await supabase.from("leave_types").update({ is_active: false }).eq("id", id)
 
       if (error) throw error
-      toast({ title: "Success", description: "Subsidiary deactivated successfully" })
-      loadSubsidiaries()
+
+      toast({
+        title: "Success",
+        description: "Leave type deactivated successfully.",
+      })
+      loadLeaveManagementData()
     } catch (error) {
-      console.error("Error deactivating subsidiary:", error)
-      toast({ title: "Error", description: "Failed to deactivate subsidiary" })
+      console.error("Error deactivating leave type:", error)
+      toast({
+        title: "Error",
+        description: "Failed to deactivate leave type.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteLeavePolicy = async (id: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("leave_policies").update({ is_active: false }).eq("id", id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Leave policy deactivated successfully.",
+      })
+      loadLeaveManagementData()
+    } catch (error) {
+      console.error("Error deactivating leave policy:", error)
+      toast({
+        title: "Error",
+        description: "Failed to deactivate leave policy.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -3043,7 +3136,98 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
+                  <Calendar className="h-5 w-5" />
+                  Leave Types
+                </CardTitle>
+                <CardDescription>Manage different types of leave available to employees</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {leaveTypes.length > 0 ? (
+                    <div className="grid gap-4">
+                      {leaveTypes.map((leaveType) => (
+                        <div key={leaveType.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                              <h4 className="font-medium">{leaveType.name}</h4>
+                              <Badge variant="outline">{leaveType.code}</Badge>
+                              <Badge variant={leaveType.is_active ? "default" : "secondary"}>
+                                {leaveType.is_active ? "Active" : "Inactive"}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">{leaveType.description}</p>
+                            <div className="flex gap-6 mt-2 text-sm">
+                              <span>Annual Entitlement: {leaveType.annual_entitlement} days</span>
+                              <span>Max Consecutive: {leaveType.max_consecutive_days} days</span>
+                              <span>Pay: {leaveType.pay_percentage}%</span>
+                              <span>Notice: {leaveType.min_notice_days} days</span>
+                            </div>
+                            <div className="flex gap-4 mt-2">
+                              {leaveType.requires_approval && (
+                                <Badge variant="outline" className="text-xs">
+                                  Requires Approval
+                                </Badge>
+                              )}
+                              {leaveType.requires_medical_certificate && (
+                                <Badge variant="outline" className="text-xs">
+                                  Medical Certificate Required
+                                </Badge>
+                              )}
+                              {leaveType.allow_carry_over && (
+                                <Badge variant="outline" className="text-xs">
+                                  Carry Over Allowed
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => handleEditLeaveType(leaveType)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setShowApproverDialog(true)}>
+                                  <Users className="h-4 w-4 mr-2" />
+                                  Manage Approvers
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setShowEligibilityDialog(true)}>
+                                  <Shield className="h-4 w-4 mr-2" />
+                                  Manage Eligibility
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteLeaveType(leaveType.id)}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Deactivate
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">No leave types found. Add leave types to get started.</p>
+                  )}
+                  <Button onClick={() => setShowLeaveTypeDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Leave Type
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
                   Leave Policies
                 </CardTitle>
                 <CardDescription>Manage company leave policies and entitlements</CardDescription>
@@ -3051,40 +3235,70 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               <CardContent>
                 <div className="space-y-4">
                   {leavePolicies.length > 0 ? (
-                    leavePolicies.map((policy) => (
-                      <div key={policy.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h4 className="font-medium">{policy.policy_name}</h4>
-                          <p className="text-sm text-muted-foreground">{policy.description}</p>
-                          <div className="flex gap-4 mt-2 text-sm">
-                            <span>Max Days: {policy.max_days}</span>
-                            <span>Notice Period: {policy.notice_period_days} days</span>
-                            <span>Paid: {policy.paid_percentage}%</span>
+                    <div className="grid gap-4">
+                      {leavePolicies.map((policy) => (
+                        <div key={policy.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                              <h4 className="font-medium">{policy.policy_name}</h4>
+                              <Badge variant="outline">{policy.policy_type}</Badge>
+                              <Badge variant={policy.is_active ? "default" : "secondary"}>
+                                {policy.is_active ? "Active" : "Inactive"}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">{policy.description}</p>
+                            <div className="flex gap-6 mt-2 text-sm">
+                              <span>Max Days: {policy.max_days}</span>
+                              <span>Notice Period: {policy.notice_period_days} days</span>
+                              <span>Paid: {policy.paid_percentage}%</span>
+                              <span>Carry Over: {policy.carry_over_days} days</span>
+                            </div>
+                            <div className="flex gap-4 mt-2">
+                              {policy.requires_approval && (
+                                <Badge variant="outline" className="text-xs">
+                                  Requires Approval
+                                </Badge>
+                              )}
+                              {policy.medical_certificate_required && (
+                                <Badge variant="outline" className="text-xs">
+                                  Medical Certificate Required
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => handleEditLeavePolicy(policy)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit Policy
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteLeavePolicy(policy.id)}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Deactivate
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={policy.is_active ? "default" : "secondary"}>
-                            {policy.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem>Edit Policy</DropdownMenuItem>
-                              <DropdownMenuItem>View Details</DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600">Deactivate</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                    ))
+                      ))}
+                    </div>
                   ) : (
                     <p className="text-muted-foreground">No leave policies found. Add policies to get started.</p>
                   )}
-                  <Button onClick={() => setShowLeaveTypeDialog(true)}>
+                  <Button onClick={() => setShowLeavePolicyDialog(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Leave Policy
                   </Button>
@@ -3095,40 +3309,83 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Building className="h-5 w-5" />
-                  Organizational Charts
+                  <Users className="h-5 w-5" />
+                  Leave Approvers
                 </CardTitle>
-                <CardDescription>View and manage organizational structure</CardDescription>
+                <CardDescription>Manage approval workflows for different leave types</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {orgCharts && orgCharts.length > 0 ? (
-                    orgCharts.map((chart) => (
-                      <div key={chart.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h4 className="font-medium">{chart.name}</h4>
-                          <p className="text-sm text-muted-foreground">{chart.description}</p>
-                          <div className="flex gap-4 mt-2 text-sm">
-                            <span>Type: {chart.chart_type}</span>
-                            <span>Style: {chart.chart_style}</span>
+                  {leaveApprovers.length > 0 ? (
+                    <div className="grid gap-4">
+                      {leaveApprovers.map((approver) => (
+                        <div key={approver.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <span className="font-medium">{approver.approver_role}</span>
+                            <div className="text-sm text-muted-foreground">
+                              Level {approver.approval_level} • {approver.is_required ? "Required" : "Optional"}
+                            </div>
                           </div>
+                          <Badge variant="outline">Active</Badge>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={chart.is_active ? "default" : "secondary"}>
-                            {chart.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                          <Button variant="outline" size="sm">
-                            View Chart
-                          </Button>
-                        </div>
-                      </div>
-                    ))
+                      ))}
+                    </div>
                   ) : (
-                    <p className="text-muted-foreground">No organizational charts found.</p>
+                    <p className="text-muted-foreground">No approvers configured. Set up approval workflows.</p>
                   )}
+                  <Button onClick={() => setShowApproverDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Approver
+                  </Button>
                 </div>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Leave Eligibility Rules
+                </CardTitle>
+                <CardDescription>Define who is eligible for different leave types</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {leaveEligibility.length > 0 ? (
+                    <div className="grid gap-4">
+                      {leaveEligibility.map((eligibility) => (
+                        <div key={eligibility.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <div className="font-medium">
+                              {eligibility.employee_type} • {eligibility.gender || "All Genders"}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Age: {eligibility.min_age || "No min"} - {eligibility.max_age || "No max"}
+                            </div>
+                          </div>
+                          <Badge variant="outline">Active</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      No eligibility rules configured. Set up eligibility criteria.
+                    </p>
+                  )}
+                  <Button onClick={() => setShowEligibilityDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Eligibility Rule
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-end">
+              <Button onClick={loadLeaveManagementData} className="bg-green-600 hover:bg-green-700">
+                <Save className="h-4 w-4 mr-2" />
+                Save HR Settings
+              </Button>
+            </div>
           </div>
         )}
 
@@ -3770,6 +4027,494 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={showLeaveTypeDialog} onOpenChange={setShowLeaveTypeDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{selectedLeaveType ? "Edit Leave Type" : "Add Leave Type"}</DialogTitle>
+            <DialogDescription>Configure leave type settings and entitlements</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="leave-name">Leave Name</Label>
+                <Input
+                  id="leave-name"
+                  value={newLeaveType.name || ""}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
+                  placeholder="e.g., Annual Leave"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="leave-code">Leave Code</Label>
+                <Input
+                  id="leave-code"
+                  value={newLeaveType.code || ""}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, code: e.target.value })}
+                  placeholder="e.g., AL"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="leave-description">Description</Label>
+              <Textarea
+                id="leave-description"
+                value={newLeaveType.description || ""}
+                onChange={(e) => setNewLeaveType({ ...newLeaveType, description: e.target.value })}
+                placeholder="Describe this leave type..."
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="annual-entitlement">Annual Entitlement (days)</Label>
+                <Input
+                  id="annual-entitlement"
+                  type="number"
+                  value={newLeaveType.annual_entitlement || 0}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, annual_entitlement: Number(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="max-consecutive">Max Consecutive Days</Label>
+                <Input
+                  id="max-consecutive"
+                  type="number"
+                  value={newLeaveType.max_consecutive_days || 0}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, max_consecutive_days: Number(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pay-percentage">Pay Percentage (%)</Label>
+                <Input
+                  id="pay-percentage"
+                  type="number"
+                  value={newLeaveType.pay_percentage || 100}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, pay_percentage: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="min-notice">Minimum Notice (days)</Label>
+                <Input
+                  id="min-notice"
+                  type="number"
+                  value={newLeaveType.min_notice_days || 1}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, min_notice_days: Number(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="min-service">Min Service (months)</Label>
+                <Input
+                  id="min-service"
+                  type="number"
+                  value={newLeaveType.min_service_months || 0}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, min_service_months: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="requires-approval"
+                  checked={newLeaveType.requires_approval || false}
+                  onCheckedChange={(checked) =>
+                    setNewLeaveType({ ...newLeaveType, requires_approval: checked as boolean })
+                  }
+                />
+                <Label htmlFor="requires-approval">Requires Approval</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="requires-medical"
+                  checked={newLeaveType.requires_medical_certificate || false}
+                  onCheckedChange={(checked) =>
+                    setNewLeaveType({ ...newLeaveType, requires_medical_certificate: checked as boolean })
+                  }
+                />
+                <Label htmlFor="requires-medical">Requires Medical Certificate</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="allow-carry-over"
+                  checked={newLeaveType.allow_carry_over || false}
+                  onCheckedChange={(checked) =>
+                    setNewLeaveType({ ...newLeaveType, allow_carry_over: checked as boolean })
+                  }
+                />
+                <Label htmlFor="allow-carry-over">Allow Carry Over</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="is-active"
+                  checked={newLeaveType.is_active !== false}
+                  onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, is_active: checked as boolean })}
+                />
+                <Label htmlFor="is-active">Active</Label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLeaveTypeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveLeaveType}>{selectedLeaveType ? "Update" : "Create"} Leave Type</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showLeavePolicyDialog} onOpenChange={setShowLeavePolicyDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{selectedLeavePolicy ? "Edit Leave Policy" : "Add Leave Policy"}</DialogTitle>
+            <DialogDescription>Configure company-wide leave policies and rules</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="policy-name">Policy Name</Label>
+                <Input
+                  id="policy-name"
+                  value={newLeavePolicy.policy_name || ""}
+                  onChange={(e) => setNewLeavePolicy({ ...newLeavePolicy, policy_name: e.target.value })}
+                  placeholder="e.g., Annual Leave Policy"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="policy-type">Policy Type</Label>
+                <Select
+                  value={newLeavePolicy.policy_type || ""}
+                  onValueChange={(value) => setNewLeavePolicy({ ...newLeavePolicy, policy_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select policy type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="annual">Annual Leave</SelectItem>
+                    <SelectItem value="sick">Sick Leave</SelectItem>
+                    <SelectItem value="maternity">Maternity Leave</SelectItem>
+                    <SelectItem value="paternity">Paternity Leave</SelectItem>
+                    <SelectItem value="compassionate">Compassionate Leave</SelectItem>
+                    <SelectItem value="study">Study Leave</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="policy-description">Description</Label>
+              <Textarea
+                id="policy-description"
+                value={newLeavePolicy.description || ""}
+                onChange={(e) => setNewLeavePolicy({ ...newLeavePolicy, description: e.target.value })}
+                placeholder="Describe this policy..."
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="max-days">Maximum Days</Label>
+                <Input
+                  id="max-days"
+                  type="number"
+                  value={newLeavePolicy.max_days || 0}
+                  onChange={(e) => setNewLeavePolicy({ ...newLeavePolicy, max_days: Number(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="notice-period">Notice Period (days)</Label>
+                <Input
+                  id="notice-period"
+                  type="number"
+                  value={newLeavePolicy.notice_period_days || 1}
+                  onChange={(e) => setNewLeavePolicy({ ...newLeavePolicy, notice_period_days: Number(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="paid-percentage">Paid Percentage (%)</Label>
+                <Input
+                  id="paid-percentage"
+                  type="number"
+                  value={newLeavePolicy.paid_percentage || 100}
+                  onChange={(e) => setNewLeavePolicy({ ...newLeavePolicy, paid_percentage: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="policy-requires-approval"
+                  checked={newLeavePolicy.requires_approval || false}
+                  onCheckedChange={(checked) =>
+                    setNewLeavePolicy({ ...newLeavePolicy, requires_approval: checked as boolean })
+                  }
+                />
+                <Label htmlFor="policy-requires-approval">Requires Approval</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="policy-medical-cert"
+                  checked={newLeavePolicy.medical_certificate_required || false}
+                  onCheckedChange={(checked) =>
+                    setNewLeavePolicy({ ...newLeavePolicy, medical_certificate_required: checked as boolean })
+                  }
+                />
+                <Label htmlFor="policy-medical-cert">Medical Certificate Required</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="policy-active"
+                  checked={newLeavePolicy.is_active !== false}
+                  onCheckedChange={(checked) => setNewLeavePolicy({ ...newLeavePolicy, is_active: checked as boolean })}
+                />
+                <Label htmlFor="policy-active">Active</Label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLeavePolicyDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveLeavePolicy}>{selectedLeavePolicy ? "Update" : "Create"} Policy</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showLeaveTypeDialog} onOpenChange={setShowLeaveTypeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Leave Type</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="leave-type-name">Leave Type Name</Label>
+              <Input id="leave-type-name" placeholder="Vacation" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="leave-type-description">Description</Label>
+              <Textarea id="leave-type-description" placeholder="Description of leave type" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="annual-entitlement">Annual Entitlement</Label>
+                <Input id="annual-entitlement" type="number" placeholder="15" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="carry-over-days">Carry Over Days</Label>
+                <Input id="carry-over-days" type="number" placeholder="5" />
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox id="requires-approval" />
+              <Label htmlFor="requires-approval">Requires Approval</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLeaveTypeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveLeaveType}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSalaryGradeDialog} onOpenChange={setShowSalaryGradeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Salary Grade</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="grade-name">Grade Name</Label>
+              <Input id="grade-name" placeholder="Manager" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="grade-level">Grade Level</Label>
+              <Input id="grade-level" type="number" placeholder="5" />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="step-1">Step 1</Label>
+                <Input id="step-1" type="number" placeholder="5000" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="step-2">Step 2</Label>
+                <Input id="step-2" type="number" placeholder="5500" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="step-3">Step 3</Label>
+                <Input id="step-3" type="number" placeholder="6000" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSalaryGradeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveSalaryGrade}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Admin Password</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Current Password</Label>
+              <div className="relative">
+                <Input
+                  id="current-password"
+                  type={showPasswords.current ? "text" : "password"}
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                  onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
+                >
+                  {showPasswords.current ? <Eye className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="new-password"
+                  type={showPasswords.new ? "text" : "password"}
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                  onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+                >
+                  {showPasswords.new ? <Eye className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm New Password</Label>
+              <div className="relative">
+                <Input
+                  id="confirm-password"
+                  type={showPasswords.confirm ? "text" : "password"}
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                  onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+                >
+                  {showPasswords.confirm ? <Eye className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordChangeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handlePasswordChange}>Change Password</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
+
+  async function handleSaveSubsidiary(data: any) {
+    try {
+      const supabase = createClient()
+
+      if (editingSubsidiary) {
+        // Update existing subsidiary
+        const { error } = await supabase.from("subsidiaries").update(data).eq("id", editingSubsidiary.id)
+
+        if (error) throw error
+
+        // Update local state
+        setSubsidiaries((prev) =>
+          prev.map((subsidiary) => (subsidiary.id === editingSubsidiary.id ? { ...subsidiary, ...data } : subsidiary)),
+        )
+        toast({
+          title: "Success",
+          description: "Subsidiary updated successfully",
+        })
+      } else {
+        // Create new subsidiary
+        const { data: newSubsidiary, error } = await supabase.from("subsidiaries").insert([data]).select().single()
+
+        if (error) throw error
+
+        // Update local state
+        setSubsidiaries((prev) => [...prev, newSubsidiary])
+        toast({
+          title: "Success",
+          description: "Subsidiary created successfully",
+        })
+      }
+
+      setShowSubsidiaryDialog(false)
+      setEditingSubsidiary(null)
+    } catch (error) {
+      console.error("Error saving subsidiary:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save subsidiary",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleEditSubsidiary = (subsidiary: Subsidiary) => {
+    setEditingSubsidiary(subsidiary)
+    setShowSubsidiaryDialog(true)
+  }
+
+  const handleDeactivateSubsidiary = async (id: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("subsidiaries").update({ status: "inactive" }).eq("id", id)
+
+      if (error) throw error
+
+      // Update local state
+      setSubsidiaries((prev) =>
+        prev.map((subsidiary) => (subsidiary.id === id ? { ...subsidiary, status: "inactive" } : subsidiary)),
+      )
+      toast({
+        title: "Success",
+        description: "Subsidiary deactivated successfully",
+      })
+    } catch (error) {
+      console.error("Error deactivating subsidiary:", error)
+      toast({
+        title: "Error",
+        description: "Failed to deactivate subsidiary",
+        variant: "destructive",
+      })
+    }
+  }
+
+  async function handleSaveSalaryGrade() {
+    toast({
+      title: "Not implemented",
+      description: "This feature is not implemented yet",
+    })
+  }
+
+  async function handlePasswordChange() {
+    toast({
+      title: "Not implemented",
+      description: "This feature is not implemented yet",
+    })
+  }
 }
