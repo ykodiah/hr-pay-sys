@@ -875,6 +875,12 @@ export default function SettingsPage() {
 
   const loadSecuritySettings = async () => {
     try {
+      // Validate company ID exists before making database query
+      if (!companyData.id || companyData.id === "") {
+        console.log("[v0] Skipping security settings load - no company ID available")
+        return
+      }
+
       const supabase = createClient()
 
       // Since there's no security_settings table in the schema, we'll use company_settings
@@ -983,24 +989,24 @@ export default function SettingsPage() {
       // Load company data first
       await loadCompanyData()
 
-      // Wait for company data to be available
-      if (companyData.id) {
-        await Promise.all([
-          loadSubsidiaries(),
-          loadEmployees(),
-          loadLeaveTypes(),
-          loadSalaryGrades(),
-          loadPayrollConfig(),
-          loadPayrollAllowances(),
-          loadPayrollDeductions(),
-          loadLoanSettings(),
-          loadHRSettings(),
-          loadSecuritySettings(),
-          loadNotificationSettings(),
-        ])
-      }
+      // Wait a bit for company data to be set in state
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
+      // Then load all other data that depends on company ID
+      await Promise.all([
+        loadLeaveTypes(),
+        loadSalaryGrades(),
+        loadEmployees(),
+        loadSubsidiaries(),
+        loadPayrollConfig(),
+        loadPayrollAllowances(),
+        loadPayrollDeductions(),
+        loadLoanSettings(),
+        loadSecuritySettings(),
+        loadNotificationSettings(),
+      ])
     } catch (error) {
-      console.error("Error loading all data:", error)
+      console.error("Error loading data:", error)
     } finally {
       setLoading(false)
     }
