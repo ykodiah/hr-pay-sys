@@ -11,6 +11,10 @@ import { X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { MoreHorizontal, Plus, Edit, Trash2, Users, Shield, Settings } from "lucide-react"
 
 interface Company {
   id: string
@@ -495,260 +499,6 @@ export default function SettingsPage() {
   const [leaveTypesState, setLeaveTypesState] = useState<any[]>([])
   const [newDeduction, setNewDeduction] = useState<any>(null)
   const [newLoan, setNewLoan] = useState<any>(null)
-
-  const loadLeaveTypes = async () => {
-    try {
-      if (!companyData.id) {
-        console.log("[v0] Skipping leave types load - no company ID available")
-        return
-      }
-
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("leave_types")
-        .select("*")
-        .eq("company_id", companyData.id)
-        .order("name")
-
-      if (error) {
-        console.error("Error loading leave types:", error)
-        return
-      }
-
-      setLeaveTypes(data || [])
-      console.log("[v0] Leave types loaded:", data?.length)
-    } catch (error) {
-      console.error("Error loading leave types:", error)
-    }
-  }
-
-  const loadSalaryGrades = async () => {
-    try {
-      if (!companyData.id) {
-        console.log("[v0] Skipping salary grades load - no company ID available")
-        return
-      }
-
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("salary_grades")
-        .select("*")
-        .eq("company_id", companyData.id)
-        .order("grade_level")
-
-      if (error) {
-        console.error("Error loading salary grades:", error)
-        return
-      }
-
-      setSalaryGradesState(data || [])
-      console.log("[v0] Salary grades loaded:", data?.length)
-    } catch (error) {
-      console.error("Error loading salary grades:", error)
-    }
-  }
-
-  const loadEmployees = async () => {
-    try {
-      if (!companyData.id) {
-        console.log("[v0] Skipping employees load - no company ID available")
-        return
-      }
-
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("employees")
-        .select("*")
-        .eq("company_id", companyData.id)
-        .order("first_name")
-
-      if (error) {
-        console.error("Error loading employees:", error)
-        return
-      }
-
-      setEmployees(data || [])
-      console.log("[v0] Employees loaded:", data?.length)
-    } catch (error) {
-      console.error("Error loading employees:", error)
-    }
-  }
-
-  const loadSubsidiaries = async () => {
-    try {
-      if (!companyData.id) {
-        console.log("[v0] Skipping subsidiaries load - no company ID available")
-        return
-      }
-
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("subsidiaries")
-        .select("*")
-        .eq("parent_company_id", companyData.id)
-        .order("name")
-
-      if (error) {
-        console.error("Error loading subsidiaries:", error)
-        return
-      }
-
-      // Process subsidiaries data to include counts
-      const processedSubsidiaries = (data || []).map((sub: any) => ({
-        ...sub,
-        divisions_count: Array.isArray(sub.divisions) ? sub.divisions.length : 0,
-        departments_count: Array.isArray(sub.departments) ? sub.departments.length : 0,
-        locations_count: Array.isArray(sub.locations) ? sub.locations.length : 0,
-      }))
-
-      setSubsidiaries(processedSubsidiaries)
-      console.log("[v0] Subsidiaries loaded:", data?.length)
-    } catch (error) {
-      console.error("Error loading subsidiaries:", error)
-    }
-  }
-
-  const loadPayrollConfig = async () => {
-    try {
-      if (!companyData.id) {
-        console.log("[v0] Skipping payroll config load - no company ID available")
-        return
-      }
-
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("payroll_configuration")
-        .select("*")
-        .eq("company_id", companyData.id)
-        .single()
-
-      if (error && error.code !== "PGRST116") {
-        console.error("Error loading payroll config:", error)
-        return
-      }
-
-      if (data) {
-        setPayrollConfig({
-          minimum_wage: data.minimum_wage || 18.15,
-          overtime_weekday_multiplier: data.overtime_weekday_multiplier || 1.5,
-          overtime_weekend_multiplier: data.overtime_weekend_multiplier || 2,
-          currency_code: data.currency_code || "GHS",
-          currency_symbol: data.currency_symbol || "₵",
-        })
-      }
-
-      console.log("[v0] Payroll config loaded")
-    } catch (error) {
-      console.error("Error loading payroll config:", error)
-    }
-  }
-
-  const loadPayrollAllowances = async () => {
-    try {
-      if (!companyData.id) {
-        console.log("[v0] Skipping payroll allowances load - no company ID available")
-        return
-      }
-
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("payroll_allowances")
-        .select("*")
-        .eq("company_id", companyData.id)
-        .order("code")
-
-      if (error) {
-        console.error("Error loading payroll allowances:", error)
-        return
-      }
-
-      setPayrollAllowancesState(data || [])
-      console.log("[v0] Payroll allowances loaded:", data?.length)
-    } catch (error) {
-      console.error("Error loading payroll allowances:", error)
-    }
-  }
-
-  const loadPayrollDeductions = async () => {
-    try {
-      if (!companyData.id) {
-        console.log("[v0] Skipping payroll deductions load - no company ID available")
-        return
-      }
-
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("payroll_deductions")
-        .select("*")
-        .eq("company_id", companyData.id)
-        .order("code")
-
-      if (error) {
-        console.error("Error loading payroll deductions:", error)
-        return
-      }
-
-      setPayrollDeductionsState(data || [])
-      console.log("[v0] Payroll deductions loaded:", data?.length)
-    } catch (error) {
-      console.error("Error loading payroll deductions:", error)
-    }
-  }
-
-  const loadRoles = async () => {
-    try {
-      if (!companyData.id) {
-        console.log("[v0] Skipping roles load - no company ID available")
-        return
-      }
-
-      const supabase = createClient()
-      const { data, error } = await supabase.from("roles").select("*").eq("company_id", companyData.id).order("name")
-
-      if (error) {
-        console.error("Error loading roles:", error)
-        return
-      }
-
-      setRoles(data || [])
-      console.log("[v0] Roles loaded:", data?.length)
-    } catch (error) {
-      console.error("Error loading roles:", error)
-    }
-  }
-
-  const loadEmailTemplates = async () => {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("ai_knowledge_base")
-        .select("*")
-        .eq("category", "email_templates")
-        .eq("is_active", true)
-        .order("topic")
-
-      if (error) {
-        console.error("Error loading email templates:", error)
-        return
-      }
-
-      // Transform AI knowledge base data to email template format
-      const templates = (data || []).map((kb: any) => ({
-        id: kb.id,
-        name: kb.topic,
-        subject: kb.topic,
-        description: kb.description || "",
-        content: kb.content,
-        isActive: kb.is_active,
-        lastModified: kb.updated_at,
-      }))
-
-      setEmailTemplates(templates)
-      console.log("[v0] Email templates loaded:", templates.length)
-    } catch (error) {
-      console.error("Error loading email templates:", error)
-    }
-  }
 
   const dateSSNITRates = (field: "employee" | "employer", value: number) => {
     const newSsnit = { ...ssnit, [field]: value }
@@ -1673,178 +1423,209 @@ export default function SettingsPage() {
     }
   }
 
-  return (
-    <>
-      {/* Leave Types Section */}
+  const loadLeaveTypes = async () => {
+    if (!companyData.id) {
+      console.log("[v0] Skipping leave types load - no company ID available")
+      return
+    }
 
-      <div>
-        <div>
-          <div>Leave Types</div>
-          <div>Manage different types of leave available to employees</div>
-        </div>
-        <div>
-          <div>Add Leave Type</div>
-          {leaveTypes.length === 0 ? (
-            <>No leave types found. Add leave types to get started.</>
-          ) : (
-            leaveTypes.map((leaveType) => (
-              <div key={leaveType.id}>
-                <div>
-                  <div>
-                    {leaveType.name} ({leaveType.code})
-                  </div>
-                  <div>{leaveType.description}</div>
-                  <div>
-                    <div>
-                      Annual Entitlement: {leaveType.annual_entitlement} days Pay: {leaveType.pay_percentage}% Max
-                      Consecutive: {leaveType.max_consecutive_days} days
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <div>
-                    <div>
-                      <div>Edit</div>
-                      <div>Manage Approvers</div>
-                      <div>Manage Eligibility</div>
-                      <div>Deactivate</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("leave_types")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .order("name")
 
-      <div>
-        <div>
-          <div>Leave Policies</div>
-          <div>Manage company leave policies and entitlements</div>
-        </div>
-        <div>
-          <div>Add Leave Policy</div>
-          {leavePolicies.length === 0 ? (
-            <>No leave policies found. Add policies to get started.</>
-          ) : (
-            leavePolicies.map((policy) => (
-              <div key={policy.id}>
-                <div>
-                  <div>{policy.policy_name}</div>
-                  <div>{policy.description}</div>
-                  <div>
-                    <div>
-                      Max Days: {policy.max_days}
-                      Carry Over: {policy.carry_over_days} days Notice: {policy.notice_period_days} days
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <div>
-                    <div>
-                      <div>Edit</div>
-                      <div>Deactivate</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      if (error) throw error
+      setLeaveTypes(data || [])
+      console.log("[v0] Leave types loaded successfully")
+    } catch (error) {
+      console.error("Error loading leave types:", error)
+    }
+  }
 
-      <div>
-        <div>
-          <div>Leave Approvers</div>
-          <div>Manage approval workflows for different leave types</div>
-        </div>
-        <div>
-          <div>Add Approver</div>
-          {leaveApprovers.length === 0 ? (
-            <>No approvers configured. Set up approval workflows.</>
-          ) : (
-            leaveApprovers.map((approver) => (
-              <div key={approver.id}>
-                <div>
-                  <div>
-                    Level {approver.approval_level}: {approver.approver_role}
-                  </div>
-                  <div>{approver.is_required ? "Required" : "Optional"} approval step</div>
-                </div>
-                <div>
-                  <div>
-                    <div>
-                      <div>Edit</div>
-                      <div>Remove</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+  const loadSalaryGrades = async () => {
+    if (!companyData.id) {
+      console.log("[v0] Skipping salary grades load - no company ID available")
+      return
+    }
 
-      <div>
-        <div>Leave Eligibility Rules</div>
-        <div>Define who is eligible for different leave types</div>
-        <div>
-          <div>Add Eligibility Rule</div>
-          {leaveEligibility.length === 0 ? (
-            <>No eligibility rules configured. Set up eligibility criteria.</>
-          ) : (
-            leaveEligibility.map((rule) => (
-              <div key={rule.id}>
-                <div>Eligibility Rule</div>
-                <div>
-                  Type: {rule.employee_type}
-                  Gender: {rule.gender}
-                  Age: {rule.min_age}-{rule.max_age}
-                </div>
-                <div>
-                  <div>
-                    <div>
-                      <div>Edit</div>
-                      <div>Remove</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("salary_grades")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .order("grade_level")
 
-      <div>
-        <div>Salary Grades & Notches</div>
-        <div>Manage salary grades and step progressions</div>
-        <div>Add Grade</div>
-        {salaryGrades.length === 0 ? (
-          <>No salary grades found. Add grades to get started.</>
-        ) : (
-          salaryGrades.map((grade) => (
-            <div key={grade.id}>
-              <div>
-                <div>{grade.grade_name}</div>
-                <div>
-                  Salary Range: GH¢{grade.step_1?.toLocaleString()} - GH¢{grade.step_5?.toLocaleString()}
-                </div>
-                <div>Steps: 5</div>
-              </div>
-              <div>
-                <div>
-                  <div>
-                    <div>Edit</div>
-                    <div>Remove</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </>
-  )
+      if (error) throw error
+      setSalaryGradesState(data || [])
+      console.log("[v0] Salary grades loaded successfully")
+    } catch (error) {
+      console.error("Error loading salary grades:", error)
+    }
+  }
+
+  const loadEmployees = async () => {
+    if (!companyData.id) {
+      console.log("[v0] Skipping employees load - no company ID available")
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("employees")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .order("first_name")
+
+      if (error) throw error
+      setEmployees(data || [])
+      console.log("[v0] Employees loaded successfully")
+    } catch (error) {
+      console.error("Error loading employees:", error)
+    }
+  }
+
+  const loadSubsidiaries = async () => {
+    if (!companyData.id) {
+      console.log("[v0] Skipping subsidiaries load - no company ID available")
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("subsidiaries")
+        .select("*")
+        .eq("parent_company_id", companyData.id)
+        .order("name")
+
+      if (error) throw error
+      setSubsidiaries(data || [])
+      console.log("[v0] Subsidiaries loaded successfully")
+    } catch (error) {
+      console.error("Error loading subsidiaries:", error)
+    }
+  }
+
+  const loadPayrollConfig = async () => {
+    if (!companyData.id) {
+      console.log("[v0] Skipping payroll config load - no company ID available")
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("payroll_configuration")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .single()
+
+      if (error && error.code !== "PGRST116") throw error
+
+      if (data) {
+        setPayrollConfig(data)
+      }
+      console.log("[v0] Payroll config loaded successfully")
+    } catch (error) {
+      console.error("Error loading payroll config:", error)
+    }
+  }
+
+  const loadPayrollAllowances = async () => {
+    if (!companyData.id) {
+      console.log("[v0] Skipping payroll allowances load - no company ID available")
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("payroll_allowances")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .order("code")
+
+      if (error) throw error
+      setPayrollAllowancesState(data || [])
+      console.log("[v0] Payroll allowances loaded successfully")
+    } catch (error) {
+      console.error("Error loading payroll allowances:", error)
+    }
+  }
+
+  const loadPayrollDeductions = async () => {
+    if (!companyData.id) {
+      console.log("[v0] Skipping payroll deductions load - no company ID available")
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("payroll_deductions")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .order("code")
+
+      if (error) throw error
+      setPayrollDeductionsState(data || [])
+      console.log("[v0] Payroll deductions loaded successfully")
+    } catch (error) {
+      console.error("Error loading payroll deductions:", error)
+    }
+  }
+
+  const loadRoles = async () => {
+    if (!companyData.id) {
+      console.log("[v0] Skipping roles load - no company ID available")
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.from("roles").select("*").eq("company_id", companyData.id).order("name")
+
+      if (error) throw error
+      setRoles(data || [])
+      console.log("[v0] Roles loaded successfully")
+    } catch (error) {
+      console.error("Error loading roles:", error)
+    }
+  }
+
+  const loadEmailTemplates = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("ai_knowledge_base")
+        .select("*")
+        .eq("category", "email_templates")
+        .eq("is_active", true)
+        .order("topic")
+
+      if (error) throw error
+
+      const templates = (data || []).map((kb) => ({
+        id: kb.id,
+        name: kb.topic,
+        subject: kb.topic,
+        description: kb.description || "",
+        content: kb.content,
+        isActive: kb.is_active,
+        lastModified: kb.updated_at,
+      }))
+
+      setEmailTemplates(templates)
+      console.log("[v0] Email templates loaded successfully")
+    } catch (error) {
+      console.error("Error loading email templates:", error)
+    }
+  }
 
   const handleEditLeaveType = (leaveType: LeaveType) => {
     setSelectedLeaveType(leaveType)
@@ -1857,12 +1638,10 @@ export default function SettingsPage() {
   }
 
   const handleEditApprover = (approver: LeaveTypeApprover) => {
-    // Implementation for editing approver
     setShowApproverDialog(true)
   }
 
   const handleEditEligibility = (rule: LeaveTypeEligibility) => {
-    // Implementation for editing eligibility rule
     setShowEligibilityDialog(true)
   }
 
@@ -1984,4 +1763,215 @@ export default function SettingsPage() {
       })
     }
   }
+
+  return (
+    <div className="container mx-auto p-6 space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+          <p className="text-muted-foreground">Manage your configuration and preferences</p>
+        </div>
+        <Button onClick={loadAllData} disabled={isLoading}>
+          {isLoading ? "Loading..." : "Refresh Data"}
+        </Button>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-8">
+          <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="multi-company">Multi-Company</TabsTrigger>
+          <TabsTrigger value="roles">Roles & Access</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="payroll">Payroll</TabsTrigger>
+          <TabsTrigger value="hr">HR</TabsTrigger>
+          <TabsTrigger value="security">Security</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="hr" className="space-y-6">
+          {/* Leave Types Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    Leave Types
+                  </CardTitle>
+                  <CardDescription>Manage different types of leave available to employees</CardDescription>
+                </div>
+                <Button onClick={() => setShowLeaveTypeDialog(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Leave Type
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {leaveTypes.length === 0 ? (
+                <p className="text-muted-foreground">No leave types found. Add leave types to get started.</p>
+              ) : (
+                <div className="space-y-4">
+                  {leaveTypes.map((leaveType) => (
+                    <div key={leaveType.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">
+                          {leaveType.name} ({leaveType.code})
+                        </h4>
+                        <p className="text-sm text-muted-foreground">{leaveType.description}</p>
+                        <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+                          <span>Annual Entitlement: {leaveType.annual_entitlement} days</span>
+                          <span>Pay: {leaveType.pay_percentage}%</span>
+                          <span>Max Consecutive: {leaveType.max_consecutive_days} days</span>
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditLeaveType(leaveType)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {}}>
+                            <Users className="h-4 w-4 mr-2" />
+                            Manage Approvers
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {}}>
+                            <Shield className="h-4 w-4 mr-2" />
+                            Manage Eligibility
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDeactivateLeaveType(leaveType.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Deactivate
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Leave Policies Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Leave Policies</CardTitle>
+                  <CardDescription>Manage company leave policies and entitlements</CardDescription>
+                </div>
+                <Button onClick={() => setShowLeavePolicyDialog(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Leave Policy
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {leavePolicies.length === 0 ? (
+                <p className="text-muted-foreground">No leave policies found. Add policies to get started.</p>
+              ) : (
+                <div className="space-y-4">
+                  {leavePolicies.map((policy) => (
+                    <div key={policy.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{policy.policy_name}</h4>
+                        <p className="text-sm text-muted-foreground">{policy.description}</p>
+                        <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+                          <span>Max Days: {policy.max_days}</span>
+                          <span>Carry Over: {policy.carry_over_days} days</span>
+                          <span>Notice: {policy.notice_period_days} days</span>
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditLeavePolicy(policy)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDeactivateLeavePolicy(policy.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Deactivate
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Salary Grades Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Salary Grades & Notches</CardTitle>
+                  <CardDescription>Manage salary grades and step progressions</CardDescription>
+                </div>
+                <Button onClick={() => setShowSalaryGradeDialog(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Grade
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {salaryGrades.length === 0 ? (
+                <p className="text-muted-foreground">No salary grades found. Add grades to get started.</p>
+              ) : (
+                <div className="space-y-4">
+                  {salaryGrades.map((grade) => (
+                    <div key={grade.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{grade.grade_name}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Salary Range: GH¢{grade.step_1?.toLocaleString()} - GH¢{grade.step_5?.toLocaleString()}
+                        </p>
+                        <p className="text-sm text-muted-foreground">Steps: 5</p>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditSalaryGrade(grade)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleRemoveSalaryGrade(grade.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Remove
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
 }
