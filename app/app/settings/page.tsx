@@ -436,8 +436,7 @@ export default function SettingsPage() {
   const [showLeavePolicyDialog, setShowLeavePolicyDialog] = useState(false)
   const [showApproverDialog, setShowApproverDialog] = useState(false)
   const [showEligibilityDialog, setShowEligibilityDialog] = useState(false)
-  const [showAddApproverDialog, setShowAddApproverDialog] = useState(false)
-  const [showAddEligibilityDialog, setShowAddEligibilityDialog] = useState(false)
+  const [showAddApproverDialog, setShowAddEligibilityDialog] = useState(false)
   const [selectedLeaveType, setSelectedLeaveType] = useState<LeaveType | null>(null)
   const [selectedLeavePolicy, setSelectedLeavePolicy] = useState<LeavePolicy | null>(null)
   const [currentLeaveType, setCurrentLeaveType] = useState<LeaveType | null>(null)
@@ -987,46 +986,85 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
+    const loadAllData = async () => {
+      setIsLoading(true)
+      try {
+        await loadCompanyData()
+
+        await Promise.all([
+          loadLeaveTypes(),
+          loadSalaryGrades(),
+          loadEmployees(),
+          loadSubsidiaries(),
+          loadPayrollConfig(),
+          loadPayrollAllowances(),
+          loadPayrollDeductions(),
+          // loadLoanSettings() is now called from loadCompanyData()
+          loadRoles(),
+          loadEmailTemplates(),
+          loadSecuritySettings(),
+        ])
+      } catch (error) {
+        console.error("Error loading settings data:", error)
+        toast({
+          title: "Error",
+          description: "Some settings data failed to load. Please refresh the page.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
     loadAllData()
   }, [])
 
-  const loadAllData = async () => {
-    setIsLoading(true)
-    try {
-      // Load company data first
-      await loadCompanyData()
+  const [loading, setLoading] = useState(false)
 
-      // Wait a moment for state to update
-      await new Promise((resolve) => setTimeout(resolve, 200))
+  useEffect(() => {
+    const initializeData = async () => {
+      setIsLoading(true)
+      try {
+        // Load company data first and wait for it to complete
+        await loadCompanyData()
 
-      // Load all other data
-      await Promise.all([
-        loadSubsidiaries(),
-        loadPayrollConfig(),
-        loadPayrollAllowances(),
-        loadPayrollDeductions(),
-        loadSalaryGrades(),
-        loadLeaveManagementData(),
-        loadEmployees(),
-        loadRoles(),
-        loadEmailTemplates(),
-      ])
+        // Small delay to ensure company state is updated
+        await new Promise((resolve) => setTimeout(resolve, 200))
 
-      // Load company-dependent settings last
-      await Promise.all([loadLoanSettings(), loadSecuritySettings()])
+        // Load all other data in parallel after company data is confirmed
+        await Promise.all([
+          loadPayrollConfig(),
+          loadPayrollAllowances(),
+          loadPayrollDeductions(),
+          loadSalaryGrades(),
+          loadLeaveManagementData(),
+          loadNotificationSettings(),
+          loadEmployees(),
+          loadSubsidiaries(),
+          loadRoles(),
+          loadEmailTemplates(),
+        ])
 
-      console.log("[v0] All data loaded successfully")
-    } catch (error) {
-      console.error("Error loading settings data:", error)
-      toast({
-        title: "Error",
-        description: "Some settings data failed to load. Please refresh the page.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
+        // Load settings that depend on company ID after other data
+        if (companyData?.id && companyData.id.trim() !== "") {
+          await Promise.all([loadLoanSettings(), loadSecuritySettings()])
+        }
+
+        console.log("[v0] All data loaded successfully")
+      } catch (error) {
+        console.error("Error loading settings data:", error)
+        toast({
+          title: "Error",
+          description: "Some settings data failed to load. Please refresh the page.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }
+
+    initializeData()
+  }, [])
 
   const loadCompanyData = async () => {
     try {
@@ -1038,6 +1076,7 @@ export default function SettingsPage() {
         const { data: newCompany, error: createError } = await supabase
           .from("companies")
           .insert({
+            id: crypto.randomUUID(),
             name: "Your Company Name",
             email_address: "info@yourcompany.com",
             tax_id: "",
@@ -1051,7 +1090,7 @@ export default function SettingsPage() {
 
         if (createError) {
           console.error("Failed to create company:", createError)
-          const tempId = crypto.randomUUID()
+          const tempId = "00000000-0000-0000-0000-000000000001"
           setCompanyData({
             id: tempId,
             name: "Your Company Name",
@@ -1110,21 +1149,17 @@ export default function SettingsPage() {
 
   const loadLoanSettings = async () => {
     try {
-      // Use a more reliable way to get company ID
-      const currentCompanyId = companyData?.id
-
-      // If not available from state, try to get it directly
-      if (!currentCompanyId || currentCompanyId.trim() === "") {
+      if (!companyData?.id || companyData.id.trim() === "") {
         console.log("[v0] Skipping loan settings load - no company ID available")
         return
       }
 
-      console.log("[v0] Loading loan settings for company:", currentCompanyId)
       const supabase = createClient()
       const { data, error } = await supabase
         .from("loan_settings")
         .select("*")
-        .eq("company_id", currentCompanyId)
+        .eq("company_id", companyData.id)
+        .eq("is_active", true)
         .order("code")
 
       if (error) {
@@ -1141,47 +1176,28 @@ export default function SettingsPage() {
 
   const loadSecuritySettings = async () => {
     try {
-      // Use a more reliable way to get company ID
-      const currentCompanyId = companyData?.id
-
-      if (!currentCompanyId || currentCompanyId === "") {
+      if (!companyData?.id || companyData.id.trim() === "") {
         console.log("[v0] Skipping security settings load - no company ID available")
         return
       }
 
-      console.log("[v0] Loading security settings for company:", currentCompanyId)
       const supabase = createClient()
-
-      // Since there's no security_settings table in the schema, we'll use company_settings
-      const { data: companySettings, error } = await supabase
-        .from("company_settings")
-        .select("*")
-        .eq("id", currentCompanyId)
-        .single()
+      const { data, error } = await supabase.from("company_settings").select("*").eq("id", companyData.id).single()
 
       if (error && error.code !== "PGRST116") {
         console.error("Error loading security settings:", error)
         return
       }
 
-      // Set default security settings if none exist
-      if (!companySettings?.security_settings) {
+      if (data) {
         setSecuritySettings({
           twoFactorAuth: false,
-          sessionTimeout: 15,
-          auditLogging: true,
-          passwordPolicy: {
-            minLength: 8,
-            requireUppercase: true,
-            requireLowercase: true,
-            requireNumbers: true,
-            requireSymbols: false,
-          },
+          sessionTimeout: 30,
+          passwordPolicy: "medium",
+          loginAttempts: 5,
+          auditLog: true,
         })
-      } else {
-        setSecuritySettings(companySettings.security_settings)
       }
-
       console.log("[v0] Security settings loaded successfully")
     } catch (error) {
       console.error("Error loading security settings:", error)
@@ -1387,56 +1403,66 @@ export default function SettingsPage() {
   }
 
   const loadLeaveTypes = async () => {
-    if (!companyData.id) {
-      console.log("[v0] Skipping leave types load - no company ID available")
-      return
-    }
-
     try {
+      if (!companyData?.id || companyData.id.trim() === "") {
+        console.log("[v0] Skipping leave types load - no company ID available")
+        return
+      }
+
       const supabase = createClient()
       const { data, error } = await supabase
         .from("leave_types")
         .select("*")
         .eq("company_id", companyData.id)
+        .eq("is_active", true)
         .order("name")
 
-      if (error) throw error
+      if (error) {
+        console.error("Error loading leave types:", error)
+        return
+      }
+
       setLeaveTypes(data || [])
-      console.log("[v0] Leave types loaded successfully:", data?.length || 0)
+      console.log("[v0] Leave types loaded successfully")
     } catch (error) {
       console.error("Error loading leave types:", error)
     }
   }
 
   const loadSalaryGrades = async () => {
-    if (!companyData.id) {
-      console.log("[v0] Skipping salary grades load - no company ID available")
-      return
-    }
-
     try {
+      if (!companyData?.id || companyData.id.trim() === "") {
+        console.log("[v0] Skipping salary grades load - no company ID available")
+        return
+      }
+
       const supabase = createClient()
       const { data, error } = await supabase
         .from("salary_grades")
         .select("*")
         .eq("company_id", companyData.id)
+        .eq("is_active", true)
         .order("grade_level")
 
-      if (error) throw error
+      if (error) {
+        console.error("Error loading salary grades:", error)
+        return
+      }
+
       setSalaryGradesState(data || [])
-      console.log("[v0] Salary grades loaded successfully:", data?.length || 0)
+      console.log("[v0] Salary grades loaded successfully")
     } catch (error) {
       console.error("Error loading salary grades:", error)
     }
   }
 
   const loadEmployees = async () => {
-    if (!companyData.id) {
-      console.log("[v0] Skipping employees load - no company ID available")
-      return
-    }
-
     try {
+      if (!companyData?.id || companyData.id.trim() === "") {
+        console.log("[v0] Skipping employees load - no company ID available")
+        return
+      }
+
       const supabase = createClient()
       const { data, error } = await supabase
         .from("employees")
@@ -1444,83 +1470,51 @@ export default function SettingsPage() {
         .eq("company_id", companyData.id)
         .order("full_name")
 
-      if (error) throw error
+      if (error) {
+        console.error("Error loading employees:", error)
+        return
+      }
+
       setEmployees(data || [])
-      console.log("[v0] Employees loaded successfully:", data?.length || 0)
+      console.log("[v0] Employees loaded successfully")
     } catch (error) {
       console.error("Error loading employees:", error)
     }
   }
 
-  const loadRoles = async () => {
-    // Roles might be system-wide or company-specific
-    try {
-      const supabase = createClient()
-      // Since there's no roles table in schema, we'll create default roles
-      const defaultRoles = [
-        { id: "1", name: "Admin", permissions: ["all"] },
-        { id: "2", name: "HR Manager", permissions: ["hr", "employees"] },
-        { id: "3", name: "Manager", permissions: ["team_management"] },
-        { id: "4", name: "Employee", permissions: ["basic"] },
-      ]
-      setRoles(defaultRoles)
-      console.log("[v0] Default roles loaded successfully")
-    } catch (error) {
-      console.error("Error loading roles:", error)
-    }
-  }
-
-  const loadEmailTemplates = async () => {
-    if (!companyData.id) {
-      console.log("[v0] Skipping email templates load - no company ID available")
-      return
-    }
-
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("ai_knowledge_base")
-        .select("*")
-        .eq("category", "email_templates")
-        .order("topic")
-
-      if (error) throw error
-      setEmailTemplates(data || [])
-      console.log("[v0] Email templates loaded successfully:", data?.length || 0)
-    } catch (error) {
-      console.error("Error loading email templates:", error)
-    }
-  }
-
   const loadSubsidiaries = async () => {
-    if (!companyData.id) {
-      console.log("[v0] Skipping subsidiaries load - no company ID available")
-      return
-    }
-
     try {
+      if (!companyData?.id || companyData.id.trim() === "") {
+        console.log("[v0] Skipping subsidiaries load - no company ID available")
+        return
+      }
+
       const supabase = createClient()
       const { data, error } = await supabase
         .from("subsidiaries")
         .select("*")
-        .eq("company_id", companyData.id) // Using company_id instead of parent_company_id
+        .eq("company_id", companyData.id)
         .order("name")
 
-      if (error) throw error
+      if (error) {
+        console.error("Error loading subsidiaries:", error)
+        return
+      }
+
       setSubsidiaries(data || [])
-      console.log("[v0] Subsidiaries loaded successfully:", data?.length || 0)
+      console.log("[v0] Subsidiaries loaded successfully")
     } catch (error) {
       console.error("Error loading subsidiaries:", error)
     }
   }
 
   const loadPayrollConfig = async () => {
-    if (!companyData.id) {
-      console.log("[v0] Skipping payroll config load - no company ID available")
-      return
-    }
-
     try {
+      if (!companyData?.id || companyData.id.trim() === "") {
+        console.log("[v0] Skipping payroll config load - no company ID available")
+        return
+      }
+
       const supabase = createClient()
       const { data, error } = await supabase
         .from("payroll_configuration")
@@ -1528,10 +1522,19 @@ export default function SettingsPage() {
         .eq("company_id", companyData.id)
         .single()
 
-      if (error && error.code !== "PGRST116") throw error
+      if (error && error.code !== "PGRST116") {
+        console.error("Error loading payroll config:", error)
+        return
+      }
 
       if (data) {
-        setPayrollConfig(data)
+        setPayrollConfig({
+          minimum_wage: data.minimum_wage || 18.15,
+          overtime_weekday_multiplier: data.overtime_weekday_multiplier || 1.5,
+          overtime_weekend_multiplier: data.overtime_weekend_multiplier || 2,
+          currency_code: data.currency_code || "GHS",
+          currency_symbol: data.currency_symbol || "₵",
+        })
       }
       console.log("[v0] Payroll config loaded successfully")
     } catch (error) {
@@ -1540,20 +1543,25 @@ export default function SettingsPage() {
   }
 
   const loadPayrollAllowances = async () => {
-    if (!companyData.id) {
-      console.log("[v0] Skipping payroll allowances load - no company ID available")
-      return
-    }
-
     try {
+      if (!companyData?.id || companyData.id.trim() === "") {
+        console.log("[v0] Skipping payroll allowances load - no company ID available")
+        return
+      }
+
       const supabase = createClient()
       const { data, error } = await supabase
         .from("payroll_allowances")
         .select("*")
         .eq("company_id", companyData.id)
+        .eq("is_active", true)
         .order("code")
 
-      if (error) throw error
+      if (error) {
+        console.error("Error loading payroll allowances:", error)
+        return
+      }
+
       setPayrollAllowancesState(data || [])
       console.log("[v0] Payroll allowances loaded successfully")
     } catch (error) {
@@ -1562,24 +1570,76 @@ export default function SettingsPage() {
   }
 
   const loadPayrollDeductions = async () => {
-    if (!companyData.id) {
-      console.log("[v0] Skipping payroll deductions load - no company ID available")
-      return
-    }
-
     try {
+      if (!companyData?.id || companyData.id.trim() === "") {
+        console.log("[v0] Skipping payroll deductions load - no company ID available")
+        return
+      }
+
       const supabase = createClient()
       const { data, error } = await supabase
         .from("payroll_deductions")
         .select("*")
         .eq("company_id", companyData.id)
+        .eq("is_active", true)
         .order("code")
 
-      if (error) throw error
+      if (error) {
+        console.error("Error loading payroll deductions:", error)
+        return
+      }
+
       setPayrollDeductionsState(data || [])
       console.log("[v0] Payroll deductions loaded successfully")
     } catch (error) {
       console.error("Error loading payroll deductions:", error)
+    }
+  }
+
+  const loadRoles = async () => {
+    try {
+      const supabase = createClient()
+      // Since there's no roles table in the schema, we'll create default roles
+      const defaultRoles = [
+        { id: "1", name: "Admin", permissions: ["all"] },
+        { id: "2", name: "HR Manager", permissions: ["hr", "payroll"] },
+        { id: "3", name: "Employee", permissions: ["view"] },
+      ]
+
+      setRoles(defaultRoles)
+      console.log("[v0] Roles loaded successfully")
+    } catch (error) {
+      console.error("Error loading roles:", error)
+    }
+  }
+
+  const loadEmailTemplates = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("ai_knowledge_base")
+        .select("*")
+        .eq("category", "email_templates")
+        .eq("is_active", true)
+        .order("topic")
+
+      if (error) {
+        console.error("Error loading email templates:", error)
+        return
+      }
+
+      const templates = (data || []).map((item) => ({
+        id: item.id,
+        name: item.topic,
+        subject: item.topic,
+        content: item.content,
+        type: "email",
+      }))
+
+      setEmailTemplates(templates)
+      console.log("[v0] Email templates loaded successfully")
+    } catch (error) {
+      console.error("Error loading email templates:", error)
     }
   }
 
@@ -1927,7 +1987,700 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="company" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Company Information</CardTitle>
+              <CardDescription>Update your company details and preferences</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-6">
+              <div className="flex items-center space-x-4">
+                <div className="w-32 shrink-0">
+                  <Label htmlFor="logo">Company Logo</Label>
+                </div>
+                <div className="space-y-2">
+                  {logoPreview ? (
+                    <img
+                      src={logoPreview || "/placeholder.svg"}
+                      alt="Company Logo"
+                      className="h-20 w-auto rounded-md"
+                    />
+                  ) : (
+                    <div className="h-20 w-32 rounded-md bg-muted" />
+                  )}
+                  <Input type="file" id="logo" onChange={handleLogoUpload} accept="image/*" />
+                  {uploadedFileName && <p className="text-sm text-muted-foreground">Uploaded: {uploadedFileName}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Company Name</Label>
+                  <Input
+                    id="name"
+                    value={companyData.name}
+                    onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={companyData.email}
+                    onChange={(e) => setCompanyData({ ...companyData, email: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="taxId">Tax ID</Label>
+                  <Input
+                    id="taxId"
+                    value={companyData.tax_id}
+                    onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ssnitNumber">SSNIT Number</Label>
+                  <Input
+                    id="ssnitNumber"
+                    value={companyData.ssnit_number}
+                    onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="industry">Industry</Label>
+                  <Input
+                    id="industry"
+                    value={companyData.industry}
+                    onChange={(e) => setCompanyData({ ...companyData, industry: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={companyData.phone}
+                    onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">Address</Label>
+                <Textarea
+                  id="address"
+                  value={companyData.address}
+                  onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
+                />
+              </div>
+              <Button onClick={handleSaveCompany} disabled={isLoading}>
+                {isLoading ? "Saving..." : "Save Changes"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="multi-company" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight">Subsidiaries</h2>
+              <p className="text-muted-foreground">Manage your company subsidiaries and branches</p>
+            </div>
+            <Button
+              onClick={() => {
+                setShowSubsidiaryDialog(true)
+                setEditingSubsidiary(null)
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Subsidiary
+            </Button>
+          </div>
+
+          {subsidiaries.length === 0 ? (
+            <p className="text-muted-foreground">No subsidiaries found. Add subsidiaries to get started.</p>
+          ) : (
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+              {subsidiaries.map((subsidiary) => (
+                <Card key={subsidiary.id}>
+                  <CardHeader>
+                    <CardTitle>{subsidiary.name}</CardTitle>
+                    <CardDescription>{subsidiary.industry}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Email: {subsidiary.email_address}</p>
+                    <p className="text-sm text-muted-foreground">Phone: {subsidiary.phone_number}</p>
+                    <p className="text-sm text-muted-foreground">Divisions: {subsidiary.divisions?.length || 0}</p>
+                    <p className="text-sm text-muted-foreground">Departments: {subsidiary.departments?.length || 0}</p>
+                    <p className="text-sm text-muted-foreground">Locations: {subsidiary.locations?.length || 0}</p>
+                  </CardContent>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setViewingSubsidiary(subsidiary)
+                          setShowViewSubsidiaryDialog(true)
+                        }}
+                      >
+                        <Users className="h-4 w-4 mr-2" />
+                        View
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setEditingSubsidiary(subsidiary)
+                          setShowSubsidiaryDialog(true)
+                        }}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Deactivate
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="roles" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight">Roles & Permissions</h2>
+              <p className="text-muted-foreground">Manage user roles and access permissions</p>
+            </div>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Role
+            </Button>
+          </div>
+
+          {roles.length === 0 ? (
+            <p className="text-muted-foreground">No roles found. Add roles to get started.</p>
+          ) : (
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+              {roles.map((role) => (
+                <Card key={role.id}>
+                  <CardHeader>
+                    <CardTitle>{role.name}</CardTitle>
+                    <CardDescription>{role.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Users: {role.user_count}</p>
+                    <p className="text-sm text-muted-foreground">Permissions: {role.permissions.join(", ")}</p>
+                  </CardContent>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Deactivate
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="users" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight">Users</h2>
+              <p className="text-muted-foreground">Manage user accounts and access</p>
+            </div>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add User
+            </Button>
+          </div>
+
+          {employees.length === 0 ? (
+            <p className="text-muted-foreground">No users found. Add users to get started.</p>
+          ) : (
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+              {employees.map((employee) => (
+                <Card key={employee.id}>
+                  <CardHeader>
+                    <CardTitle>{employee.full_name}</CardTitle>
+                    <CardDescription>{employee.position}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Email: {employee.corporate_email}</p>
+                    <p className="text-sm text-muted-foreground">Department: {employee.department}</p>
+                    <p className="text-sm text-muted-foreground">Status: {employee.status}</p>
+                  </CardContent>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Deactivate
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="payroll" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Payroll Configuration</CardTitle>
+              <CardDescription>Configure payroll settings and parameters</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="minimumWage">Minimum Wage ({payrollConfig.currency_code})</Label>
+                  <Input
+                    id="minimumWage"
+                    type="number"
+                    value={payrollConfig.minimum_wage.toString()}
+                    onChange={(e) =>
+                      setPayrollConfig({ ...payrollConfig, minimum_wage: Number.parseFloat(e.target.value) })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="w-[200px] justify-between bg-transparent">
+                        {payrollConfig.currency_code} <MoreHorizontal className="w-4 h-4 opacity-70" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleCurrencyChange("GHS")}>GHS</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleCurrencyChange("USD")}>USD</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleCurrencyChange("EUR")}>EUR</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="weekdayOvertime">Weekday Overtime Multiplier</Label>
+                  <Input
+                    id="weekdayOvertime"
+                    type="number"
+                    value={payrollConfig.overtime_weekday_multiplier.toString()}
+                    onChange={(e) =>
+                      setPayrollConfig({
+                        ...payrollConfig,
+                        overtime_weekday_multiplier: Number.parseFloat(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="weekendOvertime">Weekend Overtime Multiplier</Label>
+                  <Input
+                    id="weekendOvertime"
+                    type="number"
+                    value={payrollConfig.overtime_weekend_multiplier.toString()}
+                    onChange={(e) =>
+                      setPayrollConfig({
+                        ...payrollConfig,
+                        overtime_weekend_multiplier: Number.parseFloat(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Allowances Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Allowances</CardTitle>
+                  <CardDescription>Manage payroll allowances</CardDescription>
+                </div>
+                <Button onClick={handleAddAllowance}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Allowance
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {payrollAllowances.length === 0 ? (
+                <p className="text-muted-foreground">No allowances found. Add allowances to get started.</p>
+              ) : (
+                <div className="space-y-4">
+                  {payrollAllowances.map((allowance, index) => (
+                    <div key={allowance.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{allowance.code}</h4>
+                        <p className="text-sm text-muted-foreground">{allowance.description}</p>
+                        <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+                          <span>Amount: {formatCurrency(allowance.amount)}</span>
+                          <span>Taxable: {allowance.taxable ? "Yes" : "No"}</span>
+                          <span>Recurring: {allowance.recurring ? "Yes" : "No"}</span>
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditAllowance(index)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteAllowance(index)} className="text-destructive">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Deductions Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Deductions</CardTitle>
+                  <CardDescription>Manage payroll deductions</CardDescription>
+                </div>
+                <Button onClick={handleAddDeduction}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Deduction
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {payrollDeductions.length === 0 ? (
+                <p className="text-muted-foreground">No deductions found. Add deductions to get started.</p>
+              ) : (
+                <div className="space-y-4">
+                  {payrollDeductions.map((deduction, index) => (
+                    <div key={deduction.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{deduction.code}</h4>
+                        <p className="text-sm text-muted-foreground">{deduction.description}</p>
+                        <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+                          <span>Amount: {formatCurrency(deduction.amount)}</span>
+                          <span>Recurring: {deduction.recurring ? "Yes" : "No"}</span>
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditDeduction(index)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteDeduction(index)} className="text-destructive">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Loan Settings Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Loan Settings</CardTitle>
+                  <CardDescription>Manage loan settings</CardDescription>
+                </div>
+                <Button onClick={handleAddLoan}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Loan Setting
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loanSettings.length === 0 ? (
+                <p className="text-muted-foreground">No loan settings found. Add loan settings to get started.</p>
+              ) : (
+                <div className="space-y-4">
+                  {loanSettings.map((loan, index) => (
+                    <div key={loan.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{loan.code}</h4>
+                        <p className="text-sm text-muted-foreground">{loan.description}</p>
+                        <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+                          <span>Max Amount: {formatCurrency(loan.max_amount)}</span>
+                          <span>Interest Rate: {loan.interest_rate}%</span>
+                          <span>Tenure: {loan.max_repayment_months} months</span>
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditLoan(index)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteLoan(index)} className="text-destructive">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="security" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Security Settings</CardTitle>
+              <CardDescription>Configure security settings and policies</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="twoFactorAuth">Two-Factor Authentication</Label>
+                <Input
+                  id="twoFactorAuth"
+                  type="checkbox"
+                  checked={securitySettings.twoFactorAuth}
+                  onChange={(e) => setSecuritySettings({ ...securitySettings, twoFactorAuth: e.target.checked })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
+                <Input
+                  id="sessionTimeout"
+                  type="number"
+                  value={securitySettings.sessionTimeout.toString()}
+                  onChange={(e) =>
+                    setSecuritySettings({ ...securitySettings, sessionTimeout: Number.parseInt(e.target.value) })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="passwordPolicy">Password Policy</Label>
+                <Input
+                  id="passwordPolicy"
+                  type="text"
+                  value={securitySettings.passwordPolicy}
+                  onChange={(e) => setSecuritySettings({ ...securitySettings, passwordPolicy: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="loginAttempts">Maximum Login Attempts</Label>
+                <Input
+                  id="loginAttempts"
+                  type="number"
+                  value={securitySettings.loginAttempts.toString()}
+                  onChange={(e) =>
+                    setSecuritySettings({ ...securitySettings, loginAttempts: Number.parseInt(e.target.value) })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="auditLog">Audit Logging</Label>
+                <Input
+                  id="auditLog"
+                  type="checkbox"
+                  checked={securitySettings.auditLog}
+                  onChange={(e) => setSecuritySettings({ ...securitySettings, auditLog: e.target.checked })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Notification Settings</CardTitle>
+              <CardDescription>Configure notification preferences</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="payrollAlerts">Payroll Alerts</Label>
+                <Input
+                  id="payrollAlerts"
+                  type="checkbox"
+                  checked={notificationSettings.payrollAlerts}
+                  onChange={(e) =>
+                    setNotificationSettings({ ...notificationSettings, payrollAlerts: e.target.checked })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="leaveAlerts">Leave Alerts</Label>
+                <Input
+                  id="leaveAlerts"
+                  type="checkbox"
+                  checked={notificationSettings.leaveAlerts}
+                  onChange={(e) => setNotificationSettings({ ...notificationSettings, leaveAlerts: e.target.checked })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="employeeUpdates">Employee Updates</Label>
+                <Input
+                  id="employeeUpdates"
+                  type="checkbox"
+                  checked={notificationSettings.employeeUpdates}
+                  onChange={(e) =>
+                    setNotificationSettings({ ...notificationSettings, employeeUpdates: e.target.checked })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="systemMaintenance">System Maintenance</Label>
+                <Input
+                  id="systemMaintenance"
+                  type="checkbox"
+                  checked={notificationSettings.systemMaintenance}
+                  onChange={(e) =>
+                    setNotificationSettings({ ...notificationSettings, systemMaintenance: e.target.checked })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="smsNotifications">SMS Notifications</Label>
+                <Input
+                  id="smsNotifications"
+                  type="checkbox"
+                  checked={notificationSettings.smsNotifications}
+                  onChange={(e) =>
+                    setNotificationSettings({ ...notificationSettings, smsNotifications: e.target.checked })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={notificationSettings.email}
+                  onChange={(e) => setNotificationSettings({ ...notificationSettings, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="webhookUrl">Webhook URL</Label>
+                <Input
+                  id="webhookUrl"
+                  type="url"
+                  value={notificationSettings.webhookUrl}
+                  onChange={(e) => setNotificationSettings({ ...notificationSettings, webhookUrl: e.target.value })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Dialogs */}
+      {showSubsidiaryDialog && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-auto h-fit w-full max-w-lg rounded-md bg-white p-6">
+            <h2 className="text-2xl font-semibold tracking-tight mb-4">
+              {editingSubsidiary ? "Edit Subsidiary" : "Add Subsidiary"}
+            </h2>
+            <SubsidiaryForm
+              subsidiary={editingSubsidiary}
+              onSave={(data) => {
+                if (editingSubsidiary) {
+                  // Update existing subsidiary
+                  const updatedSubsidiaries = subsidiaries.map((s) =>
+                    s.id === editingSubsidiary.id ? { ...s, ...data } : s,
+                  )
+                  setSubsidiaries(updatedSubsidiaries)
+                } else {
+                  // Add new subsidiary
+                  setSubsidiaries([...subsidiaries, { id: crypto.randomUUID(), ...data }])
+                }
+                setShowSubsidiaryDialog(false)
+              }}
+              onCancel={() => setShowSubsidiaryDialog(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {showViewSubsidiaryDialog && viewingSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-auto h-fit w-full max-w-lg rounded-md bg-white p-6">
+            <h2 className="text-2xl font-semibold tracking-tight mb-4">View Subsidiary</h2>
+            <Card>
+              <CardHeader>
+                <CardTitle>{viewingSubsidiary.name}</CardTitle>
+                <CardDescription>{viewingSubsidiary.industry}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-sm text-muted-foreground">Email: {viewingSubsidiary.email_address}</p>
+                <p className="text-sm text-muted-foreground">Phone: {viewingSubsidiary.phone_number}</p>
+                <p className="text-sm text-muted-foreground">Divisions: {viewingSubsidiary.divisions?.length || 0}</p>
+                <p className="text-sm text-muted-foreground">
+                  Departments: {viewingSubsidiary.departments?.length || 0}
+                </p>
+                <p className="text-sm text-muted-foreground">Locations: {viewingSubsidiary.locations?.length || 0}</p>
+              </CardContent>
+            </Card>
+            <div className="flex justify-end mt-4">
+              <Button variant="outline" onClick={() => setShowViewSubsidiaryDialog(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
