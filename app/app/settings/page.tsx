@@ -422,6 +422,7 @@ export default function SettingsPage() {
   const handleCurrencyChange = (newCurrency: string) => {
     const currencyMap: Record<string, { symbol: string; name: string }> = {
       GHS: { symbol: "₵", name: "Ghana Cedis (GHS)" },
+      NGN: { symbol: "₦", name: "Nigerian Naira (NGN)" },
       USD: { symbol: "$", name: "US Dollar (USD)" },
       EUR: { symbol: "€", name: "Euro (EUR)" },
     }
@@ -434,17 +435,45 @@ export default function SettingsPage() {
         currency_symbol: currency.symbol,
       })
 
-      // Update tax bands currency display
-      setTaxBands(
-        taxBands.map((band) => ({
-          ...band,
-          currency: newCurrency,
-        })),
-      )
+      let newTaxBands = []
+
+      if (newCurrency === "GHS") {
+        // Ghana PAYE Tax Bands (Monthly Schedule 2024)
+        newTaxBands = [
+          { rate: 0, description: "first", threshold: 490 },
+          { rate: 5, description: "next", threshold: 110 },
+          { rate: 10, description: "next", threshold: 130 },
+          { rate: 17.5, description: "next", threshold: 3167 },
+          { rate: 25, description: "next", threshold: 16000 },
+          { rate: 30, description: "next", threshold: 30520 },
+          { rate: 35, description: "next", threshold: 50000 },
+          { rate: 0, description: "remaining amount", threshold: 0 },
+        ]
+      } else if (newCurrency === "NGN") {
+        // Nigeria PAYE Tax Bands (Monthly Schedule 2024)
+        newTaxBands = [
+          { rate: 7, description: "first", threshold: 25000 },
+          { rate: 11, description: "next", threshold: 25000 },
+          { rate: 15, description: "next", threshold: 41667 },
+          { rate: 19, description: "next", threshold: 41667 },
+          { rate: 21, description: "next", threshold: 133333 },
+          { rate: 24, description: "remaining amount", threshold: 0 },
+        ]
+      } else {
+        // Default tax bands for other currencies
+        newTaxBands = [
+          { rate: 0, description: "first", threshold: 1000 },
+          { rate: 10, description: "next", threshold: 2000 },
+          { rate: 20, description: "next", threshold: 5000 },
+          { rate: 30, description: "remaining amount", threshold: 0 },
+        ]
+      }
+
+      setTaxBands(newTaxBands)
 
       toast({
         title: "Currency Updated",
-        description: `System currency changed to ${currency.name}`,
+        description: `System currency changed to ${currency.name} with updated tax bands`,
       })
     }
   }
@@ -2390,6 +2419,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="GHS">Ghana Cedis (GHS)</SelectItem>
+                          <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
                           <SelectItem value="USD">US Dollar (USD)</SelectItem>
                           <SelectItem value="EUR">Euro (EUR)</SelectItem>
                         </SelectContent>
