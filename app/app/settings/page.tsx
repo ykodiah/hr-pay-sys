@@ -1670,6 +1670,30 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     try {
       const supabase = createClient()
 
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+      if (authError || !user) {
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to perform this action",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (!companyData.id || companyData.id.trim() === "") {
+        toast({
+          title: "Error",
+          description: "Company information not loaded. Please refresh the page.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      console.log("[v0] Saving payroll settings with user:", user.id, "company:", companyData.id)
+
       // Save payroll configuration with only fields that exist in the database
       const configData = {
         company_id: Number.parseInt(companyData.id) || 1,
