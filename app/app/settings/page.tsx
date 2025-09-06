@@ -947,6 +947,11 @@ export default function SettingsPage() {
 
   const loadNotificationSettings = async () => {
     try {
+      if (!companyData.id || companyData.id === "") {
+        console.log("[v0] Skipping notification settings load - no company ID available")
+        return
+      }
+
       const supabase = createClient()
 
       // Load AI knowledge base for notification templates
