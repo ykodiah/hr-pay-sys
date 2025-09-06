@@ -1023,44 +1023,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const initializeData = async () => {
-      setIsLoading(true)
-      try {
-        // Load company data first and wait for it to complete
-        await loadCompanyData()
-
-        // Small delay to ensure company state is updated
-        await new Promise((resolve) => setTimeout(resolve, 200))
-
-        // Load all other data in parallel after company data is confirmed
-        await Promise.all([
-          loadPayrollConfig(),
-          loadPayrollAllowances(),
-          loadPayrollDeductions(),
-          loadSalaryGrades(),
-          loadLeaveManagementData(),
-          loadNotificationSettings(),
-          loadEmployees(),
-          loadSubsidiaries(),
-          loadRoles(),
-          loadEmailTemplates(),
-        ])
-
-        // Load settings that depend on company ID after other data
-        if (companyData?.id && companyData.id.trim() !== "") {
-          await Promise.all([loadLoanSettings(), loadSecuritySettings()])
-        }
-
-        console.log("[v0] All data loaded successfully")
-      } catch (error) {
-        console.error("Error loading settings data:", error)
-        toast({
-          title: "Error",
-          description: "Some settings data failed to load. Please refresh the page.",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
-      }
+      await loadAllData()
     }
 
     initializeData()
@@ -1640,6 +1603,52 @@ export default function SettingsPage() {
       console.log("[v0] Email templates loaded successfully")
     } catch (error) {
       console.error("Error loading email templates:", error)
+    }
+  }
+
+  const loadAllData = async () => {
+    setIsLoading(true)
+    try {
+      // Load company data first and wait for it to complete
+      await loadCompanyData()
+
+      // Small delay to ensure company state is updated
+      await new Promise((resolve) => setTimeout(resolve, 200))
+
+      // Load all other data in parallel after company data is confirmed
+      await Promise.all([
+        loadPayrollConfig(),
+        loadPayrollAllowances(),
+        loadPayrollDeductions(),
+        loadSalaryGrades(),
+        loadLeaveManagementData(),
+        loadNotificationSettings(),
+        loadEmployees(),
+        loadSubsidiaries(),
+        loadRoles(),
+        loadEmailTemplates(),
+      ])
+
+      // Load settings that depend on company ID after other data
+      if (companyData?.id && companyData.id.trim() !== "") {
+        await Promise.all([loadLoanSettings(), loadSecuritySettings()])
+      }
+
+      console.log("[v0] All data loaded successfully")
+
+      toast({
+        title: "Success",
+        description: "All data refreshed successfully",
+      })
+    } catch (error) {
+      console.error("Error loading settings data:", error)
+      toast({
+        title: "Error",
+        description: "Some settings data failed to load. Please refresh the page.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
