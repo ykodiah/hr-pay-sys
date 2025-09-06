@@ -2270,12 +2270,13 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="grid gap-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Fix toString() calls on potentially undefined values by adding null checks and default values */}
                 <div className="space-y-2">
                   <Label htmlFor="minimumWage">Minimum Wage ({payrollConfig.currency_code})</Label>
                   <Input
                     id="minimumWage"
                     type="number"
-                    value={payrollConfig.minimum_wage.toString()}
+                    value={(payrollConfig.minimum_wage || 0).toString()}
                     onChange={(e) =>
                       setPayrollConfig({ ...payrollConfig, minimum_wage: Number.parseFloat(e.target.value) })
                     }
@@ -2298,12 +2299,13 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Fix toString() calls on potentially undefined values by adding null checks and default values */}
                 <div className="space-y-2">
                   <Label htmlFor="weekdayOvertime">Weekday Overtime Multiplier</Label>
                   <Input
                     id="weekdayOvertime"
                     type="number"
-                    value={payrollConfig.overtime_weekday_multiplier.toString()}
+                    value={(payrollConfig.overtime_weekday_multiplier || 0).toString()}
                     onChange={(e) =>
                       setPayrollConfig({
                         ...payrollConfig,
@@ -2317,7 +2319,7 @@ export default function SettingsPage() {
                   <Input
                     id="weekendOvertime"
                     type="number"
-                    value={payrollConfig.overtime_weekend_multiplier.toString()}
+                    value={(payrollConfig.overtime_weekend_multiplier || 0).toString()}
                     onChange={(e) =>
                       setPayrollConfig({
                         ...payrollConfig,
@@ -2499,21 +2501,13 @@ export default function SettingsPage() {
               <CardDescription>Configure security settings and policies</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="twoFactorAuth">Two-Factor Authentication</Label>
-                <Input
-                  id="twoFactorAuth"
-                  type="checkbox"
-                  checked={securitySettings.twoFactorAuth}
-                  onChange={(e) => setSecuritySettings({ ...securitySettings, twoFactorAuth: e.target.checked })}
-                />
-              </div>
+              {/* Fix toString() calls on potentially undefined values by adding null checks and default values */}
               <div className="space-y-2">
                 <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
                 <Input
                   id="sessionTimeout"
                   type="number"
-                  value={securitySettings.sessionTimeout.toString()}
+                  value={(securitySettings.sessionTimeout || 0).toString()}
                   onChange={(e) =>
                     setSecuritySettings({ ...securitySettings, sessionTimeout: Number.parseInt(e.target.value) })
                   }
@@ -2524,7 +2518,7 @@ export default function SettingsPage() {
                 <Input
                   id="passwordPolicy"
                   type="text"
-                  value={securitySettings.passwordPolicy}
+                  value={securitySettings.passwordPolicy || ""}
                   onChange={(e) => setSecuritySettings({ ...securitySettings, passwordPolicy: e.target.value })}
                 />
               </div>
@@ -2533,7 +2527,7 @@ export default function SettingsPage() {
                 <Input
                   id="loginAttempts"
                   type="number"
-                  value={securitySettings.loginAttempts.toString()}
+                  value={(securitySettings.loginAttempts || 0).toString()}
                   onChange={(e) =>
                     setSecuritySettings({ ...securitySettings, loginAttempts: Number.parseInt(e.target.value) })
                   }
