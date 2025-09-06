@@ -35,11 +35,6 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  /* Added missing theme color variables */
-  --theme-primary-50: oklch(0.97 0.02 264.376);
-  --theme-primary-500: oklch(0.646 0.222 264.376);
-  --theme-primary-600: oklch(0.588 0.243 264.376);
-  --theme-primary-700: oklch(0.488 0.243 264.376);
 }
 
 .dark {
@@ -75,11 +70,6 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
-  /* Added missing theme color variables for dark mode */
-  --theme-primary-50: oklch(0.269 0.02 264.376);
-  --theme-primary-500: oklch(0.588 0.222 264.376);
-  --theme-primary-600: oklch(0.646 0.243 264.376);
-  --theme-primary-700: oklch(0.696 0.243 264.376);
 }
 
 @theme inline {
@@ -128,5 +118,32 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Added theme-aware utility classes */
+  .theme-bg-primary-50 {
+    background-color: var(--theme-primary-50);
+  }
+  .theme-bg-primary-600 {
+    background-color: var(--theme-primary-600);
+  }
+  .theme-bg-primary-700 {
+    background-color: var(--theme-primary-700);
+  }
+  .theme-text-primary-600 {
+    color: var(--theme-primary-600);
+  }
+  .theme-text-primary-700 {
+    color: var(--theme-primary-700);
+  }
+  .theme-border-primary-500 {
+    border-color: var(--theme-primary-500);
+  }
+
+  /* Form input styling */
+  .form-input {
+    @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200;
   }
 }
