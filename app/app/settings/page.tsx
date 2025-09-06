@@ -987,77 +987,40 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
-    const loadAllData = async () => {
-      setIsLoading(true)
-      try {
-        await loadCompanyData()
-
-        await Promise.all([
-          loadLeaveTypes(),
-          loadSalaryGrades(),
-          loadEmployees(),
-          loadSubsidiaries(),
-          loadPayrollConfig(),
-          loadPayrollAllowances(),
-          loadPayrollDeductions(),
-          // loadLoanSettings() is now called from loadCompanyData()
-          loadRoles(),
-          loadEmailTemplates(),
-          loadSecuritySettings(),
-        ])
-      } catch (error) {
-        console.error("Error loading settings data:", error)
-        toast({
-          title: "Error",
-          description: "Some settings data failed to load. Please refresh the page.",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     loadAllData()
   }, [])
-
-  const [loading, setLoading] = useState(false)
 
   const loadAllData = async () => {
     setIsLoading(true)
     try {
-      // Load company data first and wait for it to complete
+      // Load company data first
       await loadCompanyData()
 
-      // Verify company data is loaded before proceeding
-      if (!companyData?.id || companyData.id.trim() === "") {
-        console.log("[v0] Company data not available, retrying...")
-        // Small delay to allow state to update
-        await new Promise((resolve) => setTimeout(resolve, 100))
-      }
+      // Wait a moment for state to update
+      await new Promise((resolve) => setTimeout(resolve, 200))
 
-      // Load all other data in parallel after company data is confirmed
+      // Load all other data
       await Promise.all([
+        loadSubsidiaries(),
         loadPayrollConfig(),
         loadPayrollAllowances(),
         loadPayrollDeductions(),
         loadSalaryGrades(),
         loadLeaveManagementData(),
-        loadNotificationSettings(),
         loadEmployees(),
-        loadSubsidiaries(),
         loadRoles(),
         loadEmailTemplates(),
       ])
 
-      // Load settings that depend on company ID after other data
+      // Load company-dependent settings last
       await Promise.all([loadLoanSettings(), loadSecuritySettings()])
 
       console.log("[v0] All data loaded successfully")
     } catch (error) {
-      console.error("Error loading data:", error)
+      console.error("Error loading settings data:", error)
       toast({
         title: "Error",
-        description: "Failed to load some data. Please refresh the page.",
+        description: "Some settings data failed to load. Please refresh the page.",
         variant: "destructive",
       })
     } finally {
@@ -1424,66 +1387,56 @@ export default function SettingsPage() {
   }
 
   const loadLeaveTypes = async () => {
-    try {
-      if (!companyData?.id || companyData.id.trim() === "") {
-        console.log("[v0] Skipping leave types load - no company ID available")
-        return
-      }
+    if (!companyData.id) {
+      console.log("[v0] Skipping leave types load - no company ID available")
+      return
+    }
 
+    try {
       const supabase = createClient()
       const { data, error } = await supabase
         .from("leave_types")
         .select("*")
         .eq("company_id", companyData.id)
-        .eq("is_active", true)
         .order("name")
 
-      if (error) {
-        console.error("Error loading leave types:", error)
-        return
-      }
-
+      if (error) throw error
       setLeaveTypes(data || [])
-      console.log("[v0] Leave types loaded successfully")
+      console.log("[v0] Leave types loaded successfully:", data?.length || 0)
     } catch (error) {
       console.error("Error loading leave types:", error)
     }
   }
 
   const loadSalaryGrades = async () => {
-    try {
-      if (!companyData?.id || companyData.id.trim() === "") {
-        console.log("[v0] Skipping salary grades load - no company ID available")
-        return
-      }
+    if (!companyData.id) {
+      console.log("[v0] Skipping salary grades load - no company ID available")
+      return
+    }
 
+    try {
       const supabase = createClient()
       const { data, error } = await supabase
         .from("salary_grades")
         .select("*")
         .eq("company_id", companyData.id)
-        .eq("is_active", true)
         .order("grade_level")
 
-      if (error) {
-        console.error("Error loading salary grades:", error)
-        return
-      }
-
+      if (error) throw error
       setSalaryGradesState(data || [])
-      console.log("[v0] Salary grades loaded successfully")
+      console.log("[v0] Salary grades loaded successfully:", data?.length || 0)
     } catch (error) {
       console.error("Error loading salary grades:", error)
     }
   }
 
   const loadEmployees = async () => {
-    try {
-      if (!companyData?.id || companyData.id.trim() === "") {
-        console.log("[v0] Skipping employees load - no company ID available")
-        return
-      }
+    if (!companyData.id) {
+      console.log("[v0] Skipping employees load - no company ID available")
+      return
+    }
 
+    try {
       const supabase = createClient()
       const { data, error } = await supabase
         .from("employees")
@@ -1491,51 +1444,83 @@ export default function SettingsPage() {
         .eq("company_id", companyData.id)
         .order("full_name")
 
-      if (error) {
-        console.error("Error loading employees:", error)
-        return
-      }
-
+      if (error) throw error
       setEmployees(data || [])
-      console.log("[v0] Employees loaded successfully")
+      console.log("[v0] Employees loaded successfully:", data?.length || 0)
     } catch (error) {
       console.error("Error loading employees:", error)
     }
   }
 
-  const loadSubsidiaries = async () => {
+  const loadRoles = async () => {
+    // Roles might be system-wide or company-specific
     try {
-      if (!companyData?.id || companyData.id.trim() === "") {
-        console.log("[v0] Skipping subsidiaries load - no company ID available")
-        return
-      }
+      const supabase = createClient()
+      // Since there's no roles table in schema, we'll create default roles
+      const defaultRoles = [
+        { id: "1", name: "Admin", permissions: ["all"] },
+        { id: "2", name: "HR Manager", permissions: ["hr", "employees"] },
+        { id: "3", name: "Manager", permissions: ["team_management"] },
+        { id: "4", name: "Employee", permissions: ["basic"] },
+      ]
+      setRoles(defaultRoles)
+      console.log("[v0] Default roles loaded successfully")
+    } catch (error) {
+      console.error("Error loading roles:", error)
+    }
+  }
 
+  const loadEmailTemplates = async () => {
+    if (!companyData.id) {
+      console.log("[v0] Skipping email templates load - no company ID available")
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("ai_knowledge_base")
+        .select("*")
+        .eq("category", "email_templates")
+        .order("topic")
+
+      if (error) throw error
+      setEmailTemplates(data || [])
+      console.log("[v0] Email templates loaded successfully:", data?.length || 0)
+    } catch (error) {
+      console.error("Error loading email templates:", error)
+    }
+  }
+
+  const loadSubsidiaries = async () => {
+    if (!companyData.id) {
+      console.log("[v0] Skipping subsidiaries load - no company ID available")
+      return
+    }
+
+    try {
       const supabase = createClient()
       const { data, error } = await supabase
         .from("subsidiaries")
         .select("*")
-        .eq("company_id", companyData.id)
+        .eq("company_id", companyData.id) // Using company_id instead of parent_company_id
         .order("name")
 
-      if (error) {
-        console.error("Error loading subsidiaries:", error)
-        return
-      }
-
+      if (error) throw error
       setSubsidiaries(data || [])
-      console.log("[v0] Subsidiaries loaded successfully")
+      console.log("[v0] Subsidiaries loaded successfully:", data?.length || 0)
     } catch (error) {
       console.error("Error loading subsidiaries:", error)
     }
   }
 
   const loadPayrollConfig = async () => {
-    try {
-      if (!companyData?.id || companyData.id.trim() === "") {
-        console.log("[v0] Skipping payroll config load - no company ID available")
-        return
-      }
+    if (!companyData.id) {
+      console.log("[v0] Skipping payroll config load - no company ID available")
+      return
+    }
 
+    try {
       const supabase = createClient()
       const { data, error } = await supabase
         .from("payroll_configuration")
@@ -1543,19 +1528,10 @@ export default function SettingsPage() {
         .eq("company_id", companyData.id)
         .single()
 
-      if (error && error.code !== "PGRST116") {
-        console.error("Error loading payroll config:", error)
-        return
-      }
+      if (error && error.code !== "PGRST116") throw error
 
       if (data) {
-        setPayrollConfig({
-          minimum_wage: data.minimum_wage || 18.15,
-          overtime_weekday_multiplier: data.overtime_weekday_multiplier || 1.5,
-          overtime_weekend_multiplier: data.overtime_weekend_multiplier || 2,
-          currency_code: data.currency_code || "GHS",
-          currency_symbol: data.currency_symbol || "₵",
-        })
+        setPayrollConfig(data)
       }
       console.log("[v0] Payroll config loaded successfully")
     } catch (error) {
@@ -1564,25 +1540,20 @@ export default function SettingsPage() {
   }
 
   const loadPayrollAllowances = async () => {
-    try {
-      if (!companyData?.id || companyData.id.trim() === "") {
-        console.log("[v0] Skipping payroll allowances load - no company ID available")
-        return
-      }
+    if (!companyData.id) {
+      console.log("[v0] Skipping payroll allowances load - no company ID available")
+      return
+    }
 
+    try {
       const supabase = createClient()
       const { data, error } = await supabase
         .from("payroll_allowances")
         .select("*")
         .eq("company_id", companyData.id)
-        .eq("is_active", true)
         .order("code")
 
-      if (error) {
-        console.error("Error loading payroll allowances:", error)
-        return
-      }
-
+      if (error) throw error
       setPayrollAllowancesState(data || [])
       console.log("[v0] Payroll allowances loaded successfully")
     } catch (error) {
@@ -1591,82 +1562,26 @@ export default function SettingsPage() {
   }
 
   const loadPayrollDeductions = async () => {
-    try {
-      if (!companyData?.id || companyData.id.trim() === "") {
-        console.log("[v0] Skipping payroll deductions load - no company ID available")
-        return
-      }
+    if (!companyData.id) {
+      console.log("[v0] Skipping payroll deductions load - no company ID available")
+      return
+    }
 
+    try {
       const supabase = createClient()
       const { data, error } = await supabase
         .from("payroll_deductions")
         .select("*")
         .eq("company_id", companyData.id)
-        .eq("is_active", true)
         .order("code")
 
-      if (error) {
-        console.error("Error loading payroll deductions:", error)
-        return
-      }
-
+      if (error) throw error
       setPayrollDeductionsState(data || [])
       console.log("[v0] Payroll deductions loaded successfully")
     } catch (error) {
       console.error("Error loading payroll deductions:", error)
     }
   }
-
-  const loadRoles = async () => {
-    try {
-      const supabase = createClient()
-      // Since there's no roles table in the schema, we'll create default roles
-      const defaultRoles = [
-        { id: "1", name: "Admin", permissions: ["all"] },
-        { id: "2", name: "HR Manager", permissions: ["hr", "payroll"] },
-        { id: "3", name: "Employee", permissions: ["view"] },
-      ]
-
-      setRoles(defaultRoles)
-      console.log("[v0] Roles loaded successfully")
-    } catch (error) {
-      console.error("Error loading roles:", error)
-    }
-  }
-
-  const loadEmailTemplates = async () => {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("ai_knowledge_base")
-        .select("*")
-        .eq("category", "email_templates")
-        .eq("is_active", true)
-        .order("topic")
-
-      if (error) {
-        console.error("Error loading email templates:", error)
-        return
-      }
-
-      const templates = (data || []).map((item) => ({
-        id: item.id,
-        name: item.topic,
-        subject: item.topic,
-        content: item.content,
-        type: "email",
-      }))
-
-      setEmailTemplates(templates)
-      console.log("[v0] Email templates loaded successfully")
-    } catch (error) {
-      console.error("Error loading email templates:", error)
-    }
-  }
-
-  useEffect(() => {
-    loadAllData()
-  }, [])
 
   const handleEditLeaveType = (leaveType: LeaveType) => {
     setSelectedLeaveType(leaveType)
