@@ -7,7 +7,7 @@ import type { FunctionComponent } from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -3154,8 +3154,8 @@ function TabContent({ value, children }: { value: string; children: React.ReactN
   }
 
   return (
-    <Tabs.Content value={value} className="space-y-4">
+    <TabsContent value={value} className="space-y-4">
       {children}
-    </Tabs.Content>
+    </TabsContent>
   )
 }
