@@ -1,6 +1,8 @@
 "use client"
 
-import type React from "react"
+import React from "react"
+
+import type { FunctionComponent } from "react"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -17,18 +19,12 @@ import {
   Bell,
   Upload,
   X,
-  Plus,
   MoreVertical,
   Eye,
   Edit,
   Ban,
   Save,
-  Calculator,
-  Receipt,
-  Minus,
-  MoreHorizontal,
   Trash2,
-  Check,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -151,7 +147,7 @@ interface SubsidiaryFormProps {
   onCancel: () => void
 }
 
-const SubsidiaryForm: React.FC<SubsidiaryFormProps> = ({ subsidiary, onSave, onCancel }) => {
+const SubsidiaryForm: FunctionComponent<SubsidiaryFormProps> = ({ subsidiary, onSave, onCancel }) => {
   const [name, setName] = useState(subsidiary?.name || "")
   const [taxId, setTaxId] = useState(subsidiary?.tax_id || "")
   const [ssnitNumber, setSsnitNumber] = useState(subsidiary?.ssnit_number || "")
@@ -1616,7 +1612,11 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     }
   }
 
+  const [isSavingPayroll, setIsSavingPayroll] = useState(false)
+
   const handleSavePayrollSettings = async () => {
+    setIsSavingPayroll(true)
+
     try {
       const supabase = createClient()
 
@@ -1645,7 +1645,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       console.log("[v0] Saving payroll settings with user:", user.id, "company:", companyData.id)
 
       const configData = {
-        company_id: companyData.id, // Use UUID as string, not parsed as integer
+        company_id: companyData.id,
         minimum_wage: payrollConfig.minimum_wage,
         overtime_weekday_multiplier: payrollConfig.overtime_weekday_multiplier,
         overtime_weekend_multiplier: payrollConfig.overtime_weekend_multiplier,
@@ -1660,9 +1660,45 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         updated_at: new Date().toISOString(),
       }
 
-      const { error: configError } = await supabase.from("payroll_configuration").upsert(configData)
+      const { error: configError } = await supabase
+        .from("payroll_configuration")
+        .upsert(configData, { onConflict: "company_id" })
 
       if (configError) throw configError
+
+      if (taxBands && taxBands.length > 0) {
+        // Delete existing tax bands for this company
+        await supabase.from("paye_tax_bands").delete().eq("company_id", companyData.id)
+
+        // Insert new tax bands
+        const taxBandData = taxBands.map((band, index) => ({
+          company_id: companyData.id,
+          band_order: index + 1,
+          percentage: Number.parseFloat(band.rate) || 0,
+          threshold: Number.parseFloat(band.threshold) || 0,
+          description: band.description || `Band ${index + 1}`,
+          is_remaining: band.description?.toLowerCase().includes("remaining") || false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }))
+
+        const { error: taxBandError } = await supabase.from("paye_tax_bands").insert(taxBandData)
+
+        if (taxBandError) throw taxBandError
+      }
+
+      const ssnitData = {
+        company_id: companyData.id,
+        employee_rate: Number.parseFloat(ssnit.employee) || 5.5,
+        employer_rate: Number.parseFloat(ssnit.employer) || 13.0,
+        tier_2_rate: Number.parseFloat(tier2.employee) || 5.0,
+        tier_3_rate: Number.parseFloat(tier3.employee) || 0.0,
+        updated_at: new Date().toISOString(),
+      }
+
+      const { error: ssnitError } = await supabase.from("ssnit_rates").upsert(ssnitData, { onConflict: "company_id" })
+
+      if (ssnitError) throw ssnitError
 
       // Save allowances
       for (const allowance of payrollAllowances) {
@@ -1686,6 +1722,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         if (deductionError) throw deductionError
       }
 
+      // Save loan settings
       for (const loan of loanSettings) {
         const { error: loanError } = await supabase.from("loan_settings").upsert({
           ...loan,
@@ -1696,7 +1733,12 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         if (loanError) throw loanError
       }
 
-      toast({ title: "Success", description: "Payroll settings saved successfully" })
+      toast({
+        title: "Success",
+        description: "Payroll settings and tax configuration saved successfully",
+      })
+
+      await loadAllDataFunc()
     } catch (error) {
       console.error("Error saving payroll settings:", error)
       toast({
@@ -1704,6 +1746,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         description: `Failed to save payroll settings: ${error.message}`,
         variant: "destructive",
       })
+    } finally {
+      setIsSavingPayroll(false)
     }
   }
 
@@ -1838,6 +1882,37 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     )
   }
 
+  const loadAllDataFunc = async () => {
+    setIsLoading(true)
+    try {
+      await loadCompanyData()
+
+      // Load all other data that depends on company data
+      await Promise.all([
+        loadLeaveTypes(),
+        loadSalaryGrades(),
+        loadEmployees(),
+        loadSubsidiaries(),
+        loadPayrollConfig(),
+        loadPayrollAllowances(),
+        loadPayrollDeductions(),
+        loadLoanSettings(), // Now safe to load after company data is available
+        loadRoles(),
+        loadEmailTemplates(),
+        loadSecuritySettings(),
+      ])
+    } catch (error) {
+      console.error("Error loading settings data:", error)
+      toast({
+        title: "Error",
+        description: "Some settings data failed to load. Please refresh the page.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="container mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
@@ -1872,1114 +1947,904 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
             <DollarSign className="h-4 w-4" />
             Payroll
           </TabsTrigger>
-          <TabsTrigger value="hr" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            HR
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Notifications
           </TabsTrigger>
           <TabsTrigger value="security" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
             Security
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Notifications
-          </TabsTrigger>
         </TabsList>
 
-        {activeTab === "company" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Company Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="company-name">Company Name *</Label>
-                    <Input
-                      id="company-name"
-                      value={companyData.name}
-                      onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tax-id">Tax ID / TIN *</Label>
-                    <Input
-                      id="tax-id"
-                      value={companyData.tax_id}
-                      onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="ssnit-number">SSNIT Employer Number *</Label>
-                    <Input
-                      id="ssnit-number"
-                      value={companyData.ssnit_number}
-                      onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="industry">Industry</Label>
-                    <Select
-                      value={companyData.industry}
-                      onValueChange={(value) => setCompanyData({ ...companyData, industry: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Technology">Technology</SelectItem>
-                        <SelectItem value="Healthcare">Healthcare</SelectItem>
-                        <SelectItem value="Finance">Finance</SelectItem>
-                        <SelectItem value="Education">Education</SelectItem>
-                        <SelectItem value="Manufacturing">Manufacturing</SelectItem>
-                        <SelectItem value="Retail">Retail</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+        <TabContent value="company">
+          <Card>
+            <CardHeader>
+              <CardTitle>Company Information</CardTitle>
+              <CardDescription>Update your company details here.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="company-address">Company Address</Label>
-                  <Textarea
-                    id="company-address"
-                    value={companyData.address}
-                    onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
-                    placeholder="123 Liberation Road, Labome, Accra, Ghana"
-                    className="min-h-[80px]"
+                  <Label htmlFor="name">Company Name</Label>
+                  <Input
+                    id="name"
+                    value={companyData.name}
+                    onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
                   />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="phone-number">Phone Number</Label>
-                    <Input
-                      id="phone-number"
-                      value={companyData.phone}
-                      onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })}
-                      placeholder="+233 30 123 4567"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email-address">Email Address</Label>
-                    <Input
-                      id="email-address"
-                      type="email"
-                      value={companyData.email}
-                      onChange={(e) => setCompanyData({ ...companyData, email: e.target.value })}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={companyData.email}
+                    onChange={(e) => setCompanyData({ ...companyData, email: e.target.value })}
+                  />
                 </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Division / Branch</Label>
-                    <div className="space-y-2">
-                      {divisions.map((division, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Input value={division} readOnly />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDivisions(divisions.filter((_, i) => i !== index))}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button variant="outline" size="sm" onClick={() => setDivisions([...divisions, "New Division"])}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Division
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Department</Label>
-                    <div className="space-y-2">
-                      {departments.map((department, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Input value={department} readOnly />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDepartments(departments.filter((_, i) => i !== index))}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setDepartments([...departments, "New Department"])}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Department
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Location</Label>
-                    <div className="space-y-2">
-                      {locations.map((location, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Input value={location} readOnly />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setLocations(locations.filter((_, i) => i !== index))}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button variant="outline" size="sm" onClick={() => setLocations([...locations, "New Location"])}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Location
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-
-              <div className="flex justify-end mt-6">
-                <Button onClick={handleSaveCompanySettings} className="bg-green-600 hover:bg-green-700">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </Button>
               </div>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Upload className="h-5 w-5" />
-                  Company Logo
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-col items-center space-y-4">
-                  <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tax_id">Tax ID</Label>
+                  <Input
+                    id="tax_id"
+                    value={companyData.tax_id}
+                    onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ssnit_number">SSNIT Number</Label>
+                  <Input
+                    id="ssnit_number"
+                    value={companyData.ssnit_number}
+                    onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="industry">Industry</Label>
+                  <Input
+                    id="industry"
+                    value={companyData.industry}
+                    onChange={(e) => setCompanyData({ ...companyData, industry: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={companyData.phone}
+                    onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="address">Address</Label>
+                <Textarea
+                  id="address"
+                  value={companyData.address}
+                  onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Company Logo</Label>
+                <div className="flex items-center space-x-4">
+                  <div className="relative w-24 h-24 rounded-md overflow-hidden">
                     {logoPreview ? (
                       <img
                         src={logoPreview || "/placeholder.svg"}
                         alt="Company Logo"
-                        className="w-full h-full object-contain rounded-lg"
+                        className="object-cover w-full h-full"
                       />
                     ) : (
-                      <Upload className="h-8 w-8 text-gray-400" />
+                      <div className="flex items-center justify-center w-full h-full bg-muted">
+                        <Upload className="h-6 w-6 text-muted-foreground" />
+                      </div>
                     )}
                   </div>
-                  <div className="text-center">
-                    <input
-                      type="file"
-                      id="logo-upload"
-                      accept="image/png,image/jpeg"
-                      onChange={handleLogoUpload}
-                      className="hidden"
-                    />
-                    <Button asChild variant="outline">
-                      <label htmlFor="logo-upload" className="cursor-pointer">
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload Logo
-                      </label>
-                    </Button>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      PNG, JPG up to 2MB
-                      <br />
-                      Recommended: 200×200px
-                    </p>
-                  </div>
-                  {uploadedFileName && <p className="text-sm text-green-600">Uploaded: {uploadedFileName}</p>}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {activeTab === "multi-company" && (
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <h2 className="text-2xl font-bold">Multi-Company Management</h2>
-              <p className="text-muted-foreground">Manage multiple companies and subsidiaries</p>
-            </div>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <Building2 className="h-6 w-6 text-blue-600" />
-                    <div>
-                      <h3 className="font-semibold text-lg">{companyData.name}</h3>
-                      <p className="text-sm text-muted-foreground">{companyData.email}</p>
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    active
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-3 gap-6 mb-6">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Tax ID</p>
-                    <p className="font-medium">{companyData.tax_id}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">SSNIT Number</p>
-                    <p className="font-medium">{companyData.ssnit_number}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Industry</p>
-                    <p className="font-medium">{companyData.industry}</p>
+                    <Input type="file" id="logo-upload" className="hidden" onChange={handleLogoUpload} />
+                    <Label
+                      htmlFor="logo-upload"
+                      className="bg-secondary text-secondary-foreground rounded-md px-4 py-2 cursor-pointer hover:bg-secondary/80"
+                    >
+                      Upload Logo
+                    </Label>
+                    {uploadedFileName && (
+                      <p className="text-sm text-muted-foreground mt-1">Uploaded: {uploadedFileName}</p>
+                    )}
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabContent>
 
-                <div className="flex items-center gap-3 mb-6">
-                  <Checkbox
+        <TabContent value="multi-company">
+          <Card>
+            <CardHeader>
+              <CardTitle>Multi-Company Settings</CardTitle>
+              <CardDescription>Manage settings for multiple companies or subsidiaries.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Subsidiary Function</Label>
+                <div className="flex items-center space-x-2">
+                  <Switch
                     id="subsidiary-function"
                     checked={subsidiaryFunction}
                     onCheckedChange={handleSubsidiaryFunctionChange}
                   />
-                  <Label htmlFor="subsidiary-function" className="font-medium">
-                    Activate Subsidiary Function
-                  </Label>
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    {subsidiaryFunction ? "Active" : "Inactive"}
-                  </Badge>
+                  <Label htmlFor="subsidiary-function">Enable Subsidiary Management</Label>
                 </div>
-              </CardContent>
-            </Card>
+                <p className="text-sm text-muted-foreground">
+                  Enable this to manage multiple subsidiaries within your organization.
+                </p>
+              </div>
 
-            {subsidiaryFunction && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Subsidiaries ({subsidiaries.length})</CardTitle>
-                    <Button onClick={() => setShowSubsidiaryDialog(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Subsidiary
-                    </Button>
+              {subsidiaryFunction && (
+                <>
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-xl font-semibold">Subsidiaries</h2>
+                    <Button onClick={handleAddSubsidiary}>Add Subsidiary</Button>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {subsidiaries.map((subsidiary) => (
-                      <Card key={subsidiary.id} className="border-l-4 border-l-green-500">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                              <h4 className="font-semibold">{subsidiary.name}</h4>
-                              <p className="text-sm text-muted-foreground">{subsidiary.email}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                                {subsidiary.status}
-                              </Badge>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                  <DropdownMenuItem onClick={() => handleViewSubsidiary(subsidiary)}>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleEditSubsidiary(subsidiary)}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleDeactivateSubsidiary(subsidiary.id)}>
-                                    <Ban className="h-4 w-4 mr-2" />
-                                    Deactivate
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p className="text-muted-foreground">Tax ID:</p>
-                              <p className="font-medium">{subsidiary.tax_id}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">SSNIT:</p>
-                              <p className="font-medium">{subsidiary.ssnit_number}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Divisions:</p>
-                              <p className="font-medium">{subsidiary.divisions_count}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Departments:</p>
-                              <p className="font-medium">{subsidiary.departments_count}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Locations:</p>
-                              <p className="font-medium">{subsidiary.locations_count}</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
-            <div className="flex justify-end">
-              <Button onClick={handleSaveMultiCompany} disabled={isLoading}>
-                {isLoading ? "Saving..." : "Save Multi-Company Settings"}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "roles" && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Roles & Access Control</CardTitle>
-                <CardDescription>Manage user roles and permissions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {roles.map((role) => (
-                    <div key={role.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Shield className="h-5 w-5 text-blue-600" />
-                        <div>
-                          <h4 className="font-semibold">{role.name}</h4>
-                          <p className="text-sm text-muted-foreground">{role.description}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="font-semibold">{role.user_count} users</p>
-                          <p className="text-sm text-muted-foreground">permissions</p>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          Edit
-                        </Button>
-                      </div>
+                  {subsidiaries.length === 0 ? (
+                    <p className="text-muted-foreground">No subsidiaries added yet.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {subsidiaries.map((subsidiary) => (
+                        <Card key={subsidiary.id} className="shadow-sm">
+                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">{subsidiary.name}</CardTitle>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleViewSubsidiary(subsidiary)}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  View
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEditSubsidiary(subsidiary)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setShowDeactivateModal(true)}>
+                                  <Ban className="mr-2 h-4 w-4" />
+                                  Deactivate
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-muted-foreground">
+                              Divisions: {subsidiary.divisions_count || 0}, Departments:{" "}
+                              {subsidiary.departments_count || 0}, Locations: {subsidiary.locations_count || 0}
+                            </p>
+                            <Badge variant={subsidiary.status === "active" ? "default" : "destructive"}>
+                              {subsidiary.status}
+                            </Badge>
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabContent>
+
+        <TabContent value="roles">
+          <Card>
+            <CardHeader>
+              <CardTitle>Roles & Access</CardTitle>
+              <CardDescription>Manage user roles and permissions.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {roles.map((role) => (
+                <div key={role.id} className="border rounded-md p-4 mb-4">
+                  <h3 className="text-lg font-semibold">{role.name}</h3>
+                  <p className="text-muted-foreground">{role.description}</p>
+                  <p className="text-sm">Users: {role.user_count}</p>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              ))}
+            </CardContent>
+          </Card>
+        </TabContent>
 
-        {activeTab === "users" && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>Manage system users and their access</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
-                        A
-                      </div>
-                      <div>
-                        <h4 className="font-semibold">Admin User</h4>
-                        <p className="text-sm text-muted-foreground">admin@akwaabatech.com</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Badge>Super Admin</Badge>
-                      <p className="text-sm text-muted-foreground">Last login: 2024-01-15 09:30</p>
-                      <Badge variant="secondary">Active</Badge>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-semibold">
-                        H
-                      </div>
-                      <div>
-                        <h4 className="font-semibold">HR Manager</h4>
-                        <p className="text-sm text-muted-foreground">hr@akwaabatech.com</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Badge variant="outline">HR Manager</Badge>
-                      <p className="text-sm text-muted-foreground">Last login: 2024-01-15 08:45</p>
-                      <Badge variant="secondary">Active</Badge>
-                    </div>
-                  </div>
+        <TabContent value="users">
+          <Card>
+            <CardHeader>
+              <CardTitle>Users</CardTitle>
+              <CardDescription>Manage user accounts and access.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {employees.map((employee) => (
+                <div key={employee.id} className="border rounded-md p-4 mb-4">
+                  <h3 className="text-lg font-semibold">
+                    {employee.first_name} {employee.last_name}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {employee.position} - {employee.department}
+                  </p>
+                  <p className="text-sm">Email: {employee.corporate_email}</p>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              ))}
+            </CardContent>
+          </Card>
+        </TabContent>
 
-        {activeTab === "payroll" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calculator className="h-5 w-5" />
-                    Payroll Configuration
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Pay Frequency</Label>
-                      <Select
-                        value={payrollSettings.pay_frequency}
-                        onValueChange={(value) => setPayrollSettings({ ...payrollSettings, pay_frequency: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Monthly">Monthly</SelectItem>
-                          <SelectItem value="Bi-weekly">Bi-weekly</SelectItem>
-                          <SelectItem value="Weekly">Weekly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Currency</Label>
-                      <Select value={payrollConfig.currency_code} onValueChange={handleCurrencyChange}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="GHS">Ghana Cedis (GHS)</SelectItem>
-                          <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
-                          <SelectItem value="USD">US Dollar (USD)</SelectItem>
-                          <SelectItem value="EUR">Euro (EUR)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+        <TabContent value="payroll">
+          <Card>
+            <CardHeader>
+              <CardTitle>Payroll Settings</CardTitle>
+              <CardDescription>Configure payroll settings and tax bands.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="minimum_wage">Minimum Wage ({payrollConfig.currency_symbol})</Label>
+                  <Input
+                    id="minimum_wage"
+                    type="number"
+                    value={payrollConfig.minimum_wage}
+                    onChange={(e) =>
+                      setPayrollConfig({ ...payrollConfig, minimum_wage: Number.parseFloat(e.target.value) })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="currency">Currency</Label>
+                  <Select value={payrollConfig.currency_code} onValueChange={handleCurrencyChange}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="GHS">Ghana Cedis (GHS)</SelectItem>
+                      <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
+                      <SelectItem value="USD">US Dollar (USD)</SelectItem>
+                      <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Minimum Wage ({payrollConfig.currency_code})</Label>
-                      <Input
-                        type="number"
-                        value={payrollConfig.minimum_wage}
-                        onChange={(e) =>
-                          setPayrollConfig({ ...payrollConfig, minimum_wage: Number.parseFloat(e.target.value) || 0 })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Weekday Overtime Rate Multiplier</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={payrollConfig.overtime_weekday_multiplier}
-                        onChange={(e) =>
-                          setPayrollConfig({
-                            ...payrollConfig,
-                            overtime_weekday_multiplier: Number.parseFloat(e.target.value) || 0,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="overtime_weekday_multiplier">Overtime Weekday Multiplier</Label>
+                  <Input
+                    id="overtime_weekday_multiplier"
+                    type="number"
+                    value={payrollConfig.overtime_weekday_multiplier}
+                    onChange={(e) =>
+                      setPayrollConfig({
+                        ...payrollConfig,
+                        overtime_weekday_multiplier: Number.parseFloat(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="overtime_weekend_multiplier">Overtime Weekend Multiplier</Label>
+                  <Input
+                    id="overtime_weekend_multiplier"
+                    type="number"
+                    value={payrollConfig.overtime_weekend_multiplier}
+                    onChange={(e) =>
+                      setPayrollConfig({
+                        ...payrollConfig,
+                        overtime_weekend_multiplier: Number.parseFloat(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Weekend Overtime Rate Multiplier</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={payrollConfig.overtime_weekend_multiplier}
-                        onChange={(e) =>
-                          setPayrollConfig({
-                            ...payrollConfig,
-                            overtime_weekend_multiplier: Number.parseFloat(e.target.value) || 0,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Payroll Cutoff Day</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        max="31"
-                        value={payrollSettings.cutoff_day}
-                        onChange={(e) =>
-                          setPayrollSettings({ ...payrollSettings, cutoff_day: Number.parseInt(e.target.value) || 0 })
-                        }
-                      />
-                    </div>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="pay_frequency">Pay Frequency</Label>
+                  <Select
+                    value={payrollSettings.pay_frequency}
+                    onValueChange={(value) => setPayrollSettings({ ...payrollSettings, pay_frequency: value })}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Weekly">Weekly</SelectItem>
+                      <SelectItem value="Bi-Weekly">Bi-Weekly</SelectItem>
+                      <SelectItem value="Monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cutoff_day">Cutoff Day</Label>
+                  <Input
+                    id="cutoff_day"
+                    type="number"
+                    value={payrollSettings.cutoff_day}
+                    onChange={(e) =>
+                      setPayrollSettings({ ...payrollSettings, cutoff_day: Number.parseInt(e.target.value) })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="processing_day">Processing Day</Label>
+                  <Input
+                    id="processing_day"
+                    type="number"
+                    value={payrollSettings.processing_day}
+                    onChange={(e) =>
+                      setPayrollSettings({ ...payrollSettings, processing_day: Number.parseInt(e.target.value) })
+                    }
+                  />
+                </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label>Processing Day</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="31"
-                      value={payrollSettings.processing_day}
-                      onChange={(e) =>
-                        setPayrollSettings({ ...payrollSettings, processing_day: Number.parseInt(e.target.value) || 0 })
-                      }
-                    />
-                  </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="auto_calculate_paye"
+                  checked={payrollSettings.auto_calculate_paye}
+                  onCheckedChange={(checked) =>
+                    setPayrollSettings({ ...payrollSettings, auto_calculate_paye: checked })
+                  }
+                />
+                <Label htmlFor="auto_calculate_paye">Auto Calculate PAYE</Label>
+              </div>
 
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label>Auto-calculate PAYE</Label>
-                      <Switch
-                        checked={payrollSettings.auto_calculate_paye}
-                        onCheckedChange={(checked) =>
-                          setPayrollSettings({ ...payrollSettings, auto_calculate_paye: checked })
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label>Auto-calculate SSNIT</Label>
-                      <Switch
-                        checked={payrollSettings.auto_calculate_ssnit}
-                        onCheckedChange={(checked) =>
-                          setPayrollSettings({ ...payrollSettings, auto_calculate_ssnit: checked })
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label>Auto-calculate Provident Fund (Tier 3)</Label>
-                      <Switch
-                        checked={payrollSettings.auto_calculate_provident}
-                        onCheckedChange={(checked) =>
-                          setPayrollSettings({ ...payrollSettings, auto_calculate_provident: checked })
-                        }
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="auto_calculate_ssnit"
+                  checked={payrollSettings.auto_calculate_ssnit}
+                  onCheckedChange={(checked) =>
+                    setPayrollSettings({ ...payrollSettings, auto_calculate_ssnit: checked })
+                  }
+                />
+                <Label htmlFor="auto_calculate_ssnit">Auto Calculate SSNIT</Label>
+              </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Receipt className="h-5 w-5" />
-                    Tax Configuration
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold">PAYE Tax Bands</h4>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          const remainingBand = taxBands.find((band) => band.description === "remaining amount")
-                          const otherBands = taxBands.filter((band) => band.description !== "remaining amount")
-                          const newBand = {
-                            rate: 0,
-                            description: "next",
-                            threshold: 0,
-                          }
-                          const newBands = [...otherBands, newBand]
-                          if (remainingBand) {
-                            newBands.push(remainingBand)
-                          }
-                          setTaxBands(newBands)
-                        }}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="space-y-2">
-                      {taxBands.map((band, index) => (
-                        <div key={index} className="flex items-center gap-2 text-sm">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="auto_calculate_provident"
+                  checked={payrollSettings.auto_calculate_provident}
+                  onCheckedChange={(checked) =>
+                    setPayrollSettings({ ...payrollSettings, auto_calculate_provident: checked })
+                  }
+                />
+                <Label htmlFor="auto_calculate_provident">Auto Calculate Provident Fund</Label>
+              </div>
+
+              <h2 className="text-xl font-semibold">PAYE Tax Bands</h2>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Rate (%)
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Threshold ({payrollConfig.currency_symbol})
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Description
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {taxBands.map((band, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <Input
-                            className="w-16"
+                            type="number"
                             value={band.rate}
                             onChange={(e) => {
-                              const newBands = [...taxBands]
-                              newBands[index].rate = Number.parseFloat(e.target.value) || 0
-                              setTaxBands(newBands)
+                              const newTaxBands = [...taxBands]
+                              newTaxBands[index] = { ...band, rate: Number.parseFloat(e.target.value) }
+                              setTaxBands(newTaxBands)
                             }}
                           />
-                          <span>% on</span>
-                          <span className="text-blue-600">{band.description}</span>
-                          <span>{payrollConfig.currency_code}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <Input
-                            className="w-20"
+                            type="number"
                             value={band.threshold}
                             onChange={(e) => {
-                              const newBands = [...taxBands]
-                              newBands[index].threshold = Number.parseFloat(e.target.value) || 0
-                              setTaxBands(newBands)
+                              const newTaxBands = [...taxBands]
+                              newTaxBands[index] = { ...band, threshold: Number.parseFloat(e.target.value) }
+                              setTaxBands(newTaxBands)
                             }}
-                            disabled={band.description === "remaining amount"}
                           />
-                          {band.description !== "remaining amount" && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-red-500"
-                              onClick={() => {
-                                const newBands = taxBands.filter((_, i) => i !== index)
-                                setTaxBands(newBands)
-                              }}
-                            >
-                              <Minus className="h-4 w-4" />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Input
+                            type="text"
+                            value={band.description}
+                            onChange={(e) => {
+                              const newTaxBands = [...taxBands]
+                              newTaxBands[index] = { ...band, description: e.target.value }
+                              setTaxBands(newTaxBands)
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <h2 className="text-xl font-semibold">SSNIT Rates</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="employee_rate">Employee Rate (%)</Label>
+                  <Input
+                    id="employee_rate"
+                    type="number"
+                    value={ssnit.employee}
+                    onChange={(e) => dateSSNITRates("employee", Number.parseFloat(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="employer_rate">Employer Rate (%)</Label>
+                  <Input
+                    id="employer_rate"
+                    type="number"
+                    value={ssnit.employer}
+                    onChange={(e) => dateSSNITRates("employer", Number.parseFloat(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="total_rate">Total Rate (%)</Label>
+                  <Input id="total_rate" type="number" value={ssnit.total} readOnly />
+                </div>
+              </div>
+
+              <h2 className="text-xl font-semibold">Tier 2 Rates</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="employee_rate_tier2">Employee Rate (%)</Label>
+                  <Input
+                    id="employee_rate_tier2"
+                    type="number"
+                    value={tier2.employee}
+                    onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="employer_rate_tier2">Employer Rate (%)</Label>
+                  <Input
+                    id="employer_rate_tier2"
+                    type="number"
+                    value={tier2.employer}
+                    onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="total_rate_tier2">Total Rate (%)</Label>
+                  <Input id="total_rate_tier2" type="number" value={tier2.total} readOnly />
+                </div>
+              </div>
+
+              <h2 className="text-xl font-semibold">Tier 3 Rates</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="employee_rate_tier3">Employee Rate (%)</Label>
+                  <Input
+                    id="employee_rate_tier3"
+                    type="number"
+                    value={tier3.employee}
+                    onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="employer_rate_tier3">Employer Rate (%)</Label>
+                  <Input
+                    id="employer_rate_tier3"
+                    type="number"
+                    value={tier3.employer}
+                    onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="total_rate_tier3">Total Rate (%)</Label>
+                  <Input id="total_rate_tier3" type="number" value={tier3.total} readOnly />
+                </div>
+              </div>
+
+              <h2 className="text-xl font-semibold">Payroll Allowances</h2>
+              <div className="flex justify-between items-center mb-4">
+                <Button onClick={handleAddAllowance}>Add Allowance</Button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Code
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Description
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Amount
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {payrollAllowances.map((allowance, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 whitespace-nowrap">{allowance.code}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{allowance.description}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{allowance.type}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(allowance.amount)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex space-x-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleEditAllowance(index)}>
+                              <Edit className="h-4 w-4" />
                             </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="font-semibold mb-3">SSNIT Rates</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between items-center">
-                        <span>Employee:</span>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            className="w-16 h-6 text-xs"
-                            type="number"
-                            step="0.1"
-                            value={ssnit.employee}
-                            onChange={(e) => dateSSNITRates("employee", Number.parseFloat(e.target.value) || 0)}
-                          />
-                          <span>%</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>Employer:</span>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            className="w-16 h-6 text-xs"
-                            type="number"
-                            step="0.1"
-                            value={ssnit.employer}
-                            onChange={(e) => dateSSNITRates("employer", Number.parseFloat(e.target.value) || 0)}
-                          />
-                          <span>%</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between font-semibold">
-                        <span>Total:</span>
-                        <span>{ssnit.total.toFixed(1)}%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="font-semibold mb-3">Tier 2 Rates</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between items-center">
-                        <span>Employee:</span>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            className="w-16 h-6 text-xs"
-                            type="number"
-                            step="0.1"
-                            value={tier2.employee}
-                            onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value) || 0)}
-                          />
-                          <span>%</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>Employer:</span>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            className="w-16 h-6 text-xs"
-                            type="number"
-                            step="0.1"
-                            value={tier2.employer}
-                            onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value) || 0)}
-                          />
-                          <span>%</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between font-semibold">
-                        <span>Total:</span>
-                        <span>{tier2.total.toFixed(1)}%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="font-semibold mb-3">Tier 3 Rates</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between items-center">
-                        <span>Employee:</span>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            className="w-16 h-6 text-xs"
-                            type="number"
-                            step="0.1"
-                            value={tier3.employee}
-                            onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value) || 0)}
-                          />
-                          <span>%</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>Employer:</span>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            className="w-16 h-6 text-xs"
-                            type="number"
-                            step="0.1"
-                            value={tier3.employer}
-                            onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value) || 0)}
-                          />
-                          <span>%</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between font-semibold">
-                        <span>Total:</span>
-                        <span>{tier3.total.toFixed(1)}%</span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Allowances</span>
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={handleAddAllowance}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-2">Code</th>
-                        <th className="text-left p-2">Description</th>
-                        <th className="text-center p-2">Taxable</th>
-                        <th className="text-center p-2">Recurring</th>
-                        <th className="text-center p-2">AMOUNT</th>
-                        <th className="text-center p-2">%</th>
-                        <th className="text-center p-2">FIXED/VARIABLE</th>
-                        <th className="text-center p-2">Actions</th>
+                            <Button variant="ghost" size="sm" onClick={() => handleDeleteAllowance(index)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {payrollAllowances.map((allowance, index) => (
-                        <tr key={index} className="border-b">
-                          <td className="p-2">{allowance.code}</td>
-                          <td className="p-2">{allowance.description}</td>
-                          <td className="p-2 text-center">
-                            <Switch checked={allowance.taxable} size="sm" />
-                          </td>
-                          <td className="p-2 text-center">
-                            <Switch checked={allowance.recurring} size="sm" />
-                          </td>
-                          <td className="p-2 text-center">{allowance.amount}</td>
-                          <td className="p-2 text-center">{allowance.percentage}</td>
-                          <td className="p-2 text-center">{allowance.type}</td>
-                          <td className="p-2 text-center">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="ghost">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => handleEditAllowance(index)}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteAllowance(index)} className="text-red-600">
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Deductions</span>
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={handleAddDeduction}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-2">Code</th>
-                        <th className="text-left p-2">Description</th>
-                        <th className="text-center p-2">Recurring</th>
-                        <th className="text-center p-2">AMOUNT</th>
-                        <th className="text-center p-2">%</th>
-                        <th className="text-center p-2">FIXED/VARIABLE</th>
-                        <th className="text-center p-2">Actions</th>
+              <h2 className="text-xl font-semibold">Payroll Deductions</h2>
+              <div className="flex justify-between items-center mb-4">
+                <Button onClick={handleAddDeduction}>Add Deduction</Button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Code
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Description
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Amount
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {payrollDeductions.map((deduction, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 whitespace-nowrap">{deduction.code}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{deduction.description}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{deduction.type}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(deduction.amount)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex space-x-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleEditDeduction(index)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleDeleteDeduction(index)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {payrollDeductions.map((deduction, index) => (
-                        <tr key={index} className="border-b">
-                          <td className="p-2">{deduction.code}</td>
-                          <td className="p-2">{deduction.description}</td>
-                          <td className="p-2 text-center">
-                            <Switch checked={deduction.recurring} size="sm" />
-                          </td>
-                          <td className="p-2 text-center">{deduction.amount}</td>
-                          <td className="p-2 text-center">{deduction.percentage}</td>
-                          <td className="p-2 text-center">{deduction.type}</td>
-                          <td className="p-2 text-center">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="ghost">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => handleEditDeduction(index)}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteDeduction(index)} className="text-red-600">
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Loan Settings</span>
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={handleAddLoan}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-2">Code</th>
-                        <th className="text-left p-2">Description</th>
-                        <th className="text-center p-2">Maximum Amount</th>
-                        <th className="text-center p-2">Interest Rate (%)</th>
-                        <th className="text-center p-2">Rate Method</th>
-                        <th className="text-center p-2">Admin Charge</th>
-                        <th className="text-center p-2">Loan Tenure (months)</th>
-                        <th className="text-center p-2">Actions</th>
+              <h2 className="text-xl font-semibold">Loan Settings</h2>
+              <div className="flex justify-between items-center mb-4">
+                <Button onClick={handleAddLoan}>Add Loan</Button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Code
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Description
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Max Amount
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Interest Rate
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Tenure (Months)
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {loanSettings.map((loan, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Input
+                            type="text"
+                            value={loan.code}
+                            onChange={(e) => handleLoanInputChange(index, "code", e.target.value)}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Input
+                            type="text"
+                            value={loan.description}
+                            onChange={(e) => handleLoanInputChange(index, "description", e.target.value)}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Input
+                            type="number"
+                            value={loan.maxAmount}
+                            onChange={(e) => handleLoanInputChange(index, "maxAmount", e.target.value)}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Input
+                            type="number"
+                            value={loan.interestRate}
+                            onChange={(e) => handleLoanInputChange(index, "interestRate", e.target.value)}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Input
+                            type="number"
+                            value={loan.tenure}
+                            onChange={(e) => handleLoanInputChange(index, "tenure", e.target.value)}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex space-x-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleSaveLoan(index)}>
+                              <Save className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleDeleteLoan(index)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {loanSettings.map((loan, index) => (
-                        <tr key={loan.id || index} className="border-b">
-                          <td className="p-2">
-                            <Input
-                              value={loan.code}
-                              onChange={(e) => handleLoanInputChange(index, "code", e.target.value)}
-                              placeholder="Code"
-                              className="w-20"
-                            />
-                          </td>
-                          <td className="p-2">
-                            <Input
-                              value={loan.description}
-                              onChange={(e) => handleLoanInputChange(index, "description", e.target.value)}
-                              placeholder="Description"
-                              className="w-40"
-                            />
-                          </td>
-                          <td className="p-2 text-center">
-                            <Input
-                              type="number"
-                              value={loan.maxAmount}
-                              onChange={(e) =>
-                                handleLoanInputChange(index, "maxAmount", Number.parseFloat(e.target.value) || 0)
-                              }
-                              placeholder="0"
-                              className="w-24 text-center"
-                            />
-                          </td>
-                          <td className="p-2 text-center">
-                            <Input
-                              type="number"
-                              step="0.1"
-                              value={loan.interestRate}
-                              onChange={(e) =>
-                                handleLoanInputChange(index, "interestRate", Number.parseFloat(e.target.value) || 0)
-                              }
-                              placeholder="0"
-                              className="w-20 text-center"
-                            />
-                          </td>
-                          <td className="p-2 text-center">
-                            <Select
-                              value={loan.rateMethod}
-                              onChange={(value) => handleLoanInputChange(index, "rateMethod", value)}
-                            >
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Reducing Balance">Reducing Balance</SelectItem>
-                                <SelectItem value="Flat Rate">Flat Rate</SelectItem>
-                                <SelectItem value="Simple Interest">Simple Interest</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          <td className="p-2 text-center">
-                            <Input
-                              type="number"
-                              value={loan.adminCharge}
-                              onChange={(e) =>
-                                handleLoanInputChange(index, "adminCharge", Number.parseFloat(e.target.value) || 0)
-                              }
-                              placeholder="0"
-                              className="w-20 text-center"
-                            />
-                          </td>
-                          <td className="p-2 text-center">
-                            <Input
-                              type="number"
-                              value={loan.tenure}
-                              onChange={(e) =>
-                                handleLoanInputChange(index, "tenure", Number.parseInt(e.target.value) || 12)
-                              }
-                              placeholder="12"
-                              className="w-20 text-center"
-                            />
-                          </td>
-                          <td className="p-2 text-center">
-                            <div className="flex gap-1 justify-center">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleSaveLoan(index)}
-                                className="h-8 w-8 p-0 hover:bg-green-50 hover:border-green-300"
-                                title="Save loan settings"
-                              >
-                                <Check className="h-4 w-4 text-green-600" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleDeleteLoan(index)}
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-300"
-                                title="Delete loan"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {loanSettings.length === 0 && (
-                        <tr>
-                          <td colSpan="8" className="p-4 text-center text-gray-500">
-                            No loan settings configured. Click "Add" to create a new loan type.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabContent>
 
-            <div className="flex justify-end">
-              <Button onClick={handleSavePayrollSettings} className="bg-green-600 hover:bg-green-700">
-                <Save className="h-4 w-4 mr-2" />
-                Save Payroll Settings
+        <TabContent value="notifications">
+          <Card>
+            <CardHeader>
+              <CardTitle>Notification Settings</CardTitle>
+              <CardDescription>Configure notification preferences.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Notification Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={notificationSettings.email}
+                  onChange={(e) => setNotificationSettings({ ...notificationSettings, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="webhookUrl">Webhook URL</Label>
+                <Input
+                  id="webhookUrl"
+                  type="url"
+                  value={notificationSettings.webhookUrl}
+                  onChange={(e) => setNotificationSettings({ ...notificationSettings, webhookUrl: e.target.value })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabContent>
+
+        <TabContent value="security">
+          <Card>
+            <CardHeader>
+              <CardTitle>Security Settings</CardTitle>
+              <CardDescription>Configure security settings and password policies.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="two-factor-auth"
+                  checked={securitySettings.twoFactorAuth}
+                  onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, twoFactorAuth: checked })}
+                />
+                <Label htmlFor="two-factor-auth">Two-Factor Authentication</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="auto-session-timeout"
+                  checked={securitySettings.autoSessionTimeout}
+                  onCheckedChange={(checked) =>
+                    setSecuritySettings({ ...securitySettings, autoSessionTimeout: checked })
+                  }
+                />
+                <Label htmlFor="auto-session-timeout">Auto Session Timeout</Label>
+              </div>
+
+              {securitySettings.autoSessionTimeout && (
+                <div className="space-y-2 ml-6">
+                  <Label htmlFor="timeout-duration">Timeout Duration (minutes)</Label>
+                  <Input
+                    id="timeout-duration"
+                    type="number"
+                    value={securitySettings.timeoutDuration}
+                    onChange={(e) =>
+                      setSecuritySettings({ ...securitySettings, timeoutDuration: Number.parseInt(e.target.value) })
+                    }
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="audit-logging"
+                  checked={securitySettings.auditLogging}
+                  onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, auditLogging: checked })}
+                />
+                <Label htmlFor="audit-logging">Audit Logging</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="automated-backups"
+                  checked={securitySettings.automatedBackups}
+                  onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, automatedBackups: checked })}
+                />
+                <Label htmlFor="automated-backups">Automated Backups</Label>
+              </div>
+
+              {securitySettings.automatedBackups && (
+                <div className="space-y-2 ml-6">
+                  <Label htmlFor="backup-frequency">Backup Frequency</Label>
+                  <Select
+                    value={securitySettings.backupFrequency}
+                    onValueChange={(value) => setSecuritySettings({ ...securitySettings, backupFrequency: value })}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <h2 className="text-xl font-semibold">Password Policy</h2>
+              <div className="space-y-2 ml-6">
+                <Label htmlFor="min-length">Minimum Length</Label>
+                <Input
+                  id="min-length"
+                  type="number"
+                  value={passwordPolicy.minLength}
+                  onChange={(e) => setPasswordPolicy({ ...passwordPolicy, minLength: Number.parseInt(e.target.value) })}
+                />
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="require-uppercase"
+                    checked={passwordPolicy.requireUppercase}
+                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireUppercase: checked })}
+                  />
+                  <Label htmlFor="require-uppercase">Require Uppercase</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="require-numbers"
+                    checked={passwordPolicy.requireNumbers}
+                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireNumbers: checked })}
+                  />
+                  <Label htmlFor="require-numbers">Require Numbers</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="require-symbols"
+                    checked={passwordPolicy.requireSymbols}
+                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireSymbols: checked })}
+                  />
+                  <Label htmlFor="require-symbols">Require Symbols</Label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Password Strength</h3>
+                <div className="relative pt-1">
+                  <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-muted">
+                    <div
+                      style={{ width: `${passwordStrength.score}%` }}
+                      className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary"
+                    ></div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Strength: {passwordStrength.score}% (
+                    {passwordStrength.requirements.length === 0 ? "Strong" : "Weak"} - Missing:{" "}
+                    {passwordStrength.requirements.join(", ") || "None"})
+                  </p>
+                </div>
+              </div>
+
+              <Button variant="outline" onClick={handleChangeAdminPassword}>
+                Change Admin Password
               </Button>
-            </div>
-          </div>
-        )}
+              <Button variant="secondary" onClick={handleDownloadSecurityReport}>
+                Download Security Report
+              </Button>
 
-        {activeTab === "hr" && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>HR Settings</CardTitle>
-                <CardDescription>Manage leave types, salary grades, and HR policies</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">HR settings content will be implemented here.</p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              <h2 className="text-xl font-semibold mt-6">System Backups</h2>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground">
+                    Last Backup: {lastBackupTime ? new Date(lastBackupTime).toLocaleString() : "Never"}
+                  </p>
+                </div>
+                <div>
+                  <Button onClick={handleBackupNow} disabled={isBackingUp}>
+                    {isBackingUp ? "Backing Up..." : "Backup Now"}
+                  </Button>
+                </div>
+              </div>
 
-        {activeTab === "security" && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Security Settings</CardTitle>
-                <CardDescription>Configure security policies and access controls</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Security settings content will be implemented here.</p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {activeTab === "notifications" && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Settings</CardTitle>
-                <CardDescription>Configure email templates and notification preferences</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Notification settings content will be implemented here.</p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              <h2 className="text-xl font-semibold mt-6">Activity Log</h2>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground">Track user activity and system events.</p>
+                </div>
+                <div>
+                  <Button onClick={handleViewActivityLog}>View Activity Log</Button>
+                  <Button variant="secondary" onClick={handleDownloadAuditTrail}>
+                    Download Audit Trail
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabContent>
       </Tabs>
 
       <Dialog open={showSubsidiaryDialog} onOpenChange={setShowSubsidiaryDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>{editingSubsidiary ? "Edit Subsidiary" : "Add Subsidiary"}</DialogTitle>
+            <DialogDescription>Make changes to your subsidiary here. Click save when you're done.</DialogDescription>
           </DialogHeader>
           <SubsidiaryForm
             subsidiary={editingSubsidiary}
@@ -2990,61 +2855,54 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       </Dialog>
 
       <Dialog open={showViewSubsidiaryDialog} onOpenChange={setShowViewSubsidiaryDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Subsidiary Details</DialogTitle>
+            <DialogDescription>View details of the selected subsidiary.</DialogDescription>
           </DialogHeader>
           {viewingSubsidiary && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Name</Label>
-                  <p className="font-medium">{viewingSubsidiary.name}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Status</Label>
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    {viewingSubsidiary.status}
-                  </Badge>
-                </div>
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input value={viewingSubsidiary.name} readOnly />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Tax ID</Label>
-                  <p className="font-medium">{viewingSubsidiary.tax_id}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">SSNIT Number</Label>
-                  <p className="font-medium">{viewingSubsidiary.ssnit_number}</p>
-                </div>
+              <div className="space-y-2">
+                <Label>Tax ID</Label>
+                <Input value={viewingSubsidiary.tax_id} readOnly />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Email</Label>
-                  <p className="font-medium">{viewingSubsidiary.email_address}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
-                  <p className="font-medium">{viewingSubsidiary.phone_number}</p>
-                </div>
+              <div className="space-y-2">
+                <Label>SSNIT Number</Label>
+                <Input value={viewingSubsidiary.ssnit_number} readOnly />
               </div>
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Address</Label>
-                <p className="font-medium">{viewingSubsidiary.address}</p>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input value={viewingSubsidiary.email_address} readOnly />
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Divisions</Label>
-                  <p className="font-medium">{viewingSubsidiary.divisions_count || 0}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Departments</Label>
-                  <p className="font-medium">{viewingSubsidiary.departments_count || 0}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Locations</Label>
-                  <p className="font-medium">{viewingSubsidiary.locations_count || 0}</p>
-                </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input value={viewingSubsidiary.phone_number} readOnly />
+              </div>
+              <div className="space-y-2">
+                <Label>Address</Label>
+                <Textarea value={viewingSubsidiary.address} readOnly />
+              </div>
+              <div className="space-y-2">
+                <Label>Divisions</Label>
+                {viewingSubsidiary.divisions?.map((division, index) => (
+                  <Input key={index} value={division} readOnly />
+                ))}
+              </div>
+              <div className="space-y-2">
+                <Label>Departments</Label>
+                {viewingSubsidiary.departments?.map((department, index) => (
+                  <Input key={index} value={department} readOnly />
+                ))}
+              </div>
+              <div className="space-y-2">
+                <Label>Locations</Label>
+                {viewingSubsidiary.locations?.map((location, index) => (
+                  <Input key={index} value={location} readOnly />
+                ))}
               </div>
             </div>
           )}
@@ -3052,22 +2910,12 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
             <Button variant="outline" onClick={() => setShowViewSubsidiaryDialog(false)}>
               Close
             </Button>
-            <Button
-              onClick={() => {
-                setShowViewSubsidiaryDialog(false)
-                if (viewingSubsidiary) {
-                  handleEditSubsidiary(viewingSubsidiary)
-                }
-              }}
-            >
-              Edit
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={showDeactivateModal} onOpenChange={setShowDeactivateModal}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Deactivate Subsidiary Function</DialogTitle>
             <DialogDescription>
@@ -3079,418 +2927,224 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
             <Button variant="outline" onClick={handleCancelDeactivation}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleConfirmDeactivation}>
-              Deactivate
-            </Button>
+            <Button onClick={handleConfirmDeactivation}>Deactivate</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showAllowanceDialog} onOpenChange={setShowAllowanceDialog}>
-        <DialogContent>
+      <Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog}>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>{editingIndex >= 0 ? "Edit Allowance" : "Add Allowance"}</DialogTitle>
+            <DialogTitle>Change Admin Password</DialogTitle>
+            <DialogDescription>Change your admin password for enhanced security.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Code</Label>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="current">Current Password</Label>
+              <div className="relative">
                 <Input
-                  value={editingItem?.code || ""}
-                  onChange={(e) => setEditingItem({ ...editingItem, code: e.target.value })}
+                  id="current"
+                  type={showPasswords.current ? "text" : "password"}
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Input
-                  value={editingItem?.description || ""}
-                  onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={editingItem?.taxable || false}
-                  onCheckedChange={(checked) => setEditingItem({ ...editingItem, taxable: checked })}
-                />
-                <Label>Taxable</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={editingItem?.recurring || false}
-                  onCheckedChange={(checked) => setEditingItem({ ...editingItem, recurring: checked })}
-                />
-                <Label>Recurring</Label>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Amount</Label>
-                <Input
-                  type="number"
-                  value={editingItem?.amount || 0}
-                  onChange={(e) => setEditingItem({ ...editingItem, amount: Number.parseFloat(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Percentage</Label>
-                <Input
-                  type="number"
-                  value={editingItem?.percentage || 0}
-                  onChange={(e) =>
-                    setEditingItem({ ...editingItem, percentage: Number.parseFloat(e.target.value) || 0 })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <Select
-                  value={editingItem?.type || "FIXED"}
-                  onValueChange={(value) => setEditingItem({ ...editingItem, type: value })}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="FIXED">FIXED</SelectItem>
-                    <SelectItem value="VARIABLE">VARIABLE</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAllowanceDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                try {
-                  const supabase = createClient()
-
-                  if (!companyData.id) {
-                    toast({
-                      title: "Error",
-                      description: "Company data not available",
-                      variant: "destructive",
-                    })
-                    return
-                  }
-
-                  const allowanceData = {
-                    company_id: companyData.id,
-                    code: editingItem.code,
-                    description: editingItem.description,
-                    taxable: editingItem.taxable,
-                    recurring: editingItem.recurring,
-                    amount: editingItem.amount,
-                    percentage: editingItem.percentage,
-                    type: editingItem.type,
-                  }
-
-                  if (editingIndex >= 0) {
-                    // Update existing allowance
-                    const { data, error } = await supabase
-                      .from("payroll_allowances")
-                      .update(allowanceData)
-                      .eq("id", payrollAllowances[editingIndex].id)
-                      .select()
-
-                    if (error) throw error
-
-                    // Update local state with saved data
-                    const updatedAllowances = [...payrollAllowances]
-                    updatedAllowances[editingIndex] = {
-                      ...editingItem,
-                      id: data[0].id,
-                    }
-                    setPayrollAllowancesState(updatedAllowances)
-
-                    toast({
-                      title: "Success",
-                      description: "Allowance updated successfully",
-                    })
-                  } else {
-                    // Insert new allowance
-                    const { data, error } = await supabase.from("payroll_allowances").insert(allowanceData).select()
-
-                    if (error) throw error
-
-                    // Update local state with saved data
-                    setPayrollAllowancesState((prev) => [
-                      ...prev,
-                      {
-                        ...editingItem,
-                        id: data[0].id,
-                      },
-                    ])
-
-                    toast({
-                      title: "Success",
-                      description: "Allowance saved successfully",
-                    })
-                  }
-
-                  setShowAllowanceDialog(false)
-                } catch (error) {
-                  console.error("Error saving allowance:", error)
-                  toast({
-                    title: "Error",
-                    description: "Failed to save allowance",
-                    variant: "destructive",
-                  })
-                }
-              }}
-            >
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showDeductionDialog} onOpenChange={setShowDeductionDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingIndex >= 0 ? "Edit Deduction" : "Add Deduction"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Code</Label>
-                <Input
-                  value={editingItem?.code || ""}
-                  onChange={(e) => setEditingItem({ ...editingItem, code: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Input
-                  value={editingItem?.description || ""}
-                  onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                checked={editingItem?.recurring || false}
-                onCheckedChange={(checked) => setEditingItem({ ...editingItem, recurring: checked })}
-              />
-              <Label>Recurring</Label>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Amount</Label>
-                <Input
-                  type="number"
-                  value={editingItem?.amount || 0}
-                  onChange={(e) => setEditingItem({ ...editingItem, amount: Number.parseFloat(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Percentage</Label>
-                <Input
-                  type="number"
-                  value={editingItem?.percentage || 0}
-                  onChange={(e) =>
-                    setEditingItem({ ...editingItem, percentage: Number.parseFloat(e.target.value) || 0 })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <Select
-                  value={editingItem?.type || "FIXED"}
-                  onValueChange={(value) => setEditingItem({ ...editingItem, type: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="FIXED">FIXED</SelectItem>
-                    <SelectItem value="VARIABLE">VARIABLE</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeductionDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                try {
-                  const supabase = createClient()
-
-                  if (!companyData.id) {
-                    toast({
-                      title: "Error",
-                      description: "Company data not available",
-                      variant: "destructive",
-                    })
-                    return
-                  }
-
-                  const deductionData = {
-                    company_id: companyData.id,
-                    code: editingItem.code,
-                    description: editingItem.description,
-                    recurring: editingItem.recurring,
-                    amount: editingItem.amount,
-                    percentage: editingItem.percentage,
-                    type: editingItem.type,
-                  }
-
-                  if (editingIndex >= 0) {
-                    // Update existing deduction
-                    const { data, error } = await supabase
-                      .from("payroll_deductions")
-                      .update(deductionData)
-                      .eq("id", payrollDeductions[editingIndex].id)
-                      .select()
-
-                    if (error) throw error
-
-                    // Update local state with saved data
-                    const updatedDeductions = [...payrollDeductions]
-                    updatedDeductions[editingIndex] = {
-                      ...editingItem,
-                      id: data[0].id,
-                    }
-                    setPayrollDeductionsState(updatedDeductions)
-
-                    toast({
-                      title: "Success",
-                      description: "Deduction updated successfully",
-                    })
-                  } else {
-                    // Insert new deduction
-                    const { data, error } = await supabase.from("payroll_deductions").insert(deductionData).select()
-
-                    if (error) throw error
-
-                    // Update local state with saved data
-                    setPayrollDeductionsState((prev) => [
-                      ...prev,
-                      {
-                        ...editingItem,
-                        id: data[0].id,
-                      },
-                    ])
-
-                    toast({
-                      title: "Success",
-                      description: "Deduction saved successfully",
-                    })
-                  }
-
-                  setShowDeductionDialog(false)
-                } catch (error) {
-                  console.error("Error saving deduction:", error)
-                  toast({
-                    title: "Error",
-                    description: "Failed to save deduction",
-                    variant: "destructive",
-                  })
-                }
-              }}
-            >
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showLoanDialog} onOpenChange={setShowLoanDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingIndex >= 0 ? "Edit Loan Setting" : "Add Loan Setting"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Code</Label>
-                <Input
-                  value={editingItem?.code || ""}
-                  onChange={(e) => setEditingItem({ ...editingItem, code: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Input
-                  value={editingItem?.description || ""}
-                  onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Maximum Amount</Label>
-                <Input
-                  type="number"
-                  value={editingItem?.maxAmount || 0}
-                  onChange={(e) =>
-                    setEditingItem({ ...editingItem, maxAmount: Number.parseFloat(e.target.value) || 0 })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Interest Rate (%)</Label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={editingItem?.interestRate || 0}
-                  onChange={(e) =>
-                    setEditingItem({ ...editingItem, interestRate: Number.parseFloat(e.target.value) || 0 })
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Rate Method</Label>
-                <Select
-                  value={editingItem?.rateMethod || "Reducing Balance"}
-                  onValueChange={(value) => setEditingItem({ ...editingItem, rateMethod: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Reducing Balance">Reducing Balance</SelectItem>
-                    <SelectItem value="Straight Line Meet">Straight Line Meet</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Admin Charge</Label>
-                <Input
-                  type="number"
-                  value={editingItem?.adminCharge || 0}
-                  onChange={(e) =>
-                    setEditingItem({ ...editingItem, adminCharge: Number.parseFloat(e.target.value) || 0 })
-                  }
-                />
+                  {showPasswords.current ? <Eye className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+                </Button>
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Loan Tenure (months)</Label>
-              <Input
-                type="number"
-                value={editingItem?.tenure || 12}
-                onChange={(e) => setEditingItem({ ...editingItem, tenure: Number.parseInt(e.target.value) || 12 })}
-              />
+              <Label htmlFor="new">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="new"
+                  type={showPasswords.new ? "text" : "password"}
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+                >
+                  {showPasswords.new ? <Eye className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm">Confirm New Password</Label>
+              <div className="relative">
+                <Input
+                  id="confirm"
+                  type={showPasswords.confirm ? "text" : "password"}
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+                >
+                  {showPasswords.confirm ? <Eye className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLoanDialog(false)}>
+            <Button variant="outline" onClick={() => setShowPasswordChangeDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveLoan}>Save</Button>
+            <Button onClick={handlePasswordChange}>Change Password</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showActivityLog} onOpenChange={setShowActivityLog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Activity Log</DialogTitle>
+            <DialogDescription>View recent user activity and system events.</DialogDescription>
+          </DialogHeader>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Timestamp
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    User
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Action
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Resource
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    IP Address
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                <tr>
+                  <td className="px-6 py-4 whitespace-nowrap">{new Date().toLocaleString()}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">Admin</td>
+                  <td className="px-6 py-4 whitespace-nowrap">Login</td>
+                  <td className="px-6 py-4 whitespace-nowrap">System</td>
+                  <td className="px-6 py-4 whitespace-nowrap">192.168.1.1</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <Badge variant="outline">Success</Badge>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-6 py-4 whitespace-nowrap">{new Date(Date.now() - 3600000).toLocaleString()}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">Admin</td>
+                  <td className="px-6 py-4 whitespace-nowrap">Update Settings</td>
+                  <td className="px-6 py-4 whitespace-nowrap">Company Settings</td>
+                  <td className="px-6 py-4 whitespace-nowrap">192.168.1.1</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <Badge variant="outline">Success</Badge>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowActivityLog(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBackupSuccess} onOpenChange={setShowBackupSuccess}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Backup Successful</DialogTitle>
+            <DialogDescription>Your system has been backed up successfully.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setShowBackupSuccess(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEmailTemplateDialog} onOpenChange={setShowCustomTemplateDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>{editingEmailTemplate ? "Edit Email Template" : "Create Email Template"}</DialogTitle>
+            <DialogDescription>Customize email templates for various notifications.</DialogDescription>
+          </DialogHeader>
+          {/* Email Template Form */}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCustomTemplateDialog(false)}>
+              Cancel
+            </Button>
+            <Button>Save Template</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showLeaveTypeDialog} onOpenChange={setShowLeaveTypeDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{editingLeaveType ? "Edit Leave Type" : "Create Leave Type"}</DialogTitle>
+            <DialogDescription>Manage different types of leave available to employees.</DialogDescription>
+          </DialogHeader>
+          {/* Leave Type Form */}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLeaveTypeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveLeaveType}>Save Leave Type</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSalaryGradeDialog} onOpenChange={setShowSalaryGradeDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{editingSalaryGrade ? "Edit Salary Grade" : "Create Salary Grade"}</DialogTitle>
+            <DialogDescription>Define salary grades and levels for employees.</DialogDescription>
+          </DialogHeader>
+          {/* Salary Grade Form */}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSalaryGradeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveSalaryGrade}>Save Salary Grade</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+function TabContent({ value, children }: { value: string; children: React.ReactNode }) {
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return null
+  }
+
+  return (
+    <Tabs.Content value={value} className="space-y-4">
+      {children}
+    </Tabs.Content>
   )
 }
