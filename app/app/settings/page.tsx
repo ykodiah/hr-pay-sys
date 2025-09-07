@@ -28,6 +28,7 @@ import {
   Minus,
   MoreHorizontal,
   Trash2,
+  Check,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -506,17 +507,19 @@ export default function SettingsPage() {
   }
 
   const handleAddLoan = () => {
-    setEditingItem({
-      code: "",
-      description: "",
-      maxAmount: 0,
-      interestRate: 0,
-      rateMethod: "Reducing Balance",
-      adminCharge: 0,
-      tenure: 12,
-    })
-    setEditingIndex(-1)
-    setShowLoanDialog(true)
+    setLoanSettingsState((prev) => [
+      ...prev,
+      {
+        code: "",
+        description: "",
+        maxAmount: 0,
+        interestRate: 0,
+        rateMethod: "Reducing Balance",
+        adminCharge: 0,
+        tenure: 12,
+        id: null,
+      },
+    ])
   }
 
   const handleEditAllowance = (index: number) => {
@@ -583,260 +586,100 @@ export default function SettingsPage() {
     }
   }
 
-  const handleEditLoan = (index: number) => {
-    setEditingItem({ ...loanSettings[index] })
-    setEditingIndex(index)
-    setShowLoanDialog(true)
+  const handleLoanInputChange = (index, field, value) => {
+    const updatedLoans = [...loanSettings]
+    updatedLoans[index] = {
+      ...updatedLoans[index],
+      [field]: value,
+    }
+    setLoanSettingsState(updatedLoans)
   }
 
-  const handleDeleteLoan = async (index: number) => {
+  const handleSaveLoan = async (index) => {
     try {
-      const supabase = createClient()
       const loan = loanSettings[index]
+      const supabase = createClient()
+
+      if (!companyData.id) {
+        toast({
+          title: "Error",
+          description: "Company data not available",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const loanData = {
+        company_id: companyData.id,
+        code: loan.code,
+        description: loan.description,
+        type: loan.code,
+        max_amount: loan.maxAmount,
+        interest_rate: loan.interestRate,
+        max_repayment_months: loan.tenure,
+        is_active: true,
+        auto_deduct: true,
+        recurring: false,
+        taxable: false,
+      }
+
+      let result
       if (loan.id) {
+        // Update existing loan
+        result = await supabase.from("loan_settings").update(loanData).eq("id", loan.id).select()
+      } else {
+        // Insert new loan
+        result = await supabase.from("loan_settings").insert(loanData).select()
+      }
+
+      if (result.error) throw result.error
+
+      // Update local state with saved data
+      const updatedLoans = [...loanSettings]
+      updatedLoans[index] = {
+        ...loan,
+        id: result.data[0].id,
+      }
+      setLoanSettingsState(updatedLoans)
+
+      toast({
+        title: "Success",
+        description: "Loan settings saved successfully",
+      })
+    } catch (error) {
+      console.error("Error saving loan:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save loan settings",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteLoan = async (index) => {
+    try {
+      const loan = loanSettings[index]
+
+      if (loan.id) {
+        const supabase = createClient()
         const { error } = await supabase.from("loan_settings").delete().eq("id", loan.id)
+
         if (error) throw error
       }
 
-      const newLoans = loanSettings.filter((_, i) => i !== index)
-      setLoanSettingsState(newLoans)
+      // Remove from local state
+      const updatedLoans = loanSettings.filter((_, i) => i !== index)
+      setLoanSettingsState(updatedLoans)
 
       toast({
         title: "Success",
-        description: "Loan setting deleted successfully",
+        description: "Loan deleted successfully",
       })
     } catch (error) {
-      console.error("Error deleting loan setting:", error)
+      console.error("Error deleting loan:", error)
       toast({
         title: "Error",
-        description: "Failed to delete loan setting",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleSaveAllowance = async () => {
-    try {
-      const supabase = createClient()
-
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser()
-      if (authError || !user) {
-        toast({
-          title: "Authentication Error",
-          description: "You must be logged in to perform this action",
-          variant: "destructive",
-        })
-        return
-      }
-
-      if (!companyData.id || companyData.id.trim() === "") {
-        toast({
-          title: "Error",
-          description: "Company information not loaded. Please refresh the page.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      console.log("[v0] Saving allowance with user:", user.id, "company:", companyData.id)
-
-      if (editingIndex >= 0) {
-        // Update existing
-        if (editingItem.id) {
-          const { error } = await supabase.from("payroll_allowances").update(editingItem).eq("id", editingItem.id)
-          if (error) throw error
-        }
-        const newAllowances = [...payrollAllowances]
-        newAllowances[editingIndex] = editingItem
-        setPayrollAllowancesState(newAllowances)
-      } else {
-        // Add new - ensure all required fields are present
-        const allowanceData = {
-          ...editingItem,
-          company_id: companyData.id,
-          taxable: editingItem.taxable ?? false,
-          recurring: editingItem.recurring ?? false,
-          is_active: editingItem.is_active ?? true,
-          amount: editingItem.amount ?? 0,
-          percentage: editingItem.percentage ?? 0,
-        }
-
-        console.log("[v0] Inserting allowance data:", allowanceData)
-
-        const { data, error } = await supabase.from("payroll_allowances").insert([allowanceData]).select().single()
-
-        if (error) throw error
-
-        if (data) {
-          setPayrollAllowancesState([...payrollAllowances, data])
-        }
-      }
-
-      setShowAllowanceDialog(false)
-      toast({
-        title: "Success",
-        description: "Allowance saved successfully",
-      })
-    } catch (error) {
-      console.error("Error saving allowance:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save allowance",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleSaveDeduction = async () => {
-    try {
-      const supabase = createClient()
-
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser()
-      if (authError || !user) {
-        toast({
-          title: "Authentication Error",
-          description: "You must be logged in to perform this action",
-          variant: "destructive",
-        })
-        return
-      }
-
-      if (!companyData.id || companyData.id.trim() === "") {
-        toast({
-          title: "Error",
-          description: "Company information not loaded. Please refresh the page.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      console.log("[v0] Saving deduction with user:", user.id, "company:", companyData.id)
-
-      if (editingIndex >= 0) {
-        // Update existing
-        if (editingItem.id) {
-          const { error } = await supabase.from("payroll_deductions").update(editingItem).eq("id", editingItem.id)
-          if (error) throw error
-        }
-        const newDeductions = [...payrollDeductions]
-        newDeductions[editingIndex] = editingItem
-        setPayrollDeductionsState(newDeductions)
-      } else {
-        const deductionData = {
-          ...editingItem,
-          company_id: companyData.id,
-          taxable: editingItem.taxable ?? false,
-          recurring: editingItem.recurring ?? false,
-          is_active: editingItem.is_active ?? true,
-          amount: editingItem.amount ?? 0,
-          percentage: editingItem.percentage ?? 0,
-        }
-
-        console.log("[v0] Inserting deduction data:", deductionData)
-
-        const { data, error } = await supabase.from("payroll_deductions").insert([deductionData]).select().single()
-
-        if (error) throw error
-
-        if (data) {
-          setPayrollDeductionsState([...payrollDeductions, data])
-        }
-      }
-
-      setShowDeductionDialog(false)
-      toast({
-        title: "Success",
-        description: "Deduction saved successfully",
-      })
-    } catch (error) {
-      console.error("Error saving deduction:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save deduction",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleSaveLoan = async () => {
-    try {
-      const supabase = createClient()
-
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser()
-      if (authError || !user) {
-        toast({
-          title: "Authentication Error",
-          description: "You must be logged in to perform this action",
-          variant: "destructive",
-        })
-        return
-      }
-
-      if (!companyData.id || companyData.id.trim() === "") {
-        toast({
-          title: "Error",
-          description: "Company information not loaded. Please refresh the page.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      console.log("[v0] Saving loan setting with user:", user.id, "company:", companyData.id)
-
-      if (editingIndex >= 0) {
-        // Update existing
-        if (editingItem.id) {
-          const { error } = await supabase.from("loan_settings").update(editingItem).eq("id", editingItem.id)
-          if (error) throw error
-        }
-        const newLoans = [...loanSettings]
-        newLoans[editingIndex] = editingItem
-        setLoanSettingsState(newLoans)
-      } else {
-        const loanData = {
-          code: editingItem.code || "",
-          description: editingItem.description || "",
-          type: editingItem.type || "PERSONAL",
-          company_id: companyData.id,
-          max_amount: editingItem.maxAmount ?? 0,
-          interest_rate: editingItem.interestRate ?? 0,
-          max_repayment_months: editingItem.tenure ?? 12,
-          taxable: editingItem.taxable ?? false,
-          recurring: editingItem.recurring ?? false,
-          auto_deduct: editingItem.auto_deduct ?? true,
-          is_active: editingItem.is_active ?? true,
-        }
-
-        console.log("[v0] Inserting loan data:", loanData)
-
-        const { data, error } = await supabase.from("loan_settings").insert([loanData]).select().single()
-
-        if (error) throw error
-
-        if (data) {
-          setLoanSettingsState([...loanSettings, data])
-        }
-      }
-
-      setShowLoanDialog(false)
-      toast({
-        title: "Success",
-        description: "Loan setting saved successfully",
-      })
-    } catch (error) {
-      console.error("Error saving loan setting:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save loan setting",
+        description: "Failed to delete loan",
         variant: "destructive",
       })
     }
@@ -844,12 +687,19 @@ export default function SettingsPage() {
 
   const loadLoanSettings = async () => {
     try {
-      // Don't attempt to load if company ID is not available
+      // Wait for company data to be available with retry logic
+      let retries = 0
+      while (!companyData.id && retries < 10) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        retries++
+      }
+
       if (!companyData.id) {
-        console.log("[v0] Skipping loan settings load - no company ID available")
+        console.log("[v0] Skipping loan settings load - no company ID available after retries")
         return
       }
 
+      console.log("[v0] Loading loan settings for company:", companyData.id)
       const supabase = createClient()
       const { data, error } = await supabase
         .from("loan_settings")
@@ -858,7 +708,21 @@ export default function SettingsPage() {
         .order("type")
 
       if (error) throw error
-      setLoanSettingsState(data || [])
+
+      // Transform database data to match UI expectations
+      const transformedData = (data || []).map((loan) => ({
+        code: loan.code || "",
+        description: loan.description || "",
+        maxAmount: loan.max_amount || 0,
+        interestRate: loan.interest_rate || 0,
+        rateMethod: "Reducing Balance", // Default method
+        adminCharge: 0, // Not in current schema, can be added later
+        tenure: loan.max_repayment_months || 12,
+        id: loan.id,
+      }))
+
+      setLoanSettingsState(transformedData)
+      console.log("[v0] Loaded loan settings:", transformedData.length, "records")
     } catch (error) {
       console.error("Error loading loan settings:", error)
     }
@@ -2869,35 +2733,112 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                     </thead>
                     <tbody>
                       {loanSettings.map((loan, index) => (
-                        <tr key={index} className="border-b">
-                          <td className="p-2">{loan.code}</td>
-                          <td className="p-2">{loan.description}</td>
-                          <td className="p-2 text-center">{loan.maxAmount}</td>
-                          <td className="p-2 text-center">{loan.interestRate}</td>
-                          <td className="p-2 text-center">{loan.rateMethod}</td>
-                          <td className="p-2 text-center">{loan.adminCharge}</td>
-                          <td className="p-2 text-center">{loan.tenure}</td>
+                        <tr key={loan.id || index} className="border-b">
+                          <td className="p-2">
+                            <Input
+                              value={loan.code}
+                              onChange={(e) => handleLoanInputChange(index, "code", e.target.value)}
+                              placeholder="Code"
+                              className="w-20"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <Input
+                              value={loan.description}
+                              onChange={(e) => handleLoanInputChange(index, "description", e.target.value)}
+                              placeholder="Description"
+                              className="w-40"
+                            />
+                          </td>
                           <td className="p-2 text-center">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="ghost">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => handleEditLoan(index)}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteLoan(index)} className="text-red-600">
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <Input
+                              type="number"
+                              value={loan.maxAmount}
+                              onChange={(e) =>
+                                handleLoanInputChange(index, "maxAmount", Number.parseFloat(e.target.value) || 0)
+                              }
+                              placeholder="0"
+                              className="w-24 text-center"
+                            />
+                          </td>
+                          <td className="p-2 text-center">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={loan.interestRate}
+                              onChange={(e) =>
+                                handleLoanInputChange(index, "interestRate", Number.parseFloat(e.target.value) || 0)
+                              }
+                              placeholder="0"
+                              className="w-20 text-center"
+                            />
+                          </td>
+                          <td className="p-2 text-center">
+                            <Select
+                              value={loan.rateMethod}
+                              onValueChange={(value) => handleLoanInputChange(index, "rateMethod", value)}
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Reducing Balance">Reducing Balance</SelectItem>
+                                <SelectItem value="Flat Rate">Flat Rate</SelectItem>
+                                <SelectItem value="Simple Interest">Simple Interest</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="p-2 text-center">
+                            <Input
+                              type="number"
+                              value={loan.adminCharge}
+                              onChange={(e) =>
+                                handleLoanInputChange(index, "adminCharge", Number.parseFloat(e.target.value) || 0)
+                              }
+                              placeholder="0"
+                              className="w-20 text-center"
+                            />
+                          </td>
+                          <td className="p-2 text-center">
+                            <Input
+                              type="number"
+                              value={loan.tenure}
+                              onChange={(e) =>
+                                handleLoanInputChange(index, "tenure", Number.parseInt(e.target.value) || 12)
+                              }
+                              placeholder="12"
+                              className="w-20 text-center"
+                            />
+                          </td>
+                          <td className="p-2 text-center">
+                            <div className="flex gap-1 justify-center">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSaveLoan(index)}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteLoan(index)}
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))}
+                      {loanSettings.length === 0 && (
+                        <tr>
+                          <td colSpan="8" className="p-4 text-center text-gray-500">
+                            No loan settings configured. Click "Add" to create a new loan type.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -3144,7 +3085,87 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
             <Button variant="outline" onClick={() => setShowAllowanceDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveAllowance}>Save</Button>
+            <Button
+              onClick={async () => {
+                try {
+                  const supabase = createClient()
+
+                  if (!companyData.id) {
+                    toast({
+                      title: "Error",
+                      description: "Company data not available",
+                      variant: "destructive",
+                    })
+                    return
+                  }
+
+                  const allowanceData = {
+                    company_id: companyData.id,
+                    code: editingItem.code,
+                    description: editingItem.description,
+                    taxable: editingItem.taxable,
+                    recurring: editingItem.recurring,
+                    amount: editingItem.amount,
+                    percentage: editingItem.percentage,
+                    type: editingItem.type,
+                  }
+
+                  if (editingIndex >= 0) {
+                    // Update existing allowance
+                    const { data, error } = await supabase
+                      .from("payroll_allowances")
+                      .update(allowanceData)
+                      .eq("id", payrollAllowances[editingIndex].id)
+                      .select()
+
+                    if (error) throw error
+
+                    // Update local state with saved data
+                    const updatedAllowances = [...payrollAllowances]
+                    updatedAllowances[editingIndex] = {
+                      ...editingItem,
+                      id: data[0].id,
+                    }
+                    setPayrollAllowancesState(updatedAllowances)
+
+                    toast({
+                      title: "Success",
+                      description: "Allowance updated successfully",
+                    })
+                  } else {
+                    // Insert new allowance
+                    const { data, error } = await supabase.from("payroll_allowances").insert(allowanceData).select()
+
+                    if (error) throw error
+
+                    // Update local state with saved data
+                    setPayrollAllowancesState((prev) => [
+                      ...prev,
+                      {
+                        ...editingItem,
+                        id: data[0].id,
+                      },
+                    ])
+
+                    toast({
+                      title: "Success",
+                      description: "Allowance saved successfully",
+                    })
+                  }
+
+                  setShowAllowanceDialog(false)
+                } catch (error) {
+                  console.error("Error saving allowance:", error)
+                  toast({
+                    title: "Error",
+                    description: "Failed to save allowance",
+                    variant: "destructive",
+                  })
+                }
+              }}
+            >
+              Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3218,7 +3239,86 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
             <Button variant="outline" onClick={() => setShowDeductionDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveDeduction}>Save</Button>
+            <Button
+              onClick={async () => {
+                try {
+                  const supabase = createClient()
+
+                  if (!companyData.id) {
+                    toast({
+                      title: "Error",
+                      description: "Company data not available",
+                      variant: "destructive",
+                    })
+                    return
+                  }
+
+                  const deductionData = {
+                    company_id: companyData.id,
+                    code: editingItem.code,
+                    description: editingItem.description,
+                    recurring: editingItem.recurring,
+                    amount: editingItem.amount,
+                    percentage: editingItem.percentage,
+                    type: editingItem.type,
+                  }
+
+                  if (editingIndex >= 0) {
+                    // Update existing deduction
+                    const { data, error } = await supabase
+                      .from("payroll_deductions")
+                      .update(deductionData)
+                      .eq("id", payrollDeductions[editingIndex].id)
+                      .select()
+
+                    if (error) throw error
+
+                    // Update local state with saved data
+                    const updatedDeductions = [...payrollDeductions]
+                    updatedDeductions[editingIndex] = {
+                      ...editingItem,
+                      id: data[0].id,
+                    }
+                    setPayrollDeductionsState(updatedDeductions)
+
+                    toast({
+                      title: "Success",
+                      description: "Deduction updated successfully",
+                    })
+                  } else {
+                    // Insert new deduction
+                    const { data, error } = await supabase.from("payroll_deductions").insert(deductionData).select()
+
+                    if (error) throw error
+
+                    // Update local state with saved data
+                    setPayrollDeductionsState((prev) => [
+                      ...prev,
+                      {
+                        ...editingItem,
+                        id: data[0].id,
+                      },
+                    ])
+
+                    toast({
+                      title: "Success",
+                      description: "Deduction saved successfully",
+                    })
+                  }
+
+                  setShowDeductionDialog(false)
+                } catch (error) {
+                  console.error("Error saving deduction:", error)
+                  toast({
+                    title: "Error",
+                    description: "Failed to save deduction",
+                    variant: "destructive",
+                  })
+                }
+              }}
+            >
+              Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
