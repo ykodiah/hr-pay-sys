@@ -18,12 +18,13 @@ import {
   Bell,
   Upload,
   X,
-  MoreVertical,
   Eye,
   Edit,
   Ban,
-  Save,
   Trash2,
+  Plus,
+  MapPin,
+  Calendar,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -31,7 +32,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Switch } from "@/components/ui/switch"
 import {
   Dialog,
@@ -52,6 +52,10 @@ interface Company {
   phone_number: string
   email_address: string
   logo_file_id?: string
+  logo_url?: string
+  divisions?: string[]
+  departments?: string[]
+  locations?: string[]
 }
 
 interface LeaveType {
@@ -66,6 +70,17 @@ interface LeaveType {
   requires_approval: boolean
   requires_medical_certificate: boolean
   allow_carry_over: boolean
+  is_active: boolean
+  is_paid: boolean
+}
+
+interface LeavePolicy {
+  id: string
+  policy_name: string
+  policy_type: string
+  max_days: number
+  notice_period_days: number
+  requires_approval: boolean
   is_active: boolean
 }
 
@@ -279,16 +294,19 @@ export default function SettingsPage() {
 
   const [showDeactivateModal, setShowDeactivateModal] = useState(false)
 
-  const [companyData, setCompanyData] = useState({
+  const [companyData, setCompanyData] = useState<Company>({
     id: "",
     name: "",
-    email: "",
+    email_address: "",
     tax_id: "",
     ssnit_number: "",
     industry: "",
     status: "active",
     address: "",
-    phone: "",
+    phone_number: "",
+    divisions: [],
+    departments: [],
+    locations: [],
   })
 
   const [uploadedFileName, setUploadedFileName] = useState("")
@@ -408,6 +426,7 @@ export default function SettingsPage() {
   const [loanSettings, setLoanSettingsState] = useState<any[]>([])
   const [leaveTypes, setLeaveTypesState] = useState<any[]>([])
   const [salaryGrades, setSalaryGradesState] = useState<any[]>([])
+  const [leavePolicies, setLeavePoliciesState] = useState<LeavePolicy[]>([])
 
   const dateSSNITRates = (field: "employee" | "employer", value: number) => {
     const newSsnit = { ...ssnit, [field]: value }
@@ -768,6 +787,7 @@ export default function SettingsPage() {
           loadRoles(),
           loadEmailTemplates(),
           loadSecuritySettings(),
+          loadLeavePolicies(),
         ])
       } catch (error) {
         console.error("Error loading settings data:", error)
@@ -833,13 +853,16 @@ export default function SettingsPage() {
           setCompanyData({
             id: "00000000-0000-0000-0000-000000000001",
             name: "Your Company Name",
-            email: "info@yourcompany.com",
+            email_address: "info@yourcompany.com",
             tax_id: "",
             ssnit_number: "",
             industry: "",
             status: "active",
             address: "",
-            phone: "",
+            phone_number: "",
+            divisions: [],
+            departments: [],
+            locations: [],
           })
           return
         }
@@ -848,13 +871,16 @@ export default function SettingsPage() {
         setCompanyData({
           id: newCompany.id,
           name: newCompany.name || "",
-          email: newCompany.email_address || "",
+          email_address: newCompany.email_address || "",
           tax_id: newCompany.tax_id || "",
           ssnit_number: newCompany.ssnit_number || "",
           industry: newCompany.industry || "",
           status: "active",
           address: newCompany.address || "",
-          phone: newCompany.phone_number || "",
+          phone_number: newCompany.phone_number || "",
+          divisions: [],
+          departments: [],
+          locations: [],
         })
         return
       }
@@ -863,13 +889,17 @@ export default function SettingsPage() {
       setCompanyData({
         id: data.id || "",
         name: data.name || "",
-        email: data.email_address || "",
+        email_address: data.email_address || "",
         tax_id: data.tax_id || "",
         ssnit_number: data.ssnit_number || "",
         industry: data.industry || "",
         status: "active",
         address: data.address || "",
-        phone: data.phone_number || "",
+        phone_number: data.phone_number || "",
+        divisions: data.divisions || [],
+        departments: data.departments || [],
+        locations: data.locations || [],
+        logo_url: data.logo_url || "",
       })
 
       // Load company structure data
@@ -892,13 +922,16 @@ export default function SettingsPage() {
       setCompanyData({
         id: "00000000-0000-0000-0000-000000000001",
         name: "Your Company Name",
-        email: "info@yourcompany.com",
+        email_address: "info@yourcompany.com",
         tax_id: "",
         ssnit_number: "",
         industry: "",
         status: "active",
         address: "",
-        phone: "",
+        phone_number: "",
+        divisions: [],
+        departments: [],
+        locations: [],
       })
     }
   }
@@ -1070,6 +1103,23 @@ IT Support Team
       toast({
         title: "Error",
         description: "Failed to load leave types. Please check your connection.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const loadLeavePolicies = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.from("leave_policies").select("*").order("policy_name")
+
+      if (error) throw error
+      setLeavePoliciesState(data || [])
+    } catch (error) {
+      console.error("Error loading leave policies:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load leave policies. Please check your connection.",
         variant: "destructive",
       })
     }
@@ -1572,7 +1622,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         .from("companies")
         .update({
           name: companyData.name,
-          email_address: companyData.email,
+          email_address: companyData.email_address,
           tax_id: companyData.tax_id,
           ssnit_number: companyData.ssnit_number,
           industry: companyData.industry,
@@ -1605,12 +1655,12 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         .from("companies")
         .update({
           name: companyData.name,
-          email_address: companyData.email,
+          email_address: companyData.email_address,
           tax_id: companyData.tax_id,
           ssnit_number: companyData.ssnit_number,
           industry: companyData.industry,
           address: companyData.address,
-          phone_number: companyData.phone,
+          phone_number: companyData.phone_number,
           updated_at: new Date().toISOString(),
         })
         .eq("id", companyData.id)
@@ -1880,6 +1930,133 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     setShowDeactivateModal(false)
   }
 
+  const addDivision = () => {
+    setCompanyData({
+      ...companyData,
+      divisions: [...(companyData.divisions || []), "New Division"],
+    })
+  }
+
+  const removeDivision = (index: number) => {
+    setCompanyData({
+      ...companyData,
+      divisions: companyData.divisions?.filter((_, i) => i !== index),
+    })
+  }
+
+  const addDepartment = () => {
+    setCompanyData({
+      ...companyData,
+      departments: [...(companyData.departments || []), "New Department"],
+    })
+  }
+
+  const removeDepartment = (index: number) => {
+    setCompanyData({
+      ...companyData,
+      departments: companyData.departments?.filter((_, i) => i !== index),
+    })
+  }
+
+  const addLocation = () => {
+    setCompanyData({
+      ...companyData,
+      locations: [...(companyData.locations || []), "New Location"],
+    })
+  }
+
+  const removeLocation = (index: number) => {
+    setCompanyData({
+      ...companyData,
+      locations: companyData.locations?.filter((_, i) => i !== index),
+    })
+  }
+
+  const handleAddLeaveType = () => {
+    setEditingLeaveType({
+      id: "",
+      name: "",
+      code: "",
+      description: "",
+      annual_entitlement: 0,
+      max_consecutive_days: 0,
+      pay_percentage: 0,
+      min_notice_days: 0,
+      requires_approval: false,
+      requires_medical_certificate: false,
+      allow_carry_over: false,
+      is_active: true,
+      is_paid: true,
+    })
+    setShowLeaveTypeDialog(true)
+  }
+
+  const handleEditLeaveType = (leaveType: LeaveType) => {
+    setEditingLeaveType(leaveType)
+    setShowLeaveTypeDialog(true)
+  }
+
+  const handleAddLeavePolicy = () => {
+    setEditingLeavePolicy({
+      id: "",
+      policy_name: "",
+      policy_type: "",
+      max_days: 0,
+      notice_period_days: 0,
+      requires_approval: false,
+      is_active: true,
+    })
+    setShowLeavePolicyDialog(true)
+  }
+
+  const handleEditLeavePolicy = (leavePolicy: LeavePolicy) => {
+    setEditingLeavePolicy(leavePolicy)
+    setShowLeavePolicyDialog(true)
+  }
+
+  const handleAddSalaryGrade = () => {
+    setEditingSalaryGrade({
+      id: "",
+      grade_name: "",
+      grade_level: 0,
+      step_1: 0,
+      step_2: 0,
+      step_3: 0,
+      step_4: 0,
+      step_5: 0,
+    })
+    setShowSalaryGradeDialog(true)
+  }
+
+  const handleEditSalaryGrade = (salaryGrade: SalaryGrade) => {
+    setEditingSalaryGrade(salaryGrade)
+    setShowSalaryGradeDialog(true)
+  }
+
+  const [editingLeavePolicy, setEditingLeavePolicy] = useState<LeavePolicy | null>(null)
+  const [showLeavePolicyDialog, setShowLeavePolicyDialog] = useState(false)
+
+  const handleDeleteLeavePolicy = async (id: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("leave_policies").delete().eq("id", id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Leave policy deleted successfully.",
+      })
+      loadLeavePolicies()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete leave policy.",
+        variant: "destructive",
+      })
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -1911,6 +2088,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         loadRoles(),
         loadEmailTemplates(),
         loadSecuritySettings(),
+        loadLeavePolicies(),
       ])
     } catch (error) {
       console.error("Error loading settings data:", error)
@@ -1958,17 +2136,21 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
             <DollarSign className="h-4 w-4" />
             Payroll
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Notifications
+          <TabsTrigger value="hr" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            HR
           </TabsTrigger>
           <TabsTrigger value="security" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
             Security
           </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Notifications
+          </TabsTrigger>
         </TabsList>
 
-        <TabContent value="company">
+        <TabsContent value="company">
           <Card>
             <CardHeader>
               <CardTitle>Company Information</CardTitle>
@@ -1989,8 +2171,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <Input
                     id="email"
                     type="email"
-                    value={companyData.email}
-                    onChange={(e) => setCompanyData({ ...companyData, email: e.target.value })}
+                    value={companyData.email_address}
+                    onChange={(e) => setCompanyData({ ...companyData, email_address: e.target.value })}
                   />
                 </div>
               </div>
@@ -2027,8 +2209,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <Label htmlFor="phone">Phone Number</Label>
                   <Input
                     id="phone"
-                    value={companyData.phone}
-                    onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })}
+                    value={companyData.phone_number}
+                    onChange={(e) => setCompanyData({ ...companyData, phone_number: e.target.value })}
                   />
                 </div>
               </div>
@@ -2042,13 +2224,81 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Divisions</Label>
+                  <div className="border rounded-md p-3 min-h-[100px]">
+                    {companyData.divisions && Array.isArray(companyData.divisions) ? (
+                      companyData.divisions.map((division, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 border-b">
+                          <span>{division}</span>
+                          <Button variant="ghost" size="sm" onClick={() => removeDivision(index)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground text-sm">No divisions added</p>
+                    )}
+                    <Button variant="outline" size="sm" onClick={addDivision} className="mt-2 bg-transparent">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Division
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Departments</Label>
+                  <div className="border rounded-md p-3 min-h-[100px]">
+                    {companyData.departments && Array.isArray(companyData.departments) ? (
+                      companyData.departments.map((department, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 border-b">
+                          <span>{department}</span>
+                          <Button variant="ghost" size="sm" onClick={() => removeDepartment(index)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground text-sm">No departments added</p>
+                    )}
+                    <Button variant="outline" size="sm" onClick={addDepartment} className="mt-2 bg-transparent">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Department
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Locations</Label>
+                  <div className="border rounded-md p-3 min-h-[100px]">
+                    {companyData.locations && Array.isArray(companyData.locations) ? (
+                      companyData.locations.map((location, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 border-b">
+                          <span>{location}</span>
+                          <Button variant="ghost" size="sm" onClick={() => removeLocation(index)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground text-sm">No locations added</p>
+                    )}
+                    <Button variant="outline" size="sm" onClick={addLocation} className="mt-2 bg-transparent">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Location
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label>Company Logo</Label>
                 <div className="flex items-center space-x-4">
                   <div className="relative w-24 h-24 rounded-md overflow-hidden">
-                    {logoPreview ? (
+                    {companyData.logo_url ? (
                       <img
-                        src={logoPreview || "/placeholder.svg"}
+                        src={companyData.logo_url || "/placeholder.svg"}
                         alt="Company Logo"
                         className="object-cover w-full h-full"
                       />
@@ -2074,582 +2324,253 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               </div>
             </CardContent>
           </Card>
-        </TabContent>
+        </TabsContent>
 
-        <TabContent value="multi-company">
+        <TabsContent value="hr">
           <Card>
             <CardHeader>
-              <CardTitle>Multi-Company Settings</CardTitle>
-              <CardDescription>Manage settings for multiple companies or subsidiaries.</CardDescription>
+              <CardTitle>HR Management</CardTitle>
+              <CardDescription>Manage HR policies, leave types, salary grades, and employee data.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Subsidiary Function</Label>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="subsidiary-function"
-                    checked={subsidiaryFunction}
-                    onCheckedChange={handleSubsidiaryFunctionChange}
-                  />
-                  <Label htmlFor="subsidiary-function">Enable Subsidiary Management</Label>
+            <CardContent className="space-y-6">
+              {/* Leave Types Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Leave Types</h3>
+                  <Button onClick={handleAddLeaveType}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Leave Type
+                  </Button>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Enable this to manage multiple subsidiaries within your organization.
-                </p>
-              </div>
-
-              {subsidiaryFunction && (
-                <>
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold">Subsidiaries</h2>
-                    <Button onClick={handleAddSubsidiary}>Add Subsidiary</Button>
-                  </div>
-
-                  {subsidiaries.length === 0 ? (
-                    <p className="text-muted-foreground">No subsidiaries added yet.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {subsidiaries.map((subsidiary) => (
-                        <Card key={subsidiary.id} className="shadow-sm">
-                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">{subsidiary.name}</CardTitle>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleViewSubsidiary(subsidiary)}>
-                                  <Eye className="mr-2 h-4 w-4" />
-                                  View
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleEditSubsidiary(subsidiary)}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setShowDeactivateModal(true)}>
-                                  <Ban className="mr-2 h-4 w-4" />
-                                  Deactivate
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </CardHeader>
-                          <CardContent>
-                            <p className="text-sm text-muted-foreground">
-                              Divisions: {subsidiary.divisions_count || 0}, Departments:{" "}
-                              {subsidiary.departments_count || 0}, Locations: {subsidiary.locations_count || 0}
-                            </p>
-                            <Badge variant={subsidiary.status === "active" ? "default" : "destructive"}>
-                              {subsidiary.status}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Code
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Annual Entitlement
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Paid
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {leaveTypes.map((leaveType) => (
+                        <tr key={leaveType.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {leaveType.code}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{leaveType.name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {leaveType.annual_entitlement} days
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Badge variant={leaveType.is_paid ? "default" : "secondary"}>
+                              {leaveType.is_paid ? "Paid" : "Unpaid"}
                             </Badge>
-                          </CardContent>
-                        </Card>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleEditLeaveType(leaveType)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDeleteLeaveType(leaveType.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
                       ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabContent>
-
-        <TabContent value="roles">
-          <Card>
-            <CardHeader>
-              <CardTitle>Roles & Access</CardTitle>
-              <CardDescription>Manage user roles and permissions.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {roles.map((role) => (
-                <div key={role.id} className="border rounded-md p-4 mb-4">
-                  <h3 className="text-lg font-semibold">{role.name}</h3>
-                  <p className="text-muted-foreground">{role.description}</p>
-                  <p className="text-sm">Users: {role.user_count}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabContent>
-
-        <TabContent value="users">
-          <Card>
-            <CardHeader>
-              <CardTitle>Users</CardTitle>
-              <CardDescription>Manage user accounts and access.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {employees.map((employee) => (
-                <div key={employee.id} className="border rounded-md p-4 mb-4">
-                  <h3 className="text-lg font-semibold">
-                    {employee.first_name} {employee.last_name}
-                  </h3>
-                  <p className="text-muted-foreground">
-                    {employee.position} - {employee.department}
-                  </p>
-                  <p className="text-sm">Email: {employee.corporate_email}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabContent>
-
-        <TabContent value="payroll">
-          <Card>
-            <CardHeader>
-              <CardTitle>Payroll Settings</CardTitle>
-              <CardDescription>Configure payroll settings and tax bands.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="minimum_wage">Minimum Wage ({payrollConfig.currency_symbol})</Label>
-                  <Input
-                    id="minimum_wage"
-                    type="number"
-                    value={payrollConfig.minimum_wage}
-                    onChange={(e) =>
-                      setPayrollConfig({ ...payrollConfig, minimum_wage: Number.parseFloat(e.target.value) })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="currency">Currency</Label>
-                  <Select value={payrollConfig.currency_code} onValueChange={handleCurrencyChange}>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="GHS">Ghana Cedis (GHS)</SelectItem>
-                      <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
-                      <SelectItem value="USD">US Dollar (USD)</SelectItem>
-                      <SelectItem value="EUR">Euro (EUR)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="overtime_weekday_multiplier">Overtime Weekday Multiplier</Label>
-                  <Input
-                    id="overtime_weekday_multiplier"
-                    type="number"
-                    value={payrollConfig.overtime_weekday_multiplier}
-                    onChange={(e) =>
-                      setPayrollConfig({
-                        ...payrollConfig,
-                        overtime_weekday_multiplier: Number.parseFloat(e.target.value),
-                      })
-                    }
-                  />
+              {/* Leave Policies Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Leave Policies</h3>
+                  <Button onClick={handleAddLeavePolicy}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Policy
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="overtime_weekend_multiplier">Overtime Weekend Multiplier</Label>
-                  <Input
-                    id="overtime_weekend_multiplier"
-                    type="number"
-                    value={payrollConfig.overtime_weekend_multiplier}
-                    onChange={(e) =>
-                      setPayrollConfig({
-                        ...payrollConfig,
-                        overtime_weekend_multiplier: Number.parseFloat(e.target.value),
-                      })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="pay_frequency">Pay Frequency</Label>
-                  <Select
-                    value={payrollSettings.pay_frequency}
-                    onValueChange={(value) => setPayrollSettings({ ...payrollSettings, pay_frequency: value })}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Weekly">Weekly</SelectItem>
-                      <SelectItem value="Bi-Weekly">Bi-Weekly</SelectItem>
-                      <SelectItem value="Monthly">Monthly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cutoff_day">Cutoff Day</Label>
-                  <Input
-                    id="cutoff_day"
-                    type="number"
-                    value={payrollSettings.cutoff_day}
-                    onChange={(e) =>
-                      setPayrollSettings({ ...payrollSettings, cutoff_day: Number.parseInt(e.target.value) })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="processing_day">Processing Day</Label>
-                  <Input
-                    id="processing_day"
-                    type="number"
-                    value={payrollSettings.processing_day}
-                    onChange={(e) =>
-                      setPayrollSettings({ ...payrollSettings, processing_day: Number.parseInt(e.target.value) })
-                    }
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {leavePolicies.map((policy) => (
+                    <Card key={policy.id} className="shadow-sm">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">{policy.policy_name}</CardTitle>
+                        <CardDescription className="text-xs">{policy.policy_type}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 text-sm">
+                          <p>
+                            <strong>Max Days:</strong> {policy.max_days}
+                          </p>
+                          <p>
+                            <strong>Notice Period:</strong> {policy.notice_period_days} days
+                          </p>
+                          <p>
+                            <strong>Requires Approval:</strong> {policy.requires_approval ? "Yes" : "No"}
+                          </p>
+                          <Badge variant={policy.is_active ? "default" : "secondary"}>
+                            {policy.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                        <div className="flex space-x-2 mt-3">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditLeavePolicy(policy)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteLeavePolicy(policy.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="auto_calculate_paye"
-                  checked={payrollSettings.auto_calculate_paye}
-                  onCheckedChange={(checked) =>
-                    setPayrollSettings({ ...payrollSettings, auto_calculate_paye: checked })
-                  }
-                />
-                <Label htmlFor="auto_calculate_paye">Auto Calculate PAYE</Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="auto_calculate_ssnit"
-                  checked={payrollSettings.auto_calculate_ssnit}
-                  onCheckedChange={(checked) =>
-                    setPayrollSettings({ ...payrollSettings, auto_calculate_ssnit: checked })
-                  }
-                />
-                <Label htmlFor="auto_calculate_ssnit">Auto Calculate SSNIT</Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="auto_calculate_provident"
-                  checked={payrollSettings.auto_calculate_provident}
-                  onCheckedChange={(checked) =>
-                    setPayrollSettings({ ...payrollSettings, auto_calculate_provident: checked })
-                  }
-                />
-                <Label htmlFor="auto_calculate_provident">Auto Calculate Provident Fund</Label>
-              </div>
-
-              <h2 className="text-xl font-semibold">PAYE Tax Bands</h2>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Rate (%)
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Threshold ({payrollConfig.currency_symbol})
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Description
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {taxBands.map((band, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Input
-                            type="number"
-                            value={band.rate}
-                            onChange={(e) => {
-                              const newTaxBands = [...taxBands]
-                              newTaxBands[index] = { ...band, rate: Number.parseFloat(e.target.value) }
-                              setTaxBands(newTaxBands)
-                            }}
-                          />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Input
-                            type="number"
-                            value={band.threshold}
-                            onChange={(e) => {
-                              const newTaxBands = [...taxBands]
-                              newTaxBands[index] = { ...band, threshold: Number.parseFloat(e.target.value) }
-                              setTaxBands(newTaxBands)
-                            }}
-                          />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Input
-                            type="text"
-                            value={band.description}
-                            onChange={(e) => {
-                              const newTaxBands = [...taxBands]
-                              newTaxBands[index] = { ...band, description: e.target.value }
-                              setTaxBands(newTaxBands)
-                            }}
-                          />
-                        </td>
+              {/* Salary Grades Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Salary Grades & Notches</h3>
+                  <Button onClick={handleAddSalaryGrade}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Grade
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Grade
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Level
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Step 1
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Step 2
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Step 3
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Step 4
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Step 5
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <h2 className="text-xl font-semibold">SSNIT Rates</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="employee_rate">Employee Rate (%)</Label>
-                  <Input
-                    id="employee_rate"
-                    type="number"
-                    value={ssnit.employee}
-                    onChange={(e) => dateSSNITRates("employee", Number.parseFloat(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="employer_rate">Employer Rate (%)</Label>
-                  <Input
-                    id="employer_rate"
-                    type="number"
-                    value={ssnit.employer}
-                    onChange={(e) => dateSSNITRates("employer", Number.parseFloat(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="total_rate">Total Rate (%)</Label>
-                  <Input id="total_rate" type="number" value={ssnit.total} readOnly />
-                </div>
-              </div>
-
-              <h2 className="text-xl font-semibold">Tier 2 Rates</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="employee_rate_tier2">Employee Rate (%)</Label>
-                  <Input
-                    id="employee_rate_tier2"
-                    type="number"
-                    value={tier2.employee}
-                    onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="employer_rate_tier2">Employer Rate (%)</Label>
-                  <Input
-                    id="employer_rate_tier2"
-                    type="number"
-                    value={tier2.employer}
-                    onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="total_rate_tier2">Total Rate (%)</Label>
-                  <Input id="total_rate_tier2" type="number" value={tier2.total} readOnly />
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {salaryGrades.map((grade) => (
+                        <tr key={grade.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {grade.grade_name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.grade_level}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatCurrency(grade.step_1)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatCurrency(grade.step_2)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatCurrency(grade.step_3)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatCurrency(grade.step_4)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatCurrency(grade.step_5)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleEditSalaryGrade(grade)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDeleteSalaryGrade(grade.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
-              <h2 className="text-xl font-semibold">Tier 3 Rates</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="employee_rate_tier3">Employee Rate (%)</Label>
-                  <Input
-                    id="employee_rate_tier3"
-                    type="number"
-                    value={tier3.employee}
-                    onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value))}
-                  />
+              {/* Employee Summary */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Employee Overview</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center">
+                        <Users className="h-8 w-8 text-blue-600" />
+                        <div className="ml-4">
+                          <p className="text-sm font-medium text-gray-500">Total Employees</p>
+                          <p className="text-2xl font-bold text-gray-900">{employees.length}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center">
+                        <Building2 className="h-8 w-8 text-green-600" />
+                        <div className="ml-4">
+                          <p className="text-sm font-medium text-gray-500">Departments</p>
+                          <p className="text-2xl font-bold text-gray-900">{companyData.departments?.length || 0}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center">
+                        <MapPin className="h-8 w-8 text-purple-600" />
+                        <div className="ml-4">
+                          <p className="text-sm font-medium text-gray-500">Locations</p>
+                          <p className="text-2xl font-bold text-gray-900">{companyData.locations?.length || 0}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center">
+                        <Calendar className="h-8 w-8 text-orange-600" />
+                        <div className="ml-4">
+                          <p className="text-sm font-medium text-gray-500">Leave Types</p>
+                          <p className="text-2xl font-bold text-gray-900">{leaveTypes.length}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="employer_rate_tier3">Employer Rate (%)</Label>
-                  <Input
-                    id="employer_rate_tier3"
-                    type="number"
-                    value={tier3.employer}
-                    onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="total_rate_tier3">Total Rate (%)</Label>
-                  <Input id="total_rate_tier3" type="number" value={tier3.total} readOnly />
-                </div>
-              </div>
-
-              <h2 className="text-xl font-semibold">Payroll Allowances</h2>
-              <div className="flex justify-between items-center mb-4">
-                <Button onClick={handleAddAllowance}>Add Allowance</Button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Code
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Description
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Amount
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {payrollAllowances.map((allowance, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap">{allowance.code}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">{allowance.description}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">{allowance.type}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(allowance.amount)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex space-x-2">
-                            <Button variant="ghost" size="sm" onClick={() => handleEditAllowance(index)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDeleteAllowance(index)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <h2 className="text-xl font-semibold">Payroll Deductions</h2>
-              <div className="flex justify-between items-center mb-4">
-                <Button onClick={handleAddDeduction}>Add Deduction</Button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Code
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Description
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Amount
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {payrollDeductions.map((deduction, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap">{deduction.code}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">{deduction.description}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">{deduction.type}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">{formatCurrency(deduction.amount)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex space-x-2">
-                            <Button variant="ghost" size="sm" onClick={() => handleEditDeduction(index)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDeleteDeduction(index)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <h2 className="text-xl font-semibold">Loan Settings</h2>
-              <div className="flex justify-between items-center mb-4">
-                <Button onClick={handleAddLoan}>Add Loan</Button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Code
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Description
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Max Amount
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Interest Rate
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Tenure (Months)
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {loanSettings.map((loan, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Input
-                            type="text"
-                            value={loan.code}
-                            onChange={(e) => handleLoanInputChange(index, "code", e.target.value)}
-                          />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Input
-                            type="text"
-                            value={loan.description}
-                            onChange={(e) => handleLoanInputChange(index, "description", e.target.value)}
-                          />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Input
-                            type="number"
-                            value={loan.maxAmount}
-                            onChange={(e) => handleLoanInputChange(index, "maxAmount", e.target.value)}
-                          />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Input
-                            type="number"
-                            value={loan.interestRate}
-                            onChange={(e) => handleLoanInputChange(index, "interestRate", e.target.value)}
-                          />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Input
-                            type="number"
-                            value={loan.tenure}
-                            onChange={(e) => handleLoanInputChange(index, "tenure", e.target.value)}
-                          />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex space-x-2">
-                            <Button variant="ghost" size="sm" onClick={() => handleSaveLoan(index)}>
-                              <Save className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDeleteLoan(index)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             </CardContent>
           </Card>
-        </TabContent>
+        </TabsContent>
 
         <TabContent value="notifications">
           <Card>
