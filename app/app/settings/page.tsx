@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import type React from "react"
 
 import type { FunctionComponent } from "react"
 
@@ -20,11 +20,12 @@ import {
   X,
   Eye,
   Edit,
-  Ban,
   Trash2,
   Plus,
   MapPin,
   Calendar,
+  Download,
+  ExternalLink,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -33,14 +34,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
 
 interface Company {
   id: string
@@ -316,7 +309,15 @@ export default function SettingsPage() {
   const [departments, setDepartments] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
 
-  const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([])
+  const [subsidiaries, setSubsidiaries] = useState<any[]>([])
+  const [currencyRates, setCurrencyRates] = useState<any[]>([])
+  const [organizationalCharts, setOrganizationalCharts] = useState<any[]>([])
+  const [promotions, setPromotions] = useState<any[]>([])
+  const [employeeDocuments, setEmployeeDocuments] = useState<any[]>([])
+  const [communicationGroups, setCommunicationGroups] = useState<any[]>([])
+  const [onlineMeetings, setOnlineMeetings] = useState<any[]>([])
+  const [payrollConfigDetailed, setPayrollConfigDetailed] = useState<any>({})
+
   const [showViewSubsidiaryDialog, setShowViewSubsidiaryDialog] = useState(false)
   const [viewingSubsidiary, setViewingSubsidiary] = useState<Subsidiary | null>(null)
 
@@ -400,6 +401,11 @@ export default function SettingsPage() {
   const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
   const [isBackingUp, setIsBackingUp] = useState(false)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
+
+  const [showAddSubsidiaryDialog, setShowAddCurrencyRateDialog] = useState(false)
+  const [showAddOrgChartDialog, setShowAddPromotionDialog] = useState(false)
+  const [showAddDocumentDialog, setShowAddCommGroupDialog] = useState(false)
+  const [showAddMeetingDialog, setShowLeavePolicyDialog] = useState(false)
 
   const [editingEmailTemplate, setEditingEmailTemplate] = useState<EmailTemplate | null>(null)
   const [editingLeaveType, setEditingLeaveType] = useState<LeaveType | null>(null)
@@ -1108,6 +1114,17 @@ IT Support Team
     }
   }
 
+  const loadLeaveManagementData = async () => {
+    try {
+      await Promise.all([
+        loadLeaveTypes(),
+        loadLeavePolicies()
+      ])
+    } catch (error) {
+      console.error("Error loading leave management data:", error)
+    }
+  }
+
   const loadLeavePolicies = async () => {
     try {
       const supabase = createClient()
@@ -1151,6 +1168,175 @@ IT Support Team
       setEmployees(data || [])
     } catch (error) {
       console.error("Error loading employees:", error)
+    }
+  }
+
+  const loadCurrencyRates = async () => {
+    try {
+      console.log("[v0] Loading currency rates")
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("currency_rates")
+        .select("*")
+        .order("effective_date", { ascending: false })
+
+      if (error) {
+        console.error("[v0] Error loading currency rates:", error)
+        return
+      }
+
+      console.log("[v0] Currency rates loaded:", data?.length || 0)
+      setCurrencyRates(data || [])
+    } catch (error) {
+      console.error("[v0] Error loading currency rates:", error)
+    }
+  }
+
+  const loadOrganizationalCharts = async () => {
+    if (!companyData.id || companyData.id === "") {
+      console.log("[v0] Skipping organizational charts load - no company ID available")
+      return
+    }
+
+    try {
+      console.log("[v0] Loading organizational charts for company:", companyData.id)
+      const supabase = createClient()
+      const { data, error } = await supabase.from("organizational_charts").select("*").eq("company_id", companyData.id)
+
+      if (error) {
+        console.error("[v0] Error loading organizational charts:", error)
+        return
+      }
+
+      console.log("[v0] Organizational charts loaded:", data?.length || 0)
+      setOrganizationalCharts(data || [])
+    } catch (error) {
+      console.error("[v0] Error loading organizational charts:", error)
+    }
+  }
+
+  const loadPromotions = async () => {
+    if (!companyData.id || companyData.id === "") {
+      console.log("[v0] Skipping promotions load - no company ID available")
+      return
+    }
+
+    try {
+      console.log("[v0] Loading promotions for company:", companyData.id)
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("promotions")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        console.error("[v0] Error loading promotions:", error)
+        return
+      }
+
+      console.log("[v0] Promotions loaded:", data?.length || 0)
+      setPromotions(data || [])
+    } catch (error) {
+      console.error("[v0] Error loading promotions:", error)
+    }
+  }
+
+  const loadEmployeeDocuments = async () => {
+    try {
+      console.log("[v0] Loading employee documents")
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("employee_documents")
+        .select("*")
+        .order("upload_date", { ascending: false })
+
+      if (error) {
+        console.error("[v0] Error loading employee documents:", error)
+        return
+      }
+
+      console.log("[v0] Employee documents loaded:", data?.length || 0)
+      setEmployeeDocuments(data || [])
+    } catch (error) {
+      console.error("[v0] Error loading employee documents:", error)
+    }
+  }
+
+  const loadCommunicationGroups = async () => {
+    if (!companyData.id || companyData.id === "") {
+      console.log("[v0] Skipping communication groups load - no company ID available")
+      return
+    }
+
+    try {
+      console.log("[v0] Loading communication groups for company:", companyData.id)
+      const supabase = createClient()
+      const { data, error } = await supabase.from("communication_groups").select("*").eq("company_id", companyData.id)
+
+      if (error) {
+        console.error("[v0] Error loading communication groups:", error)
+        return
+      }
+
+      console.log("[v0] Communication groups loaded:", data?.length || 0)
+      setCommunicationGroups(data || [])
+    } catch (error) {
+      console.error("[v0] Error loading communication groups:", error)
+    }
+  }
+
+  const loadOnlineMeetings = async () => {
+    if (!companyData.id || companyData.id === "") {
+      console.log("[v0] Skipping online meetings load - no company ID available")
+      return
+    }
+
+    try {
+      console.log("[v0] Loading online meetings for company:", companyData.id)
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("online_meetings")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .order("scheduled_start", { ascending: false })
+
+      if (error) {
+        console.error("[v0] Error loading online meetings:", error)
+        return
+      }
+
+      console.log("[v0] Online meetings loaded:", data?.length || 0)
+      setOnlineMeetings(data || [])
+    } catch (error) {
+      console.error("[v0] Error loading online meetings:", error)
+    }
+  }
+
+  const loadPayrollConfigDetailed = async () => {
+    if (!companyData.id || companyData.id === "") {
+      console.log("[v0] Skipping detailed payroll config load - no company ID available")
+      return
+    }
+
+    try {
+      console.log("[v0] Loading detailed payroll configuration for company:", companyData.id)
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("payroll_configuration")
+        .select("*")
+        .eq("company_id", companyData.id)
+        .single()
+
+      if (error && error.code !== "PGRST116") {
+        console.error("[v0] Error loading detailed payroll config:", error)
+        return
+      }
+
+      console.log("[v0] Detailed payroll config loaded:", data)
+      setPayrollConfigDetailed(data || {})
+    } catch (error) {
+      console.error("[v0] Error loading detailed payroll config:", error)
     }
   }
 
@@ -1604,6 +1790,117 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     }
   }
 
+  const handleDeleteSubsidiary = async (subsidiaryId: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("subsidiaries").delete().eq("id", subsidiaryId)
+
+      if (error) throw error
+      toast({ title: "Success", description: "Subsidiary deleted successfully" })
+      loadSubsidiaries()
+    } catch (error) {
+      console.error("Error deleting subsidiary:", error)
+      toast({ title: "Error", description: "Failed to delete subsidiary", variant: "destructive" })
+    }
+  }
+
+  const handleEditCurrencyRate = (rate: any) => {
+    // Implementation for editing currency rate
+    console.log("Edit currency rate:", rate)
+  }
+
+  const handleDeleteCurrencyRate = async (rateId: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("currency_rates").delete().eq("id", rateId)
+
+      if (error) throw error
+      toast({ title: "Success", description: "Currency rate deleted successfully" })
+      loadCurrencyRates()
+    } catch (error) {
+      console.error("Error deleting currency rate:", error)
+      toast({ title: "Error", description: "Failed to delete currency rate", variant: "destructive" })
+    }
+  }
+
+  const handleViewOrgChart = (chart: any) => {
+    console.log("View org chart:", chart)
+  }
+
+  const handleEditOrgChart = (chart: any) => {
+    console.log("Edit org chart:", chart)
+  }
+
+  const handleDeleteOrgChart = async (chartId: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("organizational_charts").delete().eq("id", chartId)
+
+      if (error) throw error
+      toast({ title: "Success", description: "Organizational chart deleted successfully" })
+      loadOrganizationalCharts()
+    } catch (error) {
+      console.error("Error deleting organizational chart:", error)
+      toast({ title: "Error", description: "Failed to delete organizational chart", variant: "destructive" })
+    }
+  }
+
+  const handleViewPromotion = (promotion: any) => {
+    console.log("View promotion:", promotion)
+  }
+
+  const handleEditPromotion = (promotion: any) => {
+    console.log("Edit promotion:", promotion)
+  }
+
+  const handleViewDocument = (document: any) => {
+    console.log("View document:", document)
+  }
+
+  const handleDownloadDocument = (document: any) => {
+    console.log("Download document:", document)
+  }
+
+  const handleDeleteDocument = async (documentId: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("employee_documents").delete().eq("id", documentId)
+
+      if (error) throw error
+      toast({ title: "Success", description: "Document deleted successfully" })
+      loadEmployeeDocuments()
+    } catch (error) {
+      console.error("Error deleting document:", error)
+      toast({ title: "Error", description: "Failed to delete document", variant: "destructive" })
+    }
+  }
+
+  const handleViewCommGroup = (group: any) => {
+    console.log("View communication group:", group)
+  }
+
+  const handleEditCommGroup = (group: any) => {
+    console.log("Edit communication group:", group)
+  }
+
+  const handleDeleteCommGroup = async (groupId: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("communication_groups").delete().eq("id", groupId)
+
+      if (error) throw error
+      toast({ title: "Success", description: "Communication group deleted successfully" })
+      loadCommunicationGroups()
+    } catch (error) {
+      console.error("Error deleting communication group:", error)
+      toast({ title: "Error", description: "Failed to delete communication group", variant: "destructive" })
+    }
+  }
+
+  const handleViewMeeting = (meeting: any) => {
+    console.log("View meeting:", meeting)
+  }
+
   const handleSaveMultiCompany = async () => {
     try {
       const supabase = createClient()
@@ -2006,12 +2303,12 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       requires_approval: false,
       is_active: true,
     })
-    setShowLeavePolicyDialog(true)
+    setShowLeavePolicyDialogFunc(true)
   }
 
   const handleEditLeavePolicy = (leavePolicy: LeavePolicy) => {
     setEditingLeavePolicy(leavePolicy)
-    setShowLeavePolicyDialog(true)
+    setShowLeavePolicyDialogFunc(true)
   }
 
   const handleAddSalaryGrade = () => {
@@ -2034,7 +2331,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
   }
 
   const [editingLeavePolicy, setEditingLeavePolicy] = useState<LeavePolicy | null>(null)
-  const [showLeavePolicyDialog, setShowLeavePolicyDialog] = useState(false)
+  const [showLeavePolicyDialog, setShowLeavePolicyDialogFunc] = useState(false)
 
   const handleDeleteLeavePolicy = async (id: string) => {
     try {
@@ -2068,6 +2365,54 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         </div>
       </div>
     )
+  }
+
+  const loadAllData = async () => {
+    setIsLoading(true)
+    try {
+      console.log("[v0] Starting comprehensive data load")
+
+      // Wait for company data to be available
+      let retries = 0
+      const maxRetries = 5
+      while ((!companyData.id || companyData.id === "") && retries < maxRetries) {
+        console.log(`[v0] Waiting for company ID, attempt ${retries + 1}`)
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        retries++
+      }
+
+      if (!companyData.id || companyData.id === "") {
+        console.log("[v0] Company ID not available after retries, loading basic data only")
+        await Promise.all([loadCurrencyRates(), loadEmployeeDocuments()])
+        return
+      }
+
+      // Load all data in parallel for better performance
+      await Promise.all([
+        loadSubsidiaries(),
+        loadCurrencyRates(),
+        loadOrganizationalCharts(),
+        loadPromotions(),
+        loadEmployeeDocuments(),
+        loadCommunicationGroups(),
+        loadOnlineMeetings(),
+        loadPayrollConfigDetailed(),
+        loadLeaveManagementData(),
+        loadSalaryGrades(),
+        loadEmployees(),
+        loadPayrollAllowances(),
+        loadPayrollDeductions(),
+        loadLoanSettings(),
+        loadRoles(),
+        loadEmailTemplates(),
+      ])
+
+      console.log("[v0] Comprehensive data load completed")
+    } catch (error) {
+      console.error("[v0] Error in comprehensive data load:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const loadAllDataFunc = async () => {
@@ -2326,13 +2671,177 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           </Card>
         </TabsContent>
 
+        <TabsContent value="multi-company">
+          <Card>
+            <CardHeader>
+              <CardTitle>Multi-Company Management</CardTitle>
+              <CardDescription>Manage subsidiaries and multi-company operations.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Subsidiaries Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Subsidiaries</h3>
+                  <Button onClick={() => setShowAddSubsidiaryDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Subsidiary
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {subsidiaries.map((subsidiary) => (
+                    <Card key={subsidiary.id} className="shadow-sm">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">{subsidiary.name}</CardTitle>
+                        <CardDescription className="text-xs">{subsidiary.status}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 text-sm">
+                          <p>
+                            <strong>Tax ID:</strong> {subsidiary.tax_id}
+                          </p>
+                          <p>
+                            <strong>SSNIT:</strong> {subsidiary.ssnit_number}
+                          </p>
+                          <p>
+                            <strong>Email:</strong> {subsidiary.email_address}
+                          </p>
+                          <p>
+                            <strong>Phone:</strong> {subsidiary.phone_number}
+                          </p>
+                          <Badge variant={subsidiary.status === "active" ? "default" : "secondary"}>
+                            {subsidiary.status}
+                          </Badge>
+                        </div>
+                        <div className="flex space-x-2 mt-3">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditSubsidiary(subsidiary)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteSubsidiary(subsidiary.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {/* Currency Management */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Currency Exchange Rates</h3>
+                  <Button onClick={() => setShowAddCurrencyRateDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Rate
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          From Currency
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          To Currency
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Exchange Rate
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Effective Date
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {currencyRates.map((rate) => (
+                        <tr key={rate.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {rate.from_currency}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{rate.to_currency}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{rate.exchange_rate}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(rate.effective_date).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleEditCurrencyRate(rate)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDeleteCurrencyRate(rate.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Organizational Charts */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Organizational Charts</h3>
+                  <Button onClick={() => setShowAddOrgChartDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Chart
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {organizationalCharts.map((chart) => (
+                    <Card key={chart.id} className="shadow-sm">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">{chart.name}</CardTitle>
+                        <CardDescription className="text-xs">{chart.chart_type}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 text-sm">
+                          <p>
+                            <strong>Style:</strong> {chart.chart_style}
+                          </p>
+                          <p>
+                            <strong>Description:</strong> {chart.description}
+                          </p>
+                          <Badge variant={chart.is_active ? "default" : "secondary"}>
+                            {chart.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                        <div className="flex space-x-2 mt-3">
+                          <Button variant="ghost" size="sm" onClick={() => handleViewOrgChart(chart)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleEditOrgChart(chart)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteOrgChart(chart.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="hr">
           <Card>
             <CardHeader>
               <CardTitle>HR Management</CardTitle>
-              <CardDescription>Manage HR policies, leave types, salary grades, and employee data.</CardDescription>
+              <CardDescription>
+                Comprehensive HR management including promotions, documents, and communications.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Existing leave types, policies, salary grades sections */}
               {/* Leave Types Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -2509,6 +3018,244 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                               <Button variant="ghost" size="sm" onClick={() => handleDeleteSalaryGrade(grade.id)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Promotions Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Employee Promotions</h3>
+                  <Button onClick={() => setShowAddPromotionDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Initiate Promotion
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Employee
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Current Position
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Proposed Position
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Effective Date
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {promotions.map((promotion) => (
+                        <tr key={promotion.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {promotion.employee_id}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {promotion.current_position}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {promotion.proposed_position}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Badge
+                              variant={
+                                promotion.status === "approved"
+                                  ? "default"
+                                  : promotion.status === "pending"
+                                    ? "secondary"
+                                    : "destructive"
+                              }
+                            >
+                              {promotion.status}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {promotion.effective_date ? new Date(promotion.effective_date).toLocaleDateString() : "TBD"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleViewPromotion(promotion)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleEditPromotion(promotion)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Employee Documents */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Employee Documents</h3>
+                  <Button onClick={() => setShowAddDocumentDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Upload Document
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {employeeDocuments.slice(0, 6).map((document) => (
+                    <Card key={document.id} className="shadow-sm">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">{document.document_name}</CardTitle>
+                        <CardDescription className="text-xs">{document.document_type}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 text-sm">
+                          <p>
+                            <strong>Size:</strong> {(document.file_size / 1024).toFixed(2)} KB
+                          </p>
+                          <p>
+                            <strong>Uploaded:</strong> {new Date(document.upload_date).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex space-x-2 mt-3">
+                          <Button variant="ghost" size="sm" onClick={() => handleViewDocument(document)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDownloadDocument(document)}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteDocument(document.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {/* Communication Groups */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Communication Groups</h3>
+                  <Button onClick={() => setShowAddCommGroupDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Group
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {communicationGroups.map((group) => (
+                    <Card key={group.id} className="shadow-sm">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">{group.group_name}</CardTitle>
+                        <CardDescription className="text-xs">{group.group_type}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 text-sm">
+                          <p>
+                            <strong>Description:</strong> {group.description}
+                          </p>
+                          <Badge variant={group.is_active ? "default" : "secondary"}>
+                            {group.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                        <div className="flex space-x-2 mt-3">
+                          <Button variant="ghost" size="sm" onClick={() => handleViewCommGroup(group)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleEditCommGroup(group)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteCommGroup(group.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {/* Online Meetings */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Online Meetings</h3>
+                  <Button onClick={() => setShowAddMeetingDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Schedule Meeting
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Meeting Title
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Type
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Scheduled Start
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {onlineMeetings.slice(0, 5).map((meeting) => (
+                        <tr key={meeting.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {meeting.meeting_title}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{meeting.meeting_type}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(meeting.scheduled_start).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Badge
+                              variant={
+                                meeting.status === "completed"
+                                  ? "default"
+                                  : meeting.status === "ongoing"
+                                    ? "secondary"
+                                    : "outline"
+                              }
+                            >
+                              {meeting.status}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleViewMeeting(meeting)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              {meeting.meeting_url && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => window.open(meeting.meeting_url, "_blank")}
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -2718,365 +3465,4 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-lg font-semibold">Password Strength</h3>
-                <div className="relative pt-1">
-                  <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-muted">
-                    <div
-                      style={{ width: `${passwordStrength.score}%` }}
-                      className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary"
-                    ></div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Strength: {passwordStrength.score}% (
-                    {passwordStrength.requirements.length === 0 ? "Strong" : "Weak"} - Missing:{" "}
-                    {passwordStrength.requirements.join(", ") || "None"})
-                  </p>
-                </div>
-              </div>
-
-              <Button variant="outline" onClick={handleChangeAdminPassword}>
-                Change Admin Password
-              </Button>
-              <Button variant="secondary" onClick={handleDownloadSecurityReport}>
-                Download Security Report
-              </Button>
-
-              <h2 className="text-xl font-semibold mt-6">System Backups</h2>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground">
-                    Last Backup: {lastBackupTime ? new Date(lastBackupTime).toLocaleString() : "Never"}
-                  </p>
-                </div>
-                <div>
-                  <Button onClick={handleBackupNow} disabled={isBackingUp}>
-                    {isBackingUp ? "Backing Up..." : "Backup Now"}
-                  </Button>
-                </div>
-              </div>
-
-              <h2 className="text-xl font-semibold mt-6">Activity Log</h2>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground">Track user activity and system events.</p>
-                </div>
-                <div>
-                  <Button onClick={handleViewActivityLog}>View Activity Log</Button>
-                  <Button variant="secondary" onClick={handleDownloadAuditTrail}>
-                    Download Audit Trail
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabContent>
-      </Tabs>
-
-      <Dialog open={showSubsidiaryDialog} onOpenChange={setShowSubsidiaryDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{editingSubsidiary ? "Edit Subsidiary" : "Add Subsidiary"}</DialogTitle>
-            <DialogDescription>Make changes to your subsidiary here. Click save when you're done.</DialogDescription>
-          </DialogHeader>
-          <SubsidiaryForm
-            subsidiary={editingSubsidiary}
-            onSave={handleSaveSubsidiary}
-            onCancel={() => setShowSubsidiaryDialog(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showViewSubsidiaryDialog} onOpenChange={setShowViewSubsidiaryDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Subsidiary Details</DialogTitle>
-            <DialogDescription>View details of the selected subsidiary.</DialogDescription>
-          </DialogHeader>
-          {viewingSubsidiary && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input value={viewingSubsidiary.name} readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label>Tax ID</Label>
-                <Input value={viewingSubsidiary.tax_id} readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label>SSNIT Number</Label>
-                <Input value={viewingSubsidiary.ssnit_number} readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input value={viewingSubsidiary.email_address} readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label>Phone</Label>
-                <Input value={viewingSubsidiary.phone_number} readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label>Address</Label>
-                <Textarea value={viewingSubsidiary.address} readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label>Divisions</Label>
-                {viewingSubsidiary.divisions?.map((division, index) => (
-                  <Input key={index} value={division} readOnly />
-                ))}
-              </div>
-              <div className="space-y-2">
-                <Label>Departments</Label>
-                {viewingSubsidiary.departments?.map((department, index) => (
-                  <Input key={index} value={department} readOnly />
-                ))}
-              </div>
-              <div className="space-y-2">
-                <Label>Locations</Label>
-                {viewingSubsidiary.locations?.map((location, index) => (
-                  <Input key={index} value={location} readOnly />
-                ))}
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowViewSubsidiaryDialog(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showDeactivateModal} onOpenChange={setShowDeactivateModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Deactivate Subsidiary Function</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to deactivate the subsidiary function? This will hide all subsidiary management
-              features.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCancelDeactivation}>
-              Cancel
-            </Button>
-            <Button onClick={handleConfirmDeactivation}>Deactivate</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Change Admin Password</DialogTitle>
-            <DialogDescription>Change your admin password for enhanced security.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="current">Current Password</Label>
-              <div className="relative">
-                <Input
-                  id="current"
-                  type={showPasswords.current ? "text" : "password"}
-                  value={passwordForm.currentPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
-                >
-                  {showPasswords.current ? <Eye className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="new">New Password</Label>
-              <div className="relative">
-                <Input
-                  id="new"
-                  type={showPasswords.new ? "text" : "password"}
-                  value={passwordForm.newPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
-                >
-                  {showPasswords.new ? <Eye className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirm">Confirm New Password</Label>
-              <div className="relative">
-                <Input
-                  id="confirm"
-                  type={showPasswords.confirm ? "text" : "password"}
-                  value={passwordForm.confirmPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
-                >
-                  {showPasswords.confirm ? <Eye className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPasswordChangeDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handlePasswordChange}>Change Password</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showActivityLog} onOpenChange={setShowActivityLog}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Activity Log</DialogTitle>
-            <DialogDescription>View recent user activity and system events.</DialogDescription>
-          </DialogHeader>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Timestamp
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    User
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Action
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Resource
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    IP Address
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                <tr>
-                  <td className="px-6 py-4 whitespace-nowrap">{new Date().toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">Admin</td>
-                  <td className="px-6 py-4 whitespace-nowrap">Login</td>
-                  <td className="px-6 py-4 whitespace-nowrap">System</td>
-                  <td className="px-6 py-4 whitespace-nowrap">192.168.1.1</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge variant="outline">Success</Badge>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-6 py-4 whitespace-nowrap">{new Date(Date.now() - 3600000).toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">Admin</td>
-                  <td className="px-6 py-4 whitespace-nowrap">Update Settings</td>
-                  <td className="px-6 py-4 whitespace-nowrap">Company Settings</td>
-                  <td className="px-6 py-4 whitespace-nowrap">192.168.1.1</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge variant="outline">Success</Badge>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowActivityLog(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showBackupSuccess} onOpenChange={setShowBackupSuccess}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Backup Successful</DialogTitle>
-            <DialogDescription>Your system has been backed up successfully.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => setShowBackupSuccess(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showEmailTemplateDialog} onOpenChange={setShowCustomTemplateDialog}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>{editingEmailTemplate ? "Edit Email Template" : "Create Email Template"}</DialogTitle>
-            <DialogDescription>Customize email templates for various notifications.</DialogDescription>
-          </DialogHeader>
-          {/* Email Template Form */}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCustomTemplateDialog(false)}>
-              Cancel
-            </Button>
-            <Button>Save Template</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showLeaveTypeDialog} onOpenChange={setShowLeaveTypeDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{editingLeaveType ? "Edit Leave Type" : "Create Leave Type"}</DialogTitle>
-            <DialogDescription>Manage different types of leave available to employees.</DialogDescription>
-          </DialogHeader>
-          {/* Leave Type Form */}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLeaveTypeDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveLeaveType}>Save Leave Type</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showSalaryGradeDialog} onOpenChange={setShowSalaryGradeDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{editingSalaryGrade ? "Edit Salary Grade" : "Create Salary Grade"}</DialogTitle>
-            <DialogDescription>Define salary grades and levels for employees.</DialogDescription>
-          </DialogHeader>
-          {/* Salary Grade Form */}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSalaryGradeDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveSalaryGrade}>Save Salary Grade</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
-}
-
-function TabContent({ value, children }: { value: string; children: React.ReactNode }) {
-  const [mounted, setMounted] = React.useState(false)
-
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return null
-  }
-
-  return (
-    <TabsContent value={value} className="space-y-4">
-      {children}
-    </TabsContent>
-  )
-}
+\
