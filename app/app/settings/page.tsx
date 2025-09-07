@@ -600,6 +600,20 @@ export default function SettingsPage() {
       const loan = loanSettings[index]
       const supabase = createClient()
 
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+
+      if (authError || !user) {
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to save loan settings",
+          variant: "destructive",
+        })
+        return
+      }
+
       if (!companyData.id) {
         toast({
           title: "Error",
@@ -650,7 +664,7 @@ export default function SettingsPage() {
       console.error("Error saving loan:", error)
       toast({
         title: "Error",
-        description: "Failed to save loan settings",
+        description: `Failed to save loan settings: ${error.message}`,
         variant: "destructive",
       })
     }
