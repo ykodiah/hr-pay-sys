@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import { useCurrency } from "@/lib/currency-context"
 import { createClient } from "@/lib/supabase/client"
 import {
   Building2,
@@ -255,9 +254,21 @@ const SubsidiaryForm: FunctionComponent<SubsidiaryFormProps> = ({ subsidiary, on
   )
 }
 
+const formatCurrency = (amount: number, currencyCode = "GHS") => {
+  const currencySymbols: { [key: string]: string } = {
+    GHS: "₵",
+    NGN: "₦",
+    USD: "$",
+    EUR: "€",
+    GBP: "£",
+  }
+
+  const symbol = currencySymbols[currencyCode] || currencyCode
+  return `${symbol}${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 export default function SettingsPage() {
   const { toast } = useToast()
-  const { currency, formatCurrency } = useCurrency()
 
   const [activeTab, setActiveTab] = useState("company")
   const [isLoading, setIsLoading] = useState(true)
