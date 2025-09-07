@@ -1587,13 +1587,19 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
 
       console.log("[v0] Saving payroll settings with user:", user.id, "company:", companyData.id)
 
-      // Save payroll configuration with only fields that exist in the database
       const configData = {
-        company_id: Number.parseInt(companyData.id) || 1,
+        company_id: companyData.id, // Use UUID as string, not parsed as integer
         minimum_wage: payrollConfig.minimum_wage,
         overtime_weekday_multiplier: payrollConfig.overtime_weekday_multiplier,
+        overtime_weekend_multiplier: payrollConfig.overtime_weekend_multiplier,
         currency_code: payrollConfig.currency_code,
         currency_symbol: payrollConfig.currency_symbol,
+        pay_frequency: payrollSettings.pay_frequency,
+        cutoff_day: payrollSettings.cutoff_day,
+        processing_day: payrollSettings.processing_day,
+        auto_calculate_paye: payrollSettings.auto_calculate_paye,
+        auto_calculate_ssnit: payrollSettings.auto_calculate_ssnit,
+        auto_calculate_provident: payrollSettings.auto_calculate_provident,
         updated_at: new Date().toISOString(),
       }
 
@@ -1623,10 +1629,24 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         if (deductionError) throw deductionError
       }
 
+      for (const loan of loanSettings) {
+        const { error: loanError } = await supabase.from("loan_settings").upsert({
+          ...loan,
+          company_id: companyData.id,
+          updated_at: new Date().toISOString(),
+        })
+
+        if (loanError) throw loanError
+      }
+
       toast({ title: "Success", description: "Payroll settings saved successfully" })
     } catch (error) {
       console.error("Error saving payroll settings:", error)
-      toast({ title: "Error", description: "Failed to save payroll settings" })
+      toast({
+        title: "Error",
+        description: `Failed to save payroll settings: ${error.message}`,
+        variant: "destructive",
+      })
     }
   }
 
