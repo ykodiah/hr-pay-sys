@@ -2893,15 +2893,17 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleSaveLoan(index)}
-                                className="h-8 w-8 p-0"
+                                className="h-8 w-8 p-0 hover:bg-green-50 hover:border-green-300"
+                                title="Save loan settings"
                               >
-                                <Check className="h-4 w-4" />
+                                <Check className="h-4 w-4 text-green-600" />
                               </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleDeleteLoan(index)}
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-300"
+                                title="Delete loan"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
