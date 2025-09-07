@@ -763,13 +763,28 @@ export default function SettingsPage() {
     loadAllData()
   }, [])
 
-  const loadCompanyData = async () => {
+  const loadCompanyData = async (retryCount = 0) => {
     try {
+      console.log("[v0] Loading company data, attempt:", retryCount + 1)
       const supabase = createClient()
-      const { data, error } = await supabase.from("companies").select("*").single()
 
-      if (error) {
-        console.error("Company data error:", error)
+      // Test connection first
+      const { data: testData, error: testError } = await supabase.from("companies").select("count").limit(1)
+      if (testError) {
+        console.error("[v0] Database connection test failed:", testError)
+        throw testError
+      }
+
+      const { data, error } = await supabase.from("companies").select("*").limit(1).single()
+
+      if (error && error.code !== "PGRST116") {
+        // PGRST116 is "no rows returned"
+        console.error("[v0] Company data error:", error)
+        throw error
+      }
+
+      if (!data || error?.code === "PGRST116") {
+        console.log("[v0] No company found, creating default company")
         // Create a default company if none exists
         const { data: newCompany, error: createError } = await supabase
           .from("companies")
@@ -786,9 +801,16 @@ export default function SettingsPage() {
           .single()
 
         if (createError) {
-          console.error("Failed to create company:", createError)
+          console.error("[v0] Failed to create company:", createError)
+          if (retryCount < 2) {
+            console.log("[v0] Retrying company creation...")
+            await new Promise((resolve) => setTimeout(resolve, 1000))
+            return loadCompanyData(retryCount + 1)
+          }
+
+          // Set fallback data
           setCompanyData({
-            id: "",
+            id: "00000000-0000-0000-0000-000000000001",
             name: "Your Company Name",
             email: "info@yourcompany.com",
             tax_id: "",
@@ -801,6 +823,7 @@ export default function SettingsPage() {
           return
         }
 
+        console.log("[v0] Company created successfully:", newCompany.id)
         setCompanyData({
           id: newCompany.id,
           name: newCompany.name || "",
@@ -815,6 +838,7 @@ export default function SettingsPage() {
         return
       }
 
+      console.log("[v0] Company data loaded successfully:", data.id)
       setCompanyData({
         id: data.id || "",
         name: data.name || "",
@@ -835,7 +859,26 @@ export default function SettingsPage() {
       // Load logo if exists
       if (data.logo_url) setLogoPreview(data.logo_url)
     } catch (error) {
-      console.error("Error loading company data:", error)
+      console.error("[v0] Error loading company data:", error)
+
+      if (retryCount < 2) {
+        console.log("[v0] Retrying company data load...")
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        return loadCompanyData(retryCount + 1)
+      }
+
+      // Set fallback data after all retries failed
+      setCompanyData({
+        id: "00000000-0000-0000-0000-000000000001",
+        name: "Your Company Name",
+        email: "info@yourcompany.com",
+        tax_id: "",
+        ssnit_number: "",
+        industry: "",
+        status: "active",
+        address: "",
+        phone: "",
+      })
     }
   }
 
@@ -2796,7 +2839,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                           <td className="p-2 text-center">
                             <Select
                               value={loan.rateMethod}
-                              onValueChange={(value) => handleLoanInputChange(index, "rateMethod", value)}
+                              onChange={(value) => handleLoanInputChange(index, "rateMethod", value)}
                             >
                               <SelectTrigger className="w-32">
                                 <SelectValue />
