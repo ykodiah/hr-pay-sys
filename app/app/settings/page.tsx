@@ -1938,7 +1938,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       if (!companyData.id) {
         toast({
           title: "Error",
-          description: "Company ID not found. Please refresh the page and try again.",
+          description: "Company ID not found. Please refresh the page.",
         })
         return
       }
@@ -2485,6 +2485,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       setIsLoading(false)
     }
   }
+
+  const [showAddCurrencyRateDialogFunc, setShowAddCurrencyRateDialogFunc] = useState(false)
 
   return (
     <div className="container mx-auto p-6">
