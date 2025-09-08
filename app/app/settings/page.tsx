@@ -229,7 +229,15 @@ const SubsidiaryForm: FunctionComponent<SubsidiaryFormProps> = ({ subsidiary, on
         <Label>Divisions</Label>
         {divisions.map((division: string, index: number) => (
           <div key={index} className="flex items-center space-x-2">
-            <Input value={division} readOnly />
+            <Input
+              value={division}
+              onChange={(e) => {
+                const newDivisions = [...divisions]
+                newDivisions[index] = e.target.value
+                setDivisions(newDivisions)
+              }}
+              placeholder="Enter division name"
+            />
             <Button variant="ghost" size="sm" onClick={() => setDivisions(divisions.filter((_, i) => i !== index))}>
               <X className="h-4 w-4" />
             </Button>
@@ -244,7 +252,15 @@ const SubsidiaryForm: FunctionComponent<SubsidiaryFormProps> = ({ subsidiary, on
         <Label>Departments</Label>
         {departments.map((department: string, index: number) => (
           <div key={index} className="flex items-center space-x-2">
-            <Input value={department} readOnly />
+            <Input
+              value={department}
+              onChange={(e) => {
+                const newDepartments = [...departments]
+                newDepartments[index] = e.target.value
+                setDepartments(newDepartments)
+              }}
+              placeholder="Enter department name"
+            />
             <Button variant="ghost" size="sm" onClick={() => setDepartments(departments.filter((_, i) => i !== index))}>
               <X className="h-4 w-4" />
             </Button>
@@ -259,7 +275,15 @@ const SubsidiaryForm: FunctionComponent<SubsidiaryFormProps> = ({ subsidiary, on
         <Label>Locations</Label>
         {locations.map((location: string, index: number) => (
           <div key={index} className="flex items-center space-x-2">
-            <Input value={location} readOnly />
+            <Input
+              value={location}
+              onChange={(e) => {
+                const newLocations = [...locations]
+                newLocations[index] = e.target.value
+                setLocations(newLocations)
+              }}
+              placeholder="Enter location name"
+            />
             <Button variant="ghost" size="sm" onClick={() => setLocations(locations.filter((_, i) => i !== index))}>
               <X className="h-4 w-4" />
             </Button>
