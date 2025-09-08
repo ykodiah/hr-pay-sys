@@ -350,9 +350,29 @@ export default function SettingsPage() {
     { rate: 30, threshold: 0, description: "remaining amount", isFixed: true },
   ])
 
+  // Dialog states
+  const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState(false)
+  const [showActivityLog, setShowActivityLog] = useState(false)
+  const [showBackupSuccess, setShowBackupSuccess] = useState(false)
+  const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
+  const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
+  const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
+  const [isBackingUp, setIsBackingUp] = useState(false)
+  const [lastBackupTime, setLastBackupTime] = useState<string>("")
+
   const [showAllowanceDialog, setShowAllowanceDialog] = useState(false)
   const [showDeductionDialog, setShowDeductionDialog] = useState(false)
   const [showLoanDialog, setShowLoanDialog] = useState(false)
+  
+  const [showAddSubsidiaryDialog, setShowAddSubsidiaryDialog] = useState(false)
+  const [showAddCurrencyRateDialog, setShowAddCurrencyRateDialog] = useState(false)
+  const [showAddOrgChartDialog, setShowAddOrgChartDialog] = useState(false)
+  const [showAddPromotionDialog, setShowAddPromotionDialog] = useState(false)
+  const [showAddDocumentDialog, setShowAddDocumentDialog] = useState(false)
+  const [showAddCommGroupDialog, setShowAddCommGroupDialog] = useState(false)
+  const [showAddMeetingDialog, setShowAddMeetingDialog] = useState(false)
+  const [showLeavePolicyDialog, setShowLeavePolicyDialog] = useState(false)
+
   const [editingItem, setEditingItem] = useState<any>(null)
   const [editingIndex, setEditingIndex] = useState<number>(-1)
 
@@ -391,28 +411,6 @@ export default function SettingsPage() {
   })
 
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([])
-
-  // Dialog states
-  const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState(false)
-  const [showActivityLog, setShowActivityLog] = useState(false)
-  const [showBackupSuccess, setShowBackupSuccess] = useState(false)
-  const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
-  const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
-  const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
-  const [isBackingUp, setIsBackingUp] = useState(false)
-  const [lastBackupTime, setLastBackupTime] = useState<string>("")
-
-  const [showAddCurrencyRateDialog, setShowAddCurrencyRateDialog] = useState(false)
-  const [showAddOrgChartDialog, setShowAddOrgChartDialog] = useState(false)
-  const [showAddDocumentDialog, setShowAddDocumentDialog] = useState(false)
-  const [showAddMeetingDialog, setShowAddMeetingDialog] = useState(false)
-  const [showAddPromotionDialog, setShowAddPromotionDialog] = useState(false)
-  const [showAddCommGroupDialog, setShowAddCommGroupDialog] = useState(false)
-  const [showLeavePolicyDialog, setShowLeavePolicyDialog] = useState(false)
-
-  const [editingEmailTemplate, setEditingEmailTemplate] = useState<EmailTemplate | null>(null)
-  const [editingLeaveType, setEditingLeaveType] = useState<LeaveType | null>(null)
-  const [editingSalaryGrade, setEditingSalaryGrade] = useState<SalaryGrade | null>(null)
 
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
@@ -2009,7 +2007,6 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         company_id: companyData.id,
         minimum_wage: payrollConfig.minimum_wage,
         overtime_weekday_multiplier: payrollConfig.overtime_weekday_multiplier,
-        overtime_weekend_multiplier: payrollConfig.overtime_weekend_multiplier,
         currency_code: payrollConfig.currency_code,
         currency_symbol: payrollConfig.currency_symbol,
         pay_frequency: payrollSettings.pay_frequency,
@@ -2306,12 +2303,12 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       requires_approval: false,
       is_active: true,
     })
-    setShowLeavePolicyDialogFunc(true)
+    setShowLeavePolicyDialog(true)
   }
 
   const handleEditLeavePolicy = (leavePolicy: LeavePolicy) => {
     setEditingLeavePolicy(leavePolicy)
-    setShowLeavePolicyDialogFunc(true)
+    setShowLeavePolicyDialog(true)
   }
 
   const handleAddSalaryGrade = () => {
@@ -2334,6 +2331,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
   }
 
   const [editingLeavePolicy, setEditingLeavePolicy] = useState<LeavePolicy | null>(null)
+
+  const [showLeavePolicyDialog, setShowLeavePolicyDialogFunc] = useState(false)
 
   const handleDeleteLeavePolicy = async (id: string) => {
     try {
@@ -3510,5 +3509,5 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         </Card>
       </TabsContent>
     </Tabs>
-  )
-}\
+  )\
+}
