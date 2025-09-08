@@ -379,7 +379,7 @@ export default function SettingsPage() {
   const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
   const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
   const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
-  const [isBackingUp, setIsBackingUp] = useState(isBackingUp)
+  const [isBackingUp, setIsBackingUp] = useState(false)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
 
   const [showAllowanceDialog, setShowAllowanceDialog] = useState(false)
@@ -1043,7 +1043,7 @@ Payroll Department`,
         {
           id: 3,
           name: "Leave Approval",
-          subject: "Leave Request {{status}} - {{leave_type}}",
+          subject: "Your Leave Request {{status}} - {{leave_type}}",
           description: "Leave request status updates",
           content: `Dear {{employee_name}},
 
