@@ -364,7 +364,7 @@ export default function SettingsPage() {
   const [showDeductionDialog, setShowDeductionDialog] = useState(false)
   const [showLoanDialog, setShowLoanDialog] = useState(false)
   
-  const [showAddSubsidiaryDialog, setShowAddCurrencyRateDialog] = useState(false)
+  const [showAddCurrencyRateDialog, setShowSubsidiaryDialogFunc] = useState(false)
   const [showAddOrgChartDialog, setShowAddOrgChartDialog] = useState(false)
   const [showAddPromotionDialog, setShowAddPromotionDialog] = useState(false)
   const [showAddDocumentDialog, setShowAddDocumentDialog] = useState(false)
@@ -2726,7 +2726,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Subsidiaries</h3>
-                  <Button onClick={() => setShowAddSubsidiaryDialog(true)}>
+                  <Button onClick={() => setShowSubsidiaryDialogFunc(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Subsidiary
                   </Button>
@@ -3403,7 +3403,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 <Switch
                   id="two-factor-auth"
                   checked={securitySettings.twoFactorAuth}
-                  onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, twoFactorAuth: checked })}
+                  onChange={(checked) => setSecuritySettings({ ...securitySettings, twoFactorAuth: checked })}
                 />
                 <Label htmlFor="two-factor-auth">Two-Factor Authentication</Label>
               </div>
@@ -3412,7 +3412,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 <Switch
                   id="auto-session-timeout"
                   checked={securitySettings.autoSessionTimeout}
-                  onCheckedChange={(checked) =>
+                  onChange={(checked) =>
                     setSecuritySettings({ ...securitySettings, autoSessionTimeout: checked })
                   }
                 />
@@ -3437,7 +3437,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 <Switch
                   id="audit-logging"
                   checked={securitySettings.auditLogging}
-                  onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, auditLogging: checked })}
+                  onChange={(checked) => setSecuritySettings({ ...securitySettings, auditLogging: checked })}
                 />
                 <Label htmlFor="audit-logging">Audit Logging</Label>
               </div>
@@ -3446,7 +3446,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 <Switch
                   id="automated-backups"
                   checked={securitySettings.automatedBackups}
-                  onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, automatedBackups: checked })}
+                  onChange={(checked) => setSecuritySettings({ ...securitySettings, automatedBackups: checked })}
                 />
                 <Label htmlFor="automated-backups">Automated Backups</Label>
               </div>
@@ -3484,7 +3484,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <Checkbox
                     id="require-uppercase"
                     checked={passwordPolicy.requireUppercase}
-                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireUppercase: checked })}
+                    onChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireUppercase: checked })}
                   />
                   <Label htmlFor="require-uppercase">Require Uppercase</Label>
                 </div>
@@ -3493,7 +3493,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <Checkbox
                     id="require-numbers"
                     checked={passwordPolicy.requireNumbers}
-                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireNumbers: checked })}
+                    onChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireNumbers: checked })}
                   />
                   <Label htmlFor="require-numbers">Require Numbers</Label>
                 </div>
@@ -3502,7 +3502,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <Checkbox
                     id="require-symbols"
                     checked={passwordPolicy.requireSymbols}
-                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireSymbols: checked })}
+                    onChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireSymbols: checked })}
                   />
                   <Label htmlFor="require-symbols">Require Symbols</Label>
                 </div>
