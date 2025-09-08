@@ -376,6 +376,9 @@ export default function SettingsPage() {
   const [editingItem, setEditingItem] = useState<any>(null)
   const [editingIndex, setEditingIndex] = useState<number>(-1)
 
+  const [editingLeaveType, setEditingLeaveType] = useState<LeaveType | null>(null)
+  const [editingSalaryGrade, setEditingSalaryGrade] = useState<SalaryGrade | null>(null)
+
   const [ssnit, setSsnit] = useState({
     employee: 5.5,
     employer: 13,
