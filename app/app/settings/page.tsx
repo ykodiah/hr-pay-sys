@@ -374,7 +374,7 @@ export default function SettingsPage() {
   const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
   const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
   const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
-  const [isBackingUp, setIsBackingUp] = useState(isBackingUp)
+  const [isBackingUp, setIsBackingUp] = useState(false)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
 
   const [showAllowanceDialog, setShowAllowanceDialog] = useState(false)
