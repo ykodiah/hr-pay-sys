@@ -305,6 +305,10 @@ export default function SettingsPage() {
 
   const [showDeactivateModal, setShowDeactivateModal] = useState(false)
 
+  const [showActivateSubsidiaryModal, setShowActivateSubsidiaryModal] = useState(false)
+  const [showDeactivateSubsidiaryModal, setShowDeactivateSubsidiaryModal] = useState(false)
+  const [subsidiaryToToggle, setSubsidiaryToToggle] = useState<any>(null)
+
   const [companyData, setCompanyData] = useState<Company>({
     id: "",
     name: "",
@@ -375,7 +379,7 @@ export default function SettingsPage() {
   const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
   const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
   const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
-  const [isBackingUp, setIsBackingUp] = useState(false)
+  const [isBackingUp, setIsBackingUp] = useState(isBackingUp)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
 
   const [showAllowanceDialog, setShowAllowanceDialog] = useState(false)
@@ -2878,9 +2882,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                                 {subsidiary.status === "inactive" ? (
                                   <DropdownMenuItem
                                     onClick={() => {
-                                      if (window.confirm("Are you sure you want to activate this subsidiary?")) {
-                                        handleActivateSubsidiary(subsidiary.id)
-                                      }
+                                      setSubsidiaryToToggle(subsidiary)
+                                      setShowActivateSubsidiaryModal(true)
                                     }}
                                     className="text-green-600"
                                   >
@@ -2890,13 +2893,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                                 ) : (
                                   <DropdownMenuItem
                                     onClick={() => {
-                                      if (
-                                        window.confirm(
-                                          "Are you sure you want to deactivate this subsidiary? This will disable access but preserve all data.",
-                                        )
-                                      ) {
-                                        handleDeactivateSubsidiary(subsidiary.id)
-                                      }
+                                      setSubsidiaryToToggle(subsidiary)
+                                      setShowDeactivateSubsidiaryModal(true)
                                     }}
                                     className="text-orange-600"
                                   >
@@ -3756,6 +3754,59 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               }}
             >
               Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeactivateSubsidiaryModal} onOpenChange={setShowDeactivateSubsidiaryModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Deactivate Subsidiary Company</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate this subsidiary? This will disable access but preserve all data.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setShowDeactivateSubsidiaryModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (subsidiaryToToggle) {
+                  handleDeactivateSubsidiary(subsidiaryToToggle.id)
+                }
+                setShowDeactivateSubsidiaryModal(false)
+                setSubsidiaryToToggle(null)
+              }}
+            >
+              Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showActivateSubsidiaryModal} onOpenChange={setShowActivateSubsidiaryModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Activate Subsidiary Company</DialogTitle>
+            <DialogDescription>Are you sure you want to activate this subsidiary?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setShowActivateSubsidiaryModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (subsidiaryToToggle) {
+                  handleActivateSubsidiary(subsidiaryToToggle.id)
+                }
+                setShowActivateSubsidiaryModal(false)
+                setSubsidiaryToToggle(null)
+              }}
+            >
+              OK
             </Button>
           </DialogFooter>
         </DialogContent>
