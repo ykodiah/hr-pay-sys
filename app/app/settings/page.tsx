@@ -357,7 +357,7 @@ export default function SettingsPage() {
   const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
   const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
   const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
-  const [isBackingUp, setIsBackingUp] = useState(false)
+  const [isBackingUp, setIsBackingUp] = useState(isBackingUp)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
 
   const [showAllowanceDialog, setShowAllowanceDialog] = useState(false)
@@ -2303,12 +2303,12 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       requires_approval: false,
       is_active: true,
     })
-    setShowLeavePolicyDialog(true)
+    setShowLeavePolicyDialogFunc(true)
   }
 
   const handleEditLeavePolicy = (leavePolicy: LeavePolicy) => {
     setEditingLeavePolicy(leavePolicy)
-    setShowLeavePolicyDialog(true)
+    setShowLeavePolicyDialogFunc(true)
   }
 
   const handleAddSalaryGrade = () => {
@@ -2332,7 +2332,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
 
   const [editingLeavePolicy, setEditingLeavePolicy] = useState<LeavePolicy | null>(null)
 
-  const [showLeavePolicyDialog, setShowLeavePolicyDialogFunc] = useState(false)
+  const [showLeavePolicyDialogFunc, setShowLeavePolicyDialogFunc] = useState(false)
 
   const handleDeleteLeavePolicy = async (id: string) => {
     try {
