@@ -173,6 +173,22 @@ interface SubsidiaryFormProps {
 }
 
 const SubsidiaryForm: FunctionComponent<SubsidiaryFormProps> = ({ subsidiary, onSave, onCancel }) => {
+  const { toast } = useToast()
+  const [companyData, setCompanyData] = useState<Company>({
+    id: "",
+    name: "",
+    email_address: "",
+    tax_id: "",
+    ssnit_number: "",
+    industry: "",
+    status: "active",
+    address: "",
+    phone_number: "",
+    divisions: [],
+    departments: [],
+    locations: [],
+  })
+
   const [name, setName] = useState(subsidiary?.name || "")
   const [taxId, setTaxId] = useState(subsidiary?.tax_id || "")
   const [ssnitNumber, setSsnitNumber] = useState(subsidiary?.ssnit_number || "")
@@ -182,6 +198,104 @@ const SubsidiaryForm: FunctionComponent<SubsidiaryFormProps> = ({ subsidiary, on
   const [divisions, setDivisions] = useState(subsidiary?.divisions || [])
   const [departments, setDepartments] = useState(subsidiary?.departments || [])
   const [locations, setLocations] = useState(subsidiary?.locations || [])
+  const [logoPreview, setLogoPreview] = useState(subsidiary?.logo_url || "")
+  const [logoFileName, setLogoFileName] = useState("")
+  const [logoFileId, setLogoFileId] = useState(subsidiary?.logo_file_id || null)
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    console.log("[v0] Starting subsidiary logo upload for file:", file.name)
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: "File size must be less than 2MB.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!file.type.match(/^image\/(png|jpeg|jpg)$/)) {
+      toast({
+        title: "Error",
+        description: "Only PNG, JPG, and JPEG files are allowed.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        try {
+          const base64Data = e.target?.result as string
+          console.log("[v0] File read successfully, preparing for upload...")
+
+          const supabase = createClient()
+
+          // Upload to company_files table
+          const { data, error } = await supabase
+            .from("company_files")
+            .insert({
+              company_id: companyData?.id || "00000000-0000-0000-0000-000000000001",
+              file_name: file.name,
+              file_type: file.type,
+              file_size: file.size,
+              file_data: base64Data,
+              file_category: "subsidiary_logo",
+            })
+            .select()
+            .single()
+
+          if (error) {
+            console.log("[v0] Database error:", error.message)
+            toast({
+              title: "Error",
+              description: `Failed to upload logo: ${error.message}`,
+              variant: "destructive",
+            })
+            return
+          }
+
+          console.log("[v0] Subsidiary logo uploaded successfully:", data)
+          setLogoFileName(file.name)
+          setLogoPreview(base64Data)
+          setLogoFileId(data.id)
+
+          toast({
+            title: "Success",
+            description: "Logo uploaded successfully.",
+          })
+        } catch (uploadError) {
+          console.error("[v0] Upload error:", uploadError)
+          toast({
+            title: "Error",
+            description: "Failed to upload logo. Please try again.",
+            variant: "destructive",
+          })
+        }
+      }
+
+      reader.onerror = () => {
+        toast({
+          title: "Error",
+          description: "Failed to read file.",
+          variant: "destructive",
+        })
+      }
+
+      reader.readAsDataURL(file)
+    } catch (error) {
+      console.error("[v0] Logo upload error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to upload logo. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
 
   const handleSubmit = () => {
     const subsidiaryData = {
@@ -194,6 +308,8 @@ const SubsidiaryForm: FunctionComponent<SubsidiaryFormProps> = ({ subsidiary, on
       divisions,
       departments,
       locations,
+      logo_file_id: logoFileId,
+      logo_url: logoPreview,
     }
     onSave(subsidiaryData)
   }
@@ -223,6 +339,47 @@ const SubsidiaryForm: FunctionComponent<SubsidiaryFormProps> = ({ subsidiary, on
       <div className="space-y-2">
         <Label htmlFor="address">Address</Label>
         <Textarea id="address" value={address} onChange={(e) => setAddress(e.target.value)} />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Subsidiary Logo</Label>
+        <div className="flex items-center space-x-4">
+          <div className="relative w-20 h-20 rounded-md overflow-hidden border-2 border-dashed border-muted-foreground/25">
+            {logoPreview ? (
+              <img
+                src={logoPreview || "/placeholder.svg"}
+                alt="Subsidiary Logo"
+                className="object-cover w-full h-full"
+              />
+            ) : (
+              <div className="flex items-center justify-center w-full h-full bg-muted">
+                <Upload className="h-6 w-6 text-muted-foreground" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1">
+            <Input
+              type="file"
+              id="subsidiary-logo-upload"
+              className="hidden"
+              accept="image/png,image/jpeg,image/jpg"
+              onChange={handleLogoUpload}
+            />
+            <Label
+              htmlFor="subsidiary-logo-upload"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 cursor-pointer"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Logo
+            </Label>
+            {logoFileName && (
+              <p className="text-sm text-muted-foreground mt-2">
+                <span className="font-medium">File:</span> {logoFileName}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">PNG, JPG, JPEG up to 2MB</p>
+          </div>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -1804,6 +1961,9 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
             divisions: subsidiaryData.divisions || [],
             departments: subsidiaryData.departments || [],
             locations: subsidiaryData.locations || [],
+            // Added logo data to update
+            logo_file_id: subsidiaryData.logo_file_id,
+            logo_url: subsidiaryData.logo_url,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingSubsidiary.id)
@@ -1813,7 +1973,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       } else {
         // Create new subsidiary
         const { error } = await supabase.from("subsidiaries").insert({
-          company_id: "1", // Replace with actual company ID
+          company_id: companyData?.id || "00000000-0000-0000-0000-000000000001", // Replace with actual company ID
           name: subsidiaryData.name,
           tax_id: subsidiaryData.tax_id,
           ssnit_number: subsidiaryData.ssnit_number,
@@ -1823,6 +1983,9 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           divisions: subsidiaryData.divisions || [],
           departments: subsidiaryData.departments || [],
           locations: subsidiaryData.locations || [],
+          // Added logo data to insert
+          logo_file_id: subsidiaryData.logo_file_id,
+          logo_url: subsidiaryData.logo_url,
           status: "active",
         })
 
