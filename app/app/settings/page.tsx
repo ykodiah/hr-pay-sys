@@ -364,8 +364,7 @@ export default function SettingsPage() {
   const [showDeductionDialog, setShowDeductionDialog] = useState(false)
   const [showLoanDialog, setShowLoanDialog] = useState(false)
   
-  const [showAddSubsidiaryDialog, setShowAddSubsidiaryDialog] = useState(false)
-  const [showAddCurrencyRateDialog, setShowAddCurrencyRateDialog] = useState(false)
+  const [showAddSubsidiaryDialog, setShowAddCurrencyRateDialog] = useState(false)
   const [showAddOrgChartDialog, setShowAddOrgChartDialog] = useState(false)
   const [showAddPromotionDialog, setShowAddPromotionDialog] = useState(false)
   const [showAddDocumentDialog, setShowAddDocumentDialog] = useState(false)
@@ -375,9 +374,6 @@ export default function SettingsPage() {
 
   const [editingItem, setEditingItem] = useState<any>(null)
   const [editingIndex, setEditingIndex] = useState<number>(-1)
-
-  const [editingLeaveType, setEditingLeaveType] = useState<LeaveType | null>(null)
-  const [editingSalaryGrade, setEditingSalaryGrade] = useState<SalaryGrade | null>(null)
 
   const [ssnit, setSsnit] = useState({
     employee: 5.5,
@@ -2272,6 +2268,22 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     })
   }
 
+  const [editingLeaveType, setEditingLeaveType] = useState<LeaveType>({
+    id: "",
+    name: "",
+    code: "",
+    description: "",
+    annual_entitlement: 0,
+    max_consecutive_days: 0,
+    pay_percentage: 0,
+    min_notice_days: 0,
+    requires_approval: false,
+    requires_medical_certificate: false,
+    allow_carry_over: false,
+    is_active: true,
+    is_paid: true,
+  })
+
   const handleAddLeaveType = () => {
     setEditingLeaveType({
       id: "",
@@ -2296,6 +2308,18 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     setShowLeaveTypeDialog(true)
   }
 
+  const [editingLeavePolicy, setEditingLeavePolicy] = useState<LeavePolicy>({
+    id: "",
+    policy_name: "",
+    policy_type: "",
+    max_days: 0,
+    notice_period_days: 0,
+    requires_approval: false,
+    is_active: true,
+  })
+
+  const [showLeavePolicyDialogFunc, setShowLeavePolicyDialogFunc] = useState(false)
+
   const handleAddLeavePolicy = () => {
     setEditingLeavePolicy({
       id: "",
@@ -2313,6 +2337,17 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     setEditingLeavePolicy(leavePolicy)
     setShowLeavePolicyDialogFunc(true)
   }
+
+  const [editingSalaryGrade, setEditingSalaryGrade] = useState<SalaryGrade>({
+    id: "",
+    grade_name: "",
+    grade_level: 0,
+    step_1: 0,
+    step_2: 0,
+    step_3: 0,
+    step_4: 0,
+    step_5: 0,
+  })
 
   const handleAddSalaryGrade = () => {
     setEditingSalaryGrade({
@@ -2332,10 +2367,6 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     setEditingSalaryGrade(salaryGrade)
     setShowSalaryGradeDialog(true)
   }
-
-  const [editingLeavePolicy, setEditingLeavePolicy] = useState<LeavePolicy | null>(null)
-
-  const [showLeavePolicyDialogFunc, setShowLeavePolicyDialogFunc] = useState(false)
 
   const handleDeleteLeavePolicy = async (id: string) => {
     try {
