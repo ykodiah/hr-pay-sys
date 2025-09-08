@@ -28,6 +28,7 @@ import {
   ExternalLink,
   MoreVertical,
   Loader2,
+  Power,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -1812,7 +1813,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       loadSubsidiaries()
     } catch (error) {
       console.error("Error deactivating subsidiary:", error)
-      toast({ title: "Error", description: "Failed to deactivate subsidiary" })
+      toast({ title: "Error", description: "Failed to deactivate subsidiary", variant: "destructive" })
     }
   }
 
@@ -2862,14 +2863,18 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   onClick={() => {
-                                    if (window.confirm("Are you sure you want to delete this subsidiary?")) {
-                                      handleDeleteSubsidiary(subsidiary.id)
+                                    if (
+                                      window.confirm(
+                                        "Are you sure you want to deactivate this subsidiary? This will disable access but preserve all data.",
+                                      )
+                                    ) {
+                                      handleDeactivateSubsidiary(subsidiary.id)
                                     }
                                   }}
-                                  className="text-red-600"
+                                  className="text-orange-600"
                                 >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
+                                  <Power className="h-4 w-4 mr-2" />
+                                  Deactivate
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
