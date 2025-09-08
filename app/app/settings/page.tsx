@@ -363,9 +363,8 @@ export default function SettingsPage() {
   const [showAllowanceDialog, setShowAllowanceDialog] = useState(false)
   const [showDeductionDialog, setShowDeductionDialog] = useState(false)
   const [showLoanDialog, setShowLoanDialog] = useState(false)
-  
-  const [showAddCurrencyRateDialog, setShowAddSubsidiaryDialog] = useState(false)
-  const [showAddOrgChartDialog, setShowAddOrgChartDialog] = useState(false)
+
+  const [showAddCurrencyRateDialog, setShowAddOrgChartDialog] = useState(false)
   const [showAddPromotionDialog, setShowAddPromotionDialog] = useState(false)
   const [showAddDocumentDialog, setShowAddDocumentDialog] = useState(false)
   const [showAddCommGroupDialog, setShowAddCommGroupDialog] = useState(false)
@@ -1116,10 +1115,7 @@ IT Support Team
 
   const loadLeaveManagementData = async () => {
     try {
-      await Promise.all([
-        loadLeaveTypes(),
-        loadLeavePolicies()
-      ])
+      await Promise.all([loadLeaveTypes(), loadLeavePolicies()])
     } catch (error) {
       console.error("Error loading leave management data:", error)
     }
@@ -1943,7 +1939,6 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         toast({
           title: "Error",
           description: "Company ID not found. Please refresh the page and try again.",
-          variant: "destructive",
         })
         return
       }
@@ -2726,7 +2721,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Subsidiaries</h3>
-                  <Button onClick={() => setShowAddSubsidiaryDialog(true)}>
+                  <Button onClick={handleAddSubsidiary}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Subsidiary
                   </Button>
@@ -2774,7 +2769,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Currency Exchange Rates</h3>
-                  <Button onClick={() => setShowAddCurrencyRateDialog(true)}>
+                  <Button onClick={() => setShowAddCurrencyRateDialogFunc(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Rate
                   </Button>
@@ -3403,7 +3398,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 <Switch
                   id="two-factor-auth"
                   checked={securitySettings.twoFactorAuth}
-                  onChange={(checked) => setSecuritySettings({ ...securitySettings, twoFactorAuth: checked })}
+                  onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, twoFactorAuth: checked })}
                 />
                 <Label htmlFor="two-factor-auth">Two-Factor Authentication</Label>
               </div>
@@ -3412,7 +3407,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 <Switch
                   id="auto-session-timeout"
                   checked={securitySettings.autoSessionTimeout}
-                  onChange={(checked) =>
+                  onCheckedChange={(checked) =>
                     setSecuritySettings({ ...securitySettings, autoSessionTimeout: checked })
                   }
                 />
@@ -3437,7 +3432,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 <Switch
                   id="audit-logging"
                   checked={securitySettings.auditLogging}
-                  onChange={(checked) => setSecuritySettings({ ...securitySettings, auditLogging: checked })}
+                  onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, auditLogging: checked })}
                 />
                 <Label htmlFor="audit-logging">Audit Logging</Label>
               </div>
@@ -3446,7 +3441,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 <Switch
                   id="automated-backups"
                   checked={securitySettings.automatedBackups}
-                  onChange={(checked) => setSecuritySettings({ ...securitySettings, automatedBackups: checked })}
+                  onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, automatedBackups: checked })}
                 />
                 <Label htmlFor="automated-backups">Automated Backups</Label>
               </div>
@@ -3484,7 +3479,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <Checkbox
                     id="require-uppercase"
                     checked={passwordPolicy.requireUppercase}
-                    onChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireUppercase: checked })}
+                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireUppercase: checked })}
                   />
                   <Label htmlFor="require-uppercase">Require Uppercase</Label>
                 </div>
@@ -3493,7 +3488,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <Checkbox
                     id="require-numbers"
                     checked={passwordPolicy.requireNumbers}
-                    onChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireNumbers: checked })}
+                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireNumbers: checked })}
                   />
                   <Label htmlFor="require-numbers">Require Numbers</Label>
                 </div>
@@ -3502,25 +3497,21 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <Checkbox
                     id="require-symbols"
                     checked={passwordPolicy.requireSymbols}
-                    onChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireSymbols: checked })}
+                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireSymbols: checked })}
                   />
                   <Label htmlFor="require-symbols">Require Symbols</Label>
                 </div>
               </div>
 
               <div className="space-y-2">
-
-              <div className="space-y-2">
                 <Label htmlFor="meeting-duration">Default Meeting Duration (minutes)</Label>
                 <Input
                   id="meeting-duration"
                   type="number"
-                  value={onlineMeetings.find(m => m.is_default)?.duration || 60}
+                  value={onlineMeetings.find((m) => m.is_default)?.duration || 60}
                   onChange={(e) => {
-                    const updatedMeetings = onlineMeetings.map(meeting => 
-                      meeting.is_default 
-                        ? { ...meeting, duration: Number.parseInt(e.target.value) }
-                        : meeting
+                    const updatedMeetings = onlineMeetings.map((meeting) =>
+                      meeting.is_default ? { ...meeting, duration: Number.parseInt(e.target.value) } : meeting,
                     )
                     setOnlineMeetings(updatedMeetings)
                   }}
@@ -3528,20 +3519,15 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               </div>
 
               <div className="flex justify-end space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowAddMeetingDialog(false)}
-                >
+                <Button variant="outline" onClick={() => setShowAddMeetingDialog(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleSaveMeeting}>
-                  Save Meeting
-                </Button>
+                <Button onClick={handleSaveMeeting}>Save Meeting</Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
-  )\
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
 }
