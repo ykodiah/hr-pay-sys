@@ -1803,6 +1803,20 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     }
   }
 
+  const handleActivateSubsidiary = async (subsidiaryId: string) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("subsidiaries").update({ status: "active" }).eq("id", subsidiaryId)
+
+      if (error) throw error
+      toast({ title: "Success", description: "Subsidiary activated successfully" })
+      loadSubsidiaries()
+    } catch (error) {
+      console.error("Error activating subsidiary:", error)
+      toast({ title: "Error", description: "Failed to activate subsidiary", variant: "destructive" })
+    }
+  }
+
   const handleDeactivateSubsidiary = async (subsidiaryId: string) => {
     try {
       const supabase = createClient()
@@ -2856,26 +2870,40 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setViewingSubsidiary(subsidiary)}>
+                                <DropdownMenuItem onClick={() => handleViewSubsidiary(subsidiary)}>
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Details
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    if (
-                                      window.confirm(
-                                        "Are you sure you want to deactivate this subsidiary? This will disable access but preserve all data.",
-                                      )
-                                    ) {
-                                      handleDeactivateSubsidiary(subsidiary.id)
-                                    }
-                                  }}
-                                  className="text-orange-600"
-                                >
-                                  <Power className="h-4 w-4 mr-2" />
-                                  Deactivate
-                                </DropdownMenuItem>
+                                {subsidiary.status === "inactive" ? (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      if (window.confirm("Are you sure you want to activate this subsidiary?")) {
+                                        handleActivateSubsidiary(subsidiary.id)
+                                      }
+                                    }}
+                                    className="text-green-600"
+                                  >
+                                    <Power className="h-4 w-4 mr-2" />
+                                    Activate
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      if (
+                                        window.confirm(
+                                          "Are you sure you want to deactivate this subsidiary? This will disable access but preserve all data.",
+                                        )
+                                      ) {
+                                        handleDeactivateSubsidiary(subsidiary.id)
+                                      }
+                                    }}
+                                    className="text-orange-600"
+                                  >
+                                    <Power className="h-4 w-4 mr-2" />
+                                    Deactivate
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -3589,7 +3617,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       </Tabs>
 
       <Dialog open={showSubsidiaryDialog} onOpenChange={setShowSubsidiaryDialog}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingSubsidiary ? "Edit Subsidiary" : "Add New Subsidiary"}</DialogTitle>
             <DialogDescription>
@@ -3601,11 +3629,6 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
             onSave={handleSaveSubsidiary}
             onCancel={() => setShowSubsidiaryDialog(false)}
           />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSubsidiaryDialog(false)}>
-              Cancel
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -3712,14 +3735,12 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         </DialogContent>
       </Dialog>
 
-      {/* Deactivate Subsidiary Function Modal */}
       <Dialog open={showDeactivateModal} onOpenChange={setShowDeactivateModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Deactivate Subsidiary Function</DialogTitle>
             <DialogDescription>
-              Are you sure you want to deactivate the subsidiary function? This will hide all subsidiary management
-              features.
+              Are you sure you want to deactivate this subsidiary? This will disable access but preserve all data.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex justify-end space-x-2">
