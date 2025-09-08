@@ -364,7 +364,7 @@ export default function SettingsPage() {
   const [showDeductionDialog, setShowDeductionDialog] = useState(false)
   const [showLoanDialog, setShowLoanDialog] = useState(false)
   
-  const [showAddCurrencyRateDialog, setShowSubsidiaryDialogFunc] = useState(false)
+  const [showAddCurrencyRateDialog, setShowAddSubsidiaryDialog] = useState(false)
   const [showAddOrgChartDialog, setShowAddOrgChartDialog] = useState(false)
   const [showAddPromotionDialog, setShowAddPromotionDialog] = useState(false)
   const [showAddDocumentDialog, setShowAddDocumentDialog] = useState(false)
@@ -2726,7 +2726,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Subsidiaries</h3>
-                  <Button onClick={() => setShowSubsidiaryDialogFunc(true)}>
+                  <Button onClick={() => setShowAddSubsidiaryDialog(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Subsidiary
                   </Button>
