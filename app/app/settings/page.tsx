@@ -402,19 +402,13 @@ export default function SettingsPage() {
   const [isBackingUp, setIsBackingUp] = useState(false)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
 
-  const [showAddCurrencyRateDialog, setShowAddSubsidiaryDialog] = useState(false)
-  const [showAddOrgChartDialog, setShowAddPromotionDialog] = useState(false)
-  const [showAddDocumentDialog, setShowAddCommGroupDialog] = useState(false)
-  const [showAddMeetingDialog, setShowLeavePolicyDialog] = useState(false)
-
-  const [showAddSubsidiaryDialog, setShowPromotionDialog] = useState(false)
-  const [showAddPromotionDialog, setShowCommGroupDialog] = useState(false)
-  const [showAddCommGroupDialog, setShowLeavePolicyDialog] = useState(false)
-  const [showLeavePolicyDialog, setShowAddCurrencyRateDialog] = useState(false)
-  const [showAddCurrencyRateDialog, setShowAddOrgChartDialog] = useState(false)
-  const [showAddOrgChartDialog, setShowAddDocumentDialog] = useState(false)
-  const [showAddDocumentDialog, setShowAddMeetingDialog] = useState(false)
-  const [showAddMeetingDialog, ] = useState(false)
+  const [showAddCurrencyRateDialog, setShowAddCurrencyRateDialog] = useState(false)
+  const [showAddOrgChartDialog, setShowAddOrgChartDialog] = useState(false)
+  const [showAddDocumentDialog, setShowAddDocumentDialog] = useState(false)
+  const [showAddMeetingDialog, setShowAddMeetingDialog] = useState(false)
+  const [showAddPromotionDialog, setShowAddPromotionDialog] = useState(false)
+  const [showAddCommGroupDialog, setShowAddCommGroupDialog] = useState(false)
+  const [showLeavePolicyDialog, setShowLeavePolicyDialog] = useState(false)
 
   const [editingEmailTemplate, setEditingEmailTemplate] = useState<EmailTemplate | null>(null)
   const [editingLeaveType, setEditingLeaveType] = useState<LeaveType | null>(null)
@@ -2340,7 +2334,6 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
   }
 
   const [editingLeavePolicy, setEditingLeavePolicy] = useState<LeavePolicy | null>(null)
-  const [showLeavePolicyDialog, setShowLeavePolicyDialogFunc] = useState(false)
 
   const handleDeleteLeavePolicy = async (id: string) => {
     try {
@@ -3517,5 +3510,5 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         </Card>
       </TabsContent>
     </Tabs>
-  )\
-}
+  )
+}\
