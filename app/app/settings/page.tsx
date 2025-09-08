@@ -26,6 +26,8 @@ import {
   Calendar,
   Download,
   ExternalLink,
+  MoreVertical,
+  Loader2,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -34,6 +36,21 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface Company {
   id: string
@@ -357,7 +374,7 @@ export default function SettingsPage() {
   const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
   const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
   const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
-  const [isBackingUp, setIsBackingUp] = useState(false)
+  const [isBackingUp, setIsBackingUp] = useState(isBackingUp)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
 
   const [showAllowanceDialog, setShowAllowanceDialog] = useState(false)
@@ -1910,21 +1927,23 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     console.log("View meeting:", meeting)
   }
 
-  const handleSaveMultiCompany = async () => {
+  const handleSaveMultiCompanySettings = async () => {
     try {
+      setIsBackingUp(true)
       const supabase = createClient()
 
-      if (!companyData.id) {
-        toast({
-          title: "Error",
-          description: "Company ID not found. Please refresh the page and try again.",
-          variant: "destructive",
-        })
+      // Get authenticated user
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+      if (authError || !user) {
+        toast({ title: "Error", description: "Authentication required", variant: "destructive" })
         return
       }
 
-      // Update company settings
-      const { error } = await supabase
+      // Update company settings with subsidiary function status
+      const { error: companyError } = await supabase
         .from("companies")
         .update({
           name: companyData.name,
@@ -1932,15 +1951,39 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           tax_id: companyData.tax_id,
           ssnit_number: companyData.ssnit_number,
           industry: companyData.industry,
+          address: companyData.address,
+          phone_number: companyData.phone_number,
+          divisions: companyData.divisions,
+          departments: companyData.departments,
+          locations: companyData.locations,
           updated_at: new Date().toISOString(),
         })
         .eq("id", companyData.id)
 
-      if (error) throw error
+      if (companyError) {
+        console.error("Company update error:", companyError)
+        throw companyError
+      }
+
+      // Save subsidiary function status to company_settings
+      const { error: settingsError } = await supabase.from("company_settings").upsert({
+        id: companyData.id,
+        name: companyData.name,
+        subsidiary_function_active: subsidiaryFunction,
+        updated_at: new Date().toISOString(),
+      })
+
+      if (settingsError) {
+        console.error("Settings update error:", settingsError)
+        // Don't throw here as this might be a new field
+      }
+
       toast({ title: "Success", description: "Multi-company settings saved successfully" })
     } catch (error) {
       console.error("Error saving multi-company settings:", error)
-      toast({ title: "Error", description: "Failed to save settings" })
+      toast({ title: "Error", description: "Failed to save settings", variant: "destructive" })
+    } finally {
+      setIsBackingUp(false)
     }
   }
 
@@ -2713,164 +2756,169 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         </TabsContent>
 
         <TabsContent value="multi-company">
-          <Card>
-            <CardHeader>
-              <CardTitle>Multi-Company Management</CardTitle>
-              <CardDescription>Manage subsidiaries and multi-company operations.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Subsidiaries Section */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Multi-Company Management</h2>
+                <p className="text-gray-600">Manage multiple companies and subsidiaries</p>
+              </div>
+            </div>
+
+            {/* Main Company Card */}
+            <Card className="border-2">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Building2 className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">{companyData.name || "Akwaaba Technologies Ltd"}</h3>
+                      <p className="text-gray-600">{companyData.email_address || "ykodiah@gmail.com"}</p>
+                    </div>
+                  </div>
+                  <Badge variant={subsidiaryFunction ? "default" : "secondary"} className="bg-green-100 text-green-800">
+                    {subsidiaryFunction ? "active" : "inactive"}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                  <div>
+                    <p className="text-sm text-gray-600">Tax ID</p>
+                    <p className="font-medium">{companyData.tax_id || "C001234567B"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">SSNIT Number</p>
+                    <p className="font-medium">{companyData.ssnit_number || "1234567890"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Industry</p>
+                    <p className="font-medium">{companyData.industry || "Technology"}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="subsidiaryFunction"
+                      checked={subsidiaryFunction}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSubsidiaryFunction(true)
+                        } else {
+                          setShowDeactivateModal(true)
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor="subsidiaryFunction" className="text-sm font-medium">
+                      Activate Subsidiary Function
+                    </label>
+                    <Badge variant={subsidiaryFunction ? "default" : "secondary"} className="text-xs">
+                      {subsidiaryFunction ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Subsidiaries Section */}
+            {subsidiaryFunction && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Subsidiaries</h3>
-                  <Button onClick={handleAddSubsidiary}>
+                  <h3 className="text-lg font-semibold">Subsidiaries ({subsidiaries.length})</h3>
+                  <Button onClick={handleAddSubsidiary} className="bg-black text-white hover:bg-gray-800">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Subsidiary
                   </Button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {subsidiaries.map((subsidiary) => (
-                    <Card key={subsidiary.id} className="shadow-sm">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">{subsidiary.name}</CardTitle>
-                        <CardDescription className="text-xs">{subsidiary.status}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2 text-sm">
-                          <p>
-                            <strong>Tax ID:</strong> {subsidiary.tax_id}
-                          </p>
-                          <p>
-                            <strong>SSNIT:</strong> {subsidiary.ssnit_number}
-                          </p>
-                          <p>
-                            <strong>Email:</strong> {subsidiary.email_address}
-                          </p>
-                          <p>
-                            <strong>Phone:</strong> {subsidiary.phone_number}
-                          </p>
-                          <Badge variant={subsidiary.status === "active" ? "default" : "secondary"}>
-                            {subsidiary.status}
-                          </Badge>
+                    <Card key={subsidiary.id} className="border-l-4 border-l-green-500">
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <h4 className="text-lg font-semibold">{subsidiary.name}</h4>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant="default" className="bg-green-100 text-green-800">
+                              {subsidiary.status || "active"}
+                            </Badge>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditSubsidiary(subsidiary)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setViewingSubsidiary(subsidiary)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteSubsidiary(subsidiary.id)}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
-                        <div className="flex space-x-2 mt-3">
-                          <Button variant="ghost" size="sm" onClick={() => handleEditSubsidiary(subsidiary)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteSubsidiary(subsidiary.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-600">Tax ID:</p>
+                            <p className="font-medium">{subsidiary.tax_id}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">SSNIT:</p>
+                            <p className="font-medium">{subsidiary.ssnit_number}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Divisions:</p>
+                            <p className="font-medium">{subsidiary.divisions_count || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Departments:</p>
+                            <p className="font-medium">{subsidiary.departments_count || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Locations:</p>
+                            <p className="font-medium">{subsidiary.locations_count || 0}</p>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
               </div>
+            )}
 
-              {/* Currency Management */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Currency Exchange Rates</h3>
-                  <Button onClick={() => setShowAddCurrencyRateDialogFunc(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Rate
-                  </Button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          From Currency
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          To Currency
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Exchange Rate
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Effective Date
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {currencyRates.map((rate) => (
-                        <tr key={rate.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {rate.from_currency}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{rate.to_currency}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{rate.exchange_rate}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(rate.effective_date).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              <Button variant="ghost" size="sm" onClick={() => handleEditCurrencyRate(rate)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDeleteCurrencyRate(rate.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Organizational Charts */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Organizational Charts</h3>
-                  <Button onClick={() => setShowAddOrgChartDialog(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Chart
-                  </Button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {organizationalCharts.map((chart) => (
-                    <Card key={chart.id} className="shadow-sm">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">{chart.name}</CardTitle>
-                        <CardDescription className="text-xs">{chart.chart_type}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2 text-sm">
-                          <p>
-                            <strong>Style:</strong> {chart.chart_style}
-                          </p>
-                          <p>
-                            <strong>Description:</strong> {chart.description}
-                          </p>
-                          <Badge variant={chart.is_active ? "default" : "secondary"}>
-                            {chart.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                        </div>
-                        <div className="flex space-x-2 mt-3">
-                          <Button variant="ghost" size="sm" onClick={() => handleViewOrgChart(chart)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleEditOrgChart(chart)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteOrgChart(chart.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Save Button */}
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSaveMultiCompanySettings}
+                className="bg-black text-white hover:bg-gray-800"
+                disabled={isBackingUp}
+              >
+                {isBackingUp ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Multi-Company Settings"
+                )}
+              </Button>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="hr">
@@ -3530,6 +3578,34 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Deactivate Subsidiary Function Modal */}
+      <Dialog open={showDeactivateModal} onOpenChange={setShowDeactivateModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Deactivate Subsidiary Function</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate the subsidiary function? This will hide all subsidiary management
+              features.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setShowDeactivateModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setSubsidiaryFunction(false)
+                setShowDeactivateModal(false)
+                toast({ title: "Success", description: "Subsidiary function deactivated" })
+              }}
+            >
+              Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
