@@ -67,6 +67,7 @@ interface Company {
   divisions?: string[]
   departments?: string[]
   locations?: string[]
+  status?: string
 }
 
 interface LeaveType {
@@ -181,7 +182,6 @@ const SubsidiaryForm: FunctionComponent<SubsidiaryFormProps> = ({ subsidiary, on
     tax_id: "",
     ssnit_number: "",
     industry: "",
-    status: "active",
     address: "",
     phone_number: "",
     divisions: [],
