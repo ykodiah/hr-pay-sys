@@ -998,6 +998,8 @@ export default function SettingsPage() {
   const [showBulkImportDialog, setShowBulkImportDialog] = useState(false)
   const [showAddUserDialog, setShowAddUserDialog] = useState(false)
 
+  const [isLoadingSubsidiaries, setIsLoadingSubsidiaries] = useState(false)
+
   useEffect(() => {
     const loadAllData = async () => {
       setIsLoading(true)
@@ -1013,26 +1015,21 @@ export default function SettingsPage() {
           loadPayrollConfig(),
           loadPayrollAllowances(),
           loadPayrollDeductions(),
-          loadLoanSettings(), // Now safe to load after company data is available
+          loadLoanSettings(),
           loadRoles(),
           loadEmailTemplates(),
           loadSecuritySettings(),
           loadLeavePolicies(),
         ])
       } catch (error) {
-        console.error("Error loading settings data:", error)
-        toast({
-          title: "Error",
-          description: "Some settings data failed to load. Please refresh the page.",
-          variant: "destructive",
-        })
+        console.error("Error loading data:", error)
       } finally {
         setIsLoading(false)
       }
     }
 
     loadAllData()
-  }, [])
+  }, []) // Only run once on mount
 
   const loadCompanyData = async (retryCount = 0) => {
     try {
@@ -1562,7 +1559,10 @@ IT Support Team
   }
 
   const loadSubsidiaries = async () => {
+    if (isLoadingSubsidiaries) return // Prevent concurrent calls
+
     try {
+      setIsLoadingSubsidiaries(true)
       const supabase = createClient()
       const { data, error } = await supabase.from("subsidiaries").select("*")
 
@@ -1583,6 +1583,8 @@ IT Support Team
       setSubsidiaries(subsidiariesWithCounts)
     } catch (error) {
       console.error("Error loading subsidiaries:", error)
+    } finally {
+      setIsLoadingSubsidiaries(false)
     }
   }
 
@@ -2361,7 +2363,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         description: "Payroll settings and tax configuration saved successfully",
       })
 
-      await loadAllDataFunc()
+      await refreshAllData()
     } catch (error) {
       console.error("Error saving payroll settings:", error)
       toast({
@@ -2666,25 +2668,12 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     )
   }
 
-  const loadAllData = async () => {
+  const refreshAllData = async () => {
+    if (isLoading) return // Prevent concurrent calls
+
     setIsLoading(true)
     try {
-      console.log("[v0] Starting comprehensive data load")
-
-      // Wait for company data to be available
-      let retries = 0
-      const maxRetries = 5
-      while ((!companyData.id || companyData.id === "") && retries < maxRetries) {
-        console.log(`[v0] Waiting for company ID, attempt ${retries + 1}`)
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-        retries++
-      }
-
-      if (!companyData.id || companyData.id === "") {
-        console.log("[v0] Company ID not available after retries, loading basic data only")
-        await Promise.all([loadCurrencyRates(), loadEmployeeDocuments()])
-        return
-      }
+      await loadCompanyData()
 
       // Load all data in parallel for better performance
       await Promise.all([
@@ -2706,41 +2695,9 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         loadEmailTemplates(),
       ])
 
-      console.log("[v0] Comprehensive data load completed")
+      console.log("[v0] Data refresh completed")
     } catch (error) {
-      console.error("[v0] Error in comprehensive data load:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const loadAllDataFunc = async () => {
-    setIsLoading(true)
-    try {
-      await loadCompanyData()
-
-      // Load all other data that depends on company data
-      await Promise.all([
-        loadLeaveTypes(),
-        loadSalaryGrades(),
-        loadEmployees(),
-        loadSubsidiaries(),
-        loadPayrollConfig(),
-        loadPayrollAllowances(),
-        loadPayrollDeductions(),
-        loadLoanSettings(), // Now safe to load after company data is available
-        loadRoles(),
-        loadEmailTemplates(),
-        loadSecuritySettings(),
-        loadLeavePolicies(),
-      ])
-    } catch (error) {
-      console.error("Error loading settings data:", error)
-      toast({
-        title: "Error",
-        description: "Some settings data failed to load. Please refresh the page.",
-        variant: "destructive",
-      })
+      console.error("[v0] Error refreshing data:", error)
     } finally {
       setIsLoading(false)
     }
