@@ -402,7 +402,7 @@ export default function SettingsPage() {
   const [isBackingUp, setIsBackingUp] = useState(false)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
 
-  const [showAddSubsidiaryDialog, setShowAddCurrencyRateDialog] = useState(false)
+  const [showAddCurrencyRateDialog, setShowAddSubsidiaryDialog] = useState(false)
   const [showAddOrgChartDialog, setShowAddPromotionDialog] = useState(false)
   const [showAddDocumentDialog, setShowAddCommGroupDialog] = useState(false)
   const [showAddMeetingDialog, setShowLeavePolicyDialog] = useState(false)
@@ -2354,6 +2354,15 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     }
   }
 
+  const handleSaveMeeting = async () => {
+    // Implementation for saving meeting
+    toast({
+      title: "Success",
+      description: "Meeting saved successfully.",
+    })
+    setShowAddMeetingDialog(false)
+  }
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -3319,7 +3328,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           </Card>
         </TabsContent>
 
-        <TabContent value="notifications">
+        <TabsContent value="notifications">
           <Card>
             <CardHeader>
               <CardTitle>Notification Settings</CardTitle>
@@ -3346,9 +3355,9 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               </div>
             </CardContent>
           </Card>
-        </TabContent>
+        </TabsContent>
 
-        <TabContent value="security">
+        <TabsContent value="security">
           <Card>
             <CardHeader>
               <CardTitle>Security Settings</CardTitle>
@@ -3465,4 +3474,39 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               </div>
 
               <div className="space-y-2">
-\
+
+              <div className="space-y-2">
+                <Label htmlFor="meeting-duration">Default Meeting Duration (minutes)</Label>
+                <Input
+                  id="meeting-duration"
+                  type="number"
+                  value={onlineMeetings.find(m => m.is_default)?.duration || 60}
+                  onChange={(e) => {
+                    const updatedMeetings = onlineMeetings.map(meeting => 
+                      meeting.is_default 
+                        ? { ...meeting, duration: Number.parseInt(e.target.value) }
+                        : meeting
+                    )
+                    setOnlineMeetings(updatedMeetings)
+                  }}
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowAddMeetingDialog(false)}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveMeeting}>
+                  Save Meeting
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
+  )\
+}
