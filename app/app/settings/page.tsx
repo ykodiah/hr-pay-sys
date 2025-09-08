@@ -357,7 +357,7 @@ export default function SettingsPage() {
   const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
   const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
   const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
-  const [isBackingUp, setIsBackingUp] = useState(isBackingUp)
+  const [isBackingUp, setIsBackingUp] = useState(false)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
 
   const [showAllowanceDialog, setShowAllowanceDialog] = useState(false)
@@ -432,6 +432,19 @@ export default function SettingsPage() {
   const [leaveTypes, setLeaveTypesState] = useState<any[]>([])
   const [salaryGrades, setSalaryGradesState] = useState<any[]>([])
   const [leavePolicies, setLeavePoliciesState] = useState<LeavePolicy[]>([])
+
+  const [editingSalaryGradeState, setEditingSalaryGradeState] = useState<SalaryGrade>({
+    id: "",
+    grade_name: "",
+    grade_level: 0,
+    step_1: 0,
+    step_2: 0,
+    step_3: 0,
+    step_4: 0,
+    step_5: 0,
+  })
+
+  const [showAddCurrencyRateDialogFunc, setShowAddCurrencyRateDialogFunc] = useState(false)
 
   const dateSSNITRates = (field: "employee" | "employer", value: number) => {
     const newSsnit = { ...ssnit, [field]: value }
@@ -2333,19 +2346,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     setShowLeavePolicyDialogFunc(true)
   }
 
-  const [editingSalaryGrade, setEditingSalaryGrade] = useState<SalaryGrade>({
-    id: "",
-    grade_name: "",
-    grade_level: 0,
-    step_1: 0,
-    step_2: 0,
-    step_3: 0,
-    step_4: 0,
-    step_5: 0,
-  })
-
   const handleAddSalaryGrade = () => {
-    setEditingSalaryGrade({
+    setEditingSalaryGradeState({
       id: "",
       grade_name: "",
       grade_level: 0,
@@ -2359,7 +2361,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
   }
 
   const handleEditSalaryGrade = (salaryGrade: SalaryGrade) => {
-    setEditingSalaryGrade(salaryGrade)
+    setEditingSalaryGradeState(salaryGrade)
     setShowSalaryGradeDialog(true)
   }
 
@@ -2485,8 +2487,6 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       setIsLoading(false)
     }
   }
-
-  const [showAddCurrencyRateDialogFunc, setShowAddCurrencyRateDialogFunc] = useState(false)
 
   return (
     <div className="container mx-auto p-6">
