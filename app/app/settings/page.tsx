@@ -407,6 +407,15 @@ export default function SettingsPage() {
   const [showAddDocumentDialog, setShowAddCommGroupDialog] = useState(false)
   const [showAddMeetingDialog, setShowLeavePolicyDialog] = useState(false)
 
+  const [showAddSubsidiaryDialog, setShowPromotionDialog] = useState(false)
+  const [showAddPromotionDialog, setShowCommGroupDialog] = useState(false)
+  const [showAddCommGroupDialog, setShowLeavePolicyDialog] = useState(false)
+  const [showLeavePolicyDialog, setShowAddCurrencyRateDialog] = useState(false)
+  const [showAddCurrencyRateDialog, setShowAddOrgChartDialog] = useState(false)
+  const [showAddOrgChartDialog, setShowAddDocumentDialog] = useState(false)
+  const [showAddDocumentDialog, setShowAddMeetingDialog] = useState(false)
+  const [showAddMeetingDialog, ] = useState(false)
+
   const [editingEmailTemplate, setEditingEmailTemplate] = useState<EmailTemplate | null>(null)
   const [editingLeaveType, setEditingLeaveType] = useState<LeaveType | null>(null)
   const [editingSalaryGrade, setEditingSalaryGrade] = useState<SalaryGrade | null>(null)
