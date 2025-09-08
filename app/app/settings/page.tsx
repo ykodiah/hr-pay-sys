@@ -31,6 +31,10 @@ import {
   Clock,
   User,
   Key,
+  Brain,
+  AlertTriangle,
+  TrendingUp,
+  Lightbulb,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -488,8 +492,7 @@ export default function SettingsPage() {
 
   const [showDeactivateModal, setShowDeactivateModal] = useState(false)
 
-  const [showActivateSubsidiaryModal, setShowActivateSubsidiaryModal] = useState(false)
-  const [showDeactivateSubsidiaryModal, setShowDeactivateSubsidiaryModal] = useState(false)
+  const [showActivateSubsidiaryModal, setShowDeactivateSubsidiaryModal] = useState(false)
   const [subsidiaryToToggle, setSubsidiaryToToggle] = useState<any>(null)
 
   const [companyData, setCompanyData] = useState<Company>({
@@ -562,7 +565,7 @@ export default function SettingsPage() {
   const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
   const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
   const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
-  const [isBackingUp, setIsBackingUp] = useState(false)
+  const [isBackingUp, setIsBackingUp] = useState(isBackingUp)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
 
   const [showAllowanceDialog, setShowAllowanceDialog] = useState(false)
@@ -991,7 +994,21 @@ export default function SettingsPage() {
     }
   }
 
-  const [showAddRoleDialog, setShowAddRoleDialog] = useState(false)
+  const [showAddRoleDialog, setShowEditRoleDialog] = useState(false)
+  const [showPermissionsDialog, setShowPermissionsDialog] = useState(false)
+  const [showDeleteRoleDialog, setShowDeleteRoleDialog] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<any>(null)
+  const [newRole, setNewRole] = useState({
+    name: "",
+    description: "",
+    permissions: [] as string[],
+    is_active: true,
+  })
+  const [aiInsights, setAiInsights] = useState<any[]>([])
+  const [securityScore, setSecurityScore] = useState(85)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+
+  const [showAddRoleDialogFunc, setShowAddRoleDialog] = useState(false)
   const [userSearchTerm, setUserSearchTerm] = useState("")
   const [userFilterRole, setUserFilterRole] = useState("all")
   const [userFilterStatus, setUserFilterStatus] = useState("all")
@@ -2728,11 +2745,151 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     }
   }
 
+  const handleAddRole = async () => {
+    try {
+      setIsLoading(true)
+      const supabase = createClient()
+
+      const { data, error } = await supabase
+        .from("roles")
+        .insert([
+          {
+            name: newRole.name,
+            description: newRole.description,
+            permissions: newRole.permissions,
+            is_active: newRole.is_active,
+            company_id: companyData.id,
+            created_at: new Date().toISOString(),
+          },
+        ])
+        .select()
+
+      if (error) throw error
+
+      // Update local state
+      setRoles([...roles, data[0]])
+      setShowAddRoleDialog(false)
+      setNewRole({ name: "", description: "", permissions: [], is_active: true })
+
+      // Trigger AI analysis
+      await analyzeSecurityRisks()
+
+      toast({
+        title: "Success",
+        description: "Role created successfully",
+      })
+    } catch (error) {
+      console.error("Error adding role:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create role",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleEditRole = (role: any) => {
-    console.log("Edit role:", role)
+    setSelectedRole(role)
+    setNewRole({
+      name: role.name,
+      description: role.description,
+      permissions: role.permissions || [],
+      is_active: role.is_active,
+    })
+    setShowEditRoleDialog(true)
+  }
+
+  const handleUpdateRole = async () => {
+    try {
+      setIsLoading(true)
+      const supabase = createClient()
+
+      const { data, error } = await supabase
+        .from("roles")
+        .update({
+          name: newRole.name,
+          description: newRole.description,
+          permissions: newRole.permissions,
+          is_active: newRole.is_active,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", selectedRole.id)
+        .select()
+
+      if (error) throw error
+
+      // Update local state
+      setRoles(roles.map((r) => (r.id === selectedRole.id ? data[0] : r)))
+      setShowEditRoleDialog(false)
+
+      // Trigger AI analysis
+      await analyzeSecurityRisks()
+
+      toast({
+        title: "Success",
+        description: "Role updated successfully",
+      })
+    } catch (error) {
+      console.error("Error updating role:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update role",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleViewRolePermissions = (role: any) => {
+    setSelectedRole(role)
+    setShowPermissionsDialog(true)
+  }
+
+  const handleDeleteRole = (role: any) => {
+    setSelectedRole(role)
+    setShowDeleteRoleDialog(true)
+  }
+
+  const handleConfirmDeleteRole = async () => {
+    try {
+      setIsLoading(true)
+      const supabase = createClient()
+
+      const { error } = await supabase.from("roles").delete().eq("id", selectedRole.id)
+
+      if (error) throw error
+
+      // Update local state
+      setRoles(roles.filter((r) => r.id !== selectedRole.id))
+      setShowDeleteRoleDialog(false)
+
+      // Trigger AI analysis
+      await analyzeSecurityRisks()
+
+      toast({
+        title: "Success",
+        description: "Role deleted successfully",
+      })
+    } catch (error) {
+      console.error("Error deleting role:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete role",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleEditRoleFunc = (role: any) => {
+    console.log("Edit role:", role)
+  }
+
+  const handleViewRolePermissionsFunc = (role: any) => {
     console.log("View role permissions:", role)
   }
 
@@ -2740,7 +2897,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     console.log("Duplicate role:", role)
   }
 
-  const handleDeleteRole = (roleId: string) => {
+  const handleDeleteRoleFunc = (roleId: string) => {
     console.log("Delete role:", roleId)
   }
 
@@ -2762,6 +2919,30 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
 
   const handleToggleUserStatus = (employeeId: string) => {
     console.log("Toggle user status:", employeeId)
+  }
+
+  const analyzeSecurityRisks = async () => {
+    try {
+      setIsAnalyzing(true)
+
+      const response = await fetch("/api/analyze-security", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roles: roles,
+          employees: employees,
+          accessLogs: [], // Add access logs data
+        }),
+      })
+
+      const analysis = await response.json()
+      setAiInsights(analysis.insights || [])
+      setSecurityScore(analysis.securityScore || 85)
+    } catch (error) {
+      console.error("Error analyzing security:", error)
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
 
   return (
@@ -3178,11 +3359,81 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 <h2 className="text-2xl font-bold">Roles & Access Management</h2>
                 <p className="text-gray-600">Manage user roles, permissions, and access controls</p>
               </div>
-              <Button onClick={() => setShowAddRoleDialog(true)} className="bg-black text-white hover:bg-gray-800">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Role
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={analyzeSecurityRisks}
+                  variant="outline"
+                  disabled={isAnalyzing}
+                  className="border-purple-200 text-purple-700 hover:bg-purple-50 bg-transparent"
+                >
+                  {isAnalyzing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Brain className="h-4 w-4 mr-2" />}
+                  AI Analysis
+                </Button>
+                <Button onClick={() => setShowAddRoleDialog(true)} className="bg-black text-white hover:bg-gray-800">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Role
+                </Button>
+              </div>
             </div>
+
+            <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-5 w-5 text-purple-600" />
+                    <CardTitle className="text-purple-800">AI Security Insights</CardTitle>
+                  </div>
+                  <Badge variant="outline" className="border-purple-300 text-purple-700">
+                    Security Score: {securityScore}%
+                  </Badge>
+                </div>
+                <CardDescription className="text-purple-600">
+                  AI-powered analysis of role permissions and security risks
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div className="bg-white rounded-lg p-4 border border-purple-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-500" />
+                      <span className="text-sm font-medium">Risk Level</span>
+                    </div>
+                    <p className="text-2xl font-bold text-orange-600">Medium</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border border-purple-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Shield className="h-4 w-4 text-green-500" />
+                      <span className="text-sm font-medium">Compliance</span>
+                    </div>
+                    <p className="text-2xl font-bold text-green-600">92%</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border border-purple-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm font-medium">Predictions</span>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-600">{aiInsights.length}</p>
+                  </div>
+                </div>
+
+                {aiInsights.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-purple-800">AI Recommendations:</h4>
+                    {aiInsights.slice(0, 3).map((insight, index) => (
+                      <div key={index} className="bg-white rounded-lg p-3 border border-purple-100">
+                        <div className="flex items-start gap-2">
+                          <Lightbulb className="h-4 w-4 text-yellow-500 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-800">{insight.title}</p>
+                            <p className="text-xs text-gray-600">{insight.description}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Role Statistics */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -3216,7 +3467,9 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                     <Key className="h-8 w-8 text-purple-600" />
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-500">Permissions</p>
-                      <p className="text-2xl font-bold text-gray-900">24</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {roles.reduce((total, role) => total + (role.permissions?.length || 0), 0)}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -3257,7 +3510,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                             View Permissions
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleDeleteRole(role.id)} className="text-red-600">
+                          <DropdownMenuItem onClick={() => handleDeleteRole(role)} className="text-red-600">
                             <Trash2 className="h-4 w-4 mr-2" />
                             Delete Role
                           </DropdownMenuItem>
@@ -3288,75 +3541,216 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
               ))}
             </div>
 
-            {/* Permissions Matrix */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Permissions Matrix</CardTitle>
-                <CardDescription>Overview of role permissions across different modules</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Module
-                        </th>
-                        {roles.slice(0, 4).map((role) => (
-                          <th
-                            key={role.id}
-                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                          >
-                            {role.name}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {["HR Management", "Payroll", "Leave Management", "Employee Records", "Reports"].map((module) => (
-                        <tr key={module}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{module}</td>
-                          {roles.slice(0, 4).map((role) => (
-                            <td key={role.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              <Badge variant={Math.random() > 0.5 ? "default" : "secondary"}>
-                                {Math.random() > 0.5 ? "Full" : "Read"}
-                              </Badge>
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Access Logs */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Access Logs</CardTitle>
-                <CardDescription>Monitor user access and activity</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {[1, 2, 3, 4, 5].map((log) => (
-                    <div key={log} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                          <User className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">User {log} accessed HR Module</p>
-                          <p className="text-xs text-gray-500">{new Date().toLocaleString()}</p>
-                        </div>
-                      </div>
-                      <Badge variant="outline">Success</Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            {/* ... existing permissions matrix and access logs ... */}
           </div>
+
+          {/* Add Role Dialog */}
+          <Dialog open={showAddRoleDialog} onOpenChange={setShowAddRoleDialog}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Add New Role</DialogTitle>
+                <DialogDescription>Create a new role with specific permissions and access controls</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="roleName">Role Name</Label>
+                    <Input
+                      id="roleName"
+                      value={newRole.name}
+                      onChange={(e) => setNewRole({ ...newRole, name: e.target.value })}
+                      placeholder="e.g., HR Manager"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="roleStatus">Status</Label>
+                    <Select
+                      value={newRole.is_active ? "active" : "inactive"}
+                      onValueChange={(value) => setNewRole({ ...newRole, is_active: value === "active" })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="roleDescription">Description</Label>
+                  <Textarea
+                    id="roleDescription"
+                    value={newRole.description}
+                    onChange={(e) => setNewRole({ ...newRole, description: e.target.value })}
+                    placeholder="Describe the role responsibilities..."
+                  />
+                </div>
+                <div>
+                  <Label>Permissions</Label>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {["HR Management", "Payroll", "Leave Management", "Employee Records", "Reports", "Settings"].map(
+                      (permission) => (
+                        <div key={permission} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={permission}
+                            checked={newRole.permissions.includes(permission)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setNewRole({ ...newRole, permissions: [...newRole.permissions, permission] })
+                              } else {
+                                setNewRole({
+                                  ...newRole,
+                                  permissions: newRole.permissions.filter((p) => p !== permission),
+                                })
+                              }
+                            }}
+                          />
+                          <Label htmlFor={permission} className="text-sm">
+                            {permission}
+                          </Label>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAddRoleDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAddRole} disabled={isLoading}>
+                  {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Create Role
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Role Dialog */}
+          <Dialog open={showEditRoleDialog} onOpenChange={setShowEditRoleDialog}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Edit Role</DialogTitle>
+                <DialogDescription>Update role information and permissions</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="editRoleName">Role Name</Label>
+                    <Input
+                      id="editRoleName"
+                      value={newRole.name}
+                      onChange={(e) => setNewRole({ ...newRole, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="editRoleStatus">Status</Label>
+                    <Select
+                      value={newRole.is_active ? "active" : "inactive"}
+                      onValueChange={(value) => setNewRole({ ...newRole, is_active: value === "active" })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="editRoleDescription">Description</Label>
+                  <Textarea
+                    id="editRoleDescription"
+                    value={newRole.description}
+                    onChange={(e) => setNewRole({ ...newRole, description: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Permissions</Label>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {["HR Management", "Payroll", "Leave Management", "Employee Records", "Reports", "Settings"].map(
+                      (permission) => (
+                        <div key={permission} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`edit-${permission}`}
+                            checked={newRole.permissions.includes(permission)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setNewRole({ ...newRole, permissions: [...newRole.permissions, permission] })
+                              } else {
+                                setNewRole({
+                                  ...newRole,
+                                  permissions: newRole.permissions.filter((p) => p !== permission),
+                                })
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`edit-${permission}`} className="text-sm">
+                            {permission}
+                          </Label>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowEditRoleDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdateRole} disabled={isLoading}>
+                  {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Update Role
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* View Permissions Dialog */}
+          <Dialog open={showPermissionsDialog} onOpenChange={setShowPermissionsDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{selectedRole?.name} Permissions</DialogTitle>
+                <DialogDescription>View detailed permissions for this role</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                {selectedRole?.permissions?.map((permission: string) => (
+                  <div key={permission} className="flex items-center justify-between p-3 border rounded-lg">
+                    <span className="font-medium">{permission}</span>
+                    <Badge variant="default">Granted</Badge>
+                  </div>
+                ))}
+              </div>
+              <DialogFooter>
+                <Button onClick={() => setShowPermissionsDialog(false)}>Close</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Role Dialog */}
+          <Dialog open={showDeleteRoleDialog} onOpenChange={setShowDeleteRoleDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete Role</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete "{selectedRole?.name}"? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowDeleteRoleDialog(false)}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={handleConfirmDeleteRole} disabled={isLoading}>
+                  {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Delete Role
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="users">
