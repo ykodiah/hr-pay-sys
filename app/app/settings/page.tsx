@@ -25,7 +25,11 @@ import {
   MoreVertical,
   Loader2,
   Power,
+  Search,
+  UserCheck,
+  UserX,
   Clock,
+  User,
   Key,
   Brain,
   AlertTriangle,
@@ -34,8 +38,19 @@ import {
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -478,7 +493,6 @@ export default function SettingsPage() {
   const [showDeactivateModal, setShowDeactivateModal] = useState(false)
 
   const [showActivateSubsidiaryModal, setShowActivateSubsidiaryModal] = useState(false)
-  const [showDeactivateSubsidiaryModal, setShowDeactivateSubsidiaryModal] = useState(false)
   const [subsidiaryToToggle, setSubsidiaryToToggle] = useState<any>(null)
 
   const [companyData, setCompanyData] = useState<Company>({
@@ -551,7 +565,7 @@ export default function SettingsPage() {
   const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
   const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
   const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
-  const [isBackingUp, setIsBackingUp] = useState(false)
+  const [isBackingUp, setIsBackingUp] = useState(isBackingUp)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
 
   const [showAllowanceDialog, setShowAllowanceDialog] = useState(false)
@@ -564,6 +578,9 @@ export default function SettingsPage() {
   const [showAddCommGroupDialog, setShowAddCommGroupDialog] = useState(false)
   const [showAddMeetingDialog, setShowAddMeetingDialog] = useState(false)
   const [showLeavePolicyDialog, setShowLeavePolicyDialog] = useState(false)
+
+  const [showEditRoleDialog, setShowEditRoleDialog] = useState(false)
+  const [showDeactivateSubsidiaryModal, setShowDeactivateSubsidiaryModal] = useState(false)
 
   const [editingItem, setEditingItem] = useState<any>(null)
   const [editingIndex, setEditingIndex] = useState<number>(-1)
@@ -980,22 +997,7 @@ export default function SettingsPage() {
     }
   }
 
-  const [showAddRoleDialog, showEditRoleDialog] = useState(false)
-  const [setShowEditRoleDialog, setShowEditRoleDialog] = useState(false)
-  const [showPermissionsDialog, setShowPermissionsDialog] = useState(false)
-  const [showDeleteRoleDialog, setShowDeleteRoleDialog] = useState(false)
-  const [selectedRole, setSelectedRole] = useState<any>(null)
-  const [newRole, setNewRole] = useState({
-    name: "",
-    description: "",
-    permissions: [] as string[],
-    is_active: true,
-  })
-  const [aiInsights, setAiInsights] = useState<any[]>([])
-  const [securityScore, setSecurityScore] = useState(85)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-
-  const [showAddRoleDialogFunc, setShowAddRoleDialog] = useState(false)
+  const [showAddRoleDialog, setShowAddRoleDialog] = useState(false)
   const [userSearchTerm, setUserSearchTerm] = useState("")
   const [userFilterRole, setUserFilterRole] = useState("all")
   const [userFilterStatus, setUserFilterStatus] = useState("all")
@@ -1927,13 +1929,13 @@ Password Policy:
   const handleDownloadAuditTrail = () => {
     const auditData = `Timestamp,User,Action,Resource,IP Address,Status
 ${new Date().toLocaleString()},Admin,Login,System,192.168.1.1,Success
-${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company Settings
+${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company Settings,192.168.1.1,Success`
 
     const blob = new Blob([auditData], { type: "text/csv" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = \`audit-trail-${new Date().toISOString().split("T")[0]}.csv`
+    a.download = `audit-trail-${new Date().toISOString().split("T")[0]}.csv`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -2308,8 +2310,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         pay_frequency: payrollSettings.pay_frequency,
         cutoff_day: payrollSettings.cutoff_day,
         processing_day: payrollSettings.processing_day,
-        auto_calculate_paye: payrollSettings.auto_calculate_paye,
-        auto_calculate_ssnit: payrollSettings.auto_calculate_ssnit,
+        auto_calculate_paye: payrollSettings.auto_calculate_ssnit,
         auto_calculate_provident: payrollSettings.auto_calculate_provident,
         updated_at: new Date().toISOString(),
       }
@@ -2731,6 +2732,14 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       setIsLoading(false)
     }
   }
+
+  const [newRole, setNewRole] = useState({ name: "", description: "", permissions: [], is_active: true })
+  const [selectedRole, setSelectedRole] = useState<any>(null)
+  const [showPermissionsDialog, setShowPermissionsDialog] = useState(false)
+  const [showDeleteRoleDialog, setShowDeleteRoleDialog] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [aiInsights, setAiInsights] = useState<any[]>([])
+  const [securityScore, setSecurityScore] = useState(85)
 
   const handleAddRole = async () => {
     try {
@@ -3524,4 +3533,844 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                       </div>
                     </div>
                   </CardContent>
-\
+                </Card>
+              ))}
+            </div>
+
+            {/* ... existing permissions matrix and access logs ... */}
+          </div>
+
+          {/* Add Role Dialog */}
+          <Dialog open={showAddRoleDialog} onOpenChange={setShowAddRoleDialog}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Add New Role</DialogTitle>
+                <DialogDescription>Create a new role with specific permissions and access controls</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="roleName">Role Name</Label>
+                    <Input
+                      id="roleName"
+                      value={newRole.name}
+                      onChange={(e) => setNewRole({ ...newRole, name: e.target.value })}
+                      placeholder="e.g., HR Manager"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="roleStatus">Status</Label>
+                    <Select
+                      value={newRole.is_active ? "active" : "inactive"}
+                      onValueChange={(value) => setNewRole({ ...newRole, is_active: value === "active" })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="roleDescription">Description</Label>
+                  <Textarea
+                    id="roleDescription"
+                    value={newRole.description}
+                    onChange={(e) => setNewRole({ ...newRole, description: e.target.value })}
+                    placeholder="Describe the role responsibilities..."
+                  />
+                </div>
+                <div>
+                  <Label>Permissions</Label>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {["HR Management", "Payroll", "Leave Management", "Employee Records", "Reports", "Settings"].map(
+                      (permission) => (
+                        <div key={permission} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={permission}
+                            checked={newRole.permissions.includes(permission)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setNewRole({ ...newRole, permissions: [...newRole.permissions, permission] })
+                              } else {
+                                setNewRole({
+                                  ...newRole,
+                                  permissions: newRole.permissions.filter((p) => p !== permission),
+                                })
+                              }
+                            }}
+                          />
+                          <Label htmlFor={permission} className="text-sm">
+                            {permission}
+                          </Label>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAddRoleDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAddRole} disabled={isLoading}>
+                  {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Create Role
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Role Dialog */}
+          <Dialog open={showEditRoleDialog} onOpenChange={() => setShowEditRoleDialog(false)}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Edit Role</DialogTitle>
+                <DialogDescription>Update role information and permissions</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="editRoleName">Role Name</Label>
+                    <Input
+                      id="editRoleName"
+                      value={newRole.name}
+                      onChange={(e) => setNewRole({ ...newRole, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="editRoleStatus">Status</Label>
+                    <Select
+                      value={newRole.is_active ? "active" : "inactive"}
+                      onValueChange={(value) => setNewRole({ ...newRole, is_active: value === "active" })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="editRoleDescription">Description</Label>
+                  <Textarea
+                    id="editRoleDescription"
+                    value={newRole.description}
+                    onChange={(e) => setNewRole({ ...newRole, description: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Permissions</Label>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {["HR Management", "Payroll", "Leave Management", "Employee Records", "Reports", "Settings"].map(
+                      (permission) => (
+                        <div key={permission} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`edit-${permission}`}
+                            checked={newRole.permissions.includes(permission)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setNewRole({ ...newRole, permissions: [...newRole.permissions, permission] })
+                              } else {
+                                setNewRole({
+                                  ...newRole,
+                                  permissions: newRole.permissions.filter((p) => p !== permission),
+                                })
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`edit-${permission}`} className="text-sm">
+                            {permission}
+                          </Label>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowEditRoleDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdateRole} disabled={isLoading}>
+                  {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Update Role
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* View Permissions Dialog */}
+          <Dialog open={showPermissionsDialog} onOpenChange={setShowPermissionsDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{selectedRole?.name} Permissions</DialogTitle>
+                <DialogDescription>View detailed permissions for this role</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                {selectedRole?.permissions?.map((permission: string) => (
+                  <div key={permission} className="flex items-center justify-between p-3 border rounded-lg">
+                    <span className="font-medium">{permission}</span>
+                    <Badge variant="default">Granted</Badge>
+                  </div>
+                ))}
+              </div>
+              <DialogFooter>
+                <Button onClick={() => setShowPermissionsDialog(false)}>Close</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Role Dialog */}
+          <Dialog open={showDeleteRoleDialog} onOpenChange={setShowDeleteRoleDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete Role</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete "{selectedRole?.name}"? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowDeleteRoleDialog(false)}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={handleConfirmDeleteRole} disabled={isLoading}>
+                  {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Delete Role
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+        <TabsContent value="users">
+          <div className="space-y-6">
+            {console.log("[v0] Rendering users tab, employees count:", employees.length)}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">User Management</h2>
+                <p className="text-gray-600">Manage user accounts, roles, and permissions</p>
+              </div>
+              <Button onClick={() => setShowAddUserDialog(true)} className="bg-black text-white hover:bg-gray-800">
+                <Plus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
+            </div>
+
+            {/* User Statistics */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Users className="h-8 w-8 text-blue-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Total Users</p>
+                      <p className="text-2xl font-bold text-gray-900">{employees.length}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <UserCheck className="h-8 w-8 text-green-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Active Users</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {employees.filter((e) => e.status === "active").length}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <UserX className="h-8 w-8 text-red-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Inactive Users</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {employees.filter((e) => e.status === "inactive").length}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Clock className="h-8 w-8 text-orange-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Last Login</p>
+                      <p className="text-2xl font-bold text-gray-900">24h</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Search and Filters */}
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        placeholder="Search users by name, email, or employee ID..."
+                        className="pl-10"
+                        value={userSearchTerm}
+                        onChange={(e) => setUserSearchTerm(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <Select value={userFilterRole} onValueChange={setUserFilterRole}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filter by role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Roles</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="hr">HR Manager</SelectItem>
+                      <SelectItem value="employee">Employee</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={userFilterStatus} onValueChange={setUserFilterStatus}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Users Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>User Directory</CardTitle>
+                <CardDescription>Complete list of system users and their details</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          User
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Employee ID
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Department
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Role
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Last Login
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {employees.slice(0, 10).map((employee) => (
+                        <tr key={employee.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 h-10 w-10">
+                                <img
+                                  className="h-10 w-10 rounded-full"
+                                  src={employee.profile_picture || "/placeholder.svg?height=40&width=40"}
+                                  alt=""
+                                />
+                              </div>
+                              <div className="ml-4">
+                                <div className="text-sm font-medium text-gray-900">{employee.full_name}</div>
+                                <div className="text-sm text-gray-500">{employee.corporate_email}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{employee.employee_id}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{employee.department}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <Badge variant="outline">{employee.special_role || "Employee"}</Badge>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Badge variant={employee.status === "active" ? "default" : "secondary"}>
+                              {employee.status}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date().toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleViewUser(employee)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Profile
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEditUser(employee)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit User
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleResetPassword(employee.id)}>
+                                  <Key className="h-4 w-4 mr-2" />
+                                  Reset Password
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleToggleUserStatus(employee.id)}
+                                  className={employee.status === "active" ? "text-red-600" : "text-green-600"}
+                                >
+                                  <Power className="h-4 w-4 mr-2" />
+                                  {employee.status === "active" ? "Deactivate" : "Activate"}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Activity Timeline */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent User Activity</CardTitle>
+                <CardDescription>Timeline of recent user actions and system events</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5].map((activity) => (
+                    <div key={activity} className="flex items-start space-x-3">
+                      <div className="flex-shrink-0">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <User className="h-4 w-4 text-blue-600" />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">User {activity} logged into the system</p>
+                        <p className="text-sm text-gray-500">
+                          {new Date(Date.now() - activity * 3600000).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex-shrink-0">
+                        <Badge variant="outline">Login</Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <Card>
+            <CardHeader>
+              <CardTitle>Notification Settings</CardTitle>
+              <CardDescription>Configure notification preferences.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Notification Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={notificationSettings.email}
+                  onChange={(e) => setNotificationSettings({ ...notificationSettings, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="webhookUrl">Webhook URL</Label>
+                <Input
+                  id="webhookUrl"
+                  type="url"
+                  value={notificationSettings.webhookUrl}
+                  onChange={(e) => setNotificationSettings({ ...notificationSettings, webhookUrl: e.target.value })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="security">
+          <Card>
+            <CardHeader>
+              <CardTitle>Security Settings</CardTitle>
+              <CardDescription>Configure security settings and password policies.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="two-factor-auth"
+                  checked={securitySettings.twoFactorAuth}
+                  onChange={(checked) =>
+                    setSecuritySettings({ ...securitySettings, twoFactorAuth: checked.target.checked })
+                  }
+                />
+                <Label htmlFor="two-factor-auth">Two-Factor Authentication</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="auto-session-timeout"
+                  checked={securitySettings.autoSessionTimeout}
+                  onChange={(checked) =>
+                    setSecuritySettings({ ...securitySettings, autoSessionTimeout: checked.target.checked })
+                  }
+                />
+                <Label htmlFor="auto-session-timeout">Auto Session Timeout</Label>
+              </div>
+
+              {securitySettings.autoSessionTimeout && (
+                <div className="space-y-2 ml-6">
+                  <Label htmlFor="timeout-duration">Timeout Duration (minutes)</Label>
+                  <Input
+                    id="timeout-duration"
+                    type="number"
+                    value={securitySettings.timeoutDuration}
+                    onChange={(e) =>
+                      setSecuritySettings({ ...securitySettings, timeoutDuration: Number.parseInt(e.target.value) })
+                    }
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="audit-logging"
+                  checked={securitySettings.auditLogging}
+                  onChange={(checked) =>
+                    setSecuritySettings({ ...securitySettings, auditLogging: checked.target.checked })
+                  }
+                />
+                <Label htmlFor="audit-logging">Audit Logging</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="automated-backups"
+                  checked={securitySettings.automatedBackups}
+                  onChange={(checked) =>
+                    setSecuritySettings({ ...securitySettings, automatedBackups: checked.target.checked })
+                  }
+                />
+                <Label htmlFor="automated-backups">Automated Backups</Label>
+              </div>
+
+              {securitySettings.automatedBackups && (
+                <div className="space-y-2 ml-6">
+                  <Label htmlFor="backup-frequency">Backup Frequency</Label>
+                  <Select
+                    value={securitySettings.backupFrequency}
+                    onChange={(value) => setSecuritySettings({ ...securitySettings, backupFrequency: value })}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <h2 className="text-xl font-semibold">Password Policy</h2>
+              <div className="space-y-2 ml-6">
+                <Label htmlFor="min-length">Minimum Length</Label>
+                <Input
+                  id="min-length"
+                  type="number"
+                  value={passwordPolicy.minLength}
+                  onChange={(e) => setPasswordPolicy({ ...passwordPolicy, minLength: Number.parseInt(e.target.value) })}
+                />
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="require-uppercase"
+                    checked={passwordPolicy.requireUppercase}
+                    onChange={(checked) =>
+                      setPasswordPolicy({ ...passwordPolicy, requireUppercase: checked.target.checked })
+                    }
+                  />
+                  <Label htmlFor="require-uppercase">Require Uppercase</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="require-numbers"
+                    checked={passwordPolicy.requireNumbers}
+                    onChange={(checked) =>
+                      setPasswordPolicy({ ...passwordPolicy, requireNumbers: checked.target.checked })
+                    }
+                  />
+                  <Label htmlFor="require-numbers">Require Numbers</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="require-symbols"
+                    checked={passwordPolicy.requireSymbols}
+                    onChange={(checked) =>
+                      setPasswordPolicy({ ...passwordPolicy, requireSymbols: checked.target.checked })
+                    }
+                  />
+                  <Label htmlFor="require-symbols">Require Symbols</Label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="meeting-duration">Default Meeting Duration (minutes)</Label>
+                <Input
+                  id="meeting-duration"
+                  type="number"
+                  value={onlineMeetings.find((m) => m.is_default)?.duration || 60}
+                  onChange={(e) => {
+                    const updatedMeetings = onlineMeetings.map((meeting) =>
+                      meeting.is_default ? { ...meeting, duration: Number.parseInt(e.target.value) } : meeting,
+                    )
+                    setOnlineMeetings(updatedMeetings)
+                  }}
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowAddMeetingDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveMeeting}>Save Meeting</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={showSubsidiaryDialog} onOpenChange={setShowSubsidiaryDialog}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingSubsidiary ? "Edit Subsidiary" : "Add New Subsidiary"}</DialogTitle>
+            <DialogDescription>
+              {editingSubsidiary ? "Update subsidiary information" : "Create a new subsidiary company"}
+            </DialogDescription>
+          </DialogHeader>
+          <SubsidiaryForm
+            subsidiary={editingSubsidiary}
+            onSave={handleSaveSubsidiary}
+            onCancel={() => setShowSubsidiaryDialog(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showViewSubsidiaryDialog} onOpenChange={setShowViewSubsidiaryDialog}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Subsidiary Details</DialogTitle>
+            <DialogDescription>View detailed information about {viewingSubsidiary?.name}</DialogDescription>
+          </DialogHeader>
+          {viewingSubsidiary && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Name</Label>
+                  <p className="text-sm">{viewingSubsidiary.name}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Status</Label>
+                  <Badge variant="default" className="bg-green-100 text-green-800">
+                    {viewingSubsidiary.status || "active"}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Tax ID</Label>
+                  <p className="text-sm">{viewingSubsidiary.tax_id}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">SSNIT Number</Label>
+                  <p className="text-sm">{viewingSubsidiary.ssnit_number}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Email</Label>
+                  <p className="text-sm">{viewingSubsidiary.email_address}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Phone</Label>
+                  <p className="text-sm">{viewingSubsidiary.phone_number}</p>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-gray-600">Address</Label>
+                <p className="text-sm">{viewingSubsidiary.address}</p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Divisions</Label>
+                  <p className="text-2xl font-bold">{viewingSubsidiary.divisions?.length || 0}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Departments</Label>
+                  <p className="text-2xl font-bold">{viewingSubsidiary.departments?.length || 0}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Locations</Label>
+                  <p className="text-2xl font-bold">{viewingSubsidiary.locations?.length || 0}</p>
+                </div>
+              </div>
+
+              {viewingSubsidiary.divisions && viewingSubsidiary.divisions.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Division List</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {viewingSubsidiary.divisions.map((division: string, index: number) => (
+                      <Badge key={index} variant="outline">
+                        {division}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {viewingSubsidiary.departments && viewingSubsidiary.departments.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Department List</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {viewingSubsidiary.departments.map((department: string, index: number) => (
+                      <Badge key={index} variant="outline">
+                        {department}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {viewingSubsidiary.locations && viewingSubsidiary.locations.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Location List</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {viewingSubsidiary.locations.map((location: string, index: number) => (
+                      <Badge key={index} variant="outline">
+                        {location}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setShowViewSubsidiaryDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeactivateModal} onOpenChange={setShowDeactivateModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Deactivate Subsidiary Function</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate this subsidiary? This will disable access but preserve all data.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setShowDeactivateModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setSubsidiaryFunction(false)
+                setShowDeactivateModal(false)
+                toast({ title: "Success", description: "Subsidiary function deactivated" })
+              }}
+            >
+              Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeactivateSubsidiaryModal} onOpenChange={setShowDeactivateSubsidiaryModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Deactivate Subsidiary Company</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate this subsidiary? This will disable access but preserve all data.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setShowDeactivateSubsidiaryModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (subsidiaryToToggle) {
+                  handleDeactivateSubsidiary(subsidiaryToToggle.id)
+                }
+                setShowDeactivateSubsidiaryModal(false)
+                setSubsidiaryToToggle(null)
+              }}
+            >
+              Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showActivateSubsidiaryModal} onOpenChange={setShowActivateSubsidiaryModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Activate Subsidiary Company</DialogTitle>
+            <DialogDescription>Are you sure you want to activate this subsidiary?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setShowActivateSubsidiaryModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (subsidiaryToToggle) {
+                  handleActivateSubsidiary(subsidiaryToToggle.id)
+                }
+                setShowActivateSubsidiaryModal(false)
+                setSubsidiaryToToggle(null)
+              }}
+            >
+              Activate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
