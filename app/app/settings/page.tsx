@@ -1165,20 +1165,45 @@ export default function SettingsPage() {
 
   const loadRoles = async () => {
     try {
+      console.log("[v0] Loading roles data...")
       const supabase = createClient()
       // For now, use hardcoded roles since there's no roles table in the schema
-      setRoles([
-        { id: "1", name: "Super Admin", description: "Full system access", permissions: ["all"], user_count: 1 },
-        { id: "2", name: "HR Manager", description: "HR operations management", permissions: ["hr"], user_count: 3 },
+      const rolesData = [
+        {
+          id: "1",
+          name: "Super Admin",
+          description: "Full system access",
+          permissions: ["all"],
+          user_count: 1,
+          is_active: true,
+        },
+        {
+          id: "2",
+          name: "HR Manager",
+          description: "HR operations management",
+          permissions: ["hr"],
+          user_count: 3,
+          is_active: true,
+        },
         {
           id: "3",
           name: "Payroll Manager",
           description: "Payroll processing",
           permissions: ["payroll"],
           user_count: 2,
+          is_active: true,
         },
-        { id: "4", name: "Employee", description: "Self-service access", permissions: ["self"], user_count: 45 },
-      ])
+        {
+          id: "4",
+          name: "Employee",
+          description: "Self-service access",
+          permissions: ["self"],
+          user_count: 45,
+          is_active: true,
+        },
+      ]
+      setRoles(rolesData)
+      console.log("[v0] Roles loaded successfully:", rolesData.length)
     } catch (error) {
       console.error("Error loading roles:", error)
     }
@@ -3147,6 +3172,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
 
         <TabsContent value="roles">
           <div className="space-y-6">
+            {console.log("[v0] Rendering roles tab, roles count:", roles.length)}
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold">Roles & Access Management</h2>
@@ -3335,6 +3361,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
 
         <TabsContent value="users">
           <div className="space-y-6">
+            {console.log("[v0] Rendering users tab, employees count:", employees.length)}
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold">User Management</h2>
