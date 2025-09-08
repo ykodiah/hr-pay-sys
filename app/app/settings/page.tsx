@@ -2861,7 +2861,11 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  onClick={() => handleDeleteSubsidiary(subsidiary.id)}
+                                  onClick={() => {
+                                    if (window.confirm("Are you sure you want to delete this subsidiary?")) {
+                                      handleDeleteSubsidiary(subsidiary.id)
+                                    }
+                                  }}
                                   className="text-red-600"
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
@@ -3578,6 +3582,130 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={showSubsidiaryDialog} onOpenChange={setShowSubsidiaryDialog}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingSubsidiary ? "Edit Subsidiary" : "Add New Subsidiary"}</DialogTitle>
+            <DialogDescription>
+              {editingSubsidiary ? "Update subsidiary information" : "Create a new subsidiary company"}
+            </DialogDescription>
+          </DialogHeader>
+          <SubsidiaryForm
+            subsidiary={editingSubsidiary}
+            onSave={handleSaveSubsidiary}
+            onCancel={() => setShowSubsidiaryDialog(false)}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSubsidiaryDialog(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showViewSubsidiaryDialog} onOpenChange={setShowViewSubsidiaryDialog}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Subsidiary Details</DialogTitle>
+            <DialogDescription>View detailed information about {viewingSubsidiary?.name}</DialogDescription>
+          </DialogHeader>
+          {viewingSubsidiary && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Name</Label>
+                  <p className="text-sm">{viewingSubsidiary.name}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Status</Label>
+                  <Badge variant="default" className="bg-green-100 text-green-800">
+                    {viewingSubsidiary.status || "active"}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Tax ID</Label>
+                  <p className="text-sm">{viewingSubsidiary.tax_id}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">SSNIT Number</Label>
+                  <p className="text-sm">{viewingSubsidiary.ssnit_number}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Email</Label>
+                  <p className="text-sm">{viewingSubsidiary.email_address}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Phone</Label>
+                  <p className="text-sm">{viewingSubsidiary.phone_number}</p>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-gray-600">Address</Label>
+                <p className="text-sm">{viewingSubsidiary.address}</p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Divisions</Label>
+                  <p className="text-2xl font-bold">{viewingSubsidiary.divisions?.length || 0}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Departments</Label>
+                  <p className="text-2xl font-bold">{viewingSubsidiary.departments?.length || 0}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Locations</Label>
+                  <p className="text-2xl font-bold">{viewingSubsidiary.locations?.length || 0}</p>
+                </div>
+              </div>
+
+              {viewingSubsidiary.divisions && viewingSubsidiary.divisions.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Division List</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {viewingSubsidiary.divisions.map((division: string, index: number) => (
+                      <Badge key={index} variant="outline">
+                        {division}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {viewingSubsidiary.departments && viewingSubsidiary.departments.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Department List</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {viewingSubsidiary.departments.map((department: string, index: number) => (
+                      <Badge key={index} variant="outline">
+                        {department}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {viewingSubsidiary.locations && viewingSubsidiary.locations.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Location List</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {viewingSubsidiary.locations.map((location: string, index: number) => (
+                      <Badge key={index} variant="outline">
+                        {location}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setShowViewSubsidiaryDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Deactivate Subsidiary Function Modal */}
       <Dialog open={showDeactivateModal} onOpenChange={setShowDeactivateModal}>
