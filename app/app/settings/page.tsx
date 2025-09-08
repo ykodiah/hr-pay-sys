@@ -22,13 +22,15 @@ import {
   Edit,
   Trash2,
   Plus,
-  MapPin,
-  Calendar,
-  Download,
-  ExternalLink,
   MoreVertical,
   Loader2,
   Power,
+  Search,
+  UserCheck,
+  UserX,
+  Clock,
+  User,
+  Key,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -3186,228 +3188,327 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           </div>
         </TabsContent>
 
-        <TabsContent value="hr">
-          <Card>
-            <CardHeader>
-              <CardTitle>HR Management</CardTitle>
-              <CardDescription>
-                Comprehensive HR management including promotions, documents, and communications.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Existing leave types, policies, salary grades sections */}
-              {/* Leave Types Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Leave Types</h3>
-                  <Button onClick={handleAddLeaveType}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Leave Type
-                  </Button>
-                </div>
+        <TabsContent value="roles">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Roles & Access Management</h2>
+                <p className="text-gray-600">Manage user roles, permissions, and access controls</p>
+              </div>
+              <Button onClick={() => setShowAddRoleDialog(true)} className="bg-black text-white hover:bg-gray-800">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Role
+              </Button>
+            </div>
+
+            {/* Role Statistics */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Shield className="h-8 w-8 text-blue-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Total Roles</p>
+                      <p className="text-2xl font-bold text-gray-900">{roles.length}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Users className="h-8 w-8 text-green-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Active Users</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {employees.filter((e) => e.status === "active").length}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Key className="h-8 w-8 text-purple-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Permissions</p>
+                      <p className="text-2xl font-bold text-gray-900">24</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Clock className="h-8 w-8 text-orange-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Recent Access</p>
+                      <p className="text-2xl font-bold text-gray-900">12</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Roles Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {roles.map((role) => (
+                <Card key={role.id} className="shadow-sm hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg font-semibold">{role.name}</CardTitle>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditRole(role)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Role
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewRolePermissions(role)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Permissions
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleDeleteRole(role.id)} className="text-red-600">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Role
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <CardDescription>{role.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Users Assigned:</span>
+                        <Badge variant="secondary">{role.user_count || 0}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Permissions:</span>
+                        <Badge variant="outline">{role.permissions?.length || 0}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Status:</span>
+                        <Badge variant={role.is_active ? "default" : "secondary"}>
+                          {role.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Permissions Matrix */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Permissions Matrix</CardTitle>
+                <CardDescription>Overview of role permissions across different modules</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Code
+                          Module
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Name
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Annual Entitlement
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Paid
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
+                        {roles.slice(0, 4).map((role) => (
+                          <th
+                            key={role.id}
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            {role.name}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {leaveTypes.map((leaveType) => (
-                        <tr key={leaveType.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {leaveType.code}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{leaveType.name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {leaveType.annual_entitlement} days
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <Badge variant={leaveType.is_paid ? "default" : "secondary"}>
-                              {leaveType.is_paid ? "Paid" : "Unpaid"}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              <Button variant="ghost" size="sm" onClick={() => handleEditLeaveType(leaveType)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDeleteLeaveType(leaveType.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
+                      {["HR Management", "Payroll", "Leave Management", "Employee Records", "Reports"].map((module) => (
+                        <tr key={module}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{module}</td>
+                          {roles.slice(0, 4).map((role) => (
+                            <td key={role.id} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <Badge variant={Math.random() > 0.5 ? "default" : "secondary"}>
+                                {Math.random() > 0.5 ? "Full" : "Read"}
+                              </Badge>
+                            </td>
+                          ))}
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              {/* Leave Policies Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Leave Policies</h3>
-                  <Button onClick={handleAddLeavePolicy}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Policy
-                  </Button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {leavePolicies.map((policy) => (
-                    <Card key={policy.id} className="shadow-sm">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">{policy.policy_name}</CardTitle>
-                        <CardDescription className="text-xs">{policy.policy_type}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2 text-sm">
-                          <p>
-                            <strong>Max Days:</strong> {policy.max_days}
-                          </p>
-                          <p>
-                            <strong>Notice Period:</strong> {policy.notice_period_days} days
-                          </p>
-                          <p>
-                            <strong>Requires Approval:</strong> {policy.requires_approval ? "Yes" : "No"}
-                          </p>
-                          <Badge variant={policy.is_active ? "default" : "secondary"}>
-                            {policy.is_active ? "Active" : "Inactive"}
-                          </Badge>
+            {/* Access Logs */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Access Logs</CardTitle>
+                <CardDescription>Monitor user access and activity</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5].map((log) => (
+                    <div key={log} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <User className="h-4 w-4 text-blue-600" />
                         </div>
-                        <div className="flex space-x-2 mt-3">
-                          <Button variant="ghost" size="sm" onClick={() => handleEditLeavePolicy(policy)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteLeavePolicy(policy.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                        <div>
+                          <p className="text-sm font-medium">User {log} accessed HR Module</p>
+                          <p className="text-xs text-gray-500">{new Date().toLocaleString()}</p>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                      <Badge variant="outline">Success</Badge>
+                    </div>
                   ))}
                 </div>
-              </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-              {/* Salary Grades Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Salary Grades & Notches</h3>
-                  <Button onClick={handleAddSalaryGrade}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Grade
-                  </Button>
+        <TabsContent value="users">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">User Management</h2>
+                <p className="text-gray-600">Manage user accounts, roles, and permissions</p>
+              </div>
+              <Button onClick={() => setShowAddUserDialog(true)} className="bg-black text-white hover:bg-gray-800">
+                <Plus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
+            </div>
+
+            {/* User Statistics */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Users className="h-8 w-8 text-blue-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Total Users</p>
+                      <p className="text-2xl font-bold text-gray-900">{employees.length}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <UserCheck className="h-8 w-8 text-green-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Active Users</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {employees.filter((e) => e.status === "active").length}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <UserX className="h-8 w-8 text-red-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Inactive Users</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {employees.filter((e) => e.status === "inactive").length}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Clock className="h-8 w-8 text-orange-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Last Login</p>
+                      <p className="text-2xl font-bold text-gray-900">24h</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Search and Filters */}
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        placeholder="Search users by name, email, or employee ID..."
+                        className="pl-10"
+                        value={userSearchTerm}
+                        onChange={(e) => setUserSearchTerm(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <Select value={userFilterRole} onValueChange={setUserFilterRole}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filter by role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Roles</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="hr">HR Manager</SelectItem>
+                      <SelectItem value="employee">Employee</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={userFilterStatus} onValueChange={setUserFilterStatus}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Users Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>User Directory</CardTitle>
+                <CardDescription>Complete list of system users and their details</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Grade
+                          User
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Level
+                          Employee ID
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Step 1
+                          Department
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Step 2
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Step 3
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Step 4
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Step 5
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {salaryGrades.map((grade) => (
-                        <tr key={grade.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {grade.grade_name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.grade_level}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatCurrency(grade.step_1)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatCurrency(grade.step_2)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatCurrency(grade.step_3)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatCurrency(grade.step_4)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatCurrency(grade.step_5)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              <Button variant="ghost" size="sm" onClick={() => handleEditSalaryGrade(grade)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDeleteSalaryGrade(grade.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Promotions Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Employee Promotions</h3>
-                  <Button onClick={() => setShowAddPromotionDialog(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Initiate Promotion
-                  </Button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Employee
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Current Position
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Proposed Position
+                          Role
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Status
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Effective Date
+                          Last Login
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Actions
@@ -3415,262 +3516,105 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {promotions.map((promotion) => (
-                        <tr key={promotion.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {promotion.employee_id}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {promotion.current_position}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {promotion.proposed_position}
-                          </td>
+                      {employees.slice(0, 10).map((employee) => (
+                        <tr key={employee.id}>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <Badge
-                              variant={
-                                promotion.status === "approved"
-                                  ? "default"
-                                  : promotion.status === "pending"
-                                    ? "secondary"
-                                    : "destructive"
-                              }
-                            >
-                              {promotion.status}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {promotion.effective_date ? new Date(promotion.effective_date).toLocaleDateString() : "TBD"}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              <Button variant="ghost" size="sm" onClick={() => handleViewPromotion(promotion)}>
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleEditPromotion(promotion)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 h-10 w-10">
+                                <img
+                                  className="h-10 w-10 rounded-full"
+                                  src={employee.profile_picture || "/placeholder.svg?height=40&width=40"}
+                                  alt=""
+                                />
+                              </div>
+                              <div className="ml-4">
+                                <div className="text-sm font-medium text-gray-900">{employee.full_name}</div>
+                                <div className="text-sm text-gray-500">{employee.corporate_email}</div>
+                              </div>
                             </div>
                           </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Employee Documents */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Employee Documents</h3>
-                  <Button onClick={() => setShowAddDocumentDialog(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Upload Document
-                  </Button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {employeeDocuments.slice(0, 6).map((document) => (
-                    <Card key={document.id} className="shadow-sm">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">{document.document_name}</CardTitle>
-                        <CardDescription className="text-xs">{document.document_type}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2 text-sm">
-                          <p>
-                            <strong>Size:</strong> {(document.file_size / 1024).toFixed(2)} KB
-                          </p>
-                          <p>
-                            <strong>Uploaded:</strong> {new Date(document.upload_date).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex space-x-2 mt-3">
-                          <Button variant="ghost" size="sm" onClick={() => handleViewDocument(document)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDownloadDocument(document)}>
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteDocument(document.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-
-              {/* Communication Groups */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Communication Groups</h3>
-                  <Button onClick={() => setShowAddCommGroupDialog(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Group
-                  </Button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {communicationGroups.map((group) => (
-                    <Card key={group.id} className="shadow-sm">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">{group.group_name}</CardTitle>
-                        <CardDescription className="text-xs">{group.group_type}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2 text-sm">
-                          <p>
-                            <strong>Description:</strong> {group.description}
-                          </p>
-                          <Badge variant={group.is_active ? "default" : "secondary"}>
-                            {group.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                        </div>
-                        <div className="flex space-x-2 mt-3">
-                          <Button variant="ghost" size="sm" onClick={() => handleViewCommGroup(group)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleEditCommGroup(group)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteCommGroup(group.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-
-              {/* Online Meetings */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Online Meetings</h3>
-                  <Button onClick={() => setShowAddMeetingDialog(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Schedule Meeting
-                  </Button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Meeting Title
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Type
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Scheduled Start
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {onlineMeetings.slice(0, 5).map((meeting) => (
-                        <tr key={meeting.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {meeting.meeting_title}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{meeting.meeting_type}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{employee.employee_id}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{employee.department}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(meeting.scheduled_start).toLocaleString()}
+                            <Badge variant="outline">{employee.special_role || "Employee"}</Badge>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <Badge
-                              variant={
-                                meeting.status === "completed"
-                                  ? "default"
-                                  : meeting.status === "ongoing"
-                                    ? "secondary"
-                                    : "outline"
-                              }
-                            >
-                              {meeting.status}
+                            <Badge variant={employee.status === "active" ? "default" : "secondary"}>
+                              {employee.status}
                             </Badge>
                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date().toLocaleDateString()}
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              <Button variant="ghost" size="sm" onClick={() => handleViewMeeting(meeting)}>
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              {meeting.meeting_url && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => window.open(meeting.meeting_url, "_blank")}
-                                >
-                                  <ExternalLink className="h-4 w-4" />
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="h-4 w-4" />
                                 </Button>
-                              )}
-                            </div>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleViewUser(employee)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Profile
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEditUser(employee)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit User
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleResetPassword(employee.id)}>
+                                  <Key className="h-4 w-4 mr-2" />
+                                  Reset Password
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleToggleUserStatus(employee.id)}
+                                  className={employee.status === "active" ? "text-red-600" : "text-green-600"}
+                                >
+                                  <Power className="h-4 w-4 mr-2" />
+                                  {employee.status === "active" ? "Deactivate" : "Activate"}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              {/* Employee Summary */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Employee Overview</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center">
-                        <Users className="h-8 w-8 text-blue-600" />
-                        <div className="ml-4">
-                          <p className="text-sm font-medium text-gray-500">Total Employees</p>
-                          <p className="text-2xl font-bold text-gray-900">{employees.length}</p>
+            {/* Activity Timeline */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent User Activity</CardTitle>
+                <CardDescription>Timeline of recent user actions and system events</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5].map((activity) => (
+                    <div key={activity} className="flex items-start space-x-3">
+                      <div className="flex-shrink-0">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <User className="h-4 w-4 text-blue-600" />
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center">
-                        <Building2 className="h-8 w-8 text-green-600" />
-                        <div className="ml-4">
-                          <p className="text-sm font-medium text-gray-500">Departments</p>
-                          <p className="text-2xl font-bold text-gray-900">{companyData.departments?.length || 0}</p>
-                        </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">User {activity} logged into the system</p>
+                        <p className="text-sm text-gray-500">
+                          {new Date(Date.now() - activity * 3600000).toLocaleString()}
+                        </p>
                       </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center">
-                        <MapPin className="h-8 w-8 text-purple-600" />
-                        <div className="ml-4">
-                          <p className="text-sm font-medium text-gray-500">Locations</p>
-                          <p className="text-2xl font-bold text-gray-900">{companyData.locations?.length || 0}</p>
-                        </div>
+                      <div className="flex-shrink-0">
+                        <Badge variant="outline">Login</Badge>
                       </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center">
-                        <Calendar className="h-8 w-8 text-orange-600" />
-                        <div className="ml-4">
-                          <p className="text-sm font-medium text-gray-500">Leave Types</p>
-                          <p className="text-2xl font-bold text-gray-900">{leaveTypes.length}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="notifications">
