@@ -492,7 +492,7 @@ export default function SettingsPage() {
 
   const [showDeactivateModal, setShowDeactivateModal] = useState(false)
 
-  const [showActivateSubsidiaryModal, setShowActivateSubsidiaryModal] = useState(false)
+  const [showActivateSubsidiaryModal, setShowDeactivateSubsidiaryModal] = useState(false)
   const [subsidiaryToToggle, setSubsidiaryToToggle] = useState<any>(null)
 
   const [companyData, setCompanyData] = useState<Company>({
@@ -578,9 +578,6 @@ export default function SettingsPage() {
   const [showAddCommGroupDialog, setShowAddCommGroupDialog] = useState(false)
   const [showAddMeetingDialog, setShowAddMeetingDialog] = useState(false)
   const [showLeavePolicyDialog, setShowLeavePolicyDialog] = useState(false)
-
-  const [showEditRoleDialog, setShowEditRoleDialog] = useState(false)
-  const [showDeactivateSubsidiaryModal, setShowDeactivateSubsidiaryModal] = useState(false)
 
   const [editingItem, setEditingItem] = useState<any>(null)
   const [editingIndex, setEditingIndex] = useState<number>(-1)
@@ -997,7 +994,21 @@ export default function SettingsPage() {
     }
   }
 
-  const [showAddRoleDialog, setShowAddRoleDialog] = useState(false)
+  const [showAddRoleDialog, setShowEditRoleDialog] = useState(false)
+  const [showPermissionsDialog, setShowPermissionsDialog] = useState(false)
+  const [showDeleteRoleDialog, setShowDeleteRoleDialog] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<any>(null)
+  const [newRole, setNewRole] = useState({
+    name: "",
+    description: "",
+    permissions: [] as string[],
+    is_active: true,
+  })
+  const [aiInsights, setAiInsights] = useState<any[]>([])
+  const [securityScore, setSecurityScore] = useState(85)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+
+  const [showAddRoleDialogFunc, setShowAddRoleDialog] = useState(false)
   const [userSearchTerm, setUserSearchTerm] = useState("")
   const [userFilterRole, setUserFilterRole] = useState("all")
   const [userFilterStatus, setUserFilterStatus] = useState("all")
@@ -1649,7 +1660,7 @@ IT Support Team
 
     console.log("[v0] Starting logo upload for file:", file.name)
 
-    if (file.size > 2 * 1024 * 2024) {
+    if (file.size > 2 * 1024 * 1024) {
       toast({
         title: "Error",
         description: "File size must be less than 2MB.",
@@ -2310,7 +2321,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         pay_frequency: payrollSettings.pay_frequency,
         cutoff_day: payrollSettings.cutoff_day,
         processing_day: payrollSettings.processing_day,
-        auto_calculate_paye: payrollSettings.auto_calculate_ssnit,
+        auto_calculate_paye: payrollSettings.auto_calculate_paye,
+        auto_calculate_ssnit: payrollSettings.auto_calculate_ssnit,
         auto_calculate_provident: payrollSettings.auto_calculate_provident,
         updated_at: new Date().toISOString(),
       }
@@ -2732,14 +2744,6 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       setIsLoading(false)
     }
   }
-
-  const [newRole, setNewRole] = useState({ name: "", description: "", permissions: [], is_active: true })
-  const [selectedRole, setSelectedRole] = useState<any>(null)
-  const [showPermissionsDialog, setShowPermissionsDialog] = useState(false)
-  const [showDeleteRoleDialog, setShowDeleteRoleDialog] = useState(false)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [aiInsights, setAiInsights] = useState<any[]>([])
-  const [securityScore, setSecurityScore] = useState(85)
 
   const handleAddRole = async () => {
     try {
@@ -3625,7 +3629,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           </Dialog>
 
           {/* Edit Role Dialog */}
-          <Dialog open={showEditRoleDialog} onOpenChange={() => setShowEditRoleDialog(false)}>
+          <Dialog open={showEditRoleDialog} onOpenChange={setShowEditRoleDialog}>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Edit Role</DialogTitle>
@@ -4031,9 +4035,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 <Switch
                   id="two-factor-auth"
                   checked={securitySettings.twoFactorAuth}
-                  onChange={(checked) =>
-                    setSecuritySettings({ ...securitySettings, twoFactorAuth: checked.target.checked })
-                  }
+                  onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, twoFactorAuth: checked })}
                 />
                 <Label htmlFor="two-factor-auth">Two-Factor Authentication</Label>
               </div>
@@ -4042,8 +4044,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 <Switch
                   id="auto-session-timeout"
                   checked={securitySettings.autoSessionTimeout}
-                  onChange={(checked) =>
-                    setSecuritySettings({ ...securitySettings, autoSessionTimeout: checked.target.checked })
+                  onCheckedChange={(checked) =>
+                    setSecuritySettings({ ...securitySettings, autoSessionTimeout: checked })
                   }
                 />
                 <Label htmlFor="auto-session-timeout">Auto Session Timeout</Label>
@@ -4067,9 +4069,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 <Switch
                   id="audit-logging"
                   checked={securitySettings.auditLogging}
-                  onChange={(checked) =>
-                    setSecuritySettings({ ...securitySettings, auditLogging: checked.target.checked })
-                  }
+                  onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, auditLogging: checked })}
                 />
                 <Label htmlFor="audit-logging">Audit Logging</Label>
               </div>
@@ -4078,9 +4078,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 <Switch
                   id="automated-backups"
                   checked={securitySettings.automatedBackups}
-                  onChange={(checked) =>
-                    setSecuritySettings({ ...securitySettings, automatedBackups: checked.target.checked })
-                  }
+                  onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, automatedBackups: checked })}
                 />
                 <Label htmlFor="automated-backups">Automated Backups</Label>
               </div>
@@ -4090,7 +4088,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <Label htmlFor="backup-frequency">Backup Frequency</Label>
                   <Select
                     value={securitySettings.backupFrequency}
-                    onChange={(value) => setSecuritySettings({ ...securitySettings, backupFrequency: value })}
+                    onValueChange={(value) => setSecuritySettings({ ...securitySettings, backupFrequency: value })}
                   >
                     <SelectTrigger className="w-[180px]">
                       <SelectValue placeholder="Select" />
@@ -4118,9 +4116,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <Checkbox
                     id="require-uppercase"
                     checked={passwordPolicy.requireUppercase}
-                    onChange={(checked) =>
-                      setPasswordPolicy({ ...passwordPolicy, requireUppercase: checked.target.checked })
-                    }
+                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireUppercase: checked })}
                   />
                   <Label htmlFor="require-uppercase">Require Uppercase</Label>
                 </div>
@@ -4129,9 +4125,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <Checkbox
                     id="require-numbers"
                     checked={passwordPolicy.requireNumbers}
-                    onChange={(checked) =>
-                      setPasswordPolicy({ ...passwordPolicy, requireNumbers: checked.target.checked })
-                    }
+                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireNumbers: checked })}
                   />
                   <Label htmlFor="require-numbers">Require Numbers</Label>
                 </div>
@@ -4140,9 +4134,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                   <Checkbox
                     id="require-symbols"
                     checked={passwordPolicy.requireSymbols}
-                    onChange={(checked) =>
-                      setPasswordPolicy({ ...passwordPolicy, requireSymbols: checked.target.checked })
-                    }
+                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireSymbols: checked })}
                   />
                   <Label htmlFor="require-symbols">Require Symbols</Label>
                 </div>
@@ -4366,7 +4358,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 setSubsidiaryToToggle(null)
               }}
             >
-              Activate
+              OK
             </Button>
           </DialogFooter>
         </DialogContent>
