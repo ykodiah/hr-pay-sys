@@ -4433,7 +4433,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold">HR Settings</h2>
-                <p className="text-gray-600">Manage HR settings, leave types, and salary grades</p>
+                <p className="text-gray-600">Configure HR settings, leave types, and salary grades</p>
               </div>
               <Button onClick={handleSaveHRSettings}>Save HR Settings</Button>
             </div>
