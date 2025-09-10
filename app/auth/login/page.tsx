@@ -28,21 +28,25 @@ export default function LoginPage() {
 
     try {
       const supabase = createClient()
-      const { error: authError } = await supabase.auth.signInWithPassword({
+
+      console.log("[v0] Attempting login with:", { email, hasPassword: !!password })
+
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: {
-          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/app`,
-        },
       })
 
       if (authError) {
+        console.error("[v0] Auth error:", authError)
         throw authError
       }
+
+      console.log("[v0] Login successful:", { user: data.user?.email })
 
       // Redirect to main app after successful login
       router.push("/app")
     } catch (error: any) {
+      console.error("[v0] Login error:", error)
       setError(error.message || "An error occurred during sign in")
     } finally {
       setIsLoading(false)
