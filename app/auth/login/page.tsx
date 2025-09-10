@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Logo } from "@/components/logo"
-import { Eye, EyeOff, Mail, Lock, AlertCircle, Info } from "lucide-react"
+import { Eye, EyeOff, Mail, Lock, AlertCircle, Zap } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
@@ -20,6 +20,75 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
+
+  const handleDemoBypass = async (userType: "admin" | "employee") => {
+    setIsLoading(true)
+    setError("")
+
+    try {
+      const supabase = createClient()
+
+      // Create demo company if it doesn't exist
+      let { data: company } = await supabase.from("companies").select("id").eq("name", "Akwaaba HR Pay Demo").single()
+
+      if (!company) {
+        const { data: newCompany } = await supabase
+          .from("companies")
+          .insert({
+            name: "Akwaaba HR Pay Demo",
+            industry: "Technology",
+            address: "Accra, Ghana",
+            phone: "+233 20 123 4567",
+            email: "demo@akwaabahrpay.com",
+          })
+          .select("id")
+          .single()
+        company = newCompany
+      }
+
+      // Create demo employee record
+      const isAdmin = userType === "admin"
+      const demoEmail = isAdmin ? "admin@akwaabahrpay.com" : "employee@akwaabahrpay.com"
+
+      const employeeData = {
+        employee_id: isAdmin ? "EMP001" : "EMP002",
+        first_name: isAdmin ? "Admin" : "Demo",
+        last_name: isAdmin ? "User" : "Employee",
+        full_name: isAdmin ? "Admin User" : "Demo Employee",
+        phone: "+233 20 123 4567",
+        department: isAdmin ? "Administration" : "Human Resources",
+        position: isAdmin ? "System Administrator" : "HR Assistant",
+        location: "Accra Office",
+        company_id: company?.id,
+        corporate_email: demoEmail,
+        status: "active",
+        hire_date: new Date().toISOString().split("T")[0],
+        salary: isAdmin ? 8000 : 3500,
+        currency: "GHS",
+      }
+
+      await supabase.from("employees").upsert(employeeData, { onConflict: "corporate_email" })
+
+      console.log(`[v0] Demo ${userType} profile created, redirecting to app`)
+
+      // Set demo session flag and redirect
+      localStorage.setItem(
+        "demo_user",
+        JSON.stringify({
+          email: demoEmail,
+          type: userType,
+          name: employeeData.full_name,
+        }),
+      )
+
+      router.push("/app")
+    } catch (error: any) {
+      console.error("[v0] Demo bypass error:", error)
+      setError(`Failed to setup demo ${userType} profile: ${error.message}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,12 +114,7 @@ export default function LoginPage() {
         if (authError.message === "Invalid login credentials") {
           if (email.includes("@akwaabahrpay.com")) {
             setError(
-              "Demo user not found in Supabase Auth. Please create the user in Supabase Dashboard:\n" +
-                "1. Go to Authentication > Users\n" +
-                "2. Click 'Add User'\n" +
-                "3. Use email: " +
-                email +
-                " and password: demo123",
+              "Demo user not found in Supabase Auth. Use the 'Quick Demo Access' buttons below for instant access.",
             )
           } else {
             setError("Invalid email or password. Please check your credentials and try again.")
@@ -75,7 +139,6 @@ export default function LoginPage() {
         return
       }
 
-      // Redirect to main app after successful login
       router.push("/app")
     } catch (error: any) {
       console.error("[v0] Login error:", error)
@@ -109,6 +172,45 @@ export default function LoginPage() {
             <CardDescription className="text-center">Enter your credentials to access AkwaabaHRPay</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="space-y-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-2 text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                  <Zap className="h-4 w-4" />
+                  Quick Demo Access
+                </div>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+                  Skip setup and access the system instantly
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  type="button"
+                  onClick={() => handleDemoBypass("admin")}
+                  disabled={isLoading}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-10"
+                >
+                  {isLoading ? "Setting up..." : "Admin Demo"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => handleDemoBypass("employee")}
+                  disabled={isLoading}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-10"
+                >
+                  {isLoading ? "Setting up..." : "Employee Demo"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Or continue with login</span>
+              </div>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">
@@ -170,7 +272,7 @@ export default function LoginPage() {
             </form>
 
             <div className="space-y-3">
-              <div className="text-center text-sm text-muted-foreground">Demo Credentials:</div>
+              <div className="text-center text-sm text-muted-foreground">Manual Demo Credentials:</div>
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   type="button"
@@ -179,7 +281,7 @@ export default function LoginPage() {
                   onClick={() => fillDemoCredentials("admin")}
                   className="text-xs"
                 >
-                  Admin Demo
+                  Fill Admin
                 </Button>
                 <Button
                   type="button"
@@ -188,23 +290,8 @@ export default function LoginPage() {
                   onClick={() => fillDemoCredentials("employee")}
                   className="text-xs"
                 >
-                  Employee Demo
+                  Fill Employee
                 </Button>
-              </div>
-              <div className="text-xs text-muted-foreground p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <div className="flex items-start gap-2">
-                  <Info className="h-4 w-4 mt-0.5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                  <div>
-                    <div className="font-medium text-blue-900 dark:text-blue-100 mb-1">Demo Setup Required:</div>
-                    <div className="text-blue-700 dark:text-blue-300">
-                      1. Run the SQL script to create employee records
-                      <br />
-                      2. Create auth users in Supabase Dashboard
-                      <br />
-                      3. Use credentials: admin@akwaabahrpay.com / demo123
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
 

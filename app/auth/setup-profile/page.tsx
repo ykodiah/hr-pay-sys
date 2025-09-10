@@ -32,6 +32,7 @@ export default function SetupProfilePage() {
 
   useEffect(() => {
     loadCompanies()
+    checkDemoUser()
   }, [])
 
   const loadCompanies = async () => {
@@ -42,6 +43,80 @@ export default function SetupProfilePage() {
       setCompanies(data || [])
     } catch (error) {
       console.error("Error loading companies:", error)
+    }
+  }
+
+  const checkDemoUser = async () => {
+    try {
+      const user = await getUser()
+      if (!user) return
+
+      const isDemoUser = user.email === "admin@akwaabahrpay.com" || user.email === "employee@akwaabahrpay.com"
+
+      if (isDemoUser) {
+        console.log("[v0] Demo user detected, auto-creating profile")
+        await createDemoProfile(user)
+      }
+    } catch (error) {
+      console.error("Error checking demo user:", error)
+    }
+  }
+
+  const createDemoProfile = async (user: any) => {
+    try {
+      const supabase = createClient()
+
+      let { data: company } = await supabase.from("companies").select("id").eq("name", "Akwaaba HR Pay Demo").single()
+
+      if (!company) {
+        const { data: newCompany } = await supabase
+          .from("companies")
+          .insert({
+            name: "Akwaaba HR Pay Demo",
+            industry: "Technology",
+            address: "Accra, Ghana",
+            phone: "+233 20 123 4567",
+            email: "demo@akwaabahrpay.com",
+          })
+          .select("id")
+          .single()
+        company = newCompany
+      }
+
+      const isAdmin = user.email === "admin@akwaabahrpay.com"
+      const employeeData = {
+        employee_id: isAdmin ? "EMP001" : "EMP002",
+        first_name: isAdmin ? "Admin" : "Demo",
+        last_name: isAdmin ? "User" : "Employee",
+        full_name: isAdmin ? "Admin User" : "Demo Employee",
+        phone: "+233 20 123 4567",
+        department: isAdmin ? "Administration" : "Human Resources",
+        position: isAdmin ? "System Administrator" : "HR Assistant",
+        location: "Accra Office",
+        company_id: company?.id,
+        corporate_email: user.email,
+        status: "active",
+        hire_date: new Date().toISOString().split("T")[0],
+        salary: isAdmin ? 8000 : 3500,
+        currency: "GHS",
+      }
+
+      const { data: employee } = await supabase
+        .from("employees")
+        .upsert(employeeData, { onConflict: "corporate_email" })
+        .select()
+        .single()
+
+      await supabase.from("employee_profiles").upsert({
+        id: user.id,
+        employee_id: employee.id,
+      })
+
+      console.log("[v0] Demo profile created successfully")
+      router.push("/app")
+    } catch (error) {
+      console.error("Error creating demo profile:", error)
+      setError("Failed to setup demo profile. Please try manual setup.")
     }
   }
 
@@ -65,7 +140,6 @@ export default function SetupProfilePage() {
         throw new Error("User not authenticated")
       }
 
-      // Create employee record
       const { data: employee, error: employeeError } = await supabase
         .from("employees")
         .insert({
@@ -88,7 +162,6 @@ export default function SetupProfilePage() {
         throw employeeError
       }
 
-      // Link employee profile to auth user
       const { error: profileError } = await supabase.from("employee_profiles").upsert({
         id: user.id,
         employee_id: employee.id,
@@ -122,6 +195,21 @@ export default function SetupProfilePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-sm text-blue-700 mb-2">Demo User Detected</p>
+              <p className="text-xs text-blue-600 mb-3">
+                Your demo profile is being automatically created. If this doesn't work, you can set up manually below.
+              </p>
+              <Button
+                onClick={() => checkDemoUser()}
+                variant="outline"
+                size="sm"
+                className="border-blue-300 text-blue-700 hover:bg-blue-100"
+              >
+                Retry Demo Setup
+              </Button>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="company" className="text-sm font-medium">
