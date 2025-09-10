@@ -577,6 +577,8 @@ export default function SettingsPage() {
   const [showDeactivateSubsidiaryModal, setShowDeactivateSubsidiaryModal] = useState(false)
   const [showEditRoleDialog, setShowEditRoleDialog] = useState(false)
 
+  const [showPermissionsDialog, setShowPermissionsDialog] = useState(false)
+
   const [editingItem, setEditingItem] = useState<any>(null)
   const [editingIndex, setEditingIndex] = useState<number>(-1)
 
@@ -992,8 +994,7 @@ export default function SettingsPage() {
     }
   }
 
-  const [showAddRoleDialogFunc, setShowAddRoleDialog] = useState(false)
-  const [showPermissionsDialog, setShowPermissionsDialog] = useState(false)
+  const [showAddRoleDialogFunc, setShowPermissionsDialog] = useState(false)
   const [showDeleteRoleDialog, setShowDeleteRoleDialog] = useState(false)
   const [selectedRole, setSelectedRole] = useState<any>(null)
   const [newRole, setNewRole] = useState({
@@ -1006,7 +1007,7 @@ export default function SettingsPage() {
   const [securityScore, setSecurityScore] = useState(85)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
 
-  const [showAddRoleDialog, setShowEditRoleDialog] = useState(false)
+  const [showAddRoleDialog, setShowAddRoleDialog] = useState(false)
   const [userSearchTerm, setUserSearchTerm] = useState("")
   const [userFilterRole, setUserFilterRole] = useState("all")
   const [userFilterStatus, setUserFilterStatus] = useState("all")
@@ -2987,8 +2988,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
             Notifications
-          </TabsTrigger>
-        </TabsList>
+          </TabsList>
 
         <TabsContent value="company">
           <Card>
@@ -3750,4 +3750,790 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 </Button>
                 <Button variant="destructive" onClick={handleConfirmDeleteRole} disabled={isLoading}>
                   {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  Dele\
+                  Delete Role
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+        <TabsContent value="users">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">User Management</h2>
+                <p className="text-gray-600">Manage user accounts, roles, and access permissions</p>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => setShowBulkImportDialog(true)} variant="outline">
+                  Bulk Import
+                </Button>
+                <Button onClick={() => setShowAddUserDialog(true)} className="bg-black text-white hover:bg-gray-800">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add User
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between py-3">
+              <div className="flex items-center gap-4">
+                <Input
+                  type="search"
+                  placeholder="Search users..."
+                  value={userSearchTerm}
+                  onChange={(e) => setUserSearchTerm(e.target.value)}
+                  className="max-w-sm"
+                />
+                <Select value={userFilterRole} onValueChange={setUserFilterRole}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by Role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    {roles.map((role) => (
+                      <SelectItem key={role.id} value={role.name}>
+                        {role.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={userFilterStatus} onValueChange={setUserFilterStatus}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {employees.map((employee) => (
+                <Card key={employee.id} className="shadow-sm hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg font-semibold">
+                        {employee.first_name} {employee.last_name}
+                      </CardTitle>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewUser(employee)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View User
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditUser(employee)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit User
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleResetPassword(employee.id)}>
+                            <Key className="h-4 w-4 mr-2" />
+                            Reset Password
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleUserStatus(employee.id)}>
+                            <Power className="h-4 w-4 mr-2" />
+                            Toggle Status
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <CardDescription>{employee.position}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Email:</span>
+                        <span className="text-sm">{employee.corporate_email}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Role:</span>
+                        <Badge variant="secondary">Employee</Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Status:</span>
+                        <Badge variant={employee.status === "active" ? "default" : "secondary"}>
+                          {employee.status === "active" ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Bulk Import Dialog */}
+          <Dialog open={showBulkImportDialog} onOpenChange={setShowBulkImportDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Bulk Import Users</DialogTitle>
+                <DialogDescription>Import multiple users from a CSV file</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p>Upload a CSV file with user data</p>
+                <Input type="file" accept=".csv" />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowBulkImportDialog(false)}>
+                  Cancel
+                </Button>
+                <Button>Import</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Add User Dialog */}
+          <Dialog open={showAddUserDialog} onOpenChange={setShowAddUserDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New User</DialogTitle>
+                <DialogDescription>Create a new user account</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input id="firstName" placeholder="First Name" />
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input id="lastName" placeholder="Last Name" />
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" placeholder="Email" />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAddUserDialog(false)}>
+                  Cancel
+                </Button>
+                <Button>Create User</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+        <TabsContent value="payroll">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Payroll Settings</h2>
+                <p className="text-gray-600">Configure payroll settings, tax rates, and deductions</p>
+              </div>
+              <Button onClick={handleSavePayrollSettings} disabled={isSavingPayroll}>
+                {isSavingPayroll ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Payroll Settings"
+                )}
+              </Button>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>General Settings</CardTitle>
+                <CardDescription>Configure general payroll settings</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="minimumWage">Minimum Wage ({payrollConfig.currency_code})</Label>
+                    <Input
+                      id="minimumWage"
+                      type="number"
+                      value={payrollConfig.minimum_wage}
+                      onChange={(e) =>
+                        setPayrollConfig({ ...payrollConfig, minimum_wage: Number.parseFloat(e.target.value) })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">Currency</Label>
+                    <Select value={payrollConfig.currency_code} onValueChange={handleCurrencyChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GHS">Ghana Cedis (GHS)</SelectItem>
+                        <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
+                        <SelectItem value="USD">US Dollar (USD)</SelectItem>
+                        <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="weekdayOvertime">Weekday Overtime Multiplier</Label>
+                    <Input
+                      id="weekdayOvertime"
+                      type="number"
+                      value={payrollConfig.overtime_weekday_multiplier}
+                      onChange={(e) =>
+                        setPayrollConfig({
+                          ...payrollConfig,
+                          overtime_weekday_multiplier: Number.parseFloat(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="weekendOvertime">Weekend Overtime Multiplier</Label>
+                    <Input
+                      id="weekendOvertime"
+                      type="number"
+                      value={payrollConfig.overtime_weekend_multiplier}
+                      onChange={(e) =>
+                        setPayrollConfig({
+                          ...payrollConfig,
+                          overtime_weekend_multiplier: Number.parseFloat(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="payFrequency">Pay Frequency</Label>
+                    <Select value={payrollSettings.pay_frequency} onValueChange={(value) => setPayrollSettings({ ...payrollSettings, pay_frequency: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Pay Frequency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Weekly">Weekly</SelectItem>
+                        <SelectItem value="Bi-Weekly">Bi-Weekly</SelectItem>
+                        <SelectItem value="Monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cutoffDay">Cutoff Day</Label>
+                    <Input
+                      id="cutoffDay"
+                      type="number"
+                      value={payrollSettings.cutoff_day}
+                      onChange={(e) => setPayrollSettings({ ...payrollSettings, cutoff_day: Number.parseInt(e.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="processingDay">Processing Day</Label>
+                    <Input
+                      id="processingDay"
+                      type="number"
+                      value={payrollSettings.processing_day}
+                      onChange={(e) => setPayrollSettings({ ...payrollSettings, processing_day: Number.parseInt(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="autoCalculatePaye"
+                    checked={payrollSettings.auto_calculate_paye}
+                    onCheckedChange={(checked) => setPayrollSettings({ ...payrollSettings, auto_calculate_paye: checked })}
+                  />
+                  <Label htmlFor="autoCalculatePaye">Auto Calculate PAYE</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="autoCalculateSsnit"
+                    checked={payrollSettings.auto_calculate_ssnit}
+                    onCheckedChange={(checked) => setPayrollSettings({ ...payrollSettings, auto_calculate_ssnit: checked })}
+                  />
+                  <Label htmlFor="autoCalculateSsnit">Auto Calculate SSNIT</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="autoCalculateProvident"
+                    checked={payrollSettings.auto_calculate_provident}
+                    onCheckedChange={(checked) => setPayrollSettings({ ...payrollSettings, auto_calculate_provident: checked })}
+                  />
+                  <Label htmlFor="autoCalculateProvident">Auto Calculate Provident Fund</Label>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>PAYE Tax Bands</CardTitle>
+                <CardDescription>Configure PAYE tax bands</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {taxBands.map((band, index) => (
+                  <div key={index} className="grid grid-cols-4 gap-4 items-center">
+                    <Label htmlFor={`rate-${index}`}>Rate (%)</Label>
+                    <Input
+                      id={`rate-${index}`}
+                      type="number"
+                      value={band.rate}
+                      onChange={(e) => {
+                        const newTaxBands = [...taxBands]
+                        newTaxBands[index] = { ...band, rate: Number.parseFloat(e.target.value) }
+                        setTaxBands(newTaxBands)
+                      }}
+                    />
+                    <Label htmlFor={`threshold-${index}`}>Threshold ({payrollConfig.currency_code})</Label>
+                    <Input
+                      id={`threshold-${index}`}
+                      type="number"
+                      value={band.threshold}
+                      onChange={(e) => {
+                        const newTaxBands = [...taxBands]
+                        newTaxBands[index] = { ...band, threshold: Number.parseFloat(e.target.value) }
+                        setTaxBands(newTaxBands)
+                      }}
+                    />
+                    <Label htmlFor={`description-${index}`}>Description</Label>
+                    <Input
+                      id={`description-${index}`}
+                      type="text"
+                      value={band.description}
+                      onChange={(e) => {
+                        const newTaxBands = [...taxBands]
+                        newTaxBands[index] = { ...band, description: e.target.value }
+                        setTaxBands(newTaxBands)
+                      }}
+                    />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>SSNIT Rates</CardTitle>
+                <CardDescription>Configure SSNIT contribution rates</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="employeeRate">Employee Rate (%)</Label>
+                    <Input
+                      id="employeeRate"
+                      type="number"
+                      value={ssnit.employee}
+                      onChange={(e) => dateSSNITRates("employee", Number.parseFloat(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="employerRate">Employer Rate (%)</Label>
+                    <Input
+                      id="employerRate"
+                      type="number"
+                      value={ssnit.employer}
+                      onChange={(e) => dateSSNITRates("employer", Number.parseFloat(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="totalRate">Total Rate (%)</Label>
+                    <Input id="totalRate" type="number" value={ssnit.total} disabled />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="employeeRateTier2">Tier 2 Employee Rate (%)</Label>
+                    <Input
+                      id="employeeRateTier2"
+                      type="number"
+                      value={tier2.employee}
+                      onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="employerRateTier2">Tier 2 Employer Rate (%)</Label>
+                    <Input
+                      id="employerRateTier2"
+                      type="number"
+                      value={tier2.employer}
+                      onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="totalRateTier2">Tier 2 Total Rate (%)</Label>
+                    <Input id="totalRateTier2" type="number" value={tier2.total} disabled />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="employeeRateTier3">Tier 3 Employee Rate (%)</Label>
+                    <Input
+                      id="employeeRateTier3"
+                      type="number"
+                      value={tier3.employee}
+                      onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="employerRateTier3">Tier 3 Employer Rate (%)</Label>
+                    <Input
+                      id="employerRateTier3"
+                      type="number"
+                      value={tier3.employer}
+                      onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="totalRateTier3">Tier 3 Total Rate (%)</Label>
+                    <Input id="totalRateTier3" type="number" value={tier3.total} disabled />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Payroll Allowances</CardTitle>
+                <CardDescription>Manage payroll allowances</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-end">
+                  <Button onClick={handleAddAllowance}>Add Allowance</Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Code
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Description
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Type
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Amount
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Taxable
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Recurring
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {payrollAllowances.map((allowance, index) => (
+                        <tr key={index}>
+                          <td className="px-6 py-4 whitespace-no-wrap">{allowance.code}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">{allowance.description}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">{allowance.type}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">
+                            {formatCurrency(allowance.amount, payrollConfig.currency_code)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-no-wrap">
+                            {allowance.taxable ? "Yes" : "No"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-no-wrap">
+                            {allowance.recurring ? "Yes" : "No"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-no-wrap text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditAllowance(index)}>
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteAllowance(index)} className="text-red-600">
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Payroll Deductions</CardTitle>
+                <CardDescription>Manage payroll deductions</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-end">
+                  <Button onClick={handleAddDeduction}>Add Deduction</Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Code
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Description
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Type
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Amount
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Recurring
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {payrollDeductions.map((deduction, index) => (
+                        <tr key={index}>
+                          <td className="px-6 py-4 whitespace-no-wrap">{deduction.code}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">{deduction.description}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">{deduction.type}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">
+                            {formatCurrency(deduction.amount, payrollConfig.currency_code)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-no-wrap">
+                            {deduction.recurring ? "Yes" : "No"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-no-wrap text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditDeduction(index)}>
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteDeduction(index)} className="text-red-600">
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Loan Settings</CardTitle>
+                <CardDescription>Manage loan settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-end">
+                  <Button onClick={handleAddLoan}>Add Loan</Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Code
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Description
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Max Amount
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Interest Rate
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Tenure (Months)
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {loanSettings.map((loan, index) => (
+                        <tr key={index}>
+                          <td className="px-6 py-4 whitespace-no-wrap">
+                            <Input
+                              type="text"
+                              value={loan.code}
+                              onChange={(e) => handleLoanInputChange(index, "code", e.target.value)}
+                            />
+                          </td>
+                          <td className="px-6 py-4 whitespace-no-wrap">
+                            <Input
+                              type="text"
+                              value={loan.description}
+                              onChange={(e) => handleLoanInputChange(index, "description", e.target.value)}
+                            />
+                          </td>
+                          <td className="px-6 py-4 whitespace-no-wrap">
+                            <Input
+                              type="number"
+                              value={loan.maxAmount}
+                              onChange={(e) => handleLoanInputChange(index, "maxAmount", e.target.value)}
+                            />
+                          </td>
+                          <td className="px-6 py-4 whitespace-no-wrap">
+                            <Input
+                              type="number"
+                              value={loan.interestRate}
+                              onChange={(e) => handleLoanInputChange(index, "interestRate", e.target.value)}
+                            />
+                          </td>
+                          <td className="px-6 py-4 whitespace-no-wrap">
+                            <Input
+                              type="number"
+                              value={loan.tenure}
+                              onChange={(e) => handleLoanInputChange(index, "tenure", e.target.value)}
+                            />
+                          </td>
+                          <td className="px-6 py-4 whitespace-no-wrap text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleSaveLoan(index)}>
+                                  Save
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteLoan(index)} className="text-red-600">
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="hr">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">HR Settings</h2>
+                <p className="text-gray-600">Manage HR settings, leave types, and salary grades</p>
+              </div>
+              <Button onClick={handleSaveHRSettings}>Save HR Settings</Button>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Leave Types</CardTitle>
+                <CardDescription>Manage leave types</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-end">
+                  <Button onClick={handleAddLeaveType}>Add Leave Type</Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Name
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Code
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Description
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Annual Entitlement
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {leaveTypes.map((leaveType) => (
+                        <tr key={leaveType.id}>
+                          <td className="px-6 py-4 whitespace-no-wrap">{leaveType.name}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">{leaveType.code}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">{leaveType.description}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">{leaveType.annual_entitlement}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditLeaveType(leaveType)}>
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteLeaveType(leaveType.id)} className="text-red-600">
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Salary Grades</CardTitle>
+                <CardDescription>Manage salary grades</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-end">
+                  <Button onClick={handleAddSalaryGrade}>Add Salary Grade</Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Grade Name
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Grade Level
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Step 1
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Step 2
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Step 3
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Step 4
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                          Step 5
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {salaryGrades.map((salaryGrade) => (
+                        <tr key={salaryGrade.id}>\
