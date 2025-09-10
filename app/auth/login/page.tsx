@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Logo } from "@/components/logo"
-import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react"
+import { Eye, EyeOff, Mail, Lock, AlertCircle, Info } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
@@ -34,14 +34,24 @@ export default function LoginPage() {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
+        options: {
+          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/app`,
+        },
       })
 
       if (authError) {
-        console.error("[v0] Auth error:", authError)
+        console.error("[v0] Auth error:", authError.message)
 
         if (authError.message === "Invalid login credentials") {
           if (email.includes("@akwaabahrpay.com")) {
-            setError("Demo user not found. Please run the setup script or contact support.")
+            setError(
+              "Demo user not found in Supabase Auth. Please create the user in Supabase Dashboard:\n" +
+                "1. Go to Authentication > Users\n" +
+                "2. Click 'Add User'\n" +
+                "3. Use email: " +
+                email +
+                " and password: demo123",
+            )
           } else {
             setError("Invalid email or password. Please check your credentials and try again.")
           }
@@ -53,9 +63,13 @@ export default function LoginPage() {
 
       console.log("[v0] Login successful:", { user: data.user?.email })
 
-      const { data: employee } = await supabase.from("employees").select("*").eq("email", data.user?.email).single()
+      const { data: employee, error: employeeError } = await supabase
+        .from("employees")
+        .select("*")
+        .eq("corporate_email", data.user?.email)
+        .single()
 
-      if (!employee && data.user?.email?.includes("@akwaabahrpay.com")) {
+      if (employeeError && data.user?.email?.includes("@akwaabahrpay.com")) {
         console.log("[v0] Demo user missing employee profile, redirecting to setup")
         router.push("/auth/setup-profile")
         return
@@ -142,7 +156,7 @@ export default function LoginPage() {
               {error && (
                 <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20">
                   <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <div>{error}</div>
+                  <div className="whitespace-pre-line">{error}</div>
                 </div>
               )}
 
@@ -177,10 +191,20 @@ export default function LoginPage() {
                   Employee Demo
                 </Button>
               </div>
-              <div className="text-xs text-muted-foreground text-center p-2 bg-muted/50 rounded">
-                <strong>Note:</strong> Demo users need to be created in Supabase.
-                <br />
-                Run the setup script or contact support if login fails.
+              <div className="text-xs text-muted-foreground p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-start gap-2">
+                  <Info className="h-4 w-4 mt-0.5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium text-blue-900 dark:text-blue-100 mb-1">Demo Setup Required:</div>
+                    <div className="text-blue-700 dark:text-blue-300">
+                      1. Run the SQL script to create employee records
+                      <br />
+                      2. Create auth users in Supabase Dashboard
+                      <br />
+                      3. Use credentials: admin@akwaabahrpay.com / demo123
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
