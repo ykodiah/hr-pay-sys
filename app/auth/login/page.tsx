@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Logo } from "@/components/logo"
 import { Eye, EyeOff, Mail, Lock } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -25,18 +26,27 @@ export default function LoginPage() {
     setIsLoading(true)
     setError("")
 
-    // Demo authentication logic
-    if (email === "admin@akwaabahrpay.com" && password === "demo123") {
-      // Redirect to admin dashboard
-      router.push("/app")
-    } else if (email === "employee@akwaabahrpay.com" && password === "demo123") {
-      // Redirect to employee portal
-      router.push("/self-service")
-    } else {
-      setError("Invalid email or password. Use demo credentials: admin@akwaabahrpay.com / demo123")
-    }
+    try {
+      const supabase = createClient()
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+        options: {
+          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/app`,
+        },
+      })
 
-    setIsLoading(false)
+      if (authError) {
+        throw authError
+      }
+
+      // Redirect to main app after successful login
+      router.push("/app")
+    } catch (error: any) {
+      setError(error.message || "An error occurred during sign in")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const fillDemoCredentials = (type: "admin" | "employee") => {
@@ -50,59 +60,57 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-emerald-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/5 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Logo variant="full" size="lg" />
-          <p className="text-gray-600 mt-2">Sign in to your account</p>
+          <p className="text-muted-foreground mt-2">Sign in to your account</p>
         </div>
 
         <Card className="shadow-xl border-0">
           <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-2xl font-bold text-center text-gray-900">Welcome Back</CardTitle>
-            <CardDescription className="text-center text-gray-600">
-              Enter your credentials to access AkwaabaHRPay
-            </CardDescription>
+            <CardTitle className="text-2xl font-bold text-center">Welcome Back</CardTitle>
+            <CardDescription className="text-center">Enter your credentials to access AkwaabaHRPay</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                <Label htmlFor="email" className="text-sm font-medium">
                   Email Address
                 </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
                     placeholder="Enter your email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 h-12 border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
+                    className="pl-10 h-12"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                <Label htmlFor="password" className="text-sm font-medium">
                   Password
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10 h-12 border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
+                    className="pl-10 pr-10 h-12"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 h-4 w-4 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-3 h-4 w-4 text-muted-foreground hover:text-foreground"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -110,12 +118,14 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>
+                <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20">
+                  {error}
+                </div>
               )}
 
               <Button
                 type="submit"
-                className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
                 disabled={isLoading}
               >
                 {isLoading ? "Signing in..." : "Sign In"}
@@ -123,14 +133,14 @@ export default function LoginPage() {
             </form>
 
             <div className="space-y-3">
-              <div className="text-center text-sm text-gray-600">Demo Credentials:</div>
+              <div className="text-center text-sm text-muted-foreground">Demo Credentials:</div>
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => fillDemoCredentials("admin")}
-                  className="text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  className="text-xs"
                 >
                   Admin Demo
                 </Button>
@@ -139,7 +149,7 @@ export default function LoginPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => fillDemoCredentials("employee")}
-                  className="text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
+                  className="text-xs"
                 >
                   Employee Demo
                 </Button>
@@ -147,12 +157,12 @@ export default function LoginPage() {
             </div>
 
             <div className="text-center space-y-2">
-              <Link href="/auth/forgot-password" className="text-sm text-emerald-600 hover:text-emerald-700">
+              <Link href="/auth/forgot-password" className="text-sm text-primary hover:text-primary/80">
                 Forgot your password?
               </Link>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-muted-foreground">
                 Don't have an account?{" "}
-                <Link href="/contact" className="text-emerald-600 hover:text-emerald-700 font-medium">
+                <Link href="/contact" className="text-primary hover:text-primary/80 font-medium">
                   Contact Sales
                 </Link>
               </div>
@@ -160,7 +170,7 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        <div className="text-center mt-6 text-xs text-gray-500">© 2025 AkwaabaHRPay. Made with ❤️ in Ghana.</div>
+        <div className="text-center mt-6 text-xs text-muted-foreground">© 2025 AkwaabaHRPay. Made with ❤️ in Ghana.</div>
       </div>
     </div>
   )

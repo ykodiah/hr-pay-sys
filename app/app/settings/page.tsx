@@ -560,7 +560,7 @@ export default function SettingsPage() {
   const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
   const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
   const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
-  const [isBackingUp, setIsBackingUp] = useState(isBackingUp)
+  const [isBackingUp, setIsBackingUp] = useState(false)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
 
   const [showAllowanceDialog, setShowAllowanceDialog] = useState(false)
@@ -2061,518 +2061,539 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
 
   const handleDeactivateSubsidiary = async (subsidiaryId: string) => {
     try {
-      const supabase = createClient()
-      const { error } = await supabase.from("subsidiaries").update({ status: "inactive" }).eq("id", subsidiaryId)
+      const supabase = createClient()\
+      const { error } }
+    = await supabase.from("subsidiaries").update(
+    status: "inactive"
+    ).eq("id\", subsidiaryId)
 
-      if (error) throw error
-      toast({ title: "Success", description: "Subsidiary deactivated successfully" })
-      loadSubsidiaries()
-    } catch (error) {
-      console.error("Error deactivating subsidiary:", error)
-      toast({ title: "Error", description: "Failed to deactivate subsidiary", variant: "destructive" })
+    if (error) throw error
+    toast({ title: "Success", description: "Subsidiary deactivated successfully" })
+    loadSubsidiaries()
+    \
+  }
+  catch (error)
+  console.error("Error deactivating subsidiary:", error)
+  toast({ title: "Error", description: "Failed to deactivate subsidiary", variant: "destructive" })
+}
+
+const handleDeleteSubsidiary = async (subsidiaryId: string) => {
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.from("subsidiaries").delete().eq("id", subsidiaryId)
+
+    if (error) throw error
+    toast({ title: "Success", description: "Subsidiary deleted successfully" })
+    loadSubsidiaries()
+  } catch (error) {
+    console.error("Error deleting subsidiary:", error)
+    toast({ title: "Error", description: "Failed to delete subsidiary", variant: "destructive" })
+  }
+}
+
+const handleEditCurrencyRate = (rate: any) => {
+  // Implementation for editing currency rate
+  console.log("Edit currency rate:", rate)
+}
+
+const handleDeleteCurrencyRate = async (rateId: string) => {
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.from("currency_rates").delete().eq("id", rateId)
+
+    if (error) throw error
+    toast({ title: "Success", description: "Currency rate deleted successfully" })
+    loadCurrencyRates()
+  } catch (error) {
+    console.error("Error deleting currency rate:", error)
+    toast({ title: "Error", description: "Failed to delete currency rate", variant: "destructive" })
+  }
+}
+
+const handleViewOrgChart = (chart: any) => {
+  console.log("View org chart:", chart)
+}
+
+const handleEditOrgChart = (chart: any) => {
+  console.log("Edit org chart:", chart)
+}
+
+const handleDeleteOrgChart = async (chartId: string) => {
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.from("organizational_charts").delete().eq("id", chartId)
+
+    if (error) throw error
+    toast({ title: "Success", description: "Organizational chart deleted successfully" })
+    loadOrganizationalCharts()
+  } catch (error) {
+    console.error("Error deleting organizational chart:", error)
+    toast({ title: "Error", description: "Failed to delete organizational chart", variant: "destructive" })
+  }
+}
+
+const handleViewPromotion = (promotion: any) => {
+  console.log("View promotion:", promotion)
+}
+
+const handleEditPromotion = (promotion: any) => {
+  console.log("Edit promotion:", promotion)
+}
+
+const handleViewDocument = (document: any) => {
+  console.log("View document:", document)
+}
+
+const handleDownloadDocument = (document: any) => {
+  console.log("Download document:", document)
+}
+
+const handleDeleteDocument = async (documentId: string) => {
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.from("employee_documents").delete().eq("id", documentId)
+
+    if (error) throw error
+    toast({ title: "Success", description: "Document deleted successfully" })
+    loadEmployeeDocuments()
+  } catch (error) {
+    console.error("Error deleting document:", error)
+    toast({ title: "Error", description: "Failed to delete document", variant: "destructive" })
+  }
+}
+
+const handleViewCommGroup = (group: any) => {
+  console.log("View communication group:", group)
+}
+
+const handleEditCommGroup = (group: any) => {
+  console.log("Edit communication group:", group)
+}
+
+const handleDeleteCommGroup = async (groupId: string) => {
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.from("communication_groups").delete().eq("id", groupId)
+
+    if (error) throw error
+    toast({ title: "Success", description: "Communication group deleted successfully" })
+    loadCommunicationGroups()
+  } catch (error) {
+    console.error("Error deleting communication group:", error)
+    toast({ title: "Error", description: "Failed to delete communication group", variant: "destructive" })
+  }
+}
+
+const handleViewMeeting = (meeting: any) => {
+  console.log("View meeting:", meeting)
+}
+
+const handleSaveMultiCompanySettings = async () => {
+  try {
+    setIsBackingUp(true)
+    const supabase = createClient()
+
+    // Get authenticated user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (authError || !user) {
+      toast({ title: "Error", description: "Authentication required", variant: "destructive" })
+      return
     }
-  }
 
-  const handleDeleteSubsidiary = async (subsidiaryId: string) => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("subsidiaries").delete().eq("id", subsidiaryId)
-
-      if (error) throw error
-      toast({ title: "Success", description: "Subsidiary deleted successfully" })
-      loadSubsidiaries()
-    } catch (error) {
-      console.error("Error deleting subsidiary:", error)
-      toast({ title: "Error", description: "Failed to delete subsidiary", variant: "destructive" })
-    }
-  }
-
-  const handleEditCurrencyRate = (rate: any) => {
-    // Implementation for editing currency rate
-    console.log("Edit currency rate:", rate)
-  }
-
-  const handleDeleteCurrencyRate = async (rateId: string) => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("currency_rates").delete().eq("id", rateId)
-
-      if (error) throw error
-      toast({ title: "Success", description: "Currency rate deleted successfully" })
-      loadCurrencyRates()
-    } catch (error) {
-      console.error("Error deleting currency rate:", error)
-      toast({ title: "Error", description: "Failed to delete currency rate", variant: "destructive" })
-    }
-  }
-
-  const handleViewOrgChart = (chart: any) => {
-    console.log("View org chart:", chart)
-  }
-
-  const handleEditOrgChart = (chart: any) => {
-    console.log("Edit org chart:", chart)
-  }
-
-  const handleDeleteOrgChart = async (chartId: string) => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("organizational_charts").delete().eq("id", chartId)
-
-      if (error) throw error
-      toast({ title: "Success", description: "Organizational chart deleted successfully" })
-      loadOrganizationalCharts()
-    } catch (error) {
-      console.error("Error deleting organizational chart:", error)
-      toast({ title: "Error", description: "Failed to delete organizational chart", variant: "destructive" })
-    }
-  }
-
-  const handleViewPromotion = (promotion: any) => {
-    console.log("View promotion:", promotion)
-  }
-
-  const handleEditPromotion = (promotion: any) => {
-    console.log("Edit promotion:", promotion)
-  }
-
-  const handleViewDocument = (document: any) => {
-    console.log("View document:", document)
-  }
-
-  const handleDownloadDocument = (document: any) => {
-    console.log("Download document:", document)
-  }
-
-  const handleDeleteDocument = async (documentId: string) => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("employee_documents").delete().eq("id", documentId)
-
-      if (error) throw error
-      toast({ title: "Success", description: "Document deleted successfully" })
-      loadEmployeeDocuments()
-    } catch (error) {
-      console.error("Error deleting document:", error)
-      toast({ title: "Error", description: "Failed to delete document", variant: "destructive" })
-    }
-  }
-
-  const handleViewCommGroup = (group: any) => {
-    console.log("View communication group:", group)
-  }
-
-  const handleEditCommGroup = (group: any) => {
-    console.log("Edit communication group:", group)
-  }
-
-  const handleDeleteCommGroup = async (groupId: string) => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("communication_groups").delete().eq("id", groupId)
-
-      if (error) throw error
-      toast({ title: "Success", description: "Communication group deleted successfully" })
-      loadCommunicationGroups()
-    } catch (error) {
-      console.error("Error deleting communication group:", error)
-      toast({ title: "Error", description: "Failed to delete communication group", variant: "destructive" })
-    }
-  }
-
-  const handleViewMeeting = (meeting: any) => {
-    console.log("View meeting:", meeting)
-  }
-
-  const handleSaveMultiCompanySettings = async () => {
-    try {
-      setIsBackingUp(true)
-      const supabase = createClient()
-
-      // Get authenticated user
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser()
-      if (authError || !user) {
-        toast({ title: "Error", description: "Authentication required", variant: "destructive" })
-        return
-      }
-
-      // Update company settings with subsidiary function status
-      const { error: companyError } = await supabase
-        .from("companies")
-        .update({
-          name: companyData.name,
-          email_address: companyData.email_address,
-          tax_id: companyData.tax_id,
-          ssnit_number: companyData.ssnit_number,
-          industry: companyData.industry,
-          address: companyData.address,
-          phone_number: companyData.phone_number,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", companyData.id)
-
-      if (companyError) {
-        console.error("Company update error:", companyError)
-        throw companyError
-      }
-
-      // Save subsidiary function status to company_settings
-      const { error: settingsError } = await supabase.from("company_settings").upsert({
-        id: companyData.id,
+    // Update company settings with subsidiary function status
+    const { error: companyError } = await supabase
+      .from("companies")
+      .update({
         name: companyData.name,
-        subsidiary_function_active: subsidiaryFunction,
+        email_address: companyData.email_address,
+        tax_id: companyData.tax_id,
+        ssnit_number: companyData.ssnit_number,
+        industry: companyData.industry,
+        address: companyData.address,
+        phone_number: companyData.phone_number,
         updated_at: new Date().toISOString(),
       })
+      .eq("id", companyData.id)
 
-      if (settingsError) {
-        console.error("Settings update error:", settingsError)
-        // Don't throw here as this might be a new field
-      }
-
-      toast({ title: "Success", description: "Multi-company settings saved successfully" })
-    } catch (error) {
-      console.error("Error saving multi-company settings:", error)
-      toast({ title: "Error", description: "Failed to save settings", variant: "destructive" })
-    } finally {
-      setIsBackingUp(false)
+    if (companyError) {
+      console.error("Company update error:", companyError)
+      throw companyError
     }
-  }
 
-  const handleSaveCompanySettings = async () => {
-    try {
-      const supabase = createClient()
+    // Save subsidiary function status to company_settings
+    const { error: settingsError } = await supabase.from("company_settings").upsert({
+      id: companyData.id,
+      name: companyData.name,
+      subsidiary_function_active: subsidiaryFunction,
+      updated_at: new Date().toISOString(),
+    })
 
-      if (!companyData.id) {
-        toast({
-          title: "Error",
-          description: "Company ID not found. Please refresh the page.",
-        })
-        return
-      }
-
-      const { error } = await supabase
-        .from("companies")
-        .update({
-          name: companyData.name,
-          email_address: companyData.email_address,
-          tax_id: companyData.tax_id,
-          ssnit_number: companyData.ssnit_number,
-          industry: companyData.industry,
-          address: companyData.address,
-          phone_number: companyData.phone_number,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", companyData.id)
-
-      if (error) throw error
-      toast({ title: "Success", description: "Company settings saved successfully" })
-    } catch (error) {
-      console.error("Error saving company settings:", error)
-      toast({ title: "Error", description: "Failed to save company settings" })
+    if (settingsError) {
+      console.error("Settings update error:", settingsError)
+      // Don't throw here as this might be a new field
     }
+
+    toast({ title: "Success", description: "Multi-company settings saved successfully" })
+  } catch (error) {
+    console.error("Error saving multi-company settings:", error)
+    toast({ title: "Error", description: "Failed to save settings", variant: "destructive" })
+  } finally {
+    setIsBackingUp(false)
   }
+}
 
-  const [isSavingPayroll, setIsSavingPayroll] = useState(false)
+const handleSaveCompanySettings = async () => {
+  try {
+    const supabase = createClient()
 
-  const handleSavePayrollSettings = async () => {
-    setIsSavingPayroll(true)
-
-    try {
-      const supabase = createClient()
-
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser()
-      if (authError || !user) {
-        toast({
-          title: "Authentication Error",
-          description: "You must be logged in to perform this action",
-          variant: "destructive",
-        })
-        return
-      }
-
-      if (!companyData.id || companyData.id.trim() === "") {
-        toast({
-          title: "Error",
-          description: "Company information not loaded. Please refresh the page.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      console.log("[v0] Saving payroll settings with user:", user.id, "company:", companyData.id)
-
-      const configData = {
-        company_id: companyData.id,
-        minimum_wage: payrollConfig.minimum_wage,
-        overtime_weekday_multiplier: payrollConfig.overtime_weekday_multiplier,
-        currency_code: payrollConfig.currency_code,
-        currency_symbol: payrollConfig.currency_symbol,
-        pay_frequency: payrollSettings.pay_frequency,
-        cutoff_day: payrollSettings.cutoff_day,
-        processing_day: payrollSettings.processing_day,
-        auto_calculate_paye: payrollSettings.auto_calculate_ssnit,
-        auto_calculate_provident: payrollSettings.auto_calculate_provident,
-        updated_at: new Date().toISOString(),
-      }
-
-      const { error: configError } = await supabase
-        .from("payroll_configuration")
-        .upsert(configData, { onConflict: "company_id" })
-
-      if (configError) throw configError
-
-      if (taxBands && taxBands.length > 0) {
-        // Delete existing tax bands for this company
-        await supabase.from("paye_tax_bands").delete().eq("company_id", companyData.id)
-
-        // Insert new tax bands
-        const taxBandData = taxBands.map((band, index) => ({
-          company_id: companyData.id,
-          band_order: index + 1,
-          percentage: Number.parseFloat(band.rate) || 0,
-          threshold: Number.parseFloat(band.threshold) || 0,
-          description: band.description || `Band ${index + 1}`,
-          is_remaining: band.description?.toLowerCase().includes("remaining") || false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }))
-
-        const { error: taxBandError } = await supabase.from("paye_tax_bands").insert(taxBandData)
-
-        if (taxBandError) throw taxBandError
-      }
-
-      const ssnitData = {
-        company_id: companyData.id,
-        employee_rate: Number.parseFloat(ssnit.employee) || 5.5,
-        employer_rate: Number.parseFloat(ssnit.employer) || 13.0,
-        tier_2_rate: Number.parseFloat(tier2.employee) || 5.0,
-        tier_3_rate: Number.parseFloat(tier3.employee) || 0.0,
-        updated_at: new Date().toISOString(),
-      }
-
-      const { error: ssnitError } = await supabase.from("ssnit_rates").upsert(ssnitData, { onConflict: "company_id" })
-
-      if (ssnitError) throw ssnitError
-
-      // Save allowances
-      for (const allowance of payrollAllowances) {
-        const { error: allowanceError } = await supabase.from("payroll_allowances").upsert({
-          ...allowance,
-          company_id: companyData.id,
-          updated_at: new Date().toISOString(),
-        })
-
-        if (allowanceError) throw allowanceError
-      }
-
-      // Save deductions
-      for (const deduction of payrollDeductions) {
-        const { error: deductionError } = await supabase.from("payroll_deductions").upsert({
-          ...deduction,
-          company_id: companyData.id,
-          updated_at: new Date().toISOString(),
-        })
-
-        if (deductionError) throw deductionError
-      }
-
-      // Save loan settings
-      for (const loan of loanSettings) {
-        const { error: loanError } = await supabase.from("loan_settings").upsert({
-          ...loan,
-          company_id: companyData.id,
-          updated_at: new Date().toISOString(),
-        })
-
-        if (loanError) throw loanError
-      }
-
-      toast({
-        title: "Success",
-        description: "Payroll settings and tax configuration saved successfully",
-      })
-
-      await refreshAllData()
-    } catch (error) {
-      console.error("Error saving payroll settings:", error)
+    if (!companyData.id) {
       toast({
         title: "Error",
-        description: `Failed to save payroll settings: ${error.message}`,
+        description: "Company ID not found. Please refresh the page.",
+      })
+      return
+    }
+
+    const { error } = await supabase
+      .from("companies")
+      .update({
+        name: companyData.name,
+        email_address: companyData.email_address,
+        tax_id: companyData.tax_id,
+        ssnit_number: companyData.ssnit_number,
+        industry: companyData.industry,
+        address: companyData.address,
+        phone_number: companyData.phone_number,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", companyData.id)
+
+    if (error) throw error
+    toast({ title: "Success", description: "Company settings saved successfully" })
+  } catch (error) {
+    console.error("Error saving company settings:", error)
+    toast({ title: "Error", description: "Failed to save company settings" })
+  }
+}
+
+const [isSavingPayroll, setIsSavingPayroll] = useState(false)
+
+const handleSavePayrollSettings = async () => {
+  setIsSavingPayroll(true)
+
+  try {
+    const supabase = createClient()
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (authError || !user) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to perform this action",
         variant: "destructive",
       })
-    } finally {
-      setIsSavingPayroll(false)
+      return
     }
-  }
 
-  const handleSaveHRSettings = async () => {
-    try {
-      const supabase = createClient()
-
-      // Save leave types
-      for (const leaveType of leaveTypes) {
-        const { error } = await supabase.from("leave_types").upsert({
-          id: leaveType.id,
-          company_id: companyData.id,
-          name: leaveType.name,
-          description: leaveType.description,
-          annual_entitlement: leaveType.annual_entitlement,
-          requires_approval: leaveType.requires_approval,
-          is_paid: leaveType.is_paid,
-          updated_at: new Date().toISOString(),
-        })
-
-        if (error) throw error
-      }
-
-      // Save salary grades
-      for (const grade of salaryGrades) {
-        const { error } = await supabase.from("salary_grades").upsert({
-          id: grade.id,
-          company_id: companyData.id,
-          grade_name: grade.name,
-          min_salary: grade.min_salary,
-          max_salary: grade.max_salary,
-          steps: grade.steps,
-          updated_at: new Date().toISOString(),
-        })
-
-        if (error) throw error
-      }
-
-      toast({ title: "Success", description: "HR settings saved successfully" })
-    } catch (error) {
-      console.error("Error saving HR settings:", error)
-      toast({ title: "Error", description: "Failed to save HR settings" })
+    if (!companyData.id || companyData.id.trim() === "") {
+      toast({
+        title: "Error",
+        description: "Company information not loaded. Please refresh the page.",
+        variant: "destructive",
+      })
+      return
     }
-  }
 
-  const handleSaveSecuritySettings = async () => {
-    try {
-      const supabase = createClient()
+    console.log("[v0] Saving payroll settings with user:", user.id, "company:", companyData.id)
 
-      const { error } = await supabase.from("security_settings").upsert({
+    const configData = {
+      company_id: companyData.id,
+      minimum_wage: payrollConfig.minimum_wage,
+      overtime_weekday_multiplier: payrollConfig.overtime_weekday_multiplier,
+      currency_code: payrollConfig.currency_code,
+      currency_symbol: payrollConfig.currency_symbol,
+      pay_frequency: payrollSettings.pay_frequency,
+      cutoff_day: payrollSettings.cutoff_day,
+      processing_day: payrollSettings.processing_day,
+      auto_calculate_paye: payrollSettings.auto_calculate_ssnit,
+      auto_calculate_provident: payrollSettings.auto_calculate_provident,
+      updated_at: new Date().toISOString(),
+    }
+
+    const { error: configError } = await supabase
+      .from("payroll_configuration")
+      .upsert(configData, { onConflict: "company_id" })
+
+    if (configError) throw configError
+
+    if (taxBands && taxBands.length > 0) {
+      // Delete existing tax bands for this company
+      await supabase.from("paye_tax_bands").delete().eq("company_id", companyData.id)
+
+      // Insert new tax bands
+      const taxBandData = taxBands.map((band, index) => ({
         company_id: companyData.id,
-        two_factor_enabled: securitySettings.twoFactorAuth,
-        session_timeout_enabled: securitySettings.sessionTimeout,
-        timeout_duration: securitySettings.timeoutDuration,
-        audit_logging_enabled: securitySettings.auditLogging,
-        password_min_length: passwordPolicy.minLength,
-        require_uppercase: passwordPolicy.requireUppercase,
-        require_numbers: passwordPolicy.requireNumbers,
-        require_symbols: passwordPolicy.requireSymbols,
+        band_order: index + 1,
+        percentage: Number.parseFloat(band.rate) || 0,
+        threshold: Number.parseFloat(band.threshold) || 0,
+        description: band.description || `Band ${index + 1}`,
+        is_remaining: band.description?.toLowerCase().includes("remaining") || false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }))
+
+      const { error: taxBandError } = await supabase.from("paye_tax_bands").insert(taxBandData)
+
+      if (taxBandError) throw taxBandError
+    }
+
+    const ssnitData = {
+      company_id: companyData.id,
+      employee_rate: Number.parseFloat(ssnit.employee) || 5.5,
+      employer_rate: Number.parseFloat(ssnit.employer) || 13.0,
+      tier_2_rate: Number.parseFloat(tier2.employee) || 5.0,
+      tier_3_rate: Number.parseFloat(tier3.employee) || 0.0,
+      updated_at: new Date().toISOString(),
+    }
+
+    const { error: ssnitError } = await supabase.from("ssnit_rates").upsert(ssnitData, { onConflict: "company_id" })
+
+    if (ssnitError) throw ssnitError
+
+    // Save allowances
+    for (const allowance of payrollAllowances) {
+      const { error: allowanceError } = await supabase.from("payroll_allowances").upsert({
+        ...allowance,
+        company_id: companyData.id,
         updated_at: new Date().toISOString(),
       })
 
-      if (error) throw error
-      toast({ title: "Success", description: "Security settings saved successfully" })
-    } catch (error) {
-      console.error("Error saving security settings:", error)
-      toast({ title: "Error", description: "Failed to save security settings" })
+      if (allowanceError) throw allowanceError
     }
-  }
 
-  const handleSaveNotificationSettings = async () => {
-    try {
-      const supabase = createClient()
-
-      const { error } = await supabase.from("notification_settings").upsert({
+    // Save deductions
+    for (const deduction of payrollDeductions) {
+      const { error: deductionError } = await supabase.from("payroll_deductions").upsert({
+        ...deduction,
         company_id: companyData.id,
-        payroll_alerts: notificationSettings.payrollAlerts,
-        leave_alerts: notificationSettings.leaveAlerts,
-        employee_updates: notificationSettings.employeeUpdates,
-        system_maintenance: notificationSettings.systemMaintenance,
-        sms_notifications: notificationSettings.smsNotifications,
-        notification_email: notificationSettings.email,
-        webhook_url: notificationSettings.webhookUrl,
         updated_at: new Date().toISOString(),
       })
 
-      if (error) throw error
-      toast({ title: "Success", description: "Notification settings saved successfully" })
-    } catch (error) {
-      console.error("Error saving notification settings:", error)
-      toast({ title: "Error", description: "Failed to save notification settings" })
+      if (deductionError) throw deductionError
     }
-  }
 
-  const handleViewSubsidiary = (subsidiary: Subsidiary) => {
-    setViewingSubsidiary(subsidiary)
-    setShowViewSubsidiaryDialog(true)
-  }
+    // Save loan settings
+    for (const loan of loanSettings) {
+      const { error: loanError } = await supabase.from("loan_settings").upsert({
+        ...loan,
+        company_id: companyData.id,
+        updated_at: new Date().toISOString(),
+      })
 
-  const handleSubsidiaryFunctionChange = (checked: boolean) => {
-    if (!checked && subsidiaryFunction) {
-      // Show confirmation modal when trying to deactivate
-      setShowDeactivateModal(true)
-    } else {
-      setSubsidiaryFunction(checked)
+      if (loanError) throw loanError
     }
-  }
 
-  const handleConfirmDeactivation = () => {
-    setSubsidiaryFunction(false)
-    setShowDeactivateModal(false)
     toast({
-      title: "Subsidiary Function Deactivated",
-      description: "All subsidiary management features have been hidden.",
+      title: "Success",
+      description: "Payroll settings and tax configuration saved successfully",
     })
-  }
 
-  const handleCancelDeactivation = () => {
-    setShowDeactivateModal(false)
-  }
-
-  const addDivision = () => {
-    setCompanyData({
-      ...companyData,
-      divisions: [...(companyData.divisions || []), "New Division"],
+    await refreshAllData()
+  } catch (error) {
+    console.error("Error saving payroll settings:", error)
+    toast({
+      title: "Error",
+      description: `Failed to save payroll settings: ${error.message}`,
+      variant: "destructive",
     })
+  } finally {
+    setIsSavingPayroll(false)
   }
+}
 
-  const removeDivision = (index: number) => {
-    setCompanyData({
-      ...companyData,
-      divisions: companyData.divisions?.filter((_, i) => i !== index),
+const handleSaveHRSettings = async () => {
+  try {
+    const supabase = createClient()
+
+    // Save leave types
+    for (const leaveType of leaveTypes) {
+      const { error } = await supabase.from("leave_types").upsert({
+        id: leaveType.id,
+        company_id: companyData.id,
+        name: leaveType.name,
+        description: leaveType.description,
+        annual_entitlement: leaveType.annual_entitlement,
+        requires_approval: leaveType.requires_approval,
+        is_paid: leaveType.is_paid,
+        updated_at: new Date().toISOString(),
+      })
+
+      if (error) throw error
+    }
+
+    // Save salary grades
+    for (const grade of salaryGrades) {
+      const { error } = await supabase.from("salary_grades").upsert({
+        id: grade.id,
+        company_id: companyData.id,
+        grade_name: grade.name,
+        min_salary: grade.min_salary,
+        max_salary: grade.max_salary,
+        steps: grade.steps,
+        updated_at: new Date().toISOString(),
+      })
+
+      if (error) throw error
+    }
+
+    toast({ title: "Success", description: "HR settings saved successfully" })
+  } catch (error) {
+    console.error("Error saving HR settings:", error)
+    toast({ title: "Error", description: "Failed to save HR settings" })
+  }
+}
+
+const handleSaveSecuritySettings = async () => {
+  try {
+    const supabase = createClient()
+
+    const { error } = await supabase.from("security_settings").upsert({
+      company_id: companyData.id,
+      two_factor_enabled: securitySettings.twoFactorAuth,
+      session_timeout_enabled: securitySettings.sessionTimeout,
+      timeout_duration: securitySettings.timeoutDuration,
+      audit_logging_enabled: securitySettings.auditLogging,
+      password_min_length: passwordPolicy.minLength,
+      require_uppercase: passwordPolicy.requireUppercase,
+      require_numbers: passwordPolicy.requireNumbers,
+      require_symbols: passwordPolicy.requireSymbols,
+      updated_at: new Date().toISOString(),
     })
-  }
 
-  const addDepartment = () => {
-    setCompanyData({
-      ...companyData,
-      departments: [...(companyData.departments || []), "New Department"],
+    if (error) throw error
+    toast({ title: "Success", description: "Security settings saved successfully" })
+  } catch (error) {
+    console.error("Error saving security settings:", error)
+    toast({ title: "Error", description: "Failed to save security settings" })
+  }
+}
+
+const handleSaveNotificationSettings = async () => {
+  try {
+    const supabase = createClient()
+
+    const { error } = await supabase.from("notification_settings").upsert({
+      company_id: companyData.id,
+      payroll_alerts: notificationSettings.payrollAlerts,
+      leave_alerts: notificationSettings.leaveAlerts,
+      employee_updates: notificationSettings.employeeUpdates,
+      system_maintenance: notificationSettings.systemMaintenance,
+      sms_notifications: notificationSettings.smsNotifications,
+      notification_email: notificationSettings.email,
+      webhook_url: notificationSettings.webhookUrl,
+      updated_at: new Date().toISOString(),
     })
-  }
 
-  const removeDepartment = (index: number) => {
-    setCompanyData({
-      ...companyData,
-      departments: companyData.departments?.filter((_, i) => i !== index),
-    })
+    if (error) throw error
+    toast({ title: "Success", description: "Notification settings saved successfully" })
+  } catch (error) {
+    console.error("Error saving notification settings:", error)
+    toast({ title: "Error", description: "Failed to save notification settings" })
   }
+}
 
-  const addLocation = () => {
-    setCompanyData({
-      ...companyData,
-      locations: [...(companyData.locations || []), "New Location"],
-    })
+const handleViewSubsidiary = (subsidiary: Subsidiary) => {
+  setViewingSubsidiary(subsidiary)
+  setShowViewSubsidiaryDialog(true)
+}
+
+const handleSubsidiaryFunctionChange = (checked: boolean) => {
+  if (!checked && subsidiaryFunction) {
+    // Show confirmation modal when trying to deactivate
+    setShowDeactivateModal(true)
+  } else {
+    setSubsidiaryFunction(checked)
   }
+}
 
-  const removeLocation = (index: number) => {
-    setCompanyData({
-      ...companyData,
-      locations: companyData.locations?.filter((_, i) => i !== index),
-    })
-  }
+const handleConfirmDeactivation = () => {
+  setSubsidiaryFunction(false)
+  setShowDeactivateModal(false)
+  toast({
+    title: "Subsidiary Function Deactivated",
+    description: "All subsidiary management features have been hidden.",
+  })
+}
 
-  const [editingLeaveType, setEditingLeaveType] = useState<LeaveType>({
+const handleCancelDeactivation = () => {
+  setShowDeactivateModal(false)
+}
+
+const addDivision = () => {
+  setCompanyData({
+    ...companyData,
+    divisions: [...(companyData.divisions || []), "New Division"],
+  })
+}
+
+const removeDivision = (index: number) => {
+  setCompanyData({
+    ...companyData,
+    divisions: companyData.divisions?.filter((_, i) => i !== index),
+  })
+}
+
+const addDepartment = () => {
+  setCompanyData({
+    ...companyData,
+    departments: [...(companyData.departments || []), "New Department"],
+  })
+}
+
+const removeDepartment = (index: number) => {
+  setCompanyData({
+    ...companyData,
+    departments: companyData.departments?.filter((_, i) => i !== index),
+  })
+}
+
+const addLocation = () => {
+  setCompanyData({
+    ...companyData,
+    locations: [...(companyData.locations || []), "New Location"],
+  })
+}
+
+const removeLocation = (index: number) => {
+  setCompanyData({
+    ...companyData,
+    locations: companyData.locations?.filter((_, i) => i !== index),
+  })
+}
+
+const [editingLeaveType, setEditingLeaveType] = useState<LeaveType>({
+  id: "",
+  name: "",
+  code: "",
+  description: "",
+  annual_entitlement: 0,
+  max_consecutive_days: 0,
+  pay_percentage: 0,
+  min_notice_days: 0,
+  requires_approval: false,
+  requires_medical_certificate: false,
+  allow_carry_over: false,
+  is_active: true,
+  is_paid: true,
+})
+
+const handleAddLeaveType = () => {
+  setEditingLeaveType({
     id: "",
     name: "",
     code: "",
@@ -2587,32 +2608,28 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     is_active: true,
     is_paid: true,
   })
+  setShowLeaveTypeDialog(true)
+}
 
-  const handleAddLeaveType = () => {
-    setEditingLeaveType({
-      id: "",
-      name: "",
-      code: "",
-      description: "",
-      annual_entitlement: 0,
-      max_consecutive_days: 0,
-      pay_percentage: 0,
-      min_notice_days: 0,
-      requires_approval: false,
-      requires_medical_certificate: false,
-      allow_carry_over: false,
-      is_active: true,
-      is_paid: true,
-    })
-    setShowLeaveTypeDialog(true)
-  }
+const handleEditLeaveType = (leaveType: LeaveType) => {
+  setEditingLeaveType(leaveType)
+  setShowLeaveTypeDialog(true)
+}
 
-  const handleEditLeaveType = (leaveType: LeaveType) => {
-    setEditingLeaveType(leaveType)
-    setShowLeaveTypeDialog(true)
-  }
+const [editingLeavePolicy, setEditingLeavePolicy] = useState<LeavePolicy>({
+  id: "",
+  policy_name: "",
+  policy_type: "",
+  max_days: 0,
+  notice_period_days: 0,
+  requires_approval: false,
+  is_active: true,
+})
 
-  const [editingLeavePolicy, setEditingLeavePolicy] = useState<LeavePolicy>({
+const [showLeavePolicyDialogFunc, setShowLeavePolicyDialogFunc] = useState(false)
+
+const handleAddLeavePolicy = () => {
+  setEditingLeavePolicy({
     id: "",
     policy_name: "",
     policy_type: "",
@@ -2621,78 +2638,65 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
     requires_approval: false,
     is_active: true,
   })
+  setShowLeavePolicyDialogFunc(true)
+}
 
-  const [showLeavePolicyDialogFunc, setShowLeavePolicyDialogFunc] = useState(false)
+const handleEditLeavePolicy = (leavePolicy: LeavePolicy) => {
+  setEditingLeavePolicy(leavePolicy)
+  setShowLeavePolicyDialogFunc(true)
+}
 
-  const handleAddLeavePolicy = () => {
-    setEditingLeavePolicy({
-      id: "",
-      policy_name: "",
-      policy_type: "",
-      max_days: 0,
-      notice_period_days: 0,
-      requires_approval: false,
-      is_active: true,
-    })
-    setShowLeavePolicyDialogFunc(true)
-  }
+const handleAddSalaryGrade = () => {
+  setEditingSalaryGradeState({
+    id: "",
+    grade_name: "",
+    grade_level: 0,
+    step_1: 0,
+    step_2: 0,
+    step_3: 0,
+    step_4: 0,
+    step_5: 0,
+  })
+  setShowSalaryGradeDialog(true)
+}
 
-  const handleEditLeavePolicy = (leavePolicy: LeavePolicy) => {
-    setEditingLeavePolicy(leavePolicy)
-    setShowLeavePolicyDialogFunc(true)
-  }
+const handleEditSalaryGrade = (salaryGrade: SalaryGrade) => {
+  setEditingSalaryGradeState(salaryGrade)
+  setShowSalaryGradeDialog(true)
+}
 
-  const handleAddSalaryGrade = () => {
-    setEditingSalaryGradeState({
-      id: "",
-      grade_name: "",
-      grade_level: 0,
-      step_1: 0,
-      step_2: 0,
-      step_3: 0,
-      step_4: 0,
-      step_5: 0,
-    })
-    setShowSalaryGradeDialog(true)
-  }
+const handleDeleteLeavePolicy = async (id: string) => {
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.from("leave_policies").delete().eq("id", id)
 
-  const handleEditSalaryGrade = (salaryGrade: SalaryGrade) => {
-    setEditingSalaryGradeState(salaryGrade)
-    setShowSalaryGradeDialog(true)
-  }
+    if (error) throw error
 
-  const handleDeleteLeavePolicy = async (id: string) => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("leave_policies").delete().eq("id", id)
-
-      if (error) throw error
-
-      toast({
-        title: "Success",
-        description: "Leave policy deleted successfully.",
-      })
-      loadLeavePolicies()
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete leave policy.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleSaveMeeting = async () => {
-    // Implementation for saving meeting
     toast({
       title: "Success",
-      description: "Meeting saved successfully.",
+      description: "Leave policy deleted successfully.",
     })
-    setShowAddMeetingDialog(false)
+    loadLeavePolicies()
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: "Failed to delete leave policy.",
+      variant: "destructive",
+    })
   }
+}
 
-  if (isLoading) {
-    return (
+const handleSaveMeeting = async () => {
+  // Implementation for saving meeting
+  toast({
+    title: "Success",
+    description: "Meeting saved successfully.",
+  })
+  setShowAddMeetingDialog(false)
+}
+
+if (isLoading) {
+  return (
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
@@ -2702,244 +2706,244 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
         </div>
       </div>
     )
+}
+
+const refreshAllData = async () => {
+  if (isLoading) return // Prevent concurrent calls
+
+  setIsLoading(true)
+  try {
+    await loadCompanyData()
+
+    // Load all data in parallel for better performance
+    await Promise.all([
+      loadSubsidiaries(),
+      loadCurrencyRates(),
+      loadOrganizationalCharts(),
+      loadPromotions(),
+      loadEmployeeDocuments(),
+      loadCommunicationGroups(),
+      loadOnlineMeetings(),
+      loadPayrollConfigDetailed(),
+      loadLeaveManagementData(),
+      loadSalaryGrades(),
+      loadEmployees(),
+      loadPayrollAllowances(),
+      loadPayrollDeductions(),
+      loadLoanSettings(),
+      loadRoles(),
+      loadEmailTemplates(),
+    ])
+
+    console.log("[v0] Data refresh completed")
+  } catch (error) {
+    console.error("[v0] Error refreshing data:", error)
+  } finally {
+    setIsLoading(false)
   }
+}
 
-  const refreshAllData = async () => {
-    if (isLoading) return // Prevent concurrent calls
-
+const handleAddRole = async () => {
+  try {
     setIsLoading(true)
-    try {
-      await loadCompanyData()
+    const supabase = createClient()
 
-      // Load all data in parallel for better performance
-      await Promise.all([
-        loadSubsidiaries(),
-        loadCurrencyRates(),
-        loadOrganizationalCharts(),
-        loadPromotions(),
-        loadEmployeeDocuments(),
-        loadCommunicationGroups(),
-        loadOnlineMeetings(),
-        loadPayrollConfigDetailed(),
-        loadLeaveManagementData(),
-        loadSalaryGrades(),
-        loadEmployees(),
-        loadPayrollAllowances(),
-        loadPayrollDeductions(),
-        loadLoanSettings(),
-        loadRoles(),
-        loadEmailTemplates(),
-      ])
-
-      console.log("[v0] Data refresh completed")
-    } catch (error) {
-      console.error("[v0] Error refreshing data:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleAddRole = async () => {
-    try {
-      setIsLoading(true)
-      const supabase = createClient()
-
-      const { data, error } = await supabase
-        .from("roles")
-        .insert([
-          {
-            name: newRole.name,
-            description: newRole.description,
-            permissions: newRole.permissions,
-            is_active: newRole.is_active,
-            company_id: companyData.id,
-            created_at: new Date().toISOString(),
-          },
-        ])
-        .select()
-
-      if (error) throw error
-
-      // Update local state
-      setRoles([...roles, data[0]])
-      setShowAddRoleDialog(false)
-      setNewRole({ name: "", description: "", permissions: [], is_active: true })
-
-      // Trigger AI analysis
-      await analyzeSecurityRisks()
-
-      toast({
-        title: "Success",
-        description: "Role created successfully",
-      })
-    } catch (error) {
-      console.error("Error adding role:", error)
-      toast({
-        title: "Error",
-        description: "Failed to create role",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleEditRole = (role: any) => {
-    setSelectedRole(role)
-    setNewRole({
-      name: role.name,
-      description: role.description,
-      permissions: role.permissions || [],
-      is_active: role.is_active,
-    })
-    setShowEditRoleDialog(true)
-  }
-
-  const handleUpdateRole = async () => {
-    try {
-      setIsLoading(true)
-      const supabase = createClient()
-
-      const { data, error } = await supabase
-        .from("roles")
-        .update({
+    const { data, error } = await supabase
+      .from("roles")
+      .insert([
+        {
           name: newRole.name,
           description: newRole.description,
           permissions: newRole.permissions,
           is_active: newRole.is_active,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", selectedRole.id)
-        .select()
+          company_id: companyData.id,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select()
 
-      if (error) throw error
+    if (error) throw error
 
-      // Update local state
-      setRoles(roles.map((r) => (r.id === selectedRole.id ? data[0] : r)))
-      setShowEditRoleDialog(false)
+    // Update local state
+    setRoles([...roles, data[0]])
+    setShowAddRoleDialog(false)
+    setNewRole({ name: "", description: "", permissions: [], is_active: true })
 
-      // Trigger AI analysis
-      await analyzeSecurityRisks()
+    // Trigger AI analysis
+    await analyzeSecurityRisks()
 
-      toast({
-        title: "Success",
-        description: "Role updated successfully",
+    toast({
+      title: "Success",
+      description: "Role created successfully",
+    })
+  } catch (error) {
+    console.error("Error adding role:", error)
+    toast({
+      title: "Error",
+      description: "Failed to create role",
+      variant: "destructive",
+    })
+  } finally {
+    setIsLoading(false)
+  }
+}
+
+const handleEditRole = (role: any) => {
+  setSelectedRole(role)
+  setNewRole({
+    name: role.name,
+    description: role.description,
+    permissions: role.permissions || [],
+    is_active: role.is_active,
+  })
+  setShowEditRoleDialog(true)
+}
+
+const handleUpdateRole = async () => {
+  try {
+    setIsLoading(true)
+    const supabase = createClient()
+
+    const { data, error } = await supabase
+      .from("roles")
+      .update({
+        name: newRole.name,
+        description: newRole.description,
+        permissions: newRole.permissions,
+        is_active: newRole.is_active,
+        updated_at: new Date().toISOString(),
       })
-    } catch (error) {
-      console.error("Error updating role:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update role",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+      .eq("id", selectedRole.id)
+      .select()
+
+    if (error) throw error
+
+    // Update local state
+    setRoles(roles.map((r) => (r.id === selectedRole.id ? data[0] : r)))
+    setShowEditRoleDialog(false)
+
+    // Trigger AI analysis
+    await analyzeSecurityRisks()
+
+    toast({
+      title: "Success",
+      description: "Role updated successfully",
+    })
+  } catch (error) {
+    console.error("Error updating role:", error)
+    toast({
+      title: "Error",
+      description: "Failed to update role",
+      variant: "destructive",
+    })
+  } finally {
+    setIsLoading(false)
   }
+}
 
-  const handleViewRolePermissions = (role: any) => {
-    setSelectedRole(role)
-    setShowPermissionsDialog(true)
+const handleViewRolePermissions = (role: any) => {
+  setSelectedRole(role)
+  setShowPermissionsDialog(true)
+}
+
+const handleDeleteRole = (role: any) => {
+  setSelectedRole(role)
+  setShowDeleteRoleDialog(true)
+}
+
+const handleConfirmDeleteRole = async () => {
+  try {
+    setIsLoading(true)
+    const supabase = createClient()
+
+    const { error } = await supabase.from("roles").delete().eq("id", selectedRole.id)
+
+    if (error) throw error
+
+    // Update local state
+    setRoles(roles.filter((r) => r.id !== selectedRole.id))
+    setShowDeleteRoleDialog(false)
+
+    // Trigger AI analysis
+    await analyzeSecurityRisks()
+
+    toast({
+      title: "Success",
+      description: "Role deleted successfully",
+    })
+  } catch (error) {
+    console.error("Error deleting role:", error)
+    toast({
+      title: "Error",
+      description: "Failed to delete role",
+      variant: "destructive",
+    })
+  } finally {
+    setIsLoading(false)
   }
+}
 
-  const handleDeleteRole = (role: any) => {
-    setSelectedRole(role)
-    setShowDeleteRoleDialog(true)
+const handleEditRoleFunc = (role: any) => {
+  console.log("Edit role:", role)
+}
+
+const handleViewRolePermissionsFunc = (role: any) => {
+  console.log("View role permissions:", role)
+}
+
+const handleDuplicateRole = (role: any) => {
+  console.log("Duplicate role:", role)
+}
+
+const handleDeleteRoleFunc = (roleId: string) => {
+  console.log("Delete role:", roleId)
+}
+
+const handlePermissionChange = (roleId: string, permission: string, checked: boolean) => {
+  console.log("Permission change:", roleId, permission, checked)
+}
+
+const handleViewUser = (employee: any) => {
+  console.log("View user:", employee)
+}
+
+const handleEditUser = (employee: any) => {
+  console.log("Edit user:", employee)
+}
+
+const handleResetPassword = (employeeId: string) => {
+  console.log("Reset password:", employeeId)
+}
+
+const handleToggleUserStatus = (employeeId: string) => {
+  console.log("Toggle user status:", employeeId)
+}
+
+const analyzeSecurityRisks = async () => {
+  try {
+    setIsAnalyzing(true)
+
+    const response = await fetch("/api/analyze-security", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        roles: roles,
+        employees: employees,
+        accessLogs: [], // Add access logs data
+      }),
+    })
+
+    const analysis = await response.json()
+    setAiInsights(analysis.insights || [])
+    setSecurityScore(analysis.securityScore || 85)
+  } catch (error) {
+    console.error("Error analyzing security:", error)
+  } finally {
+    setIsAnalyzing(false)
   }
+}
 
-  const handleConfirmDeleteRole = async () => {
-    try {
-      setIsLoading(true)
-      const supabase = createClient()
-
-      const { error } = await supabase.from("roles").delete().eq("id", selectedRole.id)
-
-      if (error) throw error
-
-      // Update local state
-      setRoles(roles.filter((r) => r.id !== selectedRole.id))
-      setShowDeleteRoleDialog(false)
-
-      // Trigger AI analysis
-      await analyzeSecurityRisks()
-
-      toast({
-        title: "Success",
-        description: "Role deleted successfully",
-      })
-    } catch (error) {
-      console.error("Error deleting role:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete role",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleEditRoleFunc = (role: any) => {
-    console.log("Edit role:", role)
-  }
-
-  const handleViewRolePermissionsFunc = (role: any) => {
-    console.log("View role permissions:", role)
-  }
-
-  const handleDuplicateRole = (role: any) => {
-    console.log("Duplicate role:", role)
-  }
-
-  const handleDeleteRoleFunc = (roleId: string) => {
-    console.log("Delete role:", roleId)
-  }
-
-  const handlePermissionChange = (roleId: string, permission: string, checked: boolean) => {
-    console.log("Permission change:", roleId, permission, checked)
-  }
-
-  const handleViewUser = (employee: any) => {
-    console.log("View user:", employee)
-  }
-
-  const handleEditUser = (employee: any) => {
-    console.log("Edit user:", employee)
-  }
-
-  const handleResetPassword = (employeeId: string) => {
-    console.log("Reset password:", employeeId)
-  }
-
-  const handleToggleUserStatus = (employeeId: string) => {
-    console.log("Toggle user status:", employeeId)
-  }
-
-  const analyzeSecurityRisks = async () => {
-    try {
-      setIsAnalyzing(true)
-
-      const response = await fetch("/api/analyze-security", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          roles: roles,
-          employees: employees,
-          accessLogs: [], // Add access logs data
-        }),
-      })
-
-      const analysis = await response.json()
-      setAiInsights(analysis.insights || [])
-      setSecurityScore(analysis.securityScore || 85)
-    } catch (error) {
-      console.error("Error analyzing security:", error)
-    } finally {
-      setIsAnalyzing(false)
-    }
-  }
-
-  return (
+return (
     <div className="container mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -4534,1068 +4538,4 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                     <tbody className="bg-white divide-y divide-gray-200">
                       {salaryGrades.map((salaryGrade) => (
                         <tr key={salaryGrade.id}>
-                          <td className="px-6 py-4 whitespace-no-wrap">{salaryGrade.grade_name}</td>
-                          <td className="px-6 py-4 whitespace-no-wrap">{salaryGrade.grade_level}</td>
-                          <td className="px-6 py-4 whitespace-no-wrap">{salaryGrade.step_1}</td>
-                          <td className="px-6 py-4 whitespace-no-wrap">{salaryGrade.step_2}</td>
-                          <td className="px-6 py-4 whitespace-no-wrap">{salaryGrade.step_3}</td>
-                          <td className="px-6 py-4 whitespace-no-wrap">{salaryGrade.step_4}</td>
-                          <td className="px-6 py-4 whitespace-no-wrap">{salaryGrade.step_5}</td>
-                          <td className="px-6 py-4 whitespace-no-wrap text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEditSalaryGrade(salaryGrade)}>
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteSalaryGrade(salaryGrade.id)} className="text-red-600">
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="security">
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold">Security Settings</h2>
-                <p className="text-gray-600">Configure security settings and password policies</p>
-              </div>
-              <Button onClick={handleSaveSecuritySettings}>Save Security Settings</Button>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Password Policy</CardTitle>
-                <CardDescription>Configure password policy settings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="minLength">Minimum Length</Label>
-                    <Input
-                      id="minLength"
-                      type="number"
-                      value={passwordPolicy.minLength}
-                      onChange={(e) => setPasswordPolicy({ ...passwordPolicy, minLength: Number.parseInt(e.target.value) })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Password Strength</Label>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="outline">{passwordStrength.score}%</Badge>
-                      <p className="text-sm text-muted-foreground">
-                        {passwordStrength.score < 100 && `Requires: ${passwordStrength.requirements.join(", ")}`}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="requireUppercase"
-                    checked={passwordPolicy.requireUppercase}
-                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireUppercase: checked })}
-                  />
-                  <Label htmlFor="requireUppercase">Require Uppercase</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="requireNumbers"
-                    checked={passwordPolicy.requireNumbers}
-                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireNumbers: checked })}
-                  />
-                  <Label htmlFor="requireNumbers">Require Numbers</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="requireSymbols"
-                    checked={passwordPolicy.requireSymbols}
-                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireSymbols: checked })}
-                  />
-                  <Label htmlFor="requireSymbols">Require Symbols</Label>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Session Management</CardTitle>
-                <CardDescription>Configure session timeout settings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="autoSessionTimeout"
-                    checked={securitySettings.autoSessionTimeout}
-                    onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, autoSessionTimeout: checked })}
-                  />
-                  <Label htmlFor="autoSessionTimeout">Auto Session Timeout</Label>
-                </div>
-                {securitySettings.autoSessionTimeout && (
-                  <div className="space-y-2">
-                    <Label htmlFor="timeoutDuration">Timeout Duration (minutes)</Label>
-                    <Input
-                      id="timeoutDuration"
-                      type="number"
-                      value={securitySettings.timeoutDuration}
-                      onChange={(e) => setSecuritySettings({ ...securitySettings, timeoutDuration: Number.parseInt(e.target.value) })}
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Audit Logging</CardTitle>
-                <CardDescription>Configure audit logging settings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="auditLogging"
-                    checked={securitySettings.auditLogging}
-                    onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, auditLogging: checked })}
-                  />
-                  <Label htmlFor="auditLogging">Enable Audit Logging</Label>
-                </div>
-                <Button onClick={handleViewActivityLog}>View Activity Log</Button>
-                <Button onClick={handleDownloadAuditTrail}>Download Audit Trail</Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Automated Backups</CardTitle>
-                <CardDescription>Configure automated backup settings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="automatedBackups"
-                    checked={securitySettings.automatedBackups}
-                    onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, automatedBackups: checked })}
-                  />
-                  <Label htmlFor="automatedBackups">Enable Automated Backups</Label>
-                </div>
-                {securitySettings.automatedBackups && (
-                  <div className="space-y-2">
-                    <Label htmlFor="backupFrequency">Backup Frequency</Label>
-                    <Select
-                      value={securitySettings.backupFrequency}
-                      onValueChange={(value) => setSecuritySettings({ ...securitySettings, backupFrequency: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Frequency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                <Button onClick={handleBackupNow} disabled={isBackingUp}>
-                  {isBackingUp ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Backing Up...
-                    </>
-                  ) : (
-                    "Backup Now"
-                  )}
-                </Button>
-                {lastBackupTime && showBackupSuccess && (
-                  <p className="text-sm text-green-500">Last backup: {new Date(lastBackupTime).toLocaleString()}</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Admin Password</CardTitle>
-                <CardDescription>Change admin password</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button onClick={handleChangeAdminPassword}>Change Password</Button>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="notifications">
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold">Notification Settings</h2>
-                <p className="text-gray-600">Configure notification settings and alerts</p>
-              </div>
-              <Button onClick={handleSaveNotificationSettings}>Save Notification Settings</Button>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Email Notifications</CardTitle>
-                <CardDescription>Configure email notification settings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="notificationEmail">Notification Email</Label>
-                  <Input
-                    id="notificationEmail"
-                    type="email"
-                    value={notificationSettings.email}
-                    onChange={(e) => setNotificationSettings({ ...notificationSettings, email: e.target.value })}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Webhook Notifications</CardTitle>
-                <CardDescription>Configure webhook notification settings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="webhookUrl">Webhook URL</Label>
-                  <Input
-                    id="webhookUrl"
-                    type="url"
-                    value={notificationSettings.webhookUrl}
-                    onChange={(e) => setNotificationSettings({ ...notificationSettings, webhookUrl: e.target.value })}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Subsidiary Dialog */}
-      <Dialog open={showSubsidiaryDialog} onOpenChange={setShowSubsidiaryDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editingSubsidiary ? "Edit Subsidiary" : "Add Subsidiary"}</DialogTitle>
-            <DialogDescription>
-              {editingSubsidiary ? "Edit an existing subsidiary" : "Create a new subsidiary"}
-            </DialogDescription>
-          </DialogHeader>
-          <SubsidiaryForm
-            subsidiary={editingSubsidiary}
-            onSave={handleSaveSubsidiary}
-            onCancel={() => setShowSubsidiaryDialog(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* View Subsidiary Dialog */}
-      <Dialog open={showViewSubsidiaryDialog} onOpenChange={setShowViewSubsidiaryDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Subsidiary Details</DialogTitle>
-            <DialogDescription>View detailed information about the subsidiary</DialogDescription>
-          </DialogHeader>
-          {viewingSubsidiary && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input value={viewingSubsidiary.name} readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label>Tax ID</Label>
-                <Input value={viewingSubsidiary.tax_id} readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label>SSNIT Number</Label>
-                <Input value={viewingSubsidiary.ssnit_number} readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input value={viewingSubsidiary.email_address} readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label>Phone</Label>
-                <Input value={viewingSubsidiary.phone_number} readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label>Address</Label>
-                <Textarea value={viewingSubsidiary.address} readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label>Divisions</Label>
-                {viewingSubsidiary.divisions && viewingSubsidiary.divisions.length > 0 ? (
-                  <ul className="list-disc list-inside">
-                    {viewingSubsidiary.divisions.map((division, index) => (
-                      <li key={index}>{division}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-muted-foreground">No divisions added</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Departments</Label>
-                {viewingSubsidiary.departments && viewingSubsidiary.departments.length > 0 ? (
-                  <ul className="list-disc list-inside">
-                    {viewingSubsidiary.departments.map((department, index) => (
-                      <li key={index}>{department}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-muted-foreground">No departments added</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Locations</Label>
-                {viewingSubsidiary.locations && viewingSubsidiary.locations.length > 0 ? (
-                  <ul className="list-disc list-inside">
-                    {viewingSubsidiary.locations.map((location, index) => (
-                      <li key={index}>{location}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-muted-foreground">No locations added</p>
-                )}
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button onClick={() => setShowViewSubsidiaryDialog(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Deactivate Confirmation Modal */}
-      <Dialog open={showDeactivateModal} onOpenChange={setShowDeactivateModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Deactivate Subsidiary Function</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to deactivate the subsidiary function? This will hide all subsidiary management
-              features.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCancelDeactivation}>
-              Cancel
-            </Button>
-            <Button onClick={handleConfirmDeactivation}>Deactivate</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Activate Subsidiary Confirmation Modal */}
-      <Dialog open={showActivateSubsidiaryModal} onOpenChange={setShowActivateSubsidiaryModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Activate Subsidiary</DialogTitle>
-            <DialogDescription>Are you sure you want to activate this subsidiary?</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowActivateSubsidiaryModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => handleActivateSubsidiary(subsidiaryToToggle.id)}>Activate</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Deactivate Subsidiary Confirmation Modal */}
-      <Dialog open={showDeactivateSubsidiaryModal} onOpenChange={setShowDeactivateSubsidiaryModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Deactivate Subsidiary</DialogTitle>
-            <DialogDescription>Are you sure you want to deactivate this subsidiary?</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeactivateSubsidiaryModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => handleDeactivateSubsidiary(subsidiaryToToggle.id)}>Deactivate</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Leave Type Dialog */}
-      <Dialog open={showLeaveTypeDialog} onOpenChange={setShowLeaveTypeDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editingLeaveType.id ? "Edit Leave Type" : "Add Leave Type"}</DialogTitle>
-            <DialogDescription>
-              {editingLeaveType.id ? "Edit an existing leave type" : "Create a new leave type"}
-            </DialogDescription>
-          </DialogHeader>
-          {/* Leave Type Form */}
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="leaveTypeName">Name</Label>
-                <Input
-                  id="leaveTypeName"
-                  value={editingLeaveType.name}
-                  onChange={(e) => setEditingLeaveType({ ...editingLeaveType, name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="leaveTypeCode">Code</Label>
-                <Input
-                  id="leaveTypeCode"
-                  value={editingLeaveType.code}
-                  onChange={(e) => setEditingLeaveType({ ...editingLeaveType, code: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="leaveTypeDescription">Description</Label>
-              <Textarea
-                id="leaveTypeDescription"
-                value={editingLeaveType.description}
-                onChange={(e) => setEditingLeaveType({ ...editingLeaveType, description: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="leaveTypeAnnualEntitlement">Annual Entitlement</Label>
-                <Input
-                  id="leaveTypeAnnualEntitlement"
-                  type="number"
-                  value={editingLeaveType.annual_entitlement}
-                  onChange={(e) =>
-                    setEditingLeaveType({ ...editingLeaveType, annual_entitlement: Number.parseInt(e.target.value) })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="leaveTypeMaxConsecutiveDays">Max Consecutive Days</Label>
-                <Input
-                  id="leaveTypeMaxConsecutiveDays"
-                  type="number"
-                  value={editingLeaveType.max_consecutive_days}
-                  onChange={(e) =>
-                    setEditingLeaveType({
-                      ...editingLeaveType,
-                      max_consecutive_days: Number.parseInt(e.target.value),
-                    })
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="leaveTypePayPercentage">Pay Percentage</Label>
-                <Input
-                  id="leaveTypePayPercentage"
-                  type="number"
-                  value={editingLeaveType.pay_percentage}
-                  onChange={(e) =>
-                    setEditingLeaveType({ ...editingLeaveType, pay_percentage: Number.parseFloat(e.target.value) })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="leaveTypeMinNoticeDays">Min Notice Days</Label>
-                <Input
-                  id="leaveTypeMinNoticeDays"
-                  type="number"
-                  value={editingLeaveType.min_notice_days}
-                  onChange={(e) =>
-                    setEditingLeaveType({ ...editingLeaveType, min_notice_days: Number.parseInt(e.target.value) })
-                  }
-                />
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="leaveTypeRequiresApproval"
-                checked={editingLeaveType.requires_approval}
-                onCheckedChange={(checked) =>
-                  setEditingLeaveType({ ...editingLeaveType, requires_approval: checked })
-                }
-              />
-              <Label htmlFor="leaveTypeRequiresApproval">Requires Approval</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="leaveTypeRequiresMedicalCertificate"
-                checked={editingLeaveType.requires_medical_certificate}
-                onCheckedChange={(checked) =>
-                  setEditingLeaveType({ ...editingLeaveType, requires_medical_certificate: checked })
-                }
-              />
-              <Label htmlFor="leaveTypeRequiresMedicalCertificate">Requires Medical Certificate</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="leaveTypeAllowCarryOver"
-                checked={editingLeaveType.allow_carry_over}
-                onCheckedChange={(checked) =>
-                  setEditingLeaveType({ ...editingLeaveType, allow_carry_over: checked })
-                }
-              />
-              <Label htmlFor="leaveTypeAllowCarryOver">Allow Carry Over</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="leaveTypeIsActive"
-                checked={editingLeaveType.is_active}
-                onCheckedChange={(checked) => setEditingLeaveType({ ...editingLeaveType, is_active: checked })}
-              />
-              <Label htmlFor="leaveTypeIsActive">Is Active</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="leaveTypeIsPaid"
-                checked={editingLeaveType.is_paid}
-                onCheckedChange={(checked) => setEditingLeaveType({ ...editingLeaveType, is_paid: checked })}
-              />
-              <Label htmlFor="leaveTypeIsPaid">Is Paid</Label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLeaveTypeDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveLeaveType}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Salary Grade Dialog */}
-      <Dialog open={showSalaryGradeDialog} onOpenChange={setShowSalaryGradeDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editingSalaryGradeState.id ? "Edit Salary Grade" : "Add Salary Grade"}</DialogTitle>
-            <DialogDescription>
-              {editingSalaryGradeState.id ? "Edit an existing salary grade" : "Create a new salary grade"}
-            </DialogDescription>
-          </DialogHeader>
-          {/* Salary Grade Form */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="salaryGradeName">Grade Name</Label>
-              <Input
-                id="salaryGradeName"
-                value={editingSalaryGradeState.grade_name}
-                onChange={(e) =>
-                  setEditingSalaryGradeState({ ...editingSalaryGradeState, grade_name: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="salaryGradeLevel">Grade Level</Label>
-              <Input
-                id="salaryGradeLevel"
-                type="number"
-                value={editingSalaryGradeState.grade_level}
-                onChange={(e) =>
-                  setEditingSalaryGradeState({ ...editingSalaryGradeState, grade_level: Number.parseInt(e.target.value) })
-                }
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="salaryGradeStep1">Step 1</Label>
-                <Input
-                  id="salaryGradeStep1"
-                  type="number"
-                  value={editingSalaryGradeState.step_1}
-                  onChange={(e) =>
-                    setEditingSalaryGradeState({ ...editingSalaryGradeState, step_1: Number.parseFloat(e.target.value) })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="salaryGradeStep2">Step 2</Label>
-                <Input
-                  id="salaryGradeStep2"
-                  type="number"
-                  value={editingSalaryGradeState.step_2}
-                  onChange={(e) =>
-                    setEditingSalaryGradeState({ ...editingSalaryGradeState, step_2: Number.parseFloat(e.target.value) })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="salaryGradeStep3">Step 3</Label>
-                <Input
-                  id="salaryGradeStep3"
-                  type="number"
-                  value={editingSalaryGradeState.step_3}
-                  onChange={(e) =>
-                    setEditingSalaryGradeState({ ...editingSalaryGradeState, step_3: Number.parseFloat(e.target.value) })
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="salaryGradeStep4">Step 4</Label>
-                <Input
-                  id="salaryGradeStep4"
-                  type="number"
-                  value={editingSalaryGradeState.step_4}
-                  onChange={(e) =>
-                    setEditingSalaryGradeState({ ...editingSalaryGradeState, step_4: Number.parseFloat(e.target.value) })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="salaryGradeStep5">Step 5</Label>
-                <Input
-                  id="salaryGradeStep5"
-                  type="number"
-                  value={editingSalaryGradeState.step_5}
-                  onChange={(e) =>
-                    setEditingSalaryGradeState({ ...editingSalaryGradeState, step_5: Number.parseFloat(e.target.value) })
-                  }
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSalaryGradeDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveSalaryGrade}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Password Change Dialog */}
-      <Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Change Admin Password</DialogTitle>
-            <DialogDescription>Update your admin password for enhanced security</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="currentPassword">Current Password</Label>
-              <div className="relative">
-                <Input
-                  id="currentPassword"
-                  type={showPasswords.current ? "text" : "password"}
-                  value={passwordForm.currentPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
-                >
-                  {showPasswords.current ? <Eye className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="newPassword">New Password</Label>
-              <div className="relative">
-                <Input
-                  id="newPassword"
-                  type={showPasswords.new ? "text" : "password"}
-                  value={passwordForm.newPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
-                >
-                  {showPasswords.new ? <Eye className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm New Password</Label>
-              <div className="relative">
-                <Input
-                  id="confirmPassword"
-                  type={showPasswords.confirm ? "text" : "password"}
-                  value={passwordForm.confirmPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
-                >
-                  {showPasswords.confirm ? <Eye className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPasswordChangeDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handlePasswordChange}>Change Password</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Activity Log Dialog */}
-      <Dialog open={showActivityLog} onOpenChange={setShowActivityLog}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Activity Log</DialogTitle>
-            <DialogDescription>View recent system activity</DialogDescription>
-          </DialogHeader>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
-                    Timestamp
-                  </th>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
-                    User
-                  </th>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
-                    Action
-                  </th>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
-                    Resource
-                  </th>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
-                    IP Address
-                  </th>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                <tr>
-                  <td className="px-6 py-4 whitespace-no-wrap">
-                    {new Date().toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-no-wrap">Admin</td>
-                  <td className="px-6 py-4 whitespace-no-wrap">Login</td>
-                  <td className="px-6 py-4 whitespace-no-wrap">System</td>
-                  <td className="px-6 py-4 whitespace-no-wrap">192.168.1.1</td>
-                  <td className="px-6 py-4 whitespace-no-wrap">Success</td>
-                </tr>
-                <tr>
-                  <td className="px-6 py-4 whitespace-no-wrap">
-                    {new Date(Date.now() - 3600000).toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-no-wrap">Admin</td>
-                  <td className="px-6 py-4 whitespace-no-wrap">Update Settings</td>
-                  <td className="px-6 py-4 whitespace-no-wrap">Company Settings</td>
-                  <td className="px-6 py-4 whitespace-no-wrap">192.168.1.1</td>
-                  <td className="px-6 py-4 whitespace-no-wrap">Success</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setShowActivityLog(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Backup Success Dialog */}
-      <Dialog open={showBackupSuccess} onOpenChange={setShowBackupSuccess}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Backup Successful</DialogTitle>
-            <DialogDescription>System backup completed successfully</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => setShowBackupSuccess(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Custom Email Template Dialog */}
-      <Dialog open={showEmailTemplateDialog} onOpenChange={setShowCustomTemplateDialog}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Custom Email Template</DialogTitle>
-            <DialogDescription>Create and manage custom email templates</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Label htmlFor="templateName">Template Name</Label>
-            <Input id="templateName" placeholder="Template Name" />
-            <Label htmlFor="templateSubject">Subject</Label>
-            <Input id="templateSubject" placeholder="Subject" />
-            <Label htmlFor="templateContent">Content</Label>
-            <Textarea id="templateContent" placeholder="Template Content" className="min-h-[150px]" />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCustomTemplateDialog(false)}>
-              Cancel
-            </Button>
-            <Button>Save Template</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Allowance Dialog */}
-      <Dialog open={showAllowanceDialog} onOpenChange={setShowAllowanceDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editingItem ? "Edit Allowance" : "Add Allowance"}</DialogTitle>
-            <DialogDescription>
-              {editingItem ? "Edit an existing allowance" : "Create a new allowance"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="allowanceCode">Code</Label>
-              <Input
-                id="allowanceCode"
-                value={editingItem?.code || ""}
-                onChange={(e) => setEditingItem({ ...editingItem, code: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="allowanceDescription">Description</Label>
-              <Input
-                id="allowanceDescription"
-                value={editingItem?.description || ""}
-                onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="allowanceType">Type</Label>
-                <Select
-                  value={editingItem?.type || "FIXED"}
-                  onValueChange={(value) => setEditingItem({ ...editingItem, type: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="FIXED">Fixed</SelectItem>
-                    <SelectItem value="PERCENTAGE">Percentage</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="allowanceAmount">Amount</Label>
-                <Input
-                  id="allowanceAmount"
-                  type="number"
-                  value={editingItem?.amount || 0}
-                  onChange={(e) => setEditingItem({ ...editingItem, amount: Number.parseFloat(e.target.value) })}
-                />
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="allowanceTaxable"
-                checked={editingItem?.taxable || false}
-                onCheckedChange={(checked) => setEditingItem({ ...editingItem, taxable: checked })}
-              />
-              <Label htmlFor="allowanceTaxable">Taxable</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="allowanceRecurring"
-                checked={editingItem?.recurring || false}
-                onCheckedChange={(checked) => setEditingItem({ ...editingItem, recurring: checked })}
-              />
-              <Label htmlFor="allowanceRecurring">Recurring</Label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAllowanceDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => {
-              const newAllowances = [...payrollAllowances]
-              if (editingIndex > -1) {
-                newAllowances[editingIndex] = editingItem
-              } else {
-                newAllowances.push(editingItem)
-              }
-              setPayrollAllowancesState(newAllowances)
-              setShowAllowanceDialog(false)
-            }}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Deduction Dialog */}
-      <Dialog open={showDeductionDialog} onOpenChange={setShowDeductionDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editingItem ? "Edit Deduction" : "Add Deduction"}</DialogTitle>
-            <DialogDescription>
-              {editingItem ? "Edit an existing deduction" : "Create a new deduction"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="deductionCode">Code</Label>
-              <Input
-                id="deductionCode"
-                value={editingItem?.code || ""}
-                onChange={(e) => setEditingItem({ ...editingItem, code: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="deductionDescription">Description</Label>
-              <Input
-                id="deductionDescription"
-                value={editingItem?.description || ""}
-                onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="deductionType">Type</Label>
-                <Select
-                  value={editingItem?.type || "FIXED"}
-                  onValueChange={(value) => setEditingItem({ ...editingItem, type: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="FIXED">Fixed</SelectItem>
-                    <SelectItem value="PERCENTAGE">Percentage</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="deductionAmount">Amount</Label>
-                <Input
-                  id="deductionAmount"
-                  type="number"
-                  value={editingItem?.amount || 0}
-                  onChange={(e) => setEditingItem({ ...editingItem, amount: Number.parseFloat(e.target.value) })}
-                />
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="deductionRecurring"
-                checked={editingItem?.recurring || false}
-                onCheckedChange={(checked) => setEditingItem({ ...editingItem, recurring: checked })}
-              />
-              <Label htmlFor="deductionRecurring">Recurring</Label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeductionDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => {
-              const newDeductions = [...payrollDeductions]
-              if (editingIndex > -1) {
-                newDeductions[editingIndex] = editingItem
-              } else {
-                newDeductions.push(editingItem)
-              }
-              setPayrollDeductionsState(newDeductions)
-              setShowDeductionDialog(false)
-            }}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Loan Dialog */}
-      <Dialog open={showLoanDialog} onOpenChange={setShowLoanDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Loan</DialogTitle>
-            <DialogDescription>Create a new loan</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="loanCode">Code</Label>
-              <Input id="loanCode" placeholder="Loan Code" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="loanDescription">Description</Label>
-              <Input id="loanDescription" placeholder="Loan Description" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="loanMaxAmount">Max Amount</Label>
-              <Input id="loanMaxAmount" type="number" placeholder="Max Amount" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="loanInterestRate">Interest Rate</Label>
-              <Input id="loanInterestRate" type="number" placeholder="Interest Rate" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="loanTenure">Tenure (Months)</Label>
-              <Input id="loanTenure" type="number" placeholder="Tenure (Months)" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLoanDialog(false)}>
-              Cancel
-            </Button>
-            <Button>Save Loan</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Currency Rate Dialog */}
-      <Dialog open={showAddCurrencyRateDialog} onOpenChange={setShowAddOrgChartDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Currency Rate</DialogTitle>
-            <DialogDescription>Add a new currency rate</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="currencyCode">Currency Code</Label>
-              <Input id="currencyCode" placeholder="Currency Code" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="exchangeRate">Exchange Rate</Label>
-              <Input id="exchangeRate" type="number" placeholder="Exchange Rate" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="effectiveDate">Effective Date</Label>
-              <Input id="effectiveDate" type="date" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddOrgChartDialog(false)}>
-              Cancel
-            </Button>
-            <Button>Add Rate</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Promotion Dialog */}
-      <Dialog open={showAddPromotionDialog} onOpenChange={setShowAddPromotionDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Promotion</DialogTitle>
-            <DialogDescription>Add a new promotion</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="employeeName">Employee Name</Label>
-              <Input id="employeeName" placeholder="Employee Name" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="newPosition">New\
+                          \
