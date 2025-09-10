@@ -2,29 +2,14 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function updateSession(request: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
-
-  console.log("[v0] Middleware - Environment check:", {
-    url: !!supabaseUrl,
-    key: !!supabaseAnonKey,
-    urlValue: supabaseUrl?.substring(0, 20) + "...",
-    keyValue: supabaseAnonKey?.substring(0, 20) + "...",
-  })
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
   const publicPaths = ["/", "/about", "/contact", "/careers", "/demo", "/help", "/api-docs", "/auth", "/login"]
 
   const isPublicPath = publicPaths.some(
     (path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(path + "/"),
   )
-
-  // Check if environment variables are available
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("[v0] Middleware - Missing Supabase environment variables")
-    return NextResponse.next({
-      request,
-    })
-  }
 
   let supabaseResponse = NextResponse.next({
     request,
@@ -58,17 +43,10 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    console.log("[v0] Middleware - User check:", {
-      hasUser: !!user,
-      path: request.nextUrl.pathname,
-      isPublicPath,
-    })
-
     if (!user && !isPublicPath && !request.nextUrl.pathname.startsWith("/app")) {
       // no user, potentially respond by redirecting the user to the login page
       const url = request.nextUrl.clone()
       url.pathname = "/auth/login"
-      console.log("[v0] Middleware - Redirecting to login")
       return NextResponse.redirect(url)
     }
 
@@ -76,14 +54,15 @@ export async function updateSession(request: NextRequest) {
       // Check if demo mode is enabled (this will be handled client-side)
       const url = request.nextUrl.clone()
       url.pathname = "/auth/login"
-      console.log("[v0] Middleware - Redirecting protected route to login")
       return NextResponse.redirect(url)
     }
 
     return supabaseResponse
   } catch (error) {
     console.error("[v0] Middleware - Error:", error)
-    // Allow requests to continue on error
+    if (isPublicPath) {
+      return NextResponse.next({ request })
+    }
     return NextResponse.next({
       request,
     })
