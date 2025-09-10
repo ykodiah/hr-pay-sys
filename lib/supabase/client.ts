@@ -1,21 +1,21 @@
 import { createBrowserClient } from "@supabase/ssr"
 
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  (typeof window !== "undefined" && (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_SUPABASE_URL)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 
-const supabaseAnonKey =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  (typeof window !== "undefined" && (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 export function createClient() {
+  console.log("[v0] Client - Environment check:", {
+    url: !!supabaseUrl,
+    key: !!supabaseAnonKey,
+    processEnv:
+      typeof process !== "undefined" ? Object.keys(process.env || {}).filter((k) => k.includes("SUPABASE")) : [],
+  })
+
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error("[v0] Supabase environment variables missing:", {
       url: !!supabaseUrl,
       key: !!supabaseAnonKey,
-      processEnv:
-        typeof process !== "undefined" ? Object.keys(process.env || {}).filter((k) => k.includes("SUPABASE")) : [],
-      windowEnv: typeof window !== "undefined" ? (window as any).__NEXT_DATA__?.env : "not available",
     })
 
     // Return a mock client that throws helpful errors
@@ -28,6 +28,9 @@ export function createClient() {
       }),
       auth: {
         getUser: () => Promise.reject(new Error("Supabase client not configured - missing environment variables")),
+        signInWithPassword: () =>
+          Promise.reject(new Error("Supabase client not configured - missing environment variables")),
+        signOut: () => Promise.reject(new Error("Supabase client not configured - missing environment variables")),
       },
     } as any
   }
