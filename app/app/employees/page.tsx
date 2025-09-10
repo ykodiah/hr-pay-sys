@@ -23,6 +23,59 @@ import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 import { useToast } from "@/hooks/use-toast"
 // import { EmployeeProfile } from "@/components/employee-profile"
 
+const isDemoMode = () => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("demo_mode") === "true"
+  }
+  return false
+}
+
+const mockEmployees = [
+  {
+    id: "1",
+    employee_id: "AKHR0001",
+    first_name: "John",
+    last_name: "Doe",
+    full_name: "John Doe",
+    display_name: "John Doe",
+    personal_email: "john.doe@email.com",
+    corporate_email: "john.doe@akwaabahrpay.com",
+    phone: "+233 24 123 4567",
+    position: "HR Manager",
+    department: "Human Resources",
+    location: "Accra",
+    status: "Active",
+    date_of_joining: "2023-01-15",
+    contract_type: "Permanent",
+    subsidiaries: { name: "Main Office", id: "1" },
+    created_at: "2023-01-15T00:00:00Z",
+  },
+  {
+    id: "2",
+    employee_id: "AKHR0002",
+    first_name: "Jane",
+    last_name: "Smith",
+    full_name: "Jane Smith",
+    display_name: "Jane Smith",
+    personal_email: "jane.smith@email.com",
+    corporate_email: "jane.smith@akwaabahrpay.com",
+    phone: "+233 24 987 6543",
+    position: "Software Developer",
+    department: "Technology",
+    location: "Kumasi",
+    status: "Active",
+    date_of_joining: "2023-03-01",
+    contract_type: "Permanent",
+    subsidiaries: { name: "Tech Hub", id: "2" },
+    created_at: "2023-03-01T00:00:00Z",
+  },
+]
+
+const mockSubsidiaries = [
+  { id: "1", name: "Main Office", status: "active" },
+  { id: "2", name: "Tech Hub", status: "active" },
+]
+
 const initialEmployees = [
   {
     id: 1,
@@ -159,6 +212,7 @@ export default function EmployeesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
 
   const [companySettings, setCompanySettings] = useState<any>(null)
   const [subsidiaries, setSubsidiaries] = useState<any[]>([])
@@ -226,6 +280,12 @@ export default function EmployeesPage() {
 
   const loadSubsidiaries = async () => {
     try {
+      if (isDemoMode()) {
+        console.log("[v0] Demo mode: Using mock subsidiaries")
+        setSubsidiaries(mockSubsidiaries)
+        return
+      }
+
       const supabase = createClient()
       const { data, error } = await supabase.from("subsidiaries").select("*").eq("status", "active")
 
@@ -257,6 +317,11 @@ export default function EmployeesPage() {
   }, [])
 
   useEffect(() => {
+    if (isDemoMode()) {
+      console.log("[v0] Demo mode: Skipping Supabase subscription")
+      return
+    }
+
     const supabase = createClient()
 
     const subscription = supabase
@@ -429,6 +494,14 @@ export default function EmployeesPage() {
   const loadEmployees = async () => {
     try {
       console.log("[v0] Loading employees from database...")
+
+      if (isDemoMode()) {
+        console.log("[v0] Demo mode: Using mock employees")
+        setEmployees(mockEmployees)
+        setIsLoading(false)
+        return
+      }
+
       const supabase = createClient()
       const { data, error } = await supabase
         .from("employees")
@@ -468,6 +541,40 @@ export default function EmployeesPage() {
   const handleAddEmployee = async (employeeData: any) => {
     try {
       console.log("[v0] Adding employee:", employeeData)
+
+      if (isDemoMode()) {
+        console.log("[v0] Demo mode: Simulating employee creation")
+        const newEmployee = {
+          id: String(mockEmployees.length + 1),
+          employee_id: `AKHR${String(mockEmployees.length + 1).padStart(4, "0")}`,
+          first_name: employeeData.firstName,
+          last_name: employeeData.lastName,
+          full_name: `${employeeData.firstName} ${employeeData.lastName}`,
+          display_name: `${employeeData.firstName} ${employeeData.lastName}`,
+          personal_email: employeeData.personalEmail,
+          corporate_email: employeeData.corporateEmail,
+          phone: employeeData.phone,
+          position: employeeData.position,
+          department: employeeData.department,
+          location: employeeData.location,
+          status: "Active",
+          date_of_joining: employeeData.dateOfJoining,
+          contract_type: employeeData.contractType || "Permanent",
+          subsidiaries: { name: "Demo Office", id: "1" },
+          created_at: new Date().toISOString(),
+        }
+
+        mockEmployees.push(newEmployee)
+        setEmployees([...mockEmployees])
+        setShowAddEmployee(false)
+
+        toast({
+          title: "Success",
+          description: "Employee added successfully (Demo Mode)",
+        })
+        return
+      }
+
       const supabase = createClient()
 
       // Generate employee ID
@@ -639,6 +746,24 @@ export default function EmployeesPage() {
 
   const handleEditEmployee = async (employeeData: any) => {
     try {
+      if (isDemoMode()) {
+        console.log("[v0] Demo mode: Simulating employee update")
+        const updatedEmployees = mockEmployees.map((emp) =>
+          emp.id === selectedEmployee.id
+            ? { ...emp, ...employeeData, full_name: `${employeeData.firstName} ${employeeData.lastName}` }
+            : emp,
+        )
+        setEmployees(updatedEmployees)
+        setShowEditDialog(false)
+        setSelectedEmployee(null)
+
+        toast({
+          title: "Success",
+          description: "Employee updated successfully (Demo Mode)",
+        })
+        return
+      }
+
       const supabase = createClient()
 
       const updatedEmployee = {
