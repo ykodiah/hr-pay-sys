@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Logo } from "@/components/logo"
-import { Eye, EyeOff, Mail, Lock } from "lucide-react"
+import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
@@ -38,10 +38,28 @@ export default function LoginPage() {
 
       if (authError) {
         console.error("[v0] Auth error:", authError)
-        throw authError
+
+        if (authError.message === "Invalid login credentials") {
+          if (email.includes("@akwaabahrpay.com")) {
+            setError("Demo user not found. Please run the setup script or contact support.")
+          } else {
+            setError("Invalid email or password. Please check your credentials and try again.")
+          }
+        } else {
+          setError(authError.message)
+        }
+        return
       }
 
       console.log("[v0] Login successful:", { user: data.user?.email })
+
+      const { data: employee } = await supabase.from("employees").select("*").eq("email", data.user?.email).single()
+
+      if (!employee && data.user?.email?.includes("@akwaabahrpay.com")) {
+        console.log("[v0] Demo user missing employee profile, redirecting to setup")
+        router.push("/auth/setup-profile")
+        return
+      }
 
       // Redirect to main app after successful login
       router.push("/app")
@@ -122,8 +140,9 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20">
-                  {error}
+                <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20">
+                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <div>{error}</div>
                 </div>
               )}
 
@@ -157,6 +176,11 @@ export default function LoginPage() {
                 >
                   Employee Demo
                 </Button>
+              </div>
+              <div className="text-xs text-muted-foreground text-center p-2 bg-muted/50 rounded">
+                <strong>Note:</strong> Demo users need to be created in Supabase.
+                <br />
+                Run the setup script or contact support if login fails.
               </div>
             </div>
 
