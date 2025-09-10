@@ -925,15 +925,14 @@ export default function SettingsPage() {
   const handleDeleteLoan = async (index) => {
     try {
       const loan = loanSettings[index]
+      const supabase = createClient()
 
       if (loan.id) {
-        const supabase = createClient()
         const { error } = await supabase.from("loan_settings").delete().eq("id", loan.id)
 
         if (error) throw error
       }
 
-      // Remove from local state
       const updatedLoans = loanSettings.filter((_, i) => i !== index)
       setLoanSettingsState(updatedLoans)
 
@@ -1889,7 +1888,7 @@ Backup Frequency: ${securitySettings.backupFrequency}
 Password Policy:
 - Minimum Length: ${passwordPolicy.minLength} characters
 - Require Uppercase: ${passwordPolicy.requireUppercase ? "Yes" : "No"}
-- Require Numbers: ${passwordPolicy.requireNumbers} ? "Yes" : "No"}
+- Require Numbers: ${passwordPolicy.requireNumbers ? "Yes" : "No"}
 - Require Symbols: ${passwordPolicy.requireSymbols ? "Yes" : "No"}
 `
 
@@ -2211,9 +2210,6 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           industry: companyData.industry,
           address: companyData.address,
           phone_number: companyData.phone_number,
-          divisions: companyData.divisions,
-          departments: companyData.departments,
-          locations: companyData.locations,
           updated_at: new Date().toISOString(),
         })
         .eq("id", companyData.id)
@@ -4433,7 +4429,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold">HR Settings</h2>
-                <p className="text-gray-600">Configure HR settings, leave types, and salary grades</p>
+                <p className="text-gray-600">Manage HR settings, leave types, and salary grades</p>
               </div>
               <Button onClick={handleSaveHRSettings}>Save HR Settings</Button>
             </div>
@@ -4536,5 +4532,1070 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {salaryGrades.map((salaryGrade) => (\
-                        <tr key={salaryGrade.
+                      {salaryGrades.map((salaryGrade) => (
+                        <tr key={salaryGrade.id}>
+                          <td className="px-6 py-4 whitespace-no-wrap">{salaryGrade.grade_name}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">{salaryGrade.grade_level}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">{salaryGrade.step_1}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">{salaryGrade.step_2}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">{salaryGrade.step_3}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">{salaryGrade.step_4}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap">{salaryGrade.step_5}</td>
+                          <td className="px-6 py-4 whitespace-no-wrap text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditSalaryGrade(salaryGrade)}>
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteSalaryGrade(salaryGrade.id)} className="text-red-600">
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="security">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Security Settings</h2>
+                <p className="text-gray-600">Configure security settings and password policies</p>
+              </div>
+              <Button onClick={handleSaveSecuritySettings}>Save Security Settings</Button>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Password Policy</CardTitle>
+                <CardDescription>Configure password policy settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="minLength">Minimum Length</Label>
+                    <Input
+                      id="minLength"
+                      type="number"
+                      value={passwordPolicy.minLength}
+                      onChange={(e) => setPasswordPolicy({ ...passwordPolicy, minLength: Number.parseInt(e.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Password Strength</Label>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="outline">{passwordStrength.score}%</Badge>
+                      <p className="text-sm text-muted-foreground">
+                        {passwordStrength.score < 100 && `Requires: ${passwordStrength.requirements.join(", ")}`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="requireUppercase"
+                    checked={passwordPolicy.requireUppercase}
+                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireUppercase: checked })}
+                  />
+                  <Label htmlFor="requireUppercase">Require Uppercase</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="requireNumbers"
+                    checked={passwordPolicy.requireNumbers}
+                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireNumbers: checked })}
+                  />
+                  <Label htmlFor="requireNumbers">Require Numbers</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="requireSymbols"
+                    checked={passwordPolicy.requireSymbols}
+                    onCheckedChange={(checked) => setPasswordPolicy({ ...passwordPolicy, requireSymbols: checked })}
+                  />
+                  <Label htmlFor="requireSymbols">Require Symbols</Label>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Session Management</CardTitle>
+                <CardDescription>Configure session timeout settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="autoSessionTimeout"
+                    checked={securitySettings.autoSessionTimeout}
+                    onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, autoSessionTimeout: checked })}
+                  />
+                  <Label htmlFor="autoSessionTimeout">Auto Session Timeout</Label>
+                </div>
+                {securitySettings.autoSessionTimeout && (
+                  <div className="space-y-2">
+                    <Label htmlFor="timeoutDuration">Timeout Duration (minutes)</Label>
+                    <Input
+                      id="timeoutDuration"
+                      type="number"
+                      value={securitySettings.timeoutDuration}
+                      onChange={(e) => setSecuritySettings({ ...securitySettings, timeoutDuration: Number.parseInt(e.target.value) })}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Audit Logging</CardTitle>
+                <CardDescription>Configure audit logging settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="auditLogging"
+                    checked={securitySettings.auditLogging}
+                    onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, auditLogging: checked })}
+                  />
+                  <Label htmlFor="auditLogging">Enable Audit Logging</Label>
+                </div>
+                <Button onClick={handleViewActivityLog}>View Activity Log</Button>
+                <Button onClick={handleDownloadAuditTrail}>Download Audit Trail</Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Automated Backups</CardTitle>
+                <CardDescription>Configure automated backup settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="automatedBackups"
+                    checked={securitySettings.automatedBackups}
+                    onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, automatedBackups: checked })}
+                  />
+                  <Label htmlFor="automatedBackups">Enable Automated Backups</Label>
+                </div>
+                {securitySettings.automatedBackups && (
+                  <div className="space-y-2">
+                    <Label htmlFor="backupFrequency">Backup Frequency</Label>
+                    <Select
+                      value={securitySettings.backupFrequency}
+                      onValueChange={(value) => setSecuritySettings({ ...securitySettings, backupFrequency: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Frequency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <Button onClick={handleBackupNow} disabled={isBackingUp}>
+                  {isBackingUp ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Backing Up...
+                    </>
+                  ) : (
+                    "Backup Now"
+                  )}
+                </Button>
+                {lastBackupTime && showBackupSuccess && (
+                  <p className="text-sm text-green-500">Last backup: {new Date(lastBackupTime).toLocaleString()}</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Admin Password</CardTitle>
+                <CardDescription>Change admin password</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Button onClick={handleChangeAdminPassword}>Change Password</Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Notification Settings</h2>
+                <p className="text-gray-600">Configure notification settings and alerts</p>
+              </div>
+              <Button onClick={handleSaveNotificationSettings}>Save Notification Settings</Button>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Email Notifications</CardTitle>
+                <CardDescription>Configure email notification settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="notificationEmail">Notification Email</Label>
+                  <Input
+                    id="notificationEmail"
+                    type="email"
+                    value={notificationSettings.email}
+                    onChange={(e) => setNotificationSettings({ ...notificationSettings, email: e.target.value })}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Webhook Notifications</CardTitle>
+                <CardDescription>Configure webhook notification settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="webhookUrl">Webhook URL</Label>
+                  <Input
+                    id="webhookUrl"
+                    type="url"
+                    value={notificationSettings.webhookUrl}
+                    onChange={(e) => setNotificationSettings({ ...notificationSettings, webhookUrl: e.target.value })}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Subsidiary Dialog */}
+      <Dialog open={showSubsidiaryDialog} onOpenChange={setShowSubsidiaryDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingSubsidiary ? "Edit Subsidiary" : "Add Subsidiary"}</DialogTitle>
+            <DialogDescription>
+              {editingSubsidiary ? "Edit an existing subsidiary" : "Create a new subsidiary"}
+            </DialogDescription>
+          </DialogHeader>
+          <SubsidiaryForm
+            subsidiary={editingSubsidiary}
+            onSave={handleSaveSubsidiary}
+            onCancel={() => setShowSubsidiaryDialog(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* View Subsidiary Dialog */}
+      <Dialog open={showViewSubsidiaryDialog} onOpenChange={setShowViewSubsidiaryDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Subsidiary Details</DialogTitle>
+            <DialogDescription>View detailed information about the subsidiary</DialogDescription>
+          </DialogHeader>
+          {viewingSubsidiary && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input value={viewingSubsidiary.name} readOnly />
+              </div>
+              <div className="space-y-2">
+                <Label>Tax ID</Label>
+                <Input value={viewingSubsidiary.tax_id} readOnly />
+              </div>
+              <div className="space-y-2">
+                <Label>SSNIT Number</Label>
+                <Input value={viewingSubsidiary.ssnit_number} readOnly />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input value={viewingSubsidiary.email_address} readOnly />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input value={viewingSubsidiary.phone_number} readOnly />
+              </div>
+              <div className="space-y-2">
+                <Label>Address</Label>
+                <Textarea value={viewingSubsidiary.address} readOnly />
+              </div>
+              <div className="space-y-2">
+                <Label>Divisions</Label>
+                {viewingSubsidiary.divisions && viewingSubsidiary.divisions.length > 0 ? (
+                  <ul className="list-disc list-inside">
+                    {viewingSubsidiary.divisions.map((division, index) => (
+                      <li key={index}>{division}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-muted-foreground">No divisions added</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Departments</Label>
+                {viewingSubsidiary.departments && viewingSubsidiary.departments.length > 0 ? (
+                  <ul className="list-disc list-inside">
+                    {viewingSubsidiary.departments.map((department, index) => (
+                      <li key={index}>{department}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-muted-foreground">No departments added</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Locations</Label>
+                {viewingSubsidiary.locations && viewingSubsidiary.locations.length > 0 ? (
+                  <ul className="list-disc list-inside">
+                    {viewingSubsidiary.locations.map((location, index) => (
+                      <li key={index}>{location}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-muted-foreground">No locations added</p>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setShowViewSubsidiaryDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deactivate Confirmation Modal */}
+      <Dialog open={showDeactivateModal} onOpenChange={setShowDeactivateModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deactivate Subsidiary Function</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate the subsidiary function? This will hide all subsidiary management
+              features.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelDeactivation}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmDeactivation}>Deactivate</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Activate Subsidiary Confirmation Modal */}
+      <Dialog open={showActivateSubsidiaryModal} onOpenChange={setShowActivateSubsidiaryModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Activate Subsidiary</DialogTitle>
+            <DialogDescription>Are you sure you want to activate this subsidiary?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowActivateSubsidiaryModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => handleActivateSubsidiary(subsidiaryToToggle.id)}>Activate</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deactivate Subsidiary Confirmation Modal */}
+      <Dialog open={showDeactivateSubsidiaryModal} onOpenChange={setShowDeactivateSubsidiaryModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deactivate Subsidiary</DialogTitle>
+            <DialogDescription>Are you sure you want to deactivate this subsidiary?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeactivateSubsidiaryModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => handleDeactivateSubsidiary(subsidiaryToToggle.id)}>Deactivate</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Leave Type Dialog */}
+      <Dialog open={showLeaveTypeDialog} onOpenChange={setShowLeaveTypeDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingLeaveType.id ? "Edit Leave Type" : "Add Leave Type"}</DialogTitle>
+            <DialogDescription>
+              {editingLeaveType.id ? "Edit an existing leave type" : "Create a new leave type"}
+            </DialogDescription>
+          </DialogHeader>
+          {/* Leave Type Form */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="leaveTypeName">Name</Label>
+                <Input
+                  id="leaveTypeName"
+                  value={editingLeaveType.name}
+                  onChange={(e) => setEditingLeaveType({ ...editingLeaveType, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="leaveTypeCode">Code</Label>
+                <Input
+                  id="leaveTypeCode"
+                  value={editingLeaveType.code}
+                  onChange={(e) => setEditingLeaveType({ ...editingLeaveType, code: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="leaveTypeDescription">Description</Label>
+              <Textarea
+                id="leaveTypeDescription"
+                value={editingLeaveType.description}
+                onChange={(e) => setEditingLeaveType({ ...editingLeaveType, description: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="leaveTypeAnnualEntitlement">Annual Entitlement</Label>
+                <Input
+                  id="leaveTypeAnnualEntitlement"
+                  type="number"
+                  value={editingLeaveType.annual_entitlement}
+                  onChange={(e) =>
+                    setEditingLeaveType({ ...editingLeaveType, annual_entitlement: Number.parseInt(e.target.value) })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="leaveTypeMaxConsecutiveDays">Max Consecutive Days</Label>
+                <Input
+                  id="leaveTypeMaxConsecutiveDays"
+                  type="number"
+                  value={editingLeaveType.max_consecutive_days}
+                  onChange={(e) =>
+                    setEditingLeaveType({
+                      ...editingLeaveType,
+                      max_consecutive_days: Number.parseInt(e.target.value),
+                    })
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="leaveTypePayPercentage">Pay Percentage</Label>
+                <Input
+                  id="leaveTypePayPercentage"
+                  type="number"
+                  value={editingLeaveType.pay_percentage}
+                  onChange={(e) =>
+                    setEditingLeaveType({ ...editingLeaveType, pay_percentage: Number.parseFloat(e.target.value) })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="leaveTypeMinNoticeDays">Min Notice Days</Label>
+                <Input
+                  id="leaveTypeMinNoticeDays"
+                  type="number"
+                  value={editingLeaveType.min_notice_days}
+                  onChange={(e) =>
+                    setEditingLeaveType({ ...editingLeaveType, min_notice_days: Number.parseInt(e.target.value) })
+                  }
+                />
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="leaveTypeRequiresApproval"
+                checked={editingLeaveType.requires_approval}
+                onCheckedChange={(checked) =>
+                  setEditingLeaveType({ ...editingLeaveType, requires_approval: checked })
+                }
+              />
+              <Label htmlFor="leaveTypeRequiresApproval">Requires Approval</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="leaveTypeRequiresMedicalCertificate"
+                checked={editingLeaveType.requires_medical_certificate}
+                onCheckedChange={(checked) =>
+                  setEditingLeaveType({ ...editingLeaveType, requires_medical_certificate: checked })
+                }
+              />
+              <Label htmlFor="leaveTypeRequiresMedicalCertificate">Requires Medical Certificate</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="leaveTypeAllowCarryOver"
+                checked={editingLeaveType.allow_carry_over}
+                onCheckedChange={(checked) =>
+                  setEditingLeaveType({ ...editingLeaveType, allow_carry_over: checked })
+                }
+              />
+              <Label htmlFor="leaveTypeAllowCarryOver">Allow Carry Over</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="leaveTypeIsActive"
+                checked={editingLeaveType.is_active}
+                onCheckedChange={(checked) => setEditingLeaveType({ ...editingLeaveType, is_active: checked })}
+              />
+              <Label htmlFor="leaveTypeIsActive">Is Active</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="leaveTypeIsPaid"
+                checked={editingLeaveType.is_paid}
+                onCheckedChange={(checked) => setEditingLeaveType({ ...editingLeaveType, is_paid: checked })}
+              />
+              <Label htmlFor="leaveTypeIsPaid">Is Paid</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLeaveTypeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveLeaveType}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Salary Grade Dialog */}
+      <Dialog open={showSalaryGradeDialog} onOpenChange={setShowSalaryGradeDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingSalaryGradeState.id ? "Edit Salary Grade" : "Add Salary Grade"}</DialogTitle>
+            <DialogDescription>
+              {editingSalaryGradeState.id ? "Edit an existing salary grade" : "Create a new salary grade"}
+            </DialogDescription>
+          </DialogHeader>
+          {/* Salary Grade Form */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="salaryGradeName">Grade Name</Label>
+              <Input
+                id="salaryGradeName"
+                value={editingSalaryGradeState.grade_name}
+                onChange={(e) =>
+                  setEditingSalaryGradeState({ ...editingSalaryGradeState, grade_name: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="salaryGradeLevel">Grade Level</Label>
+              <Input
+                id="salaryGradeLevel"
+                type="number"
+                value={editingSalaryGradeState.grade_level}
+                onChange={(e) =>
+                  setEditingSalaryGradeState({ ...editingSalaryGradeState, grade_level: Number.parseInt(e.target.value) })
+                }
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="salaryGradeStep1">Step 1</Label>
+                <Input
+                  id="salaryGradeStep1"
+                  type="number"
+                  value={editingSalaryGradeState.step_1}
+                  onChange={(e) =>
+                    setEditingSalaryGradeState({ ...editingSalaryGradeState, step_1: Number.parseFloat(e.target.value) })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="salaryGradeStep2">Step 2</Label>
+                <Input
+                  id="salaryGradeStep2"
+                  type="number"
+                  value={editingSalaryGradeState.step_2}
+                  onChange={(e) =>
+                    setEditingSalaryGradeState({ ...editingSalaryGradeState, step_2: Number.parseFloat(e.target.value) })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="salaryGradeStep3">Step 3</Label>
+                <Input
+                  id="salaryGradeStep3"
+                  type="number"
+                  value={editingSalaryGradeState.step_3}
+                  onChange={(e) =>
+                    setEditingSalaryGradeState({ ...editingSalaryGradeState, step_3: Number.parseFloat(e.target.value) })
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="salaryGradeStep4">Step 4</Label>
+                <Input
+                  id="salaryGradeStep4"
+                  type="number"
+                  value={editingSalaryGradeState.step_4}
+                  onChange={(e) =>
+                    setEditingSalaryGradeState({ ...editingSalaryGradeState, step_4: Number.parseFloat(e.target.value) })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="salaryGradeStep5">Step 5</Label>
+                <Input
+                  id="salaryGradeStep5"
+                  type="number"
+                  value={editingSalaryGradeState.step_5}
+                  onChange={(e) =>
+                    setEditingSalaryGradeState({ ...editingSalaryGradeState, step_5: Number.parseFloat(e.target.value) })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSalaryGradeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveSalaryGrade}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Change Dialog */}
+      <Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Admin Password</DialogTitle>
+            <DialogDescription>Update your admin password for enhanced security</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="currentPassword">Current Password</Label>
+              <div className="relative">
+                <Input
+                  id="currentPassword"
+                  type={showPasswords.current ? "text" : "password"}
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
+                >
+                  {showPasswords.current ? <Eye className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  type={showPasswords.new ? "text" : "password"}
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+                >
+                  {showPasswords.new ? <Eye className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showPasswords.confirm ? "text" : "password"}
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+                >
+                  {showPasswords.confirm ? <Eye className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordChangeDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handlePasswordChange}>Change Password</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Activity Log Dialog */}
+      <Dialog open={showActivityLog} onOpenChange={setShowActivityLog}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Activity Log</DialogTitle>
+            <DialogDescription>View recent system activity</DialogDescription>
+          </DialogHeader>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                    Timestamp
+                  </th>
+                  <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                    User
+                  </th>
+                  <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                    Action
+                  </th>
+                  <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                    Resource
+                  </th>
+                  <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                    IP Address
+                  </th>
+                  <th className="px-6 py-3 bg-gray-50 text-left text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                <tr>
+                  <td className="px-6 py-4 whitespace-no-wrap">
+                    {new Date().toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-no-wrap">Admin</td>
+                  <td className="px-6 py-4 whitespace-no-wrap">Login</td>
+                  <td className="px-6 py-4 whitespace-no-wrap">System</td>
+                  <td className="px-6 py-4 whitespace-no-wrap">192.168.1.1</td>
+                  <td className="px-6 py-4 whitespace-no-wrap">Success</td>
+                </tr>
+                <tr>
+                  <td className="px-6 py-4 whitespace-no-wrap">
+                    {new Date(Date.now() - 3600000).toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-no-wrap">Admin</td>
+                  <td className="px-6 py-4 whitespace-no-wrap">Update Settings</td>
+                  <td className="px-6 py-4 whitespace-no-wrap">Company Settings</td>
+                  <td className="px-6 py-4 whitespace-no-wrap">192.168.1.1</td>
+                  <td className="px-6 py-4 whitespace-no-wrap">Success</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowActivityLog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Backup Success Dialog */}
+      <Dialog open={showBackupSuccess} onOpenChange={setShowBackupSuccess}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Backup Successful</DialogTitle>
+            <DialogDescription>System backup completed successfully</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setShowBackupSuccess(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Email Template Dialog */}
+      <Dialog open={showEmailTemplateDialog} onOpenChange={setShowCustomTemplateDialog}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Custom Email Template</DialogTitle>
+            <DialogDescription>Create and manage custom email templates</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Label htmlFor="templateName">Template Name</Label>
+            <Input id="templateName" placeholder="Template Name" />
+            <Label htmlFor="templateSubject">Subject</Label>
+            <Input id="templateSubject" placeholder="Subject" />
+            <Label htmlFor="templateContent">Content</Label>
+            <Textarea id="templateContent" placeholder="Template Content" className="min-h-[150px]" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCustomTemplateDialog(false)}>
+              Cancel
+            </Button>
+            <Button>Save Template</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Allowance Dialog */}
+      <Dialog open={showAllowanceDialog} onOpenChange={setShowAllowanceDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingItem ? "Edit Allowance" : "Add Allowance"}</DialogTitle>
+            <DialogDescription>
+              {editingItem ? "Edit an existing allowance" : "Create a new allowance"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="allowanceCode">Code</Label>
+              <Input
+                id="allowanceCode"
+                value={editingItem?.code || ""}
+                onChange={(e) => setEditingItem({ ...editingItem, code: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="allowanceDescription">Description</Label>
+              <Input
+                id="allowanceDescription"
+                value={editingItem?.description || ""}
+                onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="allowanceType">Type</Label>
+                <Select
+                  value={editingItem?.type || "FIXED"}
+                  onValueChange={(value) => setEditingItem({ ...editingItem, type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FIXED">Fixed</SelectItem>
+                    <SelectItem value="PERCENTAGE">Percentage</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="allowanceAmount">Amount</Label>
+                <Input
+                  id="allowanceAmount"
+                  type="number"
+                  value={editingItem?.amount || 0}
+                  onChange={(e) => setEditingItem({ ...editingItem, amount: Number.parseFloat(e.target.value) })}
+                />
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="allowanceTaxable"
+                checked={editingItem?.taxable || false}
+                onCheckedChange={(checked) => setEditingItem({ ...editingItem, taxable: checked })}
+              />
+              <Label htmlFor="allowanceTaxable">Taxable</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="allowanceRecurring"
+                checked={editingItem?.recurring || false}
+                onCheckedChange={(checked) => setEditingItem({ ...editingItem, recurring: checked })}
+              />
+              <Label htmlFor="allowanceRecurring">Recurring</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAllowanceDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              const newAllowances = [...payrollAllowances]
+              if (editingIndex > -1) {
+                newAllowances[editingIndex] = editingItem
+              } else {
+                newAllowances.push(editingItem)
+              }
+              setPayrollAllowancesState(newAllowances)
+              setShowAllowanceDialog(false)
+            }}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deduction Dialog */}
+      <Dialog open={showDeductionDialog} onOpenChange={setShowDeductionDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingItem ? "Edit Deduction" : "Add Deduction"}</DialogTitle>
+            <DialogDescription>
+              {editingItem ? "Edit an existing deduction" : "Create a new deduction"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="deductionCode">Code</Label>
+              <Input
+                id="deductionCode"
+                value={editingItem?.code || ""}
+                onChange={(e) => setEditingItem({ ...editingItem, code: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="deductionDescription">Description</Label>
+              <Input
+                id="deductionDescription"
+                value={editingItem?.description || ""}
+                onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="deductionType">Type</Label>
+                <Select
+                  value={editingItem?.type || "FIXED"}
+                  onValueChange={(value) => setEditingItem({ ...editingItem, type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FIXED">Fixed</SelectItem>
+                    <SelectItem value="PERCENTAGE">Percentage</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="deductionAmount">Amount</Label>
+                <Input
+                  id="deductionAmount"
+                  type="number"
+                  value={editingItem?.amount || 0}
+                  onChange={(e) => setEditingItem({ ...editingItem, amount: Number.parseFloat(e.target.value) })}
+                />
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="deductionRecurring"
+                checked={editingItem?.recurring || false}
+                onCheckedChange={(checked) => setEditingItem({ ...editingItem, recurring: checked })}
+              />
+              <Label htmlFor="deductionRecurring">Recurring</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeductionDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              const newDeductions = [...payrollDeductions]
+              if (editingIndex > -1) {
+                newDeductions[editingIndex] = editingItem
+              } else {
+                newDeductions.push(editingItem)
+              }
+              setPayrollDeductionsState(newDeductions)
+              setShowDeductionDialog(false)
+            }}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Loan Dialog */}
+      <Dialog open={showLoanDialog} onOpenChange={setShowLoanDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Loan</DialogTitle>
+            <DialogDescription>Create a new loan</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="loanCode">Code</Label>
+              <Input id="loanCode" placeholder="Loan Code" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="loanDescription">Description</Label>
+              <Input id="loanDescription" placeholder="Loan Description" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="loanMaxAmount">Max Amount</Label>
+              <Input id="loanMaxAmount" type="number" placeholder="Max Amount" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="loanInterestRate">Interest Rate</Label>
+              <Input id="loanInterestRate" type="number" placeholder="Interest Rate" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="loanTenure">Tenure (Months)</Label>
+              <Input id="loanTenure" type="number" placeholder="Tenure (Months)" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLoanDialog(false)}>
+              Cancel
+            </Button>
+            <Button>Save Loan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Currency Rate Dialog */}
+      <Dialog open={showAddCurrencyRateDialog} onOpenChange={setShowAddOrgChartDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Currency Rate</DialogTitle>
+            <DialogDescription>Add a new currency rate</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="currencyCode">Currency Code</Label>
+              <Input id="currencyCode" placeholder="Currency Code" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="exchangeRate">Exchange Rate</Label>
+              <Input id="exchangeRate" type="number" placeholder="Exchange Rate" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="effectiveDate">Effective Date</Label>
+              <Input id="effectiveDate" type="date" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddOrgChartDialog(false)}>
+              Cancel
+            </Button>
+            <Button>Add Rate</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Promotion Dialog */}
+      <Dialog open={showAddPromotionDialog} onOpenChange={setShowAddPromotionDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Promotion</DialogTitle>
+            <DialogDescription>Add a new promotion</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="employeeName">Employee Name</Label>
+              <Input id="employeeName" placeholder="Employee Name" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newPosition">New\
