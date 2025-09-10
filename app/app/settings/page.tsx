@@ -994,7 +994,7 @@ export default function SettingsPage() {
     }
   }
 
-  const [showAddRoleDialogFunc, setShowPermissionsDialog] = useState(false)
+  const [showAddRoleDialogFunc, setShowAddRoleDialogFunc] = useState(false)
   const [showDeleteRoleDialog, setShowDeleteRoleDialog] = useState(false)
   const [selectedRole, setSelectedRole] = useState<any>(null)
   const [newRole, setNewRole] = useState({
@@ -2988,7 +2988,8 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
             Notifications
-          </TabsList>
+          </TabsTrigger>
+        </TabsList>
 
         <TabsContent value="company">
           <Card>
@@ -4535,5 +4536,5 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {salaryGrades.map((salaryGrade) => (
-                        <tr key={salaryGrade.id}>\
+                      {salaryGrades.map((salaryGrade) => (\
+                        <tr key={salaryGrade.
