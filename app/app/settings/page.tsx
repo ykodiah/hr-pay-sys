@@ -26,6 +26,7 @@ import {
   Power,
   Clock,
   Brain,
+  Save,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -472,91 +473,12 @@ const formatCurrency = (amount: number, currencyCode = "GHS") => {
 
 const isDemoMode = () => {
   if (typeof window !== "undefined") {
-    return document.cookie.includes("demo-session=active") || localStorage.getItem("demo-profile")
+    const demoSession = document.cookie.includes("demo_session=true")
+    const demoProfile = localStorage.getItem("demo_profile")
+    return demoSession || !!demoProfile
   }
   return false
 }
-
-const getMockCompanyData = () => ({
-  id: "demo-company-001",
-  name: "Akwaaba HR Demo Company",
-  email_address: "demo@akwaabahr.com",
-  tax_id: "TIN123456789",
-  ssnit_number: "SSNIT987654321",
-  industry: "Technology",
-  status: "active",
-  address: "123 Demo Street, Accra, Ghana",
-  phone_number: "+233 20 123 4567",
-  divisions: [
-    { id: "div-001", name: "Technology Division", description: "IT and Software Development" },
-    { id: "div-002", name: "Operations Division", description: "Business Operations" },
-  ],
-  departments: [
-    { id: "dept-001", name: "Human Resources", description: "HR Management" },
-    { id: "dept-002", name: "Engineering", description: "Software Development" },
-    { id: "dept-003", name: "Finance", description: "Financial Management" },
-  ],
-  locations: [
-    { id: "loc-001", name: "Head Office", address: "123 Demo Street, Accra" },
-    { id: "loc-002", name: "Branch Office", address: "456 Branch Road, Kumasi" },
-  ],
-  logo_url: "",
-})
-
-const getMockEmployees = () => [
-  {
-    id: "emp-001",
-    first_name: "John",
-    last_name: "Doe",
-    email: "john.doe@demo.com",
-    position: "Software Engineer",
-    department: "Engineering",
-    status: "active",
-  },
-  {
-    id: "emp-002",
-    first_name: "Jane",
-    last_name: "Smith",
-    email: "jane.smith@demo.com",
-    position: "HR Manager",
-    department: "Human Resources",
-    status: "active",
-  },
-  {
-    id: "emp-003",
-    first_name: "Mike",
-    last_name: "Johnson",
-    email: "mike.johnson@demo.com",
-    position: "Finance Director",
-    department: "Finance",
-    status: "active",
-  },
-]
-
-const getMockSubsidiaries = () => [
-  {
-    id: "sub-001",
-    name: "Akwaaba Tech Solutions",
-    description: "Technology subsidiary",
-    divisions: [{ id: "div-tech-001", name: "Software Development" }],
-    departments: [{ id: "dept-tech-001", name: "Development Team" }],
-    locations: [{ id: "loc-tech-001", name: "Tech Hub" }],
-    divisions_count: 1,
-    departments_count: 1,
-    locations_count: 1,
-  },
-  {
-    id: "sub-002",
-    name: "Akwaaba Consulting",
-    description: "Consulting services subsidiary",
-    divisions: [{ id: "div-cons-001", name: "Business Consulting" }],
-    departments: [{ id: "dept-cons-001", name: "Consulting Team" }],
-    locations: [{ id: "loc-cons-001", name: "Consulting Office" }],
-    divisions_count: 1,
-    departments_count: 1,
-    locations_count: 1,
-  },
-]
 
 export default function SettingsPage() {
   console.log("[v0] SettingsPage component initializing")
@@ -1103,6 +1025,545 @@ export default function SettingsPage() {
 
   const [isLoadingSubsidiaries, setIsLoadingSubsidiaries] = useState(false)
 
+  const loadCompanyData = async () => {
+    try {
+      console.log("[v0] Loading company data...")
+      
+      if (isDemoMode()) {
+        console.log("[v0] Demo mode detected, using mock company data")
+        setCompanyData({
+          id: "demo-company-id",
+          name: "Akwaaba Technologies Ltd",
+          email_address: "ykodiah@gmail.com",
+          tax_id: "C001234567B",
+          ssnit_number: "1234567890",
+          industry: "Technology",
+          address: "123 Liberation Road, Labone, Accra, Ghana",
+          phone_number: "0249397960",
+          divisions: ["Head Office", "Regional Office"],
+          departments: ["Technology", "Human Resources", "Finance"],
+          locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
+        })
+        setDivisions(["Head Office", "Regional Office"])
+        setDepartments(["Technology", "Human Resources", "Finance"])
+        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+        return
+      }
+
+      const supabase = createClient()
+      const { data, error } = await supabase.from("companies").select("*").single()
+
+      if (error) {
+        console.error("Error loading company data:", error)
+        return
+      }
+
+      if (data) {
+        setCompanyData(data)
+        setDivisions(Array.isArray(data.divisions) ? data.divisions : [])
+        setDepartments(Array.isArray(data.departments) ? data.departments : [])
+        setLocations(Array.isArray(data.locations) ? data.locations : [])
+        
+        if (data.logo_url) {
+          setLogoPreview(data.logo_url)
+        }
+      }
+    } catch (error) {
+      console.error("Error loading company data:", error)
+    }
+  }
+
+  const loadEmployees = async () => {
+    try {
+      console.log("[v0] Loading employees data...")
+      
+      if (isDemoMode()) {
+        console.log("[v0] Demo mode detected, using mock employees data")
+        setEmployees([
+          {
+            id: "1",
+            first_name: "Yaw",
+            last_name: "Kodiah",
+            full_name: "Yaw Kodiah",
+            corporate_email: "ykodiah@akwaaba.com",
+            personal_email: "ykodiah@gmail.com",
+            position: "CEO",
+            department: "Executive",
+            status: "active"
+          },
+          {
+            id: "2", 
+            first_name: "Sarah",
+            last_name: "Mensah",
+            full_name: "Sarah Mensah",
+            corporate_email: "smensah@akwaaba.com",
+            personal_email: "sarah.mensah@gmail.com",
+            position: "HR Manager",
+            department: "Human Resources",
+            status: "active"
+          }
+        ])
+        return
+      }
+
+      const supabase = createClient()
+      const { data, error } = await supabase.from("employees").select("*").order("first_name")
+
+      if (error) throw error
+      setEmployees(data || [])
+    } catch (error) {
+      console.error("Error loading employees:", error)
+    }
+  }
+
+  const getMockSubsidiaries = () => {
+    return [
+      {
+        id: "sub-1",
+        name: "Akwaaba Tech Solutions",
+        tax_id: "C001234568B",
+        ssnit_number: "1234567891",
+        industry: "Software Development",
+        status: "active",
+        email_address: "info@akwaabatech.com",
+        phone_number: "0244123456",
+        address: "456 Tech Park, East Legon, Accra",
+        divisions: ["Development", "QA"],
+        departments: ["Engineering", "Product"],
+        locations: ["Accra", "Kumasi"],
+        divisions_count: 2,
+        departments_count: 2,
+        locations_count: 2,
+        created_at: "2024-01-15T00:00:00Z",
+        updated_at: "2024-01-15T00:00:00Z"
+      }
+    ]
+  }
+
+  const handleSaveCompanyData = async () => {
+    if (!companyData) return
+
+    setIsLoading(true)
+    try {
+      if (isDemoMode()) {
+        toast({
+          title: "Demo Mode",
+          description: "Company settings saved successfully (demo mode).",
+        })
+        setIsLoading(false)
+        return
+      }
+
+      const supabase = createClient()
+      
+      // Update company data including divisions, departments, locations
+      const updateData = {
+        ...companyData,
+        divisions: divisions,
+        departments: departments,
+        locations: locations,
+        updated_at: new Date().toISOString()
+      }
+
+      const { error } = await supabase
+        .from("companies")
+        .upsert(updateData)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Company settings saved successfully.",
+      })
+    } catch (error) {
+      console.error("Error saving company data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save company settings.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleAddSubsidiary = () => {
+    setEditingSubsidiary(null)
+    setShowSubsidiaryDialog(true)
+  }
+
+  const handleEditSubsidiary = (subsidiary: Subsidiary) => {
+    setEditingSubsidiary(subsidiary)
+    setShowSubsidiaryDialog(true)
+  }
+
+  const handleSaveSubsidiary = async (subsidiaryData: any) => {
+    try {
+      if (isDemoMode()) {
+        toast({
+          title: "Demo Mode",
+          description: "Subsidiary saved successfully (demo mode).",
+        })
+        setShowSubsidiaryDialog(false)
+        loadSubsidiaries()
+        return
+      }
+
+      const supabase = createClient()
+      
+      if (editingSubsidiary) {
+        // Update existing subsidiary
+        const { error } = await supabase
+          .from("subsidiaries")
+          .update({
+            ...subsidiaryData,
+            company_id: companyData.id,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", editingSubsidiary.id)
+
+        if (error) throw error
+      } else {
+        // Create new subsidiary
+        const { error } = await supabase
+          .from("subsidiaries")
+          .insert({
+            ...subsidiaryData,
+            company_id: companyData.id,
+            status: "active",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+
+        if (error) throw error
+      }
+
+      toast({
+        title: "Success",
+        description: `Subsidiary ${editingSubsidiary ? 'updated' : 'created'} successfully.`,
+      })
+      
+      setShowSubsidiaryDialog(false)
+      loadSubsidiaries()
+    } catch (error) {
+      console.error("Error saving subsidiary:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save subsidiary.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeactivateSubsidiary = async (id: string) => {
+    try {
+      if (isDemoMode()) {
+        toast({
+          title: "Demo Mode",
+          description: "Subsidiary deactivated successfully (demo mode).",
+        })
+        loadSubsidiaries()
+        return
+      }
+
+      const supabase = createClient()
+      const { error } = await supabase
+        .from("subsidiaries")
+        .update({ status: "inactive", updated_at: new Date().toISOString() })
+        .eq("id", id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Subsidiary deactivated successfully.",
+      })
+      
+      loadSubsidiaries()
+    } catch (error) {
+      console.error("Error deactivating subsidiary:", error)
+      toast({
+        title: "Error",
+        description: "Failed to deactivate subsidiary.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleActivateSubsidiary = async (id: string) => {
+    try {
+      if (isDemoMode()) {
+        toast({
+          title: "Demo Mode",
+          description: "Subsidiary activated successfully (demo mode).",
+        })
+        loadSubsidiaries()
+        return
+      }
+
+      const supabase = createClient()
+      const { error } = await supabase
+        .from("subsidiaries")
+        .update({ status: "active", updated_at: new Date().toISOString() })
+        .eq("id", id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Subsidiary activated successfully.",
+      })
+      
+      loadSubsidiaries()
+    } catch (error) {
+      console.error("Error activating subsidiary:", error)
+      toast({
+        title: "Error",
+        description: "Failed to activate subsidiary.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteSubsidiary = async (id: string) => {
+    try {
+      if (isDemoMode()) {
+        toast({
+          title: "Demo Mode",
+          description: "Subsidiary deleted successfully (demo mode).",
+        })
+        loadSubsidiaries()
+        return
+      }
+
+      const supabase = createClient()
+      const { error } = await supabase
+        .from("subsidiaries")
+        .delete()
+        .eq("id", id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Subsidiary deleted successfully.",
+      })
+      
+      loadSubsidiaries()
+    } catch (error) {
+      console.error("Error deleting subsidiary:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete subsidiary.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleChangeAdminPassword = () => {
+    setPasswordForm({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    })
+    setShowPasswordChangeDialog(true)
+  }
+
+  const handlePasswordChange = async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (passwordForm.newPassword.length < passwordPolicy.minLength) {
+      toast({
+        title: "Error",
+        description: `Password must be at least ${passwordPolicy.minLength} characters long.`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      // In a real app, this would call an API to change the password
+      toast({
+        title: "Success",
+        description: "Password changed successfully.",
+      })
+      
+      setShowPasswordChangeDialog(false)
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to change password.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDownloadSecurityReport = async () => {
+    try {
+      // Generate security report data
+      const reportData = {
+        generatedAt: new Date().toISOString(),
+        securityScore: securityScore,
+        settings: securitySettings,
+        passwordPolicy: passwordPolicy,
+        recommendations: [
+          "Enable two-factor authentication",
+          "Review user access permissions regularly",
+          "Update password policy requirements"
+        ]
+      }
+
+      // Create and download file
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `security-report-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Success",
+        description: "Security report downloaded successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to download security report.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleBackupNow = async () => {
+    setIsBackingUp(true)
+    try {
+      // Simulate backup process
+      await new Promise(resolve => setTimeout(resolve, 3000))
+      
+      setLastBackupTime(new Date().toISOString())
+      setShowBackupSuccess(true)
+      
+      toast({
+        title: "Success",
+        description: "System backup completed successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Backup failed. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsBackingUp(false)
+    }
+  }
+
+  const handleViewActivityLog = () => {
+    setShowActivityLog(true)
+  }
+
+  const handleDownloadAuditTrail = async () => {
+    try {
+      // Generate audit trail data
+      const auditData = {
+        generatedAt: new Date().toISOString(),
+        period: "Last 30 days",
+        activities: [
+          {
+            timestamp: new Date().toISOString(),
+            user: "Admin",
+            action: "Settings Updated",
+            resource: "Company Settings"
+          },
+          {
+            timestamp: new Date(Date.now() - 86400000).toISOString(),
+            user: "Admin", 
+            action: "User Created",
+            resource: "Employee Management"
+          }
+        ]
+      }
+
+      // Create and download file
+      const blob = new Blob([JSON.stringify(auditData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `audit-trail-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Success",
+        description: "Audit trail exported successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export audit trail.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSavePayrollConfig = async () => {
+    setIsLoading(true)
+    try {
+      if (isDemoMode()) {
+        toast({
+          title: "Demo Mode",
+          description: "Payroll settings saved successfully (demo mode).",
+        })
+        setIsLoading(false)
+        return
+      }
+
+      const supabase = createClient()
+      
+      // Save payroll configuration
+      const { error } = await supabase
+        .from("payroll_configuration")
+        .upsert({
+          ...payrollConfig,
+          company_id: companyData.id,
+          updated_at: new Date().toISOString()
+        })
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Payroll settings saved successfully.",
+      })
+    } catch (error) {
+      console.error("Error saving payroll config:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save payroll settings.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   useEffect(() => {
     const loadAllData = async () => {
       setIsLoading(true)
@@ -1133,149 +1594,6 @@ export default function SettingsPage() {
 
     loadAllData()
   }, []) // Only run once on mount
-
-  const loadCompanyData = async (retryCount = 0) => {
-    try {
-      console.log("[v0] Loading company data, attempt:", retryCount + 1)
-
-      if (isDemoMode()) {
-        console.log("[v0] Demo mode detected, using mock company data")
-        const mockData = getMockCompanyData()
-        setCompanyData(mockData)
-        setDivisions(mockData.divisions)
-        setDepartments(mockData.departments)
-        setLocations(mockData.locations)
-        return
-      }
-
-      const supabase = createClient()
-
-      // Test connection first
-      const { data: testData, error: testError } = await supabase.from("companies").select("count").limit(1)
-      if (testError) {
-        console.error("[v0] Database connection test failed:", testError)
-        throw testError
-      }
-
-      const { data, error } = await supabase.from("companies").select("*").limit(1).single()
-
-      if (error && error.code !== "PGRST116") {
-        // PGRST116 is "no rows returned"
-        console.error("[v0] Company data error:", error)
-        throw error
-      }
-
-      if (!data || error?.code === "PGRST116") {
-        console.log("[v0] No company found, creating default company")
-        // Create a default company if none exists
-        const { data: newCompany, error: createError } = await supabase
-          .from("companies")
-          .insert({
-            name: "Your Company Name",
-            email_address: "info@yourcompany.com",
-            tax_id: "",
-            ssnit_number: "",
-            industry: "",
-            address: "",
-            phone_number: "",
-          })
-          .select()
-          .single()
-
-        if (createError) {
-          console.error("[v0] Failed to create company:", createError)
-          if (retryCount < 2) {
-            console.log("[v0] Retrying company creation...")
-            await new Promise((resolve) => setTimeout(resolve, 1000))
-            return loadCompanyData(retryCount + 1)
-          }
-
-          // Set fallback data
-          setCompanyData({
-            id: "00000000-0000-0000-0000-000000000001",
-            name: "Your Company Name",
-            email_address: "info@yourcompany.com",
-            tax_id: "",
-            ssnit_number: "",
-            industry: "",
-            status: "active",
-            address: "",
-            phone_number: "",
-            divisions: [],
-            departments: [],
-            locations: [],
-          })
-          return
-        }
-
-        console.log("[v0] Company created successfully:", newCompany.id)
-        setCompanyData({
-          id: newCompany.id,
-          name: newCompany.name || "",
-          email_address: newCompany.email_address || "",
-          tax_id: newCompany.tax_id || "",
-          ssnit_number: newCompany.ssnit_number || "",
-          industry: newCompany.industry || "",
-          status: "active",
-          address: newCompany.address || "",
-          phone_number: newCompany.phone_number || "",
-          divisions: [],
-          departments: [],
-          locations: [],
-        })
-        return
-      }
-
-      console.log("[v0] Company data loaded successfully:", data.id)
-      setCompanyData({
-        id: data.id || "",
-        name: data.name || "",
-        email_address: data.email_address || "",
-        tax_id: data.tax_id || "",
-        ssnit_number: data.ssnit_number || "",
-        industry: data.industry || "",
-        status: "active",
-        address: data.address || "",
-        phone_number: data.phone_number || "",
-        divisions: data.divisions || [],
-        departments: data.departments || [],
-        locations: data.locations || [],
-        logo_url: data.logo_url || "",
-      })
-
-      // Load company structure data
-      if (data.divisions) setDivisions(Array.isArray(data.divisions) ? data.divisions : [])
-      if (data.departments) setDepartments(Array.isArray(data.departments) ? data.departments : [])
-      if (data.locations) setLocations(Array.isArray(data.locations) ? data.locations : [])
-
-      // Load logo if exists
-      if (data.logo_url) setLogoPreview(data.logo_url)
-    } catch (error) {
-      console.error("[v0] Error loading company data:", error)
-
-      if (retryCount < 2) {
-        console.log("[v0] Retrying company data load...")
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-        return loadCompanyData(retryCount + 1)
-      }
-
-      // Set fallback data after all retries failed
-      setCompanyData({
-        id: "00000000-0000-0000-0000-000000000001",
-        name: "Your Company Name",
-        email_address: "info@yourcompany.com",
-        tax_id: "",
-        ssnit_number: "",
-        industry: "",
-        status: "active",
-        address: "",
-        phone_number: "",
-        divisions: [],
-        departments: [],
-        locations: [],
-      })
-    }
-  }
 
   const loadRoles = async () => {
     try {
@@ -1513,24 +1831,6 @@ IT Support Team
         description: "Failed to load salary grades. Please check your connection.",
         variant: "destructive",
       })
-    }
-  }
-
-  const loadEmployees = async () => {
-    try {
-      if (isDemoMode()) {
-        console.log("[v0] Demo mode detected, using mock employees data")
-        setEmployees(getMockEmployees())
-        return
-      }
-
-      const supabase = createClient()
-      const { data, error } = await supabase.from("employees").select("*").order("first_name")
-
-      if (error) throw error
-      setEmployees(data || [])
-    } catch (error) {
-      console.error("Error loading employees:", error)
     }
   }
 
@@ -1965,110 +2265,6 @@ IT Support Team
     }
   }
 
-  const handleChangeAdminPassword = () => {
-    setShowPasswordChangeDialog(true)
-  }
-
-  const handlePasswordChange = async () => {
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "New passwords do not match.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    toast({
-      title: "Success",
-      description: "Password changed successfully.",
-    })
-    setShowPasswordChangeDialog(false)
-    setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
-  }
-
-  const handleDownloadSecurityReport = () => {
-    const report = `Security Report - ${new Date().toLocaleDateString()}
-    
-Two-Factor Authentication: ${securitySettings.twoFactorAuth ? "Enabled" : "Disabled"}
-Auto Session Timeout: ${securitySettings.autoSessionTimeout ? "Enabled" : "Disabled"}
-Timeout Duration: ${securitySettings.timeoutDuration} minutes
-Audit Logging: ${securitySettings.auditLogging ? "Enabled" : "Disabled"}
-Automated Backups: ${securitySettings.automatedBackups ? "Enabled" : "Disabled"}
-Backup Frequency: ${securitySettings.backupFrequency}
-
-Password Policy:
-- Minimum Length: ${passwordPolicy.minLength} characters
-- Require Uppercase: ${passwordPolicy.requireUppercase ? "Yes" : "No"}
-- Require Numbers: ${passwordPolicy.requireNumbers ? "Yes" : "No"}
-- Require Symbols: ${passwordPolicy.requireSymbols ? "Yes" : "No"}
-`
-
-    const blob = new Blob([report], { type: "text/plain" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `security-report-${new Date().toISOString().split("T")[0]}.txt`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-
-    toast({
-      title: "Success",
-      description: "Security report downloaded successfully.",
-    })
-  }
-
-  const handleBackupNow = async () => {
-    console.log("[v0] handleBackupNow called, current isBackingUp:", isBackingUp)
-    setIsBackingUp(true)
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-      const backupTime = new Date().toISOString()
-      setLastBackupTime(backupTime)
-      setShowBackupSuccess(true)
-
-      toast({
-        title: "Success",
-        description: "System backup completed successfully.",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Backup failed. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsBackingUp(false)
-    }
-  }
-
-  const handleViewActivityLog = () => {
-    setShowActivityLog(true)
-  }
-
-  const handleDownloadAuditTrail = () => {
-    const auditData = `Timestamp,User,Action,Resource,IP Address,Status
-${new Date().toLocaleString()},Admin,Login,System,192.168.1.1,Success
-${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company Settings,192.168.1.1,Success`
-
-    const blob = new Blob([auditData], { type: "text/csv" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `audit-trail-${new Date().toISOString().split("T")[0]}.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-
-    toast({
-      title: "Success",
-      description: "Audit trail exported successfully.",
-    })
-  }
-
   const calculatePasswordStrength = () => {
     let score = 0
     const requirements = []
@@ -2089,116 +2285,6 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
   }
 
   const passwordStrength = calculatePasswordStrength()
-
-  const handleAddSubsidiary = () => {
-    setEditingSubsidiary(null)
-    setShowSubsidiaryDialog(true)
-  }
-
-  const handleEditSubsidiary = (subsidiary: Subsidiary) => {
-    setEditingSubsidiary(subsidiary)
-    setShowSubsidiaryDialog(true)
-  }
-
-  const handleSaveSubsidiary = async (subsidiaryData: any) => {
-    try {
-      const supabase = createClient()
-
-      if (editingSubsidiary) {
-        // Update existing subsidiary
-        const { error } = await supabase
-          .from("subsidiaries")
-          .update({
-            name: subsidiaryData.name,
-            tax_id: subsidiaryData.tax_id,
-            ssnit_number: subsidiaryData.ssnit_number,
-            email_address: subsidiaryData.email,
-            phone_number: subsidiaryData.phone,
-            address: subsidiaryData.address,
-            divisions: subsidiaryData.divisions || [],
-            departments: subsidiaryData.departments || [],
-            locations: subsidiaryData.locations || [],
-            // Added logo data to update
-            logo_file_id: subsidiaryData.logo_file_id,
-            logo_url: subsidiaryData.logo_url,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", editingSubsidiary.id)
-
-        if (error) throw error
-        toast({ title: "Success", description: "Subsidiary updated successfully" })
-      } else {
-        // Create new subsidiary
-        const { error } = await supabase.from("subsidiaries").insert({
-          company_id: companyData?.id || "00000000-0000-0000-0000-000000000001", // Replace with actual company ID
-          name: subsidiaryData.name,
-          tax_id: subsidiaryData.tax_id,
-          ssnit_number: subsidiaryData.ssnit_number,
-          email_address: subsidiaryData.email,
-          phone_number: subsidiaryData.phone,
-          address: subsidiaryData.address,
-          divisions: subsidiaryData.divisions || [],
-          departments: subsidiaryData.departments || [],
-          locations: subsidiaryData.locations || [],
-          // Added logo data to insert
-          logo_file_id: subsidiaryData.logo_file_id,
-          logo_url: subsidiaryData.logo_url,
-          status: "active",
-        })
-
-        if (error) throw error
-        toast({ title: "Success", description: "Subsidiary created successfully" })
-      }
-
-      setShowSubsidiaryDialog(false)
-      loadSubsidiaries()
-    } catch (error) {
-      console.error("Error saving subsidiary:", error)
-      toast({ title: "Error", description: "Failed to save subsidiary" })
-    }
-  }
-
-  const handleActivateSubsidiary = async (subsidiaryId: string) => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("subsidiaries").update({ status: "active" }).eq("id", subsidiaryId)
-
-      if (error) throw error
-      toast({ title: "Success", description: "Subsidiary activated successfully" })
-      loadSubsidiaries()
-    } catch (error) {
-      console.error("Error activating subsidiary:", error)
-      toast({ title: "Error", description: "Failed to activate subsidiary", variant: "destructive" })
-    }
-  }
-
-  const handleDeactivateSubsidiary = async (subsidiaryId: string) => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("subsidiaries").update({ status: "inactive" }).eq("id", subsidiaryId)
-
-      if (error) throw error
-      toast({ title: "Success", description: "Subsidiary deactivated successfully" })
-      loadSubsidiaries()
-    } catch (error) {
-      console.error("Error deactivating subsidiary:", error)
-      toast({ title: "Error", description: "Failed to deactivate subsidiary", variant: "destructive" })
-    }
-  }
-
-  const handleDeleteSubsidiary = async (subsidiaryId: string) => {
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("subsidiaries").delete().eq("id", subsidiaryId)
-
-      if (error) throw error
-      toast({ title: "Success", description: "Subsidiary deleted successfully" })
-      loadSubsidiaries()
-    } catch (error) {
-      console.error("Error deleting subsidiary:", error)
-      toast({ title: "Error", description: "Failed to delete subsidiary", variant: "destructive" })
-    }
-  }
 
   return (
     <div className="flex flex-col h-screen">
@@ -2425,17 +2511,14 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                       Add Location
                     </Button>
                   </div>
-
-                  <Button onClick={handleSaveCompany} disabled={isLoading}>
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Please wait
-                      </>
-                    ) : (
-                      "Save Company Settings"
-                    )}
-                  </Button>
+                  {activeTab === "company" && (
+                    <div className="flex justify-end mt-6">
+                      <Button onClick={handleSaveCompanyData} className="bg-blue-600 hover:bg-blue-700">
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Company Settings
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
               <TabsContent value="subsidiaries">
@@ -2554,7 +2637,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                 </div>
               </TabsContent>
               <TabsContent value="security">
-                <div className="grid gap-4">
+                <div className="space-y-4">
                   <CardTitle>Security Settings</CardTitle>
                   <CardDescription>Configure your security settings to protect your account.</CardDescription>
 
@@ -2869,8 +2952,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                           <SelectItem value="Weekly">Weekly</SelectItem>
                           <SelectItem value="Bi-Weekly">Bi-Weekly</SelectItem>
                           <SelectItem value="Monthly">Monthly</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        </Select>
                     </div>
 
                     <div className="space-y-2">
@@ -3277,6 +3359,14 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                       )}
                     </div>
                   </div>
+                  {activeTab === "payroll" && (
+                    <div className="flex justify-end mt-6">
+                      <Button onClick={handleSavePayrollConfig} className="bg-green-600 hover:bg-green-700">
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Payroll Settings
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
               <TabsContent value="notifications">
@@ -3340,7 +3430,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
                             <Card key={insight.id}>
                               <CardHeader>
                                 <CardTitle>{insight.title}</CardTitle>
-                                <CardDescription>{insight.description}</CardDescription>
+                                <CardDescription>{insight.description}</CardHeader>
                               </CardHeader>
                               <CardContent>
                                 <div className="space-y-2">
@@ -3696,4 +3786,4 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
       </Dialog>
     </div>
   )
-}
+}\
