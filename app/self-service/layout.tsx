@@ -199,10 +199,10 @@ export default function SelfServiceLayout({
                 <X className="h-4 w-4" />
               </Button>
             </DialogTitle>
-            <DialogDescription className="text-left">
+            <DialogDescription asChild className="text-left">
               <div className="space-y-3">
-                <p className="text-sm text-gray-600">{selectedNotification?.fullMessage}</p>
-                <p className="text-xs text-gray-400">{selectedNotification?.time}</p>
+                <div className="text-sm text-gray-600">{selectedNotification?.fullMessage}</div>
+                <div className="text-xs text-gray-400">{selectedNotification?.time}</div>
               </div>
             </DialogDescription>
           </DialogHeader>
