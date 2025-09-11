@@ -69,9 +69,8 @@ export default function LoginPage() {
 
       await supabase.from("employees").upsert(employeeData, { onConflict: "corporate_email" })
 
-      console.log(`[v0] Demo ${userType} profile created, redirecting to app`)
+      console.log(`[v0] Demo ${userType} profile created, redirecting to ${isAdmin ? "admin" : "employee"} portal`)
 
-      // Set demo session flag and redirect
       localStorage.setItem(
         "demo_user",
         JSON.stringify({
@@ -81,7 +80,15 @@ export default function LoginPage() {
         }),
       )
 
-      router.push("/app")
+      // Set demo session cookie for middleware
+      document.cookie = "demo-session=active; path=/; max-age=86400" // 24 hours
+
+      // Redirect to appropriate portal based on user type
+      if (isAdmin) {
+        router.push("/app")
+      } else {
+        router.push("/self-service")
+      }
     } catch (error: any) {
       console.error("[v0] Demo bypass error:", error)
       setError(`Failed to setup demo ${userType} profile: ${error.message}`)
@@ -139,7 +146,15 @@ export default function LoginPage() {
         return
       }
 
-      router.push("/app")
+      if (
+        employee &&
+        (employee.position?.toLowerCase().includes("administrator") ||
+          employee.department?.toLowerCase().includes("administration"))
+      ) {
+        router.push("/app")
+      } else {
+        router.push("/self-service")
+      }
     } catch (error: any) {
       console.error("[v0] Login error:", error)
       setError(error.message || "An error occurred during sign in")

@@ -11,6 +11,9 @@ export async function updateSession(request: NextRequest) {
     (path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(path + "/"),
   )
 
+  const demoSession = request.cookies.get("demo-session")?.value
+  const isDemoMode = demoSession === "active"
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -43,15 +46,24 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    if (!user && !isPublicPath && !request.nextUrl.pathname.startsWith("/app")) {
+    const hasAccess = user || isDemoMode
+
+    if (
+      !hasAccess &&
+      !isPublicPath &&
+      !request.nextUrl.pathname.startsWith("/app") &&
+      !request.nextUrl.pathname.startsWith("/self-service")
+    ) {
       // no user, potentially respond by redirecting the user to the login page
       const url = request.nextUrl.clone()
       url.pathname = "/auth/login"
       return NextResponse.redirect(url)
     }
 
-    if (request.nextUrl.pathname.startsWith("/app") && !user) {
-      // Check if demo mode is enabled (this will be handled client-side)
+    if (
+      (request.nextUrl.pathname.startsWith("/app") || request.nextUrl.pathname.startsWith("/self-service")) &&
+      !hasAccess
+    ) {
       const url = request.nextUrl.clone()
       url.pathname = "/auth/login"
       return NextResponse.redirect(url)
@@ -60,7 +72,7 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
   } catch (error) {
     console.error("[v0] Middleware - Error:", error)
-    if (isPublicPath) {
+    if (isPublicPath || isDemoMode) {
       return NextResponse.next({ request })
     }
     return NextResponse.next({
