@@ -14,13 +14,18 @@ export async function updateSession(request: NextRequest) {
   const demoSession = request.cookies.get("demo-session")?.value
   const isDemoMode = demoSession === "active"
 
+  console.log("[v0] Middleware - Demo session check:", {
+    demoSession,
+    isDemoMode,
+    path: request.nextUrl.pathname,
+    cookies: request.cookies.getAll().map((c) => ({ name: c.name, value: c.value })),
+  })
+
   let supabaseResponse = NextResponse.next({
     request,
   })
 
   try {
-    // With Fluid compute, don't put this client in a global environment
-    // variable. Always create a new one on each request.
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
@@ -36,34 +41,36 @@ export async function updateSession(request: NextRequest) {
       },
     })
 
-    // Do not run code between createServerClient and
-    // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-    // issues with users being randomly logged out.
-
-    // IMPORTANT: If you remove getUser() and you use server-side rendering
-    // with the Supabase client, your users may be randomly logged out.
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
     const hasAccess = user || isDemoMode
 
-    if (
-      !hasAccess &&
-      !isPublicPath &&
-      !request.nextUrl.pathname.startsWith("/app") &&
-      !request.nextUrl.pathname.startsWith("/self-service")
-    ) {
-      // no user, potentially respond by redirecting the user to the login page
+    console.log("[v0] Middleware - Auth check:", {
+      hasUser: !!user,
+      isDemoMode,
+      hasAccess,
+      path: request.nextUrl.pathname,
+      isPublicPath,
+    })
+
+    const isProtectedPath =
+      request.nextUrl.pathname.startsWith("/app") || request.nextUrl.pathname.startsWith("/self-service")
+
+    if (isProtectedPath && !hasAccess) {
+      console.log("[v0] Middleware - Redirecting to login: protected path without access")
       const url = request.nextUrl.clone()
       url.pathname = "/auth/login"
       return NextResponse.redirect(url)
     }
 
-    if (
-      (request.nextUrl.pathname.startsWith("/app") || request.nextUrl.pathname.startsWith("/self-service")) &&
-      !hasAccess
-    ) {
+    if (isPublicPath || hasAccess) {
+      return supabaseResponse
+    }
+
+    if (!hasAccess) {
+      console.log("[v0] Middleware - Redirecting to login: no access to non-public path")
       const url = request.nextUrl.clone()
       url.pathname = "/auth/login"
       return NextResponse.redirect(url)
