@@ -559,6 +559,8 @@ const getMockSubsidiaries = () => [
 ]
 
 export default function SettingsPage() {
+  console.log("[v0] SettingsPage component initializing")
+
   const { toast } = useToast()
 
   const [activeTab, setActiveTab] = useState("company")
@@ -643,8 +645,11 @@ export default function SettingsPage() {
   const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
   const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
   const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
-  const [isBackingUp, setIsBackingUp] = useState(false)
+
+  const [isBackingUp, setIsBackingUp] = useState<boolean>(false)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
+
+  console.log("[v0] isBackingUp state initialized:", isBackingUp)
 
   const [showAllowanceDialog, setShowAllowanceDialog] = useState(false)
   const [showDeductionDialog, setShowDeductionDialog] = useState(false)
@@ -2016,6 +2021,7 @@ Password Policy:
   }
 
   const handleBackupNow = async () => {
+    console.log("[v0] handleBackupNow called, current isBackingUp:", isBackingUp)
     setIsBackingUp(true)
     try {
       await new Promise((resolve) => setTimeout(resolve, 3000))
@@ -2711,6 +2717,7 @@ ${new Date(Date.now() - 3600000).toLocaleString()},Admin,Update Settings,Company
 
                   <div className="flex justify-between items-center">
                     <CardTitle>System Backup</CardTitle>
+
                     <Button onClick={handleBackupNow} disabled={isBackingUp}>
                       {isBackingUp ? (
                         <>
