@@ -470,6 +470,94 @@ const formatCurrency = (amount: number, currencyCode = "GHS") => {
   return `${symbol}${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+const isDemoMode = () => {
+  if (typeof window !== "undefined") {
+    return document.cookie.includes("demo-session=active") || localStorage.getItem("demo-profile")
+  }
+  return false
+}
+
+const getMockCompanyData = () => ({
+  id: "demo-company-001",
+  name: "Akwaaba HR Demo Company",
+  email_address: "demo@akwaabahr.com",
+  tax_id: "TIN123456789",
+  ssnit_number: "SSNIT987654321",
+  industry: "Technology",
+  status: "active",
+  address: "123 Demo Street, Accra, Ghana",
+  phone_number: "+233 20 123 4567",
+  divisions: [
+    { id: "div-001", name: "Technology Division", description: "IT and Software Development" },
+    { id: "div-002", name: "Operations Division", description: "Business Operations" },
+  ],
+  departments: [
+    { id: "dept-001", name: "Human Resources", description: "HR Management" },
+    { id: "dept-002", name: "Engineering", description: "Software Development" },
+    { id: "dept-003", name: "Finance", description: "Financial Management" },
+  ],
+  locations: [
+    { id: "loc-001", name: "Head Office", address: "123 Demo Street, Accra" },
+    { id: "loc-002", name: "Branch Office", address: "456 Branch Road, Kumasi" },
+  ],
+  logo_url: "",
+})
+
+const getMockEmployees = () => [
+  {
+    id: "emp-001",
+    first_name: "John",
+    last_name: "Doe",
+    email: "john.doe@demo.com",
+    position: "Software Engineer",
+    department: "Engineering",
+    status: "active",
+  },
+  {
+    id: "emp-002",
+    first_name: "Jane",
+    last_name: "Smith",
+    email: "jane.smith@demo.com",
+    position: "HR Manager",
+    department: "Human Resources",
+    status: "active",
+  },
+  {
+    id: "emp-003",
+    first_name: "Mike",
+    last_name: "Johnson",
+    email: "mike.johnson@demo.com",
+    position: "Finance Director",
+    department: "Finance",
+    status: "active",
+  },
+]
+
+const getMockSubsidiaries = () => [
+  {
+    id: "sub-001",
+    name: "Akwaaba Tech Solutions",
+    description: "Technology subsidiary",
+    divisions: [{ id: "div-tech-001", name: "Software Development" }],
+    departments: [{ id: "dept-tech-001", name: "Development Team" }],
+    locations: [{ id: "loc-tech-001", name: "Tech Hub" }],
+    divisions_count: 1,
+    departments_count: 1,
+    locations_count: 1,
+  },
+  {
+    id: "sub-002",
+    name: "Akwaaba Consulting",
+    description: "Consulting services subsidiary",
+    divisions: [{ id: "div-cons-001", name: "Business Consulting" }],
+    departments: [{ id: "dept-cons-001", name: "Consulting Team" }],
+    locations: [{ id: "loc-cons-001", name: "Consulting Office" }],
+    divisions_count: 1,
+    departments_count: 1,
+    locations_count: 1,
+  },
+]
+
 export default function SettingsPage() {
   const { toast } = useToast()
 
@@ -555,7 +643,7 @@ export default function SettingsPage() {
   const [showEmailTemplateDialog, setShowCustomTemplateDialog] = useState(false)
   const [showLeaveTypeDialog, setShowLeaveTypeDialog] = useState(false)
   const [showSalaryGradeDialog, setShowSalaryGradeDialog] = useState(false)
-  const [isBackingUp, setIsBackingUp] = useState(false)
+  const [isBackingUp, setIsBackingUp] = useState(isBackingUp)
   const [lastBackupTime, setLastBackupTime] = useState<string>("")
 
   const [showAllowanceDialog, setShowAllowanceDialog] = useState(false)
@@ -1044,6 +1132,17 @@ export default function SettingsPage() {
   const loadCompanyData = async (retryCount = 0) => {
     try {
       console.log("[v0] Loading company data, attempt:", retryCount + 1)
+
+      if (isDemoMode()) {
+        console.log("[v0] Demo mode detected, using mock company data")
+        const mockData = getMockCompanyData()
+        setCompanyData(mockData)
+        setDivisions(mockData.divisions)
+        setDepartments(mockData.departments)
+        setLocations(mockData.locations)
+        return
+      }
+
       const supabase = createClient()
 
       // Test connection first
@@ -1414,6 +1513,12 @@ IT Support Team
 
   const loadEmployees = async () => {
     try {
+      if (isDemoMode()) {
+        console.log("[v0] Demo mode detected, using mock employees data")
+        setEmployees(getMockEmployees())
+        return
+      }
+
       const supabase = createClient()
       const { data, error } = await supabase.from("employees").select("*").order("first_name")
 
@@ -1598,6 +1703,13 @@ IT Support Team
 
     try {
       setIsLoadingSubsidiaries(true)
+
+      if (isDemoMode()) {
+        console.log("[v0] Demo mode detected, using mock subsidiaries data")
+        setSubsidiaries(getMockSubsidiaries())
+        return
+      }
+
       const supabase = createClient()
       const { data, error } = await supabase.from("subsidiaries").select("*")
 
