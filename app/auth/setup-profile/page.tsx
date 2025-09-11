@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Logo } from "@/components/logo"
 import { User, Building, MapPin, Phone } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { getUser } from "@/lib/supabase/auth"
 
 export default function SetupProfilePage() {
   const [formData, setFormData] = useState({
@@ -48,7 +47,11 @@ export default function SetupProfilePage() {
 
   const checkDemoUser = async () => {
     try {
-      const user = await getUser()
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
       if (!user) return
 
       const isDemoUser = user.email === "admin@akwaabahrpay.com" || user.email === "employee@akwaabahrpay.com"
@@ -113,7 +116,11 @@ export default function SetupProfilePage() {
       })
 
       console.log("[v0] Demo profile created successfully")
-      router.push("/app")
+      if (isAdmin) {
+        router.push("/app")
+      } else {
+        router.push("/self-service")
+      }
     } catch (error) {
       console.error("Error creating demo profile:", error)
       setError("Failed to setup demo profile. Please try manual setup.")
@@ -134,7 +141,9 @@ export default function SetupProfilePage() {
 
     try {
       const supabase = createClient()
-      const user = await getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
       if (!user) {
         throw new Error("User not authenticated")
