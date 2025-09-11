@@ -125,30 +125,8 @@ const SettingsPage: FunctionComponent = () => {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([])
   const [roles, setRoles] = useState<Role[]>([])
-  const [payrollAllowances, setPayrollAllowancesState] = useState<any[]>([])
-  const [payrollDeductions, setPayrollDeductionsState] = useState<any[]>([])
-  const [loanSettings, setLoanSettingsState] = useState<any[]>([])
-  const [salaryGrades, setSalaryGradesState] = useState<any[]>([])
-  const [leaveTypes, setLeaveTypesState] = useState<any[]>([])
-  const [emailTemplates, setEmailTemplates] = useState<any[]>([])
-  const [notificationSettings, setNotificationSettings] = useState<any>({})
-
-  // Dialog states
-  const [editingSubsidiary, setEditingSubsidiary] = useState<Subsidiary | null>(null)
-  const [showSubsidiaryDialog, setShowSubsidiaryDialog] = useState<boolean>(false)
-  const [viewingSubsidiary, setViewingSubsidiary] = useState<Subsidiary | null>(null)
-  const [showViewSubsidiaryDialog, setShowViewSubsidiaryDialog] = useState<boolean>(false)
-  const [editingItem, setEditingItem] = useState<any>(null)
-  const [editingIndex, setEditingIndex] = useState<number>(-1)
-  const [showAllowanceDialog, setShowAllowanceDialog] = useState<boolean>(false)
-  const [showDeductionDialog, setShowDeductionDialog] = useState<boolean>(false)
-  const [showLoanDialog, setShowLoanDialog] = useState<boolean>(false)
-  const [showEditRoleDialog, setShowEditRoleDialog] = useState<boolean>(false)
-  const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState<boolean>(false)
-  const [showActivityLog, setShowActivityLog] = useState<boolean>(false)
   const [isBackingUp, setIsBackingUp] = useState<boolean>(false)
   const [lastBackupTime, setLastBackupTime] = useState<string | null>(null)
-  const [showBackupSuccess, setShowBackupSuccess] = useState<boolean>(false)
 
   // Load functions
   const loadCompanyData = async () => {
@@ -533,7 +511,7 @@ const SettingsPage: FunctionComponent = () => {
                   <Building2 className="w-5 h-5" />
                   <span>Multi-Company Management</span>
                 </div>
-                <Button onClick={() => setShowSubsidiaryDialog(true)}>Add Subsidiary</Button>
+                <Button>Add Subsidiary</Button>
               </CardTitle>
               <CardDescription>Manage subsidiary companies and their organizational structure</CardDescription>
             </CardHeader>
@@ -548,10 +526,10 @@ const SettingsPage: FunctionComponent = () => {
                         <p className="text-sm text-gray-500">{subsidiary.address}</p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Button variant="ghost" size="sm" onClick={() => setViewingSubsidiary(subsidiary)}>
+                        <Button variant="ghost" size="sm">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setEditingSubsidiary(subsidiary)}>
+                        <Button variant="ghost" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
                         <DropdownMenu>
@@ -791,7 +769,7 @@ const SettingsPage: FunctionComponent = () => {
                     <Input
                       id="notificationEmail"
                       type="email"
-                      value="notifications@akwaaba.com"
+                      defaultValue="notifications@akwaaba.com"
                       placeholder="Enter notification email"
                     />
                   </div>
@@ -800,7 +778,7 @@ const SettingsPage: FunctionComponent = () => {
                     <Input
                       id="webhookUrl"
                       type="url"
-                      value="https://api.akwaaba.com/webhooks/notifications"
+                      defaultValue="https://api.akwaaba.com/webhooks/notifications"
                       placeholder="Enter webhook URL"
                     />
                   </div>
@@ -819,7 +797,7 @@ const SettingsPage: FunctionComponent = () => {
                   <Shield className="w-5 h-5" />
                   <span>Role Management</span>
                 </div>
-                <Button onClick={() => setShowEditRoleDialog(true)}>Add Role</Button>
+                <Button>Add Role</Button>
               </CardTitle>
               <CardDescription>Manage user roles and permissions</CardDescription>
             </CardHeader>
@@ -834,7 +812,7 @@ const SettingsPage: FunctionComponent = () => {
                         <p className="text-sm text-gray-500">{role.user_count} users assigned</p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Button variant="ghost" size="sm" onClick={() => setEditingItem(role)}>
+                        <Button variant="ghost" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
                         <DropdownMenu>
@@ -977,19 +955,11 @@ const SettingsPage: FunctionComponent = () => {
                 <div className="space-y-4">
                   <h3 className="font-semibold">Security Actions</h3>
                   <div className="space-y-2">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start bg-transparent"
-                      onClick={() => setShowPasswordChangeDialog(true)}
-                    >
+                    <Button variant="outline" className="w-full justify-start bg-transparent">
                       <Shield className="h-4 w-4 mr-2" />
                       Change Admin Password
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start bg-transparent"
-                      onClick={() => setShowActivityLog(true)}
-                    >
+                    <Button variant="outline" className="w-full justify-start bg-transparent">
                       <Clock className="h-4 w-4 mr-2" />
                       View Activity Log
                     </Button>
