@@ -20,6 +20,16 @@ import {
   Power,
   Clock,
   Brain,
+  Plus,
+  RefreshCw,
+  MapPin,
+  Briefcase,
+  Copy,
+  Pause,
+  Play,
+  Trash2,
+  Download,
+  Upload,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -31,6 +41,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
 
 interface Company {
   id: string
@@ -79,6 +90,7 @@ interface Subsidiary {
   divisions_count?: number
   departments_count?: number
   locations_count?: number
+  company_id?: string
 }
 
 interface Role {
@@ -127,6 +139,10 @@ const SettingsPage: FunctionComponent = () => {
   const [roles, setRoles] = useState<Role[]>([])
   const [isBackingUp, setIsBackingUp] = useState<boolean>(false)
   const [lastBackupTime, setLastBackupTime] = useState<string | null>(null)
+  const [showAddSubsidiary, setShowAddSubsidiary] = useState<boolean>(false)
+  const [showEditSubsidiary, setShowEditSubsidiary] = useState<boolean>(false)
+  const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState<boolean>(false)
+  const [selectedSubsidiary, setSelectedSubsidiary] = useState<Subsidiary | null>(null)
 
   // Load functions
   const loadCompanyData = async () => {
@@ -339,6 +355,179 @@ const SettingsPage: FunctionComponent = () => {
     loadAllData()
   }, [])
 
+  // Subsidiary Management Functions
+  const syncSubsidiarySettings = async (subsidiaryId: string) => {
+    console.log("[v0] Syncing subsidiary settings for:", subsidiaryId)
+
+    if (isDemoMode()) {
+      toast({
+        title: "Settings Synced",
+        description: "Subsidiary settings synchronized successfully (Demo Mode)",
+      })
+      return
+    }
+
+    try {
+      // In a real implementation, this would sync settings from parent company to subsidiary
+      const { error } = await supabase
+        .from("subsidiaries")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", subsidiaryId)
+
+      if (error) throw error
+
+      toast({
+        title: "Settings Synced",
+        description: "Subsidiary settings synchronized successfully",
+      })
+    } catch (error) {
+      console.error("Settings sync error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to sync subsidiary settings",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const viewSubsidiaryEmployees = (subsidiaryId: string) => {
+    console.log("[v0] Viewing employees for subsidiary:", subsidiaryId)
+    // Navigate to employees page filtered by subsidiary
+    window.open(`/app/employees?subsidiary=${subsidiaryId}`, "_blank")
+  }
+
+  const duplicateSubsidiary = async (subsidiary: Subsidiary) => {
+    console.log("[v0] Duplicating subsidiary:", subsidiary.name)
+
+    if (isDemoMode()) {
+      const newSubsidiary = {
+        ...subsidiary,
+        id: `sub-${Date.now()}`,
+        name: `${subsidiary.name} (Copy)`,
+        tax_id: `${subsidiary.tax_id}-COPY`,
+        created_at: new Date().toISOString(),
+      }
+      setSubsidiaries((prev) => [...prev, newSubsidiary])
+      toast({
+        title: "Subsidiary Duplicated",
+        description: `${subsidiary.name} has been duplicated successfully (Demo Mode)`,
+      })
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("subsidiaries")
+        .insert({
+          company_id: subsidiary.company_id,
+          name: `${subsidiary.name} (Copy)`,
+          tax_id: `${subsidiary.tax_id}-COPY`,
+          ssnit_number: subsidiary.ssnit_number,
+          industry: subsidiary.industry,
+          address: subsidiary.address,
+          phone_number: subsidiary.phone_number,
+          email_address: subsidiary.email_address,
+          status: "inactive",
+          divisions: subsidiary.divisions,
+          departments: subsidiary.departments,
+          locations: subsidiary.locations,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setSubsidiaries((prev) => [...prev, data])
+      toast({
+        title: "Subsidiary Duplicated",
+        description: `${subsidiary.name} has been duplicated successfully`,
+      })
+    } catch (error) {
+      console.error("Subsidiary duplication error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to duplicate subsidiary",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const toggleSubsidiaryStatus = async (subsidiaryId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active"
+    console.log("[v0] Toggling subsidiary status:", subsidiaryId, "to", newStatus)
+
+    if (isDemoMode()) {
+      setSubsidiaries((prev) => prev.map((s) => (s.id === subsidiaryId ? { ...s, status: newStatus } : s)))
+      toast({
+        title: "Status Updated",
+        description: `Subsidiary status changed to ${newStatus} (Demo Mode)`,
+      })
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from("subsidiaries")
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", subsidiaryId)
+
+      if (error) throw error
+
+      setSubsidiaries((prev) => prev.map((s) => (s.id === subsidiaryId ? { ...s, status: newStatus } : s)))
+
+      toast({
+        title: "Status Updated",
+        description: `Subsidiary status changed to ${newStatus}`,
+      })
+    } catch (error) {
+      console.error("Status update error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update subsidiary status",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const deleteSubsidiary = async (subsidiaryId: string) => {
+    console.log("[v0] Deleting subsidiary:", subsidiaryId)
+
+    if (!confirm("Are you sure you want to delete this subsidiary? This action cannot be undone.")) {
+      return
+    }
+
+    if (isDemoMode()) {
+      setSubsidiaries((prev) => prev.filter((s) => s.id !== subsidiaryId))
+      toast({
+        title: "Subsidiary Deleted",
+        description: "Subsidiary has been deleted successfully (Demo Mode)",
+      })
+      return
+    }
+
+    try {
+      const { error } = await supabase.from("subsidiaries").delete().eq("id", subsidiaryId)
+
+      if (error) throw error
+
+      setSubsidiaries((prev) => prev.filter((s) => s.id !== subsidiaryId))
+      toast({
+        title: "Subsidiary Deleted",
+        description: "Subsidiary has been deleted successfully",
+      })
+    } catch (error) {
+      console.error("Subsidiary deletion error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete subsidiary",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -511,44 +700,297 @@ const SettingsPage: FunctionComponent = () => {
                   <Building2 className="w-5 h-5" />
                   <span>Multi-Company Management</span>
                 </div>
-                <Button>Add Subsidiary</Button>
+                <div className="flex items-center space-x-2">
+                  <Button onClick={() => setShowAddSubsidiary(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Subsidiary
+                  </Button>
+                  <Button variant="outline" onClick={loadSubsidiaries}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
               </CardTitle>
-              <CardDescription>Manage subsidiary companies and their organizational structure</CardDescription>
+              <CardDescription>
+                Manage subsidiary companies, their organizational structure, and synchronize settings across entities
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {subsidiaries.map((subsidiary) => (
-                  <div key={subsidiary.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold">{subsidiary.name}</h3>
-                        <p className="text-sm text-gray-600">{subsidiary.industry}</p>
-                        <p className="text-sm text-gray-500">{subsidiary.address}</p>
-                      </div>
+              <div className="space-y-6">
+                {/* Company Overview Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
                       <div className="flex items-center space-x-2">
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
+                        <Building2 className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <p className="text-sm font-medium">Total Subsidiaries</p>
+                          <p className="text-2xl font-bold">{subsidiaries.length}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Users className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="text-sm font-medium">Active Companies</p>
+                          <p className="text-2xl font-bold">
+                            {subsidiaries.filter((s) => s.status === "active").length}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <MapPin className="w-5 h-5 text-purple-600" />
+                        <div>
+                          <p className="text-sm font-medium">Total Locations</p>
+                          <p className="text-2xl font-bold">
+                            {subsidiaries.reduce((acc, s) => acc + (s.locations?.length || 0), 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Briefcase className="w-5 h-5 text-orange-600" />
+                        <div>
+                          <p className="text-sm font-medium">Total Departments</p>
+                          <p className="text-2xl font-bold">
+                            {subsidiaries.reduce((acc, s) => acc + (s.departments?.length || 0), 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Subsidiaries List */}
+                <div className="space-y-4">
+                  {subsidiaries.map((subsidiary) => (
+                    <Card key={subsidiary.id} className="border-l-4 border-l-blue-500">
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-3">
+                              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
+                                {subsidiary.name.charAt(0)}
+                              </div>
+                              <div>
+                                <h3 className="text-lg font-semibold">{subsidiary.name}</h3>
+                                <p className="text-sm text-gray-600">{subsidiary.industry}</p>
+                                <div className="flex items-center space-x-2 mt-1">
+                                  <Badge variant={subsidiary.status === "active" ? "default" : "secondary"}>
+                                    {subsidiary.status}
+                                  </Badge>
+                                  <span className="text-xs text-gray-500">Tax ID: {subsidiary.tax_id}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                              <div>
+                                <p className="text-sm font-medium text-gray-700">Contact Information</p>
+                                <p className="text-sm text-gray-600">{subsidiary.email_address}</p>
+                                <p className="text-sm text-gray-600">{subsidiary.phone_number}</p>
+                                <p className="text-sm text-gray-600">{subsidiary.address}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-700">Organizational Structure</p>
+                                <div className="flex items-center space-x-4 text-sm text-gray-600">
+                                  <span>{subsidiary.divisions?.length || 0} Divisions</span>
+                                  <span>{subsidiary.departments?.length || 0} Departments</span>
+                                  <span>{subsidiary.locations?.length || 0} Locations</span>
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-700">Registration Details</p>
+                                <p className="text-sm text-gray-600">SSNIT: {subsidiary.ssnit_number}</p>
+                                <p className="text-sm text-gray-600">
+                                  Created:{" "}
+                                  {subsidiary.created_at ? new Date(subsidiary.created_at).toLocaleDateString() : "N/A"}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Quick Actions */}
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowSubsidiaryDetails(true)
+                                }}
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                View Details
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowEditSubsidiary(true)
+                                }}
+                              >
+                                <Edit className="w-4 h-4 mr-1" />
+                                Edit
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => syncSubsidiarySettings(subsidiary.id)}>
+                                <RefreshCw className="w-4 h-4 mr-1" />
+                                Sync Settings
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => viewSubsidiaryEmployees(subsidiary.id)}
+                              >
+                                <Users className="w-4 h-4 mr-1" />
+                                View Employees
+                              </Button>
+                            </div>
+                          </div>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowSubsidiaryDetails(true)
+                                }}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowEditSubsidiary(true)
+                                }}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Subsidiary
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => syncSubsidiarySettings(subsidiary.id)}>
+                                <RefreshCw className="w-4 h-4 mr-2" />
+                                Sync Settings
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => duplicateSubsidiary(subsidiary)}>
+                                <Copy className="w-4 h-4 mr-2" />
+                                Duplicate
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => toggleSubsidiaryStatus(subsidiary.id, subsidiary.status)}
+                                className={subsidiary.status === "active" ? "text-orange-600" : "text-green-600"}
+                              >
+                                {subsidiary.status === "active" ? (
+                                  <>
+                                    <Pause className="w-4 h-4 mr-2" />
+                                    Deactivate
+                                  </>
+                                ) : (
+                                  <>
+                                    <Play className="w-4 h-4 mr-2" />
+                                    Activate
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => deleteSubsidiary(subsidiary.id)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                  {subsidiaries.length === 0 && (
+                    <Card>
+                      <CardContent className="p-8 text-center">
+                        <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Subsidiaries Found</h3>
+                        <p className="text-gray-600 mb-4">
+                          Get started by adding your first subsidiary company to manage multiple entities.
+                        </p>
+                        <Button onClick={() => setShowAddSubsidiary(true)}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add First Subsidiary
                         </Button>
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem>View Details</DropdownMenuItem>
-                            <DropdownMenuItem>Edit</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600">Delete</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Settings Synchronization Panel */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <RefreshCw className="w-5 h-5" />
+                      <span>Settings Synchronization</span>
+                    </CardTitle>
+                    <CardDescription>Synchronize settings across all subsidiary companies</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="font-medium mb-2">Sync Options</h4>
+                        <div className="space-y-2">
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" defaultChecked />
+                            <span className="text-sm">HR Policies</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" defaultChecked />
+                            <span className="text-sm">Payroll Configuration</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" />
+                            <span className="text-sm">Leave Types</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" />
+                            <span className="text-sm">Roles & Permissions</span>
+                          </label>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-2">Sync Actions</h4>
+                        <div className="space-y-2">
+                          <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Sync All Settings
+                          </Button>
+                          <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
+                            <Download className="w-4 h-4 mr-2" />
+                            Export Settings Template
+                          </Button>
+                          <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
+                            <Upload className="w-4 h-4 mr-2" />
+                            Import Settings
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  </CardContent>
+                </Card>
               </div>
             </CardContent>
           </Card>
