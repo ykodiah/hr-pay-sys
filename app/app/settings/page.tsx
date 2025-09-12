@@ -74,6 +74,7 @@ interface Employee {
 
 interface Subsidiary {
   id: string
+  company_id: string
   name: string
   tax_id: string
   ssnit_number: string
@@ -82,15 +83,17 @@ interface Subsidiary {
   email_address: string
   phone_number: string
   address: string
-  divisions: string[]
-  departments: string[]
-  locations: string[]
+  logo_url?: string
+  divisions: any[] | string[]
+  departments: any[] | string[]
+  locations: any[] | string[]
   created_at?: string
   updated_at?: string
+  // Computed fields for display
   divisions_count?: number
   departments_count?: number
   locations_count?: number
-  company_id?: string
+  employee_count?: number
 }
 
 interface Role {
@@ -261,30 +264,134 @@ const SettingsPage: FunctionComponent = () => {
       setSubsidiaries([
         {
           id: "sub-001",
-          name: "Akwaaba Tech Solutions",
-          email_address: "solutions@akwaaba.com",
-          phone_number: "0244567890",
-          tax_id: "S0012345678",
-          ssnit_number: "0987654321",
-          address: "456 Tech Park, Accra",
+          company_id: "comp-001",
+          name: "Akwaaba Digital Solutions",
+          email_address: "info@akwaabadigital.com",
+          phone_number: "+233 30 276 5432",
+          tax_id: "TIN-ADS-2023-001",
+          ssnit_number: "SSNIT-ADS-789012",
+          address: "15 Liberation Road, Ridge, Accra, Ghana",
           status: "active",
-          industry: "Software Development",
-          divisions: ["Development", "Support"],
-          departments: ["Engineering", "QA", "DevOps"],
-          locations: ["Accra", "Kumasi"],
-          divisions_count: 2,
-          departments_count: 3,
+          industry: "Digital Marketing & Web Development",
+          divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
+          departments: ["Marketing", "Development", "Design", "Sales"],
+          locations: ["Accra - Ridge", "Kumasi Branch"],
+          divisions_count: 3,
+          departments_count: 4,
           locations_count: 2,
+          employee_count: 45,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "sub-002",
+          company_id: "comp-001",
+          name: "Akwaaba Consulting Group",
+          email_address: "consulting@akwaaba.com",
+          phone_number: "+233 30 276 5433",
+          tax_id: "TIN-ACG-2023-002",
+          ssnit_number: "SSNIT-ACG-789013",
+          address: "8 Airport Residential Area, Accra, Ghana",
+          status: "active",
+          industry: "Business Consulting & Strategy",
+          divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
+          departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
+          locations: ["Accra - Airport", "Tema Office"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 2,
+          employee_count: 32,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "sub-003",
+          company_id: "comp-001",
+          name: "Akwaaba Financial Services",
+          email_address: "finance@akwaabafs.com",
+          phone_number: "+233 30 276 5434",
+          tax_id: "TIN-AFS-2023-003",
+          ssnit_number: "SSNIT-AFS-789014",
+          address: "25 Independence Avenue, Accra, Ghana",
+          status: "active",
+          industry: "Financial Technology & Services",
+          divisions: ["Fintech Solutions", "Payment Processing", "Financial Advisory"],
+          departments: ["Finance", "Technology", "Compliance", "Customer Service"],
+          locations: ["Accra - Independence Ave", "Ho Regional Office"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 2,
+          employee_count: 28,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "sub-004",
+          company_id: "comp-001",
+          name: "Akwaaba Logistics Ltd",
+          email_address: "logistics@akwaabalog.com",
+          phone_number: "+233 30 276 5435",
+          tax_id: "TIN-ALL-2023-004",
+          ssnit_number: "SSNIT-ALL-789015",
+          address: "12 Spintex Road, Accra, Ghana",
+          status: "active",
+          industry: "Supply Chain & Logistics",
+          divisions: ["Transportation", "Warehousing", "Supply Chain Management"],
+          departments: ["Operations", "Fleet Management", "Warehousing", "Customer Service"],
+          locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 3,
+          employee_count: 67,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "sub-005",
+          company_id: "comp-001",
+          name: "Akwaaba Training Institute",
+          email_address: "training@akwaabainstitute.com",
+          phone_number: "+233 30 276 5436",
+          tax_id: "TIN-ATI-2023-005",
+          ssnit_number: "SSNIT-ATI-789016",
+          address: "5 Cantonments Road, Accra, Ghana",
+          status: "active",
+          industry: "Education & Professional Training",
+          divisions: ["Corporate Training", "IT Certification", "Professional Development"],
+          departments: ["Training", "Curriculum Development", "Student Services", "Administration"],
+          locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 3,
+          employee_count: 23,
+          created_at: new Date().toISOString(),
         },
       ])
       return
     }
 
     try {
-      const { data, error } = await supabase.from("subsidiaries").select("*").order("created_at", { ascending: false })
+      // Load subsidiaries with employee counts
+      const { data: subsidiariesData, error: subsidiariesError } = await supabase
+        .from("subsidiaries")
+        .select(`
+          *,
+          employees:employees(count)
+        `)
+        .order("created_at", { ascending: false })
 
-      if (error) throw error
-      setSubsidiaries(data || [])
+      if (subsidiariesError) throw subsidiariesError
+
+      // Process the data to add computed fields
+      const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => ({
+        ...sub,
+        divisions: Array.isArray(sub.divisions) ? sub.divisions : [],
+        departments: Array.isArray(sub.departments) ? sub.departments : [],
+        locations: Array.isArray(sub.locations) ? sub.locations : [],
+        divisions_count: Array.isArray(sub.divisions) ? sub.divisions.length : 0,
+        departments_count: Array.isArray(sub.departments) ? sub.departments.length : 0,
+        locations_count: Array.isArray(sub.locations) ? sub.locations.length : 0,
+        employee_count: sub.employees?.[0]?.count || 0,
+      }))
+
+      setSubsidiaries(processedSubsidiaries)
+      console.log("[v0] Loaded subsidiaries:", processedSubsidiaries.length)
     } catch (error) {
       console.error("Subsidiaries loading error:", error)
       toast({
@@ -396,21 +503,34 @@ const SettingsPage: FunctionComponent = () => {
     window.open(`/app/employees?subsidiary=${subsidiaryId}`, "_blank")
   }
 
-  const duplicateSubsidiary = async (subsidiary: Subsidiary) => {
-    console.log("[v0] Duplicating subsidiary:", subsidiary.name)
+  const addNewSubsidiary = async (subsidiaryData: Partial<Subsidiary>) => {
+    console.log("[v0] Adding new subsidiary:", subsidiaryData)
 
     if (isDemoMode()) {
-      const newSubsidiary = {
-        ...subsidiary,
+      const newSubsidiary: Subsidiary = {
         id: `sub-${Date.now()}`,
-        name: `${subsidiary.name} (Copy)`,
-        tax_id: `${subsidiary.tax_id}-COPY`,
+        company_id: "comp-001",
+        name: subsidiaryData.name || "New Subsidiary",
+        tax_id: subsidiaryData.tax_id || `TIN-${Date.now()}`,
+        ssnit_number: subsidiaryData.ssnit_number || `SSNIT-${Date.now()}`,
+        address: subsidiaryData.address || "",
+        phone_number: subsidiaryData.phone_number || "",
+        email_address: subsidiaryData.email_address || "",
+        status: "active",
+        industry: subsidiaryData.industry || "",
+        divisions: subsidiaryData.divisions || [],
+        departments: subsidiaryData.departments || [],
+        locations: subsidiaryData.locations || [],
+        divisions_count: 0,
+        departments_count: 0,
+        locations_count: 0,
+        employee_count: 0,
         created_at: new Date().toISOString(),
       }
-      setSubsidiaries((prev) => [...prev, newSubsidiary])
+      setSubsidiaries((prev) => [newSubsidiary, ...prev])
       toast({
-        title: "Subsidiary Duplicated",
-        description: `${subsidiary.name} has been duplicated successfully (Demo Mode)`,
+        title: "Subsidiary Added",
+        description: "New subsidiary created successfully (Demo Mode)",
       })
       return
     }
@@ -418,49 +538,53 @@ const SettingsPage: FunctionComponent = () => {
     try {
       const { data, error } = await supabase
         .from("subsidiaries")
-        .insert({
-          company_id: subsidiary.company_id,
-          name: `${subsidiary.name} (Copy)`,
-          tax_id: `${subsidiary.tax_id}-COPY`,
-          ssnit_number: subsidiary.ssnit_number,
-          industry: subsidiary.industry,
-          address: subsidiary.address,
-          phone_number: subsidiary.phone_number,
-          email_address: subsidiary.email_address,
-          status: "inactive",
-          divisions: subsidiary.divisions,
-          departments: subsidiary.departments,
-          locations: subsidiary.locations,
-        })
+        .insert([
+          {
+            company_id: companyData?.id,
+            name: subsidiaryData.name,
+            tax_id: subsidiaryData.tax_id,
+            ssnit_number: subsidiaryData.ssnit_number,
+            address: subsidiaryData.address,
+            phone_number: subsidiaryData.phone_number,
+            email_address: subsidiaryData.email_address,
+            industry: subsidiaryData.industry,
+            status: "active",
+            divisions: subsidiaryData.divisions || [],
+            departments: subsidiaryData.departments || [],
+            locations: subsidiaryData.locations || [],
+          },
+        ])
         .select()
-        .single()
 
       if (error) throw error
 
-      setSubsidiaries((prev) => [...prev, data])
+      await loadSubsidiaries() // Reload the list
       toast({
-        title: "Subsidiary Duplicated",
-        description: `${subsidiary.name} has been duplicated successfully`,
+        title: "Subsidiary Added",
+        description: "New subsidiary created successfully",
       })
     } catch (error) {
-      console.error("Subsidiary duplication error:", error)
+      console.error("Add subsidiary error:", error)
       toast({
         title: "Error",
-        description: "Failed to duplicate subsidiary",
+        description: "Failed to add subsidiary",
         variant: "destructive",
       })
     }
   }
 
-  const toggleSubsidiaryStatus = async (subsidiaryId: string, currentStatus: string) => {
-    const newStatus = currentStatus === "active" ? "inactive" : "active"
-    console.log("[v0] Toggling subsidiary status:", subsidiaryId, "to", newStatus)
+  const updateSubsidiary = async (subsidiaryId: string, updates: Partial<Subsidiary>) => {
+    console.log("[v0] Updating subsidiary:", subsidiaryId, updates)
 
     if (isDemoMode()) {
-      setSubsidiaries((prev) => prev.map((s) => (s.id === subsidiaryId ? { ...s, status: newStatus } : s)))
+      setSubsidiaries((prev) =>
+        prev.map((sub) =>
+          sub.id === subsidiaryId ? { ...sub, ...updates, updated_at: new Date().toISOString() } : sub,
+        ),
+      )
       toast({
-        title: "Status Updated",
-        description: `Subsidiary status changed to ${newStatus} (Demo Mode)`,
+        title: "Subsidiary Updated",
+        description: "Subsidiary information updated successfully (Demo Mode)",
       })
       return
     }
@@ -469,27 +593,46 @@ const SettingsPage: FunctionComponent = () => {
       const { error } = await supabase
         .from("subsidiaries")
         .update({
-          status: newStatus,
+          ...updates,
           updated_at: new Date().toISOString(),
         })
         .eq("id", subsidiaryId)
 
       if (error) throw error
 
-      setSubsidiaries((prev) => prev.map((s) => (s.id === subsidiaryId ? { ...s, status: newStatus } : s)))
-
+      await loadSubsidiaries() // Reload the list
       toast({
-        title: "Status Updated",
-        description: `Subsidiary status changed to ${newStatus}`,
+        title: "Subsidiary Updated",
+        description: "Subsidiary information updated successfully",
       })
     } catch (error) {
-      console.error("Status update error:", error)
+      console.error("Update subsidiary error:", error)
       toast({
         title: "Error",
-        description: "Failed to update subsidiary status",
+        description: "Failed to update subsidiary",
         variant: "destructive",
       })
     }
+  }
+
+  const toggleSubsidiaryStatus = async (subsidiaryId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active"
+    await updateSubsidiary(subsidiaryId, { status: newStatus })
+  }
+
+  const duplicateSubsidiary = async (subsidiary: Subsidiary) => {
+    const duplicatedData = {
+      ...subsidiary,
+      name: `${subsidiary.name} (Copy)`,
+      tax_id: `${subsidiary.tax_id}-COPY`,
+      ssnit_number: `${subsidiary.ssnit_number}-COPY`,
+    }
+    delete duplicatedData.id
+    delete duplicatedData.company_id
+    delete duplicatedData.created_at
+    delete duplicatedData.updated_at
+
+    await addNewSubsidiary(duplicatedData)
   }
 
   const deleteSubsidiary = async (subsidiaryId: string) => {
