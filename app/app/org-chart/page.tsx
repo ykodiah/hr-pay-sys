@@ -596,7 +596,9 @@ export default function OrganizationalChartPage() {
 
       setShowPreview(false)
       setPreviewChart(null)
-      loadData()
+      if (!isDemoMode) {
+        loadData()
+      }
     } catch (error) {
       console.error("Error saving chart:", error)
       toast({
@@ -645,7 +647,9 @@ export default function OrganizationalChartPage() {
         description: "The organizational chart has been activated successfully!",
       })
 
-      loadData()
+      if (!isDemoMode) {
+        loadData()
+      }
     } catch (error) {
       console.error("Error activating chart:", error)
       toast({
