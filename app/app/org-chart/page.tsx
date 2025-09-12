@@ -51,13 +51,114 @@ export default function OrganizationalChartPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [previewChart, setPreviewChart] = useState<any>(null)
   const [showPreview, setShowPreview] = useState(false)
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   useEffect(() => {
-    loadData()
+    checkDemoMode()
   }, [])
+
+  const checkDemoMode = () => {
+    if (typeof window !== "undefined") {
+      const demoSession = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("demo-session="))
+        ?.split("=")[1]
+
+      const isDemo = demoSession === "active"
+      setIsDemoMode(isDemo)
+      console.log("[v0] Demo mode detected:", isDemo)
+
+      if (isDemo) {
+        loadMockData()
+      } else {
+        loadData()
+      }
+    }
+  }
+
+  const loadMockData = () => {
+    console.log("[v0] Demo mode detected, using mock org chart data")
+
+    const mockEmployees: Employee[] = [
+      {
+        id: "emp-001",
+        employee_id: "EMP001",
+        full_name: "Kwame Asante",
+        position: "Chief Executive Officer",
+        department: "Executive",
+        head_of_department: "true",
+      },
+      {
+        id: "emp-002",
+        employee_id: "EMP002",
+        full_name: "Ama Osei",
+        position: "Chief Technology Officer",
+        department: "Technology",
+        direct_supervisor: "emp-001",
+        head_of_department: "true",
+      },
+      {
+        id: "emp-003",
+        employee_id: "EMP003",
+        full_name: "Kofi Mensah",
+        position: "HR Director",
+        department: "Human Resources",
+        direct_supervisor: "emp-001",
+        head_of_department: "true",
+      },
+      {
+        id: "emp-004",
+        employee_id: "EMP004",
+        full_name: "Akosua Boateng",
+        position: "Senior Developer",
+        department: "Technology",
+        direct_supervisor: "emp-002",
+      },
+      {
+        id: "emp-005",
+        employee_id: "EMP005",
+        full_name: "Yaw Appiah",
+        position: "HR Manager",
+        department: "Human Resources",
+        direct_supervisor: "emp-003",
+      },
+    ]
+
+    const mockSubsidiaries = [
+      {
+        id: "sub-001",
+        name: "Akwaaba Tech Ghana",
+        status: "active",
+      },
+      {
+        id: "sub-002",
+        name: "Akwaaba Tech Nigeria",
+        status: "active",
+      },
+    ]
+
+    const mockOrgCharts: OrgChart[] = [
+      {
+        id: "chart-001",
+        name: "Company Organizational Chart 2024",
+        description: "Main company organizational structure",
+        chart_type: "hierarchical",
+        chart_style: "modern",
+        company_id: "00000000-0000-0000-0000-000000000001",
+        chart_data: { nodes: mockEmployees, edges: [] },
+        is_active: true,
+        created_at: new Date().toISOString(),
+      },
+    ]
+
+    setEmployees(mockEmployees)
+    setSubsidiaries(mockSubsidiaries)
+    setOrgCharts(mockOrgCharts)
+  }
 
   const loadData = async () => {
     try {
+      console.log("[v0] Loading real data from database")
       const supabase = createClient()
 
       // Load employees
@@ -146,7 +247,6 @@ export default function OrganizationalChartPage() {
   }
 
   const generateChartStructure = async (employees: Employee[], type: string, style: string) => {
-    // AI/ML logic for generating optimal organizational structure
     const structure: any = {
       type,
       style,
@@ -155,11 +255,9 @@ export default function OrganizationalChartPage() {
       layout: {},
     }
 
-    // Group employees by department and hierarchy
     const departments = [...new Set(employees.map((emp) => emp.department))]
     const hierarchy: any = {}
 
-    // Build hierarchy structure
     employees.forEach((emp) => {
       if (!hierarchy[emp.department]) {
         hierarchy[emp.department] = {
@@ -179,10 +277,8 @@ export default function OrganizationalChartPage() {
       }
     })
 
-    // Generate nodes and edges based on chart type
     let nodeId = 0
     Object.values(hierarchy).forEach((dept: any) => {
-      // Add department head
       if (dept.head) {
         structure.nodes.push({
           id: `node-${nodeId++}`,
@@ -193,12 +289,11 @@ export default function OrganizationalChartPage() {
             type: "head",
             employee_id: dept.head.id,
           },
-          position: { x: 0, y: 0 }, // Will be calculated by layout algorithm
+          position: { x: 0, y: 0 },
           style: getNodeStyle(style, "head"),
         })
       }
 
-      // Add supervisors
       dept.supervisors.forEach((supervisor: Employee) => {
         structure.nodes.push({
           id: `node-${nodeId++}`,
@@ -214,7 +309,6 @@ export default function OrganizationalChartPage() {
         })
       })
 
-      // Add regular employees
       dept.employees.forEach((employee: Employee) => {
         structure.nodes.push({
           id: `node-${nodeId++}`,
@@ -231,7 +325,6 @@ export default function OrganizationalChartPage() {
       })
     })
 
-    // Generate edges based on reporting relationships
     structure.nodes.forEach((node: any) => {
       const employee = employees.find((emp) => emp.id === node.data.employee_id)
       if (employee?.direct_supervisor) {
@@ -247,7 +340,6 @@ export default function OrganizationalChartPage() {
       }
     })
 
-    // Apply layout algorithm
     structure.layout = calculateLayout(structure.nodes, structure.edges, type)
 
     return structure
@@ -414,10 +506,8 @@ export default function OrganizationalChartPage() {
   }
 
   const calculateLayout = (nodes: any[], edges: any[], type: string) => {
-    // Simple layout calculation - in a real implementation, you'd use a proper graph layout library
     const layout = { algorithm: type, spacing: { x: 200, y: 150 } }
 
-    // Apply positions based on hierarchy
     nodes.forEach((node, index) => {
       const row = Math.floor(index / 3)
       const col = index % 3
@@ -452,6 +542,15 @@ export default function OrganizationalChartPage() {
   const saveChart = async () => {
     if (!previewChart) return
 
+    if (isDemoMode) {
+      toast({
+        title: "Demo Mode",
+        description: "Chart saving is not available in demo mode. Please sign up for full access.",
+        variant: "default",
+      })
+      return
+    }
+
     try {
       const supabase = createClient()
 
@@ -477,7 +576,7 @@ export default function OrganizationalChartPage() {
           description: previewChart.description,
           chart_type: previewChart.chart_type,
           chart_style: previewChart.chart_style,
-          company_id: "00000000-0000-0000-0000-000000000001", // Main company ID
+          company_id: "00000000-0000-0000-0000-000000000001",
           subsidiary_id: previewChart.subsidiary_id,
           chart_data: previewChart.chart_data,
           preview_image: previewChart.preview_image,
@@ -497,7 +596,7 @@ export default function OrganizationalChartPage() {
 
       setShowPreview(false)
       setPreviewChart(null)
-      loadData() // Reload to show the new chart
+      loadData()
     } catch (error) {
       console.error("Error saving chart:", error)
       toast({
@@ -509,6 +608,15 @@ export default function OrganizationalChartPage() {
   }
 
   const activateChart = async (chartId: string) => {
+    if (isDemoMode) {
+      toast({
+        title: "Demo Mode",
+        description: "Chart activation is not available in demo mode. Please sign up for full access.",
+        variant: "default",
+      })
+      return
+    }
+
     try {
       const supabase = createClient()
 
@@ -526,10 +634,8 @@ export default function OrganizationalChartPage() {
         return
       }
 
-      // Deactivate all other charts
       await supabase.from("organizational_charts").update({ is_active: false }).neq("id", chartId)
 
-      // Activate selected chart
       const { error } = await supabase.from("organizational_charts").update({ is_active: true }).eq("id", chartId)
 
       if (error) throw error
@@ -721,7 +827,6 @@ export default function OrganizationalChartPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
