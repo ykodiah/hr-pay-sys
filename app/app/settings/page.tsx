@@ -687,6 +687,104 @@ const SettingsPage: FunctionComponent = () => {
     }
   }
 
+  const handleManageLeaveTypes = () => {
+    toast({
+      title: "Leave Types Management",
+      description: "Opening leave types configuration...",
+    })
+  }
+
+  const handleManageAllowances = () => {
+    toast({
+      title: "Allowances Management",
+      description: "Opening allowances configuration...",
+    })
+  }
+
+  const handleManageDeductions = () => {
+    toast({
+      title: "Deductions Management",
+      description: "Opening deductions configuration...",
+    })
+  }
+
+  const handleManageSalaryGrades = () => {
+    toast({
+      title: "Salary Grades Management",
+      description: "Opening salary grades configuration...",
+    })
+  }
+
+  const handleAddEmailTemplate = () => {
+    toast({
+      title: "Add Email Template",
+      description: "Opening email template editor...",
+    })
+  }
+
+  const handleEditEmailTemplate = (templateName: string) => {
+    toast({
+      title: "Edit Email Template",
+      description: `Editing ${templateName} template...`,
+    })
+  }
+
+  const handleAddRole = () => {
+    toast({
+      title: "Add Role",
+      description: "Opening role creation form...",
+    })
+  }
+
+  const handleEditRole = (roleName: string) => {
+    toast({
+      title: "Edit Role",
+      description: `Editing ${roleName} role...`,
+    })
+  }
+
+  const handleBackupNow = async () => {
+    setIsBackingUp(true)
+    try {
+      // Simulate backup process
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      setLastBackupTime(new Date().toISOString())
+      toast({
+        title: "Backup Completed",
+        description: "System backup completed successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Backup Failed",
+        description: "Failed to complete system backup.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsBackingUp(false)
+    }
+  }
+
+  const handleSyncAllSettings = () => {
+    toast({
+      title: "Syncing Settings",
+      description: "Synchronizing settings across all subsidiaries...",
+    })
+  }
+
+  const handleExportSettingsTemplate = () => {
+    toast({
+      title: "Exporting Template",
+      description: "Downloading settings template...",
+    })
+  }
+
+  const handleImportSettings = () => {
+    toast({
+      title: "Import Settings",
+      description: "Opening settings import dialog...",
+    })
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1133,15 +1231,30 @@ const SettingsPage: FunctionComponent = () => {
                       <div>
                         <h4 className="font-medium mb-2">Sync Actions</h4>
                         <div className="space-y-2">
-                          <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={handleSyncAllSettings}
+                          >
                             <RefreshCw className="w-4 h-4 mr-2" />
                             Sync All Settings
                           </Button>
-                          <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={handleExportSettingsTemplate}
+                          >
                             <Download className="w-4 h-4 mr-2" />
                             Export Settings Template
                           </Button>
-                          <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={handleImportSettings}
+                          >
                             <Upload className="w-4 h-4 mr-2" />
                             Import Settings
                           </Button>
@@ -1183,7 +1296,7 @@ const SettingsPage: FunctionComponent = () => {
                       <span className="text-sm text-gray-600">84 days</span>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={handleManageLeaveTypes}>
                     Manage Leave Types
                   </Button>
                 </div>
@@ -1238,7 +1351,7 @@ const SettingsPage: FunctionComponent = () => {
                       <span className="text-sm text-gray-600">₵150.00</span>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={handleManageAllowances}>
                     Manage Allowances
                   </Button>
                 </div>
@@ -1259,7 +1372,7 @@ const SettingsPage: FunctionComponent = () => {
                       <span className="text-sm text-gray-600">₵500.00</span>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={handleManageDeductions}>
                     Manage Deductions
                   </Button>
                 </div>
@@ -1307,7 +1420,7 @@ const SettingsPage: FunctionComponent = () => {
                     </tbody>
                   </table>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={handleManageSalaryGrades}>
                   Manage Salary Grades
                 </Button>
               </div>
@@ -1334,7 +1447,7 @@ const SettingsPage: FunctionComponent = () => {
                       <span className="font-medium">Welcome Email</span>
                       <p className="text-sm text-gray-600">Welcome to Akwaaba Technologies</p>
                     </div>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Welcome Email")}>
                       <Edit className="h-4 w-4" />
                     </Button>
                   </div>
@@ -1343,7 +1456,7 @@ const SettingsPage: FunctionComponent = () => {
                       <span className="font-medium">Leave Approval</span>
                       <p className="text-sm text-gray-600">Leave Request Approved</p>
                     </div>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Leave Approval")}>
                       <Edit className="h-4 w-4" />
                     </Button>
                   </div>
@@ -1352,12 +1465,12 @@ const SettingsPage: FunctionComponent = () => {
                       <span className="font-medium">Payroll Notification</span>
                       <p className="text-sm text-gray-600">Payroll Processed</p>
                     </div>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Payroll Notification")}>
                       <Edit className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={handleAddEmailTemplate}>
                   Add Email Template
                 </Button>
               </div>
@@ -1398,7 +1511,7 @@ const SettingsPage: FunctionComponent = () => {
                   <Shield className="w-5 h-5" />
                   <span>Role Management</span>
                 </div>
-                <Button>Add Role</Button>
+                <Button onClick={handleAddRole}>Add Role</Button>
               </CardTitle>
               <CardDescription>Manage user roles and permissions</CardDescription>
             </CardHeader>
@@ -1413,7 +1526,7 @@ const SettingsPage: FunctionComponent = () => {
                         <p className="text-sm text-gray-500">{role.user_count} users assigned</p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => handleEditRole(role.name)}>
                           <Edit className="h-4 w-4" />
                         </Button>
                         <DropdownMenu>
@@ -1582,7 +1695,7 @@ const SettingsPage: FunctionComponent = () => {
                     </p>
                   </div>
                   <Button
-                    onClick={() => setIsBackingUp(true)}
+                    onClick={handleBackupNow}
                     disabled={isBackingUp}
                     className="bg-emerald-600 hover:bg-emerald-700"
                   >
