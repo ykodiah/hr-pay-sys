@@ -94,6 +94,12 @@ interface Subsidiary {
   departments_count?: number
   locations_count?: number
   employee_count?: number
+  legal_name?: string
+  city?: string
+  region?: string
+  country?: string
+  phone?: string
+  website?: string
 }
 
 interface Role {
@@ -499,8 +505,18 @@ const SettingsPage: FunctionComponent = () => {
 
   const viewSubsidiaryEmployees = (subsidiaryId: string) => {
     console.log("[v0] Viewing employees for subsidiary:", subsidiaryId)
-    // Navigate to employees page filtered by subsidiary
-    window.open(`/app/employees?subsidiary=${subsidiaryId}`, "_blank")
+
+    if (isDemoMode()) {
+      toast({
+        title: "Employee View",
+        description: "Redirecting to employee management (Demo Mode)",
+      })
+      // In demo mode, just show a toast
+      return
+    }
+
+    // In real implementation, redirect to employees page with subsidiary filter
+    window.location.href = `/app/employees?subsidiary=${subsidiaryId}`
   }
 
   const addNewSubsidiary = async (subsidiaryData: Partial<Subsidiary>) => {
@@ -1588,6 +1604,516 @@ const SettingsPage: FunctionComponent = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {showAddSubsidiary && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Add New Subsidiary</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowAddSubsidiary(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const formData = new FormData(e.target as HTMLFormElement)
+                const subsidiaryData = {
+                  name: formData.get("name") as string,
+                  legal_name: formData.get("legal_name") as string,
+                  tax_id: formData.get("tax_id") as string,
+                  ssnit_number: formData.get("ssnit_number") as string,
+                  address: formData.get("address") as string,
+                  city: formData.get("city") as string,
+                  region: formData.get("region") as string,
+                  country: formData.get("country") as string,
+                  phone: formData.get("phone") as string,
+                  email: formData.get("email") as string,
+                  website: formData.get("website") as string,
+                  industry: formData.get("industry") as string,
+                  status: "active",
+                }
+                addNewSubsidiary(subsidiaryData)
+                setShowAddSubsidiary(false)
+              }}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Company Name *</label>
+                  <input
+                    name="name"
+                    type="text"
+                    required
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter company name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Legal Name *</label>
+                  <input
+                    name="legal_name"
+                    type="text"
+                    required
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter legal name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tax ID *</label>
+                  <input
+                    name="tax_id"
+                    type="text"
+                    required
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter tax ID"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">SSNIT Number</label>
+                  <input
+                    name="ssnit_number"
+                    type="text"
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter SSNIT number"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Address</label>
+                  <input
+                    name="address"
+                    type="text"
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter address"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">City</label>
+                  <input name="city" type="text" className="w-full p-2 border rounded-md" placeholder="Enter city" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Region</label>
+                  <input
+                    name="region"
+                    type="text"
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter region"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Country</label>
+                  <input
+                    name="country"
+                    type="text"
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter country"
+                    defaultValue="Ghana"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Phone</label>
+                  <input
+                    name="phone"
+                    type="tel"
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter phone number"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email</label>
+                  <input name="email" type="email" className="w-full p-2 border rounded-md" placeholder="Enter email" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Website</label>
+                  <input
+                    name="website"
+                    type="url"
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter website URL"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Industry</label>
+                  <select name="industry" className="w-full p-2 border rounded-md">
+                    <option value="">Select industry</option>
+                    <option value="Technology">Technology</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Healthcare">Healthcare</option>
+                    <option value="Manufacturing">Manufacturing</option>
+                    <option value="Retail">Retail</option>
+                    <option value="Education">Education</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 mt-6">
+                <Button type="button" variant="outline" onClick={() => setShowAddSubsidiary(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">Add Subsidiary</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showEditSubsidiary && selectedSubsidiary && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Edit Subsidiary</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowEditSubsidiary(false)
+                  setSelectedSubsidiary(null)
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const formData = new FormData(e.target as HTMLFormElement)
+                const subsidiaryData = {
+                  name: formData.get("name") as string,
+                  legal_name: formData.get("legal_name") as string,
+                  tax_id: formData.get("tax_id") as string,
+                  ssnit_number: formData.get("ssnit_number") as string,
+                  address: formData.get("address") as string,
+                  city: formData.get("city") as string,
+                  region: formData.get("region") as string,
+                  country: formData.get("country") as string,
+                  phone: formData.get("phone") as string,
+                  email: formData.get("email") as string,
+                  website: formData.get("website") as string,
+                  industry: formData.get("industry") as string,
+                }
+                updateSubsidiary(selectedSubsidiary.id, subsidiaryData)
+                setShowEditSubsidiary(false)
+                setSelectedSubsidiary(null)
+              }}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Company Name *</label>
+                  <input
+                    name="name"
+                    type="text"
+                    required
+                    defaultValue={selectedSubsidiary.name}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter company name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Legal Name *</label>
+                  <input
+                    name="legal_name"
+                    type="text"
+                    required
+                    defaultValue={selectedSubsidiary.legal_name}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter legal name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tax ID *</label>
+                  <input
+                    name="tax_id"
+                    type="text"
+                    required
+                    defaultValue={selectedSubsidiary.tax_id}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter tax ID"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">SSNIT Number</label>
+                  <input
+                    name="ssnit_number"
+                    type="text"
+                    defaultValue={selectedSubsidiary.ssnit_number || ""}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter SSNIT number"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Address</label>
+                  <input
+                    name="address"
+                    type="text"
+                    defaultValue={selectedSubsidiary.address || ""}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter address"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">City</label>
+                  <input
+                    name="city"
+                    type="text"
+                    defaultValue={selectedSubsidiary.city || ""}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter city"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Region</label>
+                  <input
+                    name="region"
+                    type="text"
+                    defaultValue={selectedSubsidiary.region || ""}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter region"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Country</label>
+                  <input
+                    name="country"
+                    type="text"
+                    defaultValue={selectedSubsidiary.country || "Ghana"}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter country"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Phone</label>
+                  <input
+                    name="phone"
+                    type="tel"
+                    defaultValue={selectedSubsidiary.phone || ""}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter phone number"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email</label>
+                  <input
+                    name="email"
+                    type="email"
+                    defaultValue={selectedSubsidiary.email || ""}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter email"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Website</label>
+                  <input
+                    name="website"
+                    type="url"
+                    defaultValue={selectedSubsidiary.website || ""}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter website URL"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Industry</label>
+                  <select
+                    name="industry"
+                    defaultValue={selectedSubsidiary.industry || ""}
+                    className="w-full p-2 border rounded-md"
+                  >
+                    <option value="">Select industry</option>
+                    <option value="Technology">Technology</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Healthcare">Healthcare</option>
+                    <option value="Manufacturing">Manufacturing</option>
+                    <option value="Retail">Retail</option>
+                    <option value="Education">Education</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 mt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowEditSubsidiary(false)
+                    setSelectedSubsidiary(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">Update Subsidiary</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showSubsidiaryDetails && selectedSubsidiary && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Subsidiary Details</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowSubsidiaryDetails(false)
+                  setSelectedSubsidiary(null)
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Company Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Company Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Company Name</label>
+                    <p className="text-sm">{selectedSubsidiary.name}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Legal Name</label>
+                    <p className="text-sm">{selectedSubsidiary.legal_name}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Tax ID</label>
+                    <p className="text-sm">{selectedSubsidiary.tax_id}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">SSNIT Number</label>
+                    <p className="text-sm">{selectedSubsidiary.ssnit_number || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Industry</label>
+                    <p className="text-sm">{selectedSubsidiary.industry || "Not specified"}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Status</label>
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                        selectedSubsidiary.status === "active"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {selectedSubsidiary.status}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Contact Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Contact Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Address</label>
+                    <p className="text-sm">{selectedSubsidiary.address || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">City</label>
+                    <p className="text-sm">{selectedSubsidiary.city || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Region</label>
+                    <p className="text-sm">{selectedSubsidiary.region || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Country</label>
+                    <p className="text-sm">{selectedSubsidiary.country || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Phone</label>
+                    <p className="text-sm">{selectedSubsidiary.phone || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Email</label>
+                    <p className="text-sm">{selectedSubsidiary.email || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Website</label>
+                    <p className="text-sm">
+                      {selectedSubsidiary.website ? (
+                        <a
+                          href={selectedSubsidiary.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {selectedSubsidiary.website}
+                        </a>
+                      ) : (
+                        "Not provided"
+                      )}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Statistics */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">Organization Statistics</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">{selectedSubsidiary.employee_count || 0}</div>
+                      <div className="text-sm text-gray-600">Employees</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">{selectedSubsidiary.divisions_count || 0}</div>
+                      <div className="text-sm text-gray-600">Divisions</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-600">
+                        {selectedSubsidiary.departments_count || 0}
+                      </div>
+                      <div className="text-sm text-gray-600">Departments</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-600">
+                        {selectedSubsidiary.locations_count || 0}
+                      </div>
+                      <div className="text-sm text-gray-600">Locations</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="flex justify-end space-x-2 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowSubsidiaryDetails(false)
+                  setSelectedSubsidiary(null)
+                  setShowEditSubsidiary(true)
+                }}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowSubsidiaryDetails(false)
+                  setSelectedSubsidiary(null)
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
