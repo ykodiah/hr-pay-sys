@@ -29,6 +29,7 @@ import {
   Play,
   Download,
   Upload,
+  ImageIcon,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -154,6 +155,56 @@ const SettingsPage: FunctionComponent = () => {
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<boolean>(false)
   const [showReactivateConfirm, setShowReactivateConfirm] = useState<boolean>(false)
   const [subsidiaryToToggle, setSubsidiaryToToggle] = useState<Subsidiary | null>(null)
+
+  const [companyLogoPreview, setCompanyLogoPreview] = useState<string>("")
+  const [subsidiaryLogoPreview, setSubsidiaryLogoPreview] = useState<string>("")
+  const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false)
+
+  // Logo upload function
+  const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
+    if (!file) return
+
+    setIsUploadingLogo(true)
+    try {
+      // Create form data for blob upload
+      const formData = new FormData()
+      formData.append("file", file)
+
+      // Upload to Vercel Blob
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error("Upload failed")
+      }
+
+      const { url } = await response.json()
+
+      // Set preview based on type
+      if (type === "company") {
+        setCompanyLogoPreview(url)
+        setCompanyData({ ...companyData, logo_url: url })
+      } else {
+        setSubsidiaryLogoPreview(url)
+      }
+
+      toast({
+        title: "Logo uploaded successfully",
+        description: "Your logo has been uploaded and is ready to use.",
+      })
+    } catch (error) {
+      console.error("Logo upload error:", error)
+      toast({
+        title: "Upload failed",
+        description: "There was an error uploading your logo. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingLogo(false)
+    }
+  }
 
   // Load functions
   const loadCompanyData = async () => {
@@ -586,6 +637,7 @@ const SettingsPage: FunctionComponent = () => {
             divisions: subsidiaryData.divisions || [],
             departments: subsidiaryData.departments || [],
             locations: subsidiaryData.locations || [],
+            logo_url: subsidiaryData.logo_url,
           },
         ])
         .select()
@@ -854,6 +906,69 @@ const SettingsPage: FunctionComponent = () => {
               <CardDescription>Manage your company information and organizational structure</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <Label>Company Logo</Label>
+                <div className="flex items-center space-x-4">
+                  {companyLogoPreview || companyData.logo_url ? (
+                    <div className="relative">
+                      <img
+                        src={companyLogoPreview || companyData.logo_url}
+                        alt="Company Logo"
+                        className="w-20 h-20 object-cover rounded-lg border"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                        onClick={() => {
+                          setCompanyLogoPreview("")
+                          setCompanyData({ ...companyData, logo_url: "" })
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                      <ImageIcon className="w-8 h-8 text-gray-400" />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleLogoUpload(file, "company")
+                        }
+                      }}
+                      className="hidden"
+                      id="company-logo-upload"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => document.getElementById("company-logo-upload")?.click()}
+                      disabled={isUploadingLogo}
+                      className="flex items-center space-x-2"
+                    >
+                      {isUploadingLogo ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" />
+                          <span>Upload Logo</span>
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Label htmlFor="companyName">Company Name</Label>
@@ -1752,7 +1867,14 @@ const SettingsPage: FunctionComponent = () => {
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Add New Subsidiary</h2>
-              <Button variant="ghost" size="sm" onClick={() => setShowAddSubsidiary(false)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowAddSubsidiary(false)
+                  setSubsidiaryLogoPreview("")
+                }}
+              >
                 <X className="w-4 h-4" />
               </Button>
             </div>
@@ -1775,11 +1897,84 @@ const SettingsPage: FunctionComponent = () => {
                   website: formData.get("website") as string,
                   industry: formData.get("industry") as string,
                   status: "active",
+                  logo_url: subsidiaryLogoPreview,
+                  departments: formData.get("departments")
+                    ? (formData.get("departments") as string).split(",").map((d) => d.trim())
+                    : [],
+                  divisions: formData.get("divisions")
+                    ? (formData.get("divisions") as string).split(",").map((d) => d.trim())
+                    : [],
+                  locations: formData.get("locations")
+                    ? (formData.get("locations") as string).split(",").map((l) => l.trim())
+                    : [],
                 }
                 addNewSubsidiary(subsidiaryData)
                 setShowAddSubsidiary(false)
+                setSubsidiaryLogoPreview("")
               }}
             >
+              <div className="mb-6">
+                <label className="block text-sm font-medium mb-2">Company Logo</label>
+                <div className="flex items-center space-x-4">
+                  {subsidiaryLogoPreview ? (
+                    <div className="relative">
+                      <img
+                        src={subsidiaryLogoPreview || "/placeholder.svg"}
+                        alt="Subsidiary Logo"
+                        className="w-16 h-16 object-cover rounded-lg border"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                        onClick={() => setSubsidiaryLogoPreview("")}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                      <ImageIcon className="w-6 h-6 text-gray-400" />
+                    </div>
+                  )}
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleLogoUpload(file, "subsidiary")
+                        }
+                      }}
+                      className="hidden"
+                      id="subsidiary-logo-upload"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => document.getElementById("subsidiary-logo-upload")?.click()}
+                      disabled={isUploadingLogo}
+                      className="flex items-center space-x-2"
+                    >
+                      {isUploadingLogo ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3 h-3" />
+                          <span>Upload</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Company Name *</label>
@@ -1938,6 +2133,7 @@ const SettingsPage: FunctionComponent = () => {
                 onClick={() => {
                   setShowEditSubsidiary(false)
                   setSelectedSubsidiary(null)
+                  setSubsidiaryLogoPreview("")
                 }}
               >
                 <X className="w-4 h-4" />
@@ -1961,12 +2157,85 @@ const SettingsPage: FunctionComponent = () => {
                   email: formData.get("email") as string,
                   website: formData.get("website") as string,
                   industry: formData.get("industry") as string,
+                  departments: formData.get("departments")
+                    ? (formData.get("departments") as string).split(",").map((d) => d.trim())
+                    : [],
+                  divisions: formData.get("divisions")
+                    ? (formData.get("divisions") as string).split(",").map((d) => d.trim())
+                    : [],
+                  locations: formData.get("locations")
+                    ? (formData.get("locations") as string).split(",").map((l) => l.trim())
+                    : [],
+                  logo_url: subsidiaryLogoPreview || selectedSubsidiary.logo_url,
                 }
                 updateSubsidiary(selectedSubsidiary.id, subsidiaryData)
                 setShowEditSubsidiary(false)
                 setSelectedSubsidiary(null)
+                setSubsidiaryLogoPreview("")
               }}
             >
+              <div className="mb-6">
+                <label className="block text-sm font-medium mb-2">Company Logo</label>
+                <div className="flex items-center space-x-4">
+                  {subsidiaryLogoPreview || selectedSubsidiary.logo_url ? (
+                    <div className="relative">
+                      <img
+                        src={subsidiaryLogoPreview || selectedSubsidiary.logo_url}
+                        alt="Subsidiary Logo"
+                        className="w-16 h-16 object-cover rounded-lg border"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                        onClick={() => setSubsidiaryLogoPreview("")}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                      <ImageIcon className="w-6 h-6 text-gray-400" />
+                    </div>
+                  )}
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleLogoUpload(file, "subsidiary")
+                        }
+                      }}
+                      className="hidden"
+                      id="edit-subsidiary-logo-upload"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => document.getElementById("edit-subsidiary-logo-upload")?.click()}
+                      disabled={isUploadingLogo}
+                      className="flex items-center space-x-2"
+                    >
+                      {isUploadingLogo ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3 h-3" />
+                          <span>Upload</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Company Name *</label>
