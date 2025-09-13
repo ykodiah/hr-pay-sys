@@ -188,6 +188,14 @@ const SettingsPage: FunctionComponent = () => {
         setCompanyData({ ...companyData, logo_url: url })
       } else {
         setSubsidiaryLogoPreview(url)
+        if (selectedSubsidiary) {
+          const updatedSubsidiary = { ...selectedSubsidiary, logo_url: url }
+          setSelectedSubsidiary(updatedSubsidiary)
+          // Also update the subsidiary in the main list
+          setSubsidiaries((prev) =>
+            prev.map((sub) => (sub.id === selectedSubsidiary.id ? { ...sub, logo_url: url } : sub)),
+          )
+        }
       }
 
       toast({
@@ -198,7 +206,7 @@ const SettingsPage: FunctionComponent = () => {
       console.error("Logo upload error:", error)
       toast({
         title: "Upload failed",
-        description: "There was an error uploading your logo. Please try again.",
+        description: "Failed to upload logo. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -611,8 +619,12 @@ const SettingsPage: FunctionComponent = () => {
         locations_count: 0,
         employee_count: 0,
         created_at: new Date().toISOString(),
+        logo_url: subsidiaryLogoPreview || "", // Include uploaded logo URL
       }
       setSubsidiaries((prev) => [newSubsidiary, ...prev])
+
+      setSubsidiaryLogoPreview("")
+
       toast({
         title: "Subsidiary Added",
         description: "New subsidiary created successfully (Demo Mode)",
@@ -637,7 +649,7 @@ const SettingsPage: FunctionComponent = () => {
             divisions: subsidiaryData.divisions || [],
             departments: subsidiaryData.departments || [],
             locations: subsidiaryData.locations || [],
-            logo_url: subsidiaryData.logo_url,
+            logo_url: subsidiaryLogoPreview || "", // Include uploaded logo URL
           },
         ])
         .select()
@@ -645,6 +657,9 @@ const SettingsPage: FunctionComponent = () => {
       if (error) throw error
 
       await loadSubsidiaries() // Reload the list
+
+      setSubsidiaryLogoPreview("")
+
       toast({
         title: "Subsidiary Added",
         description: "New subsidiary created successfully",
@@ -668,6 +683,11 @@ const SettingsPage: FunctionComponent = () => {
           sub.id === subsidiaryId ? { ...sub, ...updates, updated_at: new Date().toISOString() } : sub,
         ),
       )
+
+      if (selectedSubsidiary && selectedSubsidiary.id === subsidiaryId) {
+        setSelectedSubsidiary({ ...selectedSubsidiary, ...updates, updated_at: new Date().toISOString() })
+      }
+
       toast({
         title: "Subsidiary Updated",
         description: "Subsidiary information updated successfully (Demo Mode)",
@@ -687,6 +707,12 @@ const SettingsPage: FunctionComponent = () => {
       if (error) throw error
 
       await loadSubsidiaries() // Reload the list
+
+      if (selectedSubsidiary && selectedSubsidiary.id === subsidiaryId) {
+        const updatedSubsidiary = { ...selectedSubsidiary, ...updates, updated_at: new Date().toISOString() }
+        setSelectedSubsidiary(updatedSubsidiary)
+      }
+
       toast({
         title: "Subsidiary Updated",
         description: "Subsidiary information updated successfully",
