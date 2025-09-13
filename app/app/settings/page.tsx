@@ -1180,87 +1180,107 @@ const SettingsPage: FunctionComponent = () => {
                 </div>
 
                 {/* Subsidiaries List */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {subsidiaries.map((subsidiary) => (
                     <Card key={subsidiary.id} className="border-l-4 border-l-blue-500">
-                      <CardContent className="p-6">
+                      <CardContent className="p-4">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-3">
-                              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
                                 {subsidiary.name.charAt(0)}
                               </div>
-                              <div>
-                                <h3 className="text-lg font-semibold">{subsidiary.name}</h3>
-                                <p className="text-sm text-gray-600">{subsidiary.industry}</p>
-                                <div className="flex items-center space-x-2 mt-1">
-                                  <Badge variant={subsidiary.status === "active" ? "default" : "secondary"}>
-                                    {subsidiary.status}
-                                  </Badge>
-                                  <span className="text-xs text-gray-500">Tax ID: {subsidiary.tax_id}</span>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h3 className="text-base font-semibold">{subsidiary.name}</h3>
+                                    <p className="text-xs text-gray-600">{subsidiary.industry}</p>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Badge
+                                      variant={subsidiary.status === "active" ? "default" : "secondary"}
+                                      className="text-xs"
+                                    >
+                                      {subsidiary.status}
+                                    </Badge>
+                                    <span className="text-xs text-gray-500">Tax ID: {subsidiary.tax_id}</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                               <div>
-                                <p className="text-sm font-medium text-gray-700">Contact Information</p>
-                                <p className="text-sm text-gray-600">{subsidiary.email_address}</p>
-                                <p className="text-sm text-gray-600">{subsidiary.phone_number}</p>
-                                <p className="text-sm text-gray-600">{subsidiary.address}</p>
+                                <p className="text-xs font-medium text-gray-700 mb-1">Contact Information</p>
+                                <div className="space-y-0.5">
+                                  <p className="text-xs text-gray-600">{subsidiary.email_address}</p>
+                                  <p className="text-xs text-gray-600">{subsidiary.phone_number}</p>
+                                  <p className="text-xs text-gray-600 truncate">{subsidiary.address}</p>
+                                </div>
                               </div>
                               <div>
-                                <p className="text-sm font-medium text-gray-700">Organizational Structure</p>
-                                <div className="flex items-center space-x-4 text-sm text-gray-600">
+                                <p className="text-xs font-medium text-gray-700 mb-1">Organizational Structure</p>
+                                <div className="flex items-center space-x-3 text-xs text-gray-600">
                                   <span>{subsidiary.divisions?.length || 0} Divisions</span>
                                   <span>{subsidiary.departments?.length || 0} Departments</span>
                                   <span>{subsidiary.locations?.length || 0} Locations</span>
                                 </div>
                               </div>
                               <div>
-                                <p className="text-sm font-medium text-gray-700">Registration Details</p>
-                                <p className="text-sm text-gray-600">SSNIT: {subsidiary.ssnit_number}</p>
-                                <p className="text-sm text-gray-600">
-                                  Created:{" "}
-                                  {subsidiary.created_at ? new Date(subsidiary.created_at).toLocaleDateString() : "N/A"}
-                                </p>
+                                <p className="text-xs font-medium text-gray-700 mb-1">Registration Details</p>
+                                <div className="space-y-0.5">
+                                  <p className="text-xs text-gray-600">SSNIT: {subsidiary.ssnit_number}</p>
+                                  <p className="text-xs text-gray-600">
+                                    Created:{" "}
+                                    {subsidiary.created_at
+                                      ? new Date(subsidiary.created_at).toLocaleDateString()
+                                      : "N/A"}
+                                  </p>
+                                </div>
                               </div>
                             </div>
 
-                            {/* Quick Actions */}
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-1.5">
                               <Button
                                 variant="outline"
                                 size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
                                 onClick={() => {
                                   setSelectedSubsidiary(subsidiary)
                                   setShowSubsidiaryDetails(true)
                                 }}
                               >
-                                <Eye className="w-4 h-4 mr-1" />
+                                <Eye className="w-3 h-3 mr-1" />
                                 View Details
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
                                 onClick={() => {
                                   setSelectedSubsidiary(subsidiary)
                                   setShowEditSubsidiary(true)
                                 }}
                               >
-                                <Edit className="w-4 h-4 mr-1" />
+                                <Edit className="w-3 h-3 mr-1" />
                                 Edit
                               </Button>
-                              <Button variant="outline" size="sm" onClick={() => syncSubsidiarySettings(subsidiary.id)}>
-                                <RefreshCw className="w-4 h-4 mr-1" />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
+                                onClick={() => syncSubsidiarySettings(subsidiary.id)}
+                              >
+                                <RefreshCw className="w-3 h-3 mr-1" />
                                 Sync Settings
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
                                 onClick={() => viewSubsidiaryEmployees(subsidiary.id)}
                               >
-                                <Users className="w-4 h-4 mr-1" />
+                                <Users className="w-3 h-3 mr-1" />
                                 View Employees
                               </Button>
                             </div>
@@ -1268,8 +1288,8 @@ const SettingsPage: FunctionComponent = () => {
 
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreVertical className="h-4 w-4" />
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                <MoreVertical className="h-3 w-3" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
