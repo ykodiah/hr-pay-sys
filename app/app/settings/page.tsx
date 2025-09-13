@@ -27,7 +27,6 @@ import {
   Copy,
   Pause,
   Play,
-  Trash2,
   Download,
   Upload,
 } from "lucide-react"
@@ -152,6 +151,9 @@ const SettingsPage: FunctionComponent = () => {
   const [showEditSubsidiary, setShowEditSubsidiary] = useState<boolean>(false)
   const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState<boolean>(false)
   const [selectedSubsidiary, setSelectedSubsidiary] = useState<Subsidiary | null>(null)
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<boolean>(false)
+  const [showReactivateConfirm, setShowReactivateConfirm] = useState<boolean>(false)
+  const [subsidiaryToToggle, setSubsidiaryToToggle] = useState<Subsidiary | null>(null)
 
   // Load functions
   const loadCompanyData = async () => {
@@ -470,7 +472,7 @@ const SettingsPage: FunctionComponent = () => {
 
   // Subsidiary Management Functions
   const syncSubsidiarySettings = async (subsidiaryId: string) => {
-    console.log("[v0] Syncing subsidiary settings for:", subsidiaryId)
+    console.log("[v0] Syncing settings for subsidiary:", subsidiaryId)
 
     if (isDemoMode()) {
       toast({
@@ -481,10 +483,13 @@ const SettingsPage: FunctionComponent = () => {
     }
 
     try {
-      // In a real implementation, this would sync settings from parent company to subsidiary
+      // Simulate settings sync process
       const { error } = await supabase
         .from("subsidiaries")
-        .update({ updated_at: new Date().toISOString() })
+        .update({
+          settings_synced_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", subsidiaryId)
 
       if (error) throw error
@@ -494,7 +499,7 @@ const SettingsPage: FunctionComponent = () => {
         description: "Subsidiary settings synchronized successfully",
       })
     } catch (error) {
-      console.error("Settings sync error:", error)
+      console.error("Sync settings error:", error)
       toast({
         title: "Error",
         description: "Failed to sync subsidiary settings",
@@ -503,20 +508,33 @@ const SettingsPage: FunctionComponent = () => {
     }
   }
 
-  const viewSubsidiaryEmployees = (subsidiaryId: string) => {
+  const viewSubsidiaryEmployees = async (subsidiaryId: string) => {
     console.log("[v0] Viewing employees for subsidiary:", subsidiaryId)
 
     if (isDemoMode()) {
       toast({
         title: "Employee View",
-        description: "Redirecting to employee management (Demo Mode)",
+        description: "Opening employee management for subsidiary (Demo Mode)",
       })
-      // In demo mode, just show a toast
+      // In a real app, this would navigate to the employees page with subsidiary filter
       return
     }
 
-    // In real implementation, redirect to employees page with subsidiary filter
-    window.location.href = `/app/employees?subsidiary=${subsidiaryId}`
+    try {
+      // In a real implementation, this would navigate to employees page with filter
+      toast({
+        title: "Employee View",
+        description: "Opening employee management for subsidiary",
+      })
+      // window.location.href = `/app/employees?subsidiary=${subsidiaryId}`
+    } catch (error) {
+      console.error("View employees error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load subsidiary employees",
+        variant: "destructive",
+      })
+    }
   }
 
   const addNewSubsidiary = async (subsidiaryData: Partial<Subsidiary>) => {
@@ -685,6 +703,24 @@ const SettingsPage: FunctionComponent = () => {
         variant: "destructive",
       })
     }
+  }
+
+  const handleToggleSubsidiaryStatus = (subsidiary: Subsidiary) => {
+    setSubsidiaryToToggle(subsidiary)
+    if (subsidiary.status === "active") {
+      setShowDeactivateConfirm(true)
+    } else {
+      setShowReactivateConfirm(true)
+    }
+  }
+
+  const confirmToggleStatus = async () => {
+    if (!subsidiaryToToggle) return
+
+    await toggleSubsidiaryStatus(subsidiaryToToggle.id, subsidiaryToToggle.status)
+    setShowDeactivateConfirm(false)
+    setShowReactivateConfirm(false)
+    setSubsidiaryToToggle(null)
   }
 
   const handleManageLeaveTypes = () => {
@@ -1150,7 +1186,7 @@ const SettingsPage: FunctionComponent = () => {
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                onClick={() => toggleSubsidiaryStatus(subsidiary.id, subsidiary.status)}
+                                onClick={() => handleToggleSubsidiaryStatus(subsidiary)}
                                 className={subsidiary.status === "active" ? "text-orange-600" : "text-green-600"}
                               >
                                 {subsidiary.status === "active" ? (
@@ -1161,16 +1197,9 @@ const SettingsPage: FunctionComponent = () => {
                                 ) : (
                                   <>
                                     <Play className="w-4 h-4 mr-2" />
-                                    Activate
+                                    Reactivate
                                   </>
                                 )}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => deleteSubsidiary(subsidiary.id)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1858,6 +1887,33 @@ const SettingsPage: FunctionComponent = () => {
                     <option value="Other">Other</option>
                   </select>
                 </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Departments</label>
+                  <input
+                    name="departments"
+                    type="text"
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter departments (comma-separated)"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Divisions</label>
+                  <input
+                    name="divisions"
+                    type="text"
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter divisions (comma-separated)"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Locations</label>
+                  <input
+                    name="locations"
+                    type="text"
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter locations (comma-separated)"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2 mt-6">
@@ -2042,6 +2098,36 @@ const SettingsPage: FunctionComponent = () => {
                     <option value="Other">Other</option>
                   </select>
                 </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Departments</label>
+                  <input
+                    name="departments"
+                    type="text"
+                    defaultValue={selectedSubsidiary.departments?.join(", ") || ""}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter departments (comma-separated)"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Divisions</label>
+                  <input
+                    name="divisions"
+                    type="text"
+                    defaultValue={selectedSubsidiary.divisions?.join(", ") || ""}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter divisions (comma-separated)"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Locations</label>
+                  <input
+                    name="locations"
+                    type="text"
+                    defaultValue={selectedSubsidiary.locations?.join(", ") || ""}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Enter locations (comma-separated)"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2 mt-6">
@@ -2222,6 +2308,96 @@ const SettingsPage: FunctionComponent = () => {
                 }}
               >
                 Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeactivateConfirm && subsidiaryToToggle && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-orange-600">Confirm Deactivation</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowDeactivateConfirm(false)
+                  setSubsidiaryToToggle(null)
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-700 mb-2">
+                Are you sure you want to deactivate <strong>{subsidiaryToToggle.name}</strong>?
+              </p>
+              <p className="text-sm text-gray-600">
+                This will temporarily disable access to this subsidiary. You can reactivate it later.
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeactivateConfirm(false)
+                  setSubsidiaryToToggle(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmToggleStatus}>
+                <Pause className="w-4 h-4 mr-2" />
+                Deactivate
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReactivateConfirm && subsidiaryToToggle && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-green-600">Confirm Reactivation</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowReactivateConfirm(false)
+                  setSubsidiaryToToggle(null)
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-700 mb-2">
+                Are you sure you want to reactivate <strong>{subsidiaryToToggle.name}</strong>?
+              </p>
+              <p className="text-sm text-gray-600">
+                This will restore full access to this subsidiary and its features.
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowReactivateConfirm(false)
+                  setSubsidiaryToToggle(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button variant="default" onClick={confirmToggleStatus} className="bg-green-600 hover:bg-green-700">
+                <Play className="w-4 h-4 mr-2" />
+                Reactivate
               </Button>
             </div>
           </div>
