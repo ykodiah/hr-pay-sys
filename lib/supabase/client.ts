@@ -14,15 +14,32 @@ export function createClient() {
   })
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn("[v0] Supabase environment variables missing, using demo mode fallback")
+    console.log("[v0] Supabase environment variables missing:", {
+      url: !!supabaseUrl,
+      key: !!supabaseAnonKey,
+      availableEnvVars: typeof process !== "undefined" ? Object.keys(process.env || {}) : [],
+    })
 
-    // Return a mock client for demo mode
     return {
-      from: () => ({
-        select: () => Promise.resolve({ data: [], error: null }),
-        insert: () => Promise.resolve({ data: null, error: null }),
-        update: () => Promise.resolve({ data: null, error: null }),
-        delete: () => Promise.resolve({ data: null, error: null }),
+      from: (table: string) => ({
+        select: (columns?: string) => ({
+          single: () => Promise.resolve({ data: null, error: null }),
+          order: (column: string, options?: any) => Promise.resolve({ data: [], error: null }),
+          eq: (column: string, value: any) => ({
+            single: () => Promise.resolve({ data: null, error: null }),
+            then: (callback: any) => Promise.resolve({ data: [], error: null }).then(callback),
+          }),
+          neq: (column: string, value: any) => Promise.resolve({ data: [], error: null }),
+          then: (callback: any) => Promise.resolve({ data: [], error: null }).then(callback),
+        }),
+        insert: (data: any) => Promise.resolve({ data: null, error: null }),
+        update: (data: any) => ({
+          eq: (column: string, value: any) => Promise.resolve({ data: null, error: null }),
+          neq: (column: string, value: any) => Promise.resolve({ data: null, error: null }),
+        }),
+        delete: () => ({
+          eq: (column: string, value: any) => Promise.resolve({ data: null, error: null }),
+        }),
       }),
       auth: {
         getUser: () => Promise.resolve({ data: { user: null }, error: null }),
@@ -33,5 +50,39 @@ export function createClient() {
     } as any
   }
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
+  try {
+    return createBrowserClient(supabaseUrl, supabaseAnonKey)
+  } catch (error) {
+    console.error("[v0] Failed to create Supabase client, falling back to demo mode:", error)
+
+    // Return the same mock client as above
+    return {
+      from: (table: string) => ({
+        select: (columns?: string) => ({
+          single: () => Promise.resolve({ data: null, error: null }),
+          order: (column: string, options?: any) => Promise.resolve({ data: [], error: null }),
+          eq: (column: string, value: any) => ({
+            single: () => Promise.resolve({ data: null, error: null }),
+            then: (callback: any) => Promise.resolve({ data: [], error: null }).then(callback),
+          }),
+          neq: (column: string, value: any) => Promise.resolve({ data: [], error: null }),
+          then: (callback: any) => Promise.resolve({ data: [], error: null }).then(callback),
+        }),
+        insert: (data: any) => Promise.resolve({ data: null, error: null }),
+        update: (data: any) => ({
+          eq: (column: string, value: any) => Promise.resolve({ data: null, error: null }),
+          neq: (column: string, value: any) => Promise.resolve({ data: null, error: null }),
+        }),
+        delete: () => ({
+          eq: (column: string, value: any) => Promise.resolve({ data: null, error: null }),
+        }),
+      }),
+      auth: {
+        getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+        signInWithPassword: () => Promise.resolve({ data: null, error: null }),
+        signUp: () => Promise.resolve({ data: null, error: null }),
+        signOut: () => Promise.resolve({ error: null }),
+      },
+    } as any
+  }
 }
