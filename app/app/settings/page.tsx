@@ -1600,6 +1600,18 @@ const SettingsPage: FunctionComponent = () => {
                                 variant="outline"
                                 size="sm"
                                 className="h-7 px-2 text-xs bg-transparent"
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowEditSubsidiary(true)
+                                }}
+                              >
+                                <Edit className="w-3 h-3 mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
                                 onClick={() => syncSubsidiarySettings(subsidiary.id)}
                               >
                                 <RefreshCw className="w-3 h-3 mr-1" />
@@ -1632,6 +1644,15 @@ const SettingsPage: FunctionComponent = () => {
                               >
                                 <Eye className="w-4 h-4 mr-2" />
                                 View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowEditSubsidiary(true)
+                                }}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Subsidiary
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => syncSubsidiarySettings(subsidiary.id)}>
                                 <RefreshCw className="w-4 h-4 mr-2" />
