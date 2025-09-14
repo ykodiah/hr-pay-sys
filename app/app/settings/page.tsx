@@ -30,6 +30,8 @@ import {
   Download,
   Upload,
   ImageIcon,
+  AlertTriangle,
+  CheckCircle,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -580,7 +582,46 @@ const SettingsPage: FunctionComponent = () => {
     console.log("[v0] Viewing employees for subsidiary:", subsidiaryId)
 
     if (isDemoMode()) {
-      setViewEmployeesModal({ isOpen: true, subsidiaryId })
+      const mockEmployees = [
+        {
+          id: "emp-1",
+          name: "John Doe",
+          position: "Software Engineer",
+          department: "Technology",
+          email: "john@company.com",
+        },
+        {
+          id: "emp-2",
+          name: "Jane Smith",
+          position: "Marketing Manager",
+          department: "Marketing",
+          email: "jane@company.com",
+        },
+        {
+          id: "emp-3",
+          name: "Mike Johnson",
+          position: "HR Specialist",
+          department: "Human Resources",
+          email: "mike@company.com",
+        },
+      ]
+
+      // Update employee count in subsidiary
+      const updatedSubsidiaries = subsidiaries.map((sub) =>
+        sub.id === subsidiaryId ? { ...sub, employee_count: mockEmployees.length } : sub,
+      )
+      setSubsidiaries(updatedSubsidiaries)
+
+      // Update selectedSubsidiary if it matches
+      if (selectedSubsidiary?.id === subsidiaryId) {
+        setSelectedSubsidiary({ ...selectedSubsidiary, employee_count: mockEmployees.length })
+      }
+
+      setViewEmployeesModal({
+        isOpen: true,
+        subsidiaryId,
+        employees: mockEmployees,
+      })
       return
     }
 
@@ -588,6 +629,10 @@ const SettingsPage: FunctionComponent = () => {
       const { data: employees, error } = await supabase.from("employees").select("*").eq("subsidiary_id", subsidiaryId)
 
       if (error) throw error
+
+      // Update employee count in subsidiary
+      const employeeCount = employees?.length || 0
+      await updateSubsidiary(subsidiaryId, { employee_count: employeeCount })
 
       setViewEmployeesModal({
         isOpen: true,
@@ -686,50 +731,63 @@ const SettingsPage: FunctionComponent = () => {
     console.log("[v0] Updating subsidiary:", subsidiaryId, updates)
 
     if (isDemoMode()) {
-      setSubsidiaries((prev) =>
-        prev.map((sub) =>
-          sub.id === subsidiaryId ? { ...sub, ...updates, updated_at: new Date().toISOString() } : sub,
-        ),
-      )
+      const updatedSubsidiaries = subsidiaries.map((sub) => {
+        if (sub.id === subsidiaryId) {
+          const updatedSub = {
+            ...sub,
+            ...updates,
+            // Recalculate statistics based on updated data
+            divisions_count: updates.divisions?.length || sub.divisions?.length || 0,
+            departments_count: updates.departments?.length || sub.departments?.length || 0,
+            locations_count: updates.locations?.length || sub.locations?.length || 0,
+          }
+          return updatedSub
+        }
+        return sub
+      })
 
-      if (selectedSubsidiary && selectedSubsidiary.id === subsidiaryId) {
-        setSelectedSubsidiary({ ...selectedSubsidiary, ...updates, updated_at: new Date().toISOString() })
+      setSubsidiaries(updatedSubsidiaries)
+
+      // Update selectedSubsidiary if it's the one being updated
+      if (selectedSubsidiary?.id === subsidiaryId) {
+        const updatedSelected = updatedSubsidiaries.find((sub) => sub.id === subsidiaryId)
+        if (updatedSelected) {
+          setSelectedSubsidiary(updatedSelected)
+        }
       }
 
       toast({
-        title: "Subsidiary Updated",
-        description: "Subsidiary information updated successfully (Demo Mode)",
+        title: "Subsidiary updated",
+        description: "Subsidiary information has been updated successfully.",
       })
       return
     }
 
     try {
-      const { error } = await supabase
-        .from("subsidiaries")
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", subsidiaryId)
+      const { error } = await supabase.from("subsidiaries").update(updates).eq("id", subsidiaryId)
 
       if (error) throw error
 
-      await loadSubsidiaries() // Reload the list
+      // Reload subsidiaries to get fresh data with updated statistics
+      await loadSubsidiaries()
 
-      if (selectedSubsidiary && selectedSubsidiary.id === subsidiaryId) {
-        const updatedSubsidiary = { ...selectedSubsidiary, ...updates, updated_at: new Date().toISOString() }
-        setSelectedSubsidiary(updatedSubsidiary)
+      // Update selectedSubsidiary with fresh data
+      if (selectedSubsidiary?.id === subsidiaryId) {
+        const updatedSub = subsidiaries.find((sub) => sub.id === subsidiaryId)
+        if (updatedSub) {
+          setSelectedSubsidiary(updatedSub)
+        }
       }
 
       toast({
-        title: "Subsidiary Updated",
-        description: "Subsidiary information updated successfully",
+        title: "Subsidiary updated",
+        description: "Subsidiary information has been updated successfully.",
       })
     } catch (error) {
       console.error("Update subsidiary error:", error)
       toast({
         title: "Error",
-        description: "Failed to update subsidiary",
+        description: "Failed to update subsidiary information",
         variant: "destructive",
       })
     }
@@ -1101,6 +1159,22 @@ const SettingsPage: FunctionComponent = () => {
     }
   }
 
+  const confirmDeactivateSubsidiary = (subsidiaryId: string) => {
+    const subsidiary = subsidiaries.find((s) => s.id === subsidiaryId)
+    if (subsidiary) {
+      setSubsidiaryToToggle(subsidiary)
+      setShowDeactivateConfirm(true)
+    }
+  }
+
+  const confirmReactivateSubsidiary = (subsidiaryId: string) => {
+    const subsidiary = subsidiaries.find((s) => s.id === subsidiaryId)
+    if (subsidiary) {
+      setSubsidiaryToToggle(subsidiary)
+      setShowReactivateConfirm(true)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1410,13 +1484,24 @@ const SettingsPage: FunctionComponent = () => {
                 {/* Subsidiaries List */}
                 <div className="space-y-3">
                   {subsidiaries.map((subsidiary) => (
+                    // Updated subsidiary card to show logo and removed Edit button
                     <Card key={subsidiary.id} className="border-l-4 border-l-blue-500">
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center space-x-3 mb-2">
-                              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                                {subsidiary.name.charAt(0)}
+                              <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
+                                {subsidiary.logo_url ? (
+                                  <img
+                                    src={subsidiary.logo_url || "/placeholder.svg"}
+                                    alt={`${subsidiary.name} logo`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                                    {subsidiary.name.charAt(0)}
+                                  </div>
+                                )}
                               </div>
                               <div className="flex-1">
                                 <div className="flex items-center justify-between">
@@ -1449,9 +1534,15 @@ const SettingsPage: FunctionComponent = () => {
                               <div>
                                 <p className="text-xs font-medium text-gray-700 mb-1">Organizational Structure</p>
                                 <div className="flex items-center space-x-3 text-xs text-gray-600">
-                                  <span>{subsidiary.divisions?.length || 0} Divisions</span>
-                                  <span>{subsidiary.departments?.length || 0} Departments</span>
-                                  <span>{subsidiary.locations?.length || 0} Locations</span>
+                                  <span>
+                                    {subsidiary.divisions_count || subsidiary.divisions?.length || 0} Divisions
+                                  </span>
+                                  <span>
+                                    {subsidiary.departments_count || subsidiary.departments?.length || 0} Departments
+                                  </span>
+                                  <span>
+                                    {subsidiary.locations_count || subsidiary.locations?.length || 0} Locations
+                                  </span>
                                 </div>
                               </div>
                               <div>
@@ -1485,18 +1576,6 @@ const SettingsPage: FunctionComponent = () => {
                                 variant="outline"
                                 size="sm"
                                 className="h-7 px-2 text-xs bg-transparent"
-                                onClick={() => {
-                                  setSelectedSubsidiary(subsidiary)
-                                  setShowEditSubsidiary(true)
-                                }}
-                              >
-                                <Edit className="w-3 h-3 mr-1" />
-                                Edit
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-2 text-xs bg-transparent"
                                 onClick={() => syncSubsidiarySettings(subsidiary.id)}
                               >
                                 <RefreshCw className="w-3 h-3 mr-1" />
@@ -1509,7 +1588,7 @@ const SettingsPage: FunctionComponent = () => {
                                 onClick={() => viewSubsidiaryEmployees(subsidiary.id)}
                               >
                                 <Users className="w-3 h-3 mr-1" />
-                                View Employees
+                                View Employees ({subsidiary.employee_count || 0})
                               </Button>
                             </div>
                           </div>
@@ -1530,15 +1609,6 @@ const SettingsPage: FunctionComponent = () => {
                                 <Eye className="w-4 h-4 mr-2" />
                                 View Details
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedSubsidiary(subsidiary)
-                                  setShowEditSubsidiary(true)
-                                }}
-                              >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit Subsidiary
-                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => syncSubsidiarySettings(subsidiary.id)}>
                                 <RefreshCw className="w-4 h-4 mr-2" />
                                 Sync Settings
@@ -1548,22 +1618,23 @@ const SettingsPage: FunctionComponent = () => {
                                 Duplicate
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => handleToggleSubsidiaryStatusInner(subsidiary)}
-                                className={subsidiary.status === "active" ? "text-orange-600" : "text-green-600"}
-                              >
-                                {subsidiary.status === "active" ? (
-                                  <>
-                                    <Pause className="w-4 h-4 mr-2" />
-                                    Deactivate
-                                  </>
-                                ) : (
-                                  <>
-                                    <Play className="w-4 h-4 mr-2" />
-                                    Reactivate
-                                  </>
-                                )}
-                              </DropdownMenuItem>
+                              {subsidiary.status === "active" ? (
+                                <DropdownMenuItem
+                                  onClick={() => confirmDeactivateSubsidiary(subsidiary.id)}
+                                  className="text-orange-600"
+                                >
+                                  <AlertTriangle className="w-4 h-4 mr-2" />
+                                  Deactivate
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem
+                                  onClick={() => confirmReactivateSubsidiary(subsidiary.id)}
+                                  className="text-green-600"
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-2" />
+                                  Reactivate
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -2794,169 +2865,149 @@ const SettingsPage: FunctionComponent = () => {
       )}
 
       {showSubsidiaryDetails && selectedSubsidiary && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Subsidiary Details</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setShowSubsidiaryDetails(false)
-                  setSelectedSubsidiary(null)
-                }}
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
+        // Enhanced subsidiary details modal with logo display and updated statistics
+        <Dialog open={showSubsidiaryDetails} onOpenChange={setShowSubsidiaryDetails}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-3">
+                {selectedSubsidiary?.logo_url ? (
+                  <img
+                    src={selectedSubsidiary.logo_url || "/placeholder.svg"}
+                    alt={`${selectedSubsidiary.name} logo`}
+                    className="w-8 h-8 object-cover rounded"
+                  />
+                ) : (
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded flex items-center justify-center text-white font-bold text-sm">
+                    {selectedSubsidiary?.name.charAt(0)}
+                  </div>
+                )}
+                <span>Subsidiary Details</span>
+              </DialogTitle>
+              <DialogDescription>Detailed information for {selectedSubsidiary?.name}</DialogDescription>
+            </DialogHeader>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Company Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Company Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Company Name</label>
-                    <p className="text-sm">{selectedSubsidiary.name}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Legal Name</label>
-                    <p className="text-sm">{selectedSubsidiary.legal_name}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Tax ID</label>
-                    <p className="text-sm">{selectedSubsidiary.tax_id}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">SSNIT Number</label>
-                    <p className="text-sm">{selectedSubsidiary.ssnit_number || "Not provided"}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Industry</label>
-                    <p className="text-sm">{selectedSubsidiary.industry || "Not specified"}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Status</label>
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                        selectedSubsidiary.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {selectedSubsidiary.status}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Contact Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Contact Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Address</label>
-                    <p className="text-sm">{selectedSubsidiary.address || "Not provided"}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">City</label>
-                    <p className="text-sm">{selectedSubsidiary.city || "Not provided"}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Region</label>
-                    <p className="text-sm">{selectedSubsidiary.region || "Not provided"}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Country</label>
-                    <p className="text-sm">{selectedSubsidiary.country || "Not provided"}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Phone</label>
-                    <p className="text-sm">{selectedSubsidiary.phone || "Not provided"}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Email</label>
-                    <p className="text-sm">{selectedSubsidiary.email || "Not provided"}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Website</label>
-                    <p className="text-sm">
-                      {selectedSubsidiary.website ? (
-                        <a
-                          href={selectedSubsidiary.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          {selectedSubsidiary.website}
-                        </a>
-                      ) : (
-                        "Not provided"
-                      )}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Statistics */}
-              <Card className="md:col-span-2">
-                <CardHeader>
-                  <CardTitle className="text-lg">Organization Statistics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{selectedSubsidiary.employee_count || 0}</div>
-                      <div className="text-sm text-gray-600">Employees</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{selectedSubsidiary.divisions_count || 0}</div>
-                      <div className="text-sm text-gray-600">Divisions</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-600">
-                        {selectedSubsidiary.departments_count || 0}
+            {selectedSubsidiary && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Company Information */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Company Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Company Name</Label>
+                        <p className="text-sm">{selectedSubsidiary.name}</p>
                       </div>
-                      <div className="text-sm text-gray-600">Departments</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-orange-600">
-                        {selectedSubsidiary.locations_count || 0}
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Legal Name</Label>
+                        <p className="text-sm">{selectedSubsidiary.legal_name || selectedSubsidiary.name}</p>
                       </div>
-                      <div className="text-sm text-gray-600">Locations</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Tax ID</Label>
+                        <p className="text-sm">{selectedSubsidiary.tax_id}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">SSNIT Number</Label>
+                        <p className="text-sm">{selectedSubsidiary.ssnit_number}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Industry</Label>
+                        <p className="text-sm">{selectedSubsidiary.industry}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Status</Label>
+                        <Badge variant={selectedSubsidiary.status === "active" ? "default" : "secondary"}>
+                          {selectedSubsidiary.status}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-            <div className="flex justify-end space-x-2 mt-6">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowSubsidiaryDetails(false)
-                  setSelectedSubsidiary(null)
-                  setShowEditSubsidiary(true)
-                }}
-              >
-                <Edit className="w-4 h-4 mr-2" />
-                Edit
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowSubsidiaryDetails(false)
-                  setSelectedSubsidiary(null)
-                }}
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
+                  {/* Contact Information */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Contact Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Address</Label>
+                        <p className="text-sm">{selectedSubsidiary.address || "Not provided"}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">City</Label>
+                        <p className="text-sm">{selectedSubsidiary.city || "Not provided"}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Region</Label>
+                        <p className="text-sm">{selectedSubsidiary.region || "Not provided"}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Country</Label>
+                        <p className="text-sm">{selectedSubsidiary.country || "Ghana"}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Phone</Label>
+                        <p className="text-sm">{selectedSubsidiary.phone_number || "Not provided"}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Email</Label>
+                        <p className="text-sm">{selectedSubsidiary.email_address || "Not provided"}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Website</Label>
+                        <p className="text-sm">{selectedSubsidiary.website || "Not provided"}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card className="md:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Organization Statistics</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">{selectedSubsidiary.employee_count || 0}</div>
+                        <div className="text-sm text-gray-600">Employees</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">
+                          {selectedSubsidiary.divisions_count || selectedSubsidiary.divisions?.length || 0}
+                        </div>
+                        <div className="text-sm text-gray-600">Divisions</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-purple-600">
+                          {selectedSubsidiary.departments_count || selectedSubsidiary.departments?.length || 0}
+                        </div>
+                        <div className="text-sm text-gray-600">Departments</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-orange-600">
+                          {selectedSubsidiary.locations_count || selectedSubsidiary.locations?.length || 0}
+                        </div>
+                        <div className="text-sm text-gray-600">Locations</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="flex justify-end space-x-2 mt-6">
+                  <Button
+                    onClick={() => {
+                      setShowSubsidiaryDetails(false)
+                      setSelectedSubsidiary(null)
+                    }}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       )}
 
       {showDeactivateConfirm && subsidiaryToToggle && (
