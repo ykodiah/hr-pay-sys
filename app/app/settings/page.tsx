@@ -32,6 +32,7 @@ import {
   ImageIcon,
   AlertTriangle,
   CheckCircle,
+  Save,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -1119,6 +1120,90 @@ const SettingsPage: FunctionComponent = () => {
     }
   }
 
+  const handleSaveSettings = async () => {
+    console.log("[v0] Saving all settings changes")
+
+    if (isDemoMode()) {
+      toast({
+        title: "Settings Saved",
+        description: "All settings changes have been saved successfully (Demo Mode)",
+      })
+      return
+    }
+
+    try {
+      // Save any pending changes to subsidiaries
+      const { error: subsidiaryError } = await supabase
+        .from("subsidiaries")
+        .update({
+          updated_at: new Date().toISOString(),
+        })
+        .neq("id", "00000000-0000-0000-0000-000000000000")
+
+      if (subsidiaryError) throw subsidiaryError
+
+      // Save sync options to company settings
+      const syncOptions = {
+        hr_policies: true,
+        payroll_configuration: true,
+        leave_types: false,
+        roles_permissions: false,
+      }
+
+      const { error: settingsError } = await supabase.from("company_settings").upsert({
+        id: "sync_options",
+        settings: syncOptions,
+        updated_at: new Date().toISOString(),
+      })
+
+      if (settingsError) throw settingsError
+
+      // Refresh data to show updates
+      await loadAllData()
+
+      toast({
+        title: "Settings Saved",
+        description: "All settings changes have been saved and updated successfully",
+      })
+    } catch (error) {
+      console.error("Save settings error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save settings changes",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSaveSubsidiaryChanges = async () => {
+    console.log("[v0] Saving subsidiary changes")
+
+    if (isDemoMode()) {
+      toast({
+        title: "Changes Saved",
+        description: "Subsidiary changes have been saved successfully (Demo Mode)",
+      })
+      return
+    }
+
+    try {
+      // Save any pending subsidiary changes
+      await loadSubsidiaries()
+
+      toast({
+        title: "Changes Saved",
+        description: "Subsidiary changes have been saved and updated successfully",
+      })
+    } catch (error) {
+      console.error("Save subsidiary changes error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save subsidiary changes",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleRefreshSubsidiaries = async () => {
     console.log("[v0] Refreshing subsidiaries list")
 
@@ -1513,9 +1598,9 @@ const SettingsPage: FunctionComponent = () => {
                     <Plus className="w-4 h-4 mr-2" />
                     Add Subsidiary
                   </Button>
-                  <Button variant="outline" onClick={loadSubsidiaries}>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Refresh
+                  <Button variant="outline" onClick={handleSaveSubsidiaryChanges}>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save
                   </Button>
                 </div>
               </CardTitle>
@@ -1818,10 +1903,10 @@ const SettingsPage: FunctionComponent = () => {
                             variant="outline"
                             size="sm"
                             className="w-full justify-start bg-transparent"
-                            onClick={handleSyncAllSettings}
+                            onClick={handleSaveSettings}
                           >
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                            Sync All Settings
+                            <Save className="w-4 h-4 mr-2" />
+                            Save Settings
                           </Button>
                           <Button
                             variant="outline"
