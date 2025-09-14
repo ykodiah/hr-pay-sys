@@ -8,8 +8,8 @@ export async function updateSession(request: NextRequest) {
     timestamp: new Date().toISOString(),
   })
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   console.log("[v0] Middleware - Environment check:", {
     url: !!supabaseUrl,
@@ -17,6 +17,11 @@ export async function updateSession(request: NextRequest) {
     urlValue: supabaseUrl?.substring(0, 20) + "...",
     keyValue: supabaseAnonKey?.substring(0, 20) + "...",
   })
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.log("[v0] Middleware - Supabase not configured, allowing access")
+    return NextResponse.next({ request })
+  }
 
   const publicPaths = ["/", "/about", "/contact", "/careers", "/demo", "/help", "/api-docs", "/auth", "/login"]
 
