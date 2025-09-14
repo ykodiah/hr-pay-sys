@@ -42,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface Company {
   id: string
@@ -159,6 +160,14 @@ const SettingsPage: FunctionComponent = () => {
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string>("")
   const [subsidiaryLogoPreview, setSubsidiaryLogoPreview] = useState<string>("")
   const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false)
+
+  const [viewEmployeesModal, setViewEmployeesModal] = useState<{
+    isOpen: boolean
+    subsidiaryId: string
+    employees?: any[]
+  }>({ isOpen: false, subsidiaryId: "" })
+
+  const [importModal, setImportModal] = useState(false)
 
   // Logo upload function
   const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
@@ -571,21 +580,20 @@ const SettingsPage: FunctionComponent = () => {
     console.log("[v0] Viewing employees for subsidiary:", subsidiaryId)
 
     if (isDemoMode()) {
-      toast({
-        title: "Employee View",
-        description: "Opening employee management for subsidiary (Demo Mode)",
-      })
-      // In a real app, this would navigate to the employees page with subsidiary filter
+      setViewEmployeesModal({ isOpen: true, subsidiaryId })
       return
     }
 
     try {
-      // In a real implementation, this would navigate to employees page with filter
-      toast({
-        title: "Employee View",
-        description: "Opening employee management for subsidiary",
+      const { data: employees, error } = await supabase.from("employees").select("*").eq("subsidiary_id", subsidiaryId)
+
+      if (error) throw error
+
+      setViewEmployeesModal({
+        isOpen: true,
+        subsidiaryId,
+        employees: employees || [],
       })
-      // window.location.href = `/app/employees?subsidiary=${subsidiaryId}`
     } catch (error) {
       console.error("View employees error:", error)
       toast({
@@ -783,6 +791,221 @@ const SettingsPage: FunctionComponent = () => {
     }
   }
 
+  const handleToggleSubsidiaryStatusInner = (subsidiary: Subsidiary) => {
+    setSubsidiaryToToggle(subsidiary)
+    if (subsidiary.status === "active") {
+      setShowDeactivateConfirm(true)
+    } else {
+      setShowReactivateConfirm(true)
+    }
+  }
+
+  const confirmToggleStatusInner = async () => {
+    if (!subsidiaryToToggle) return
+
+    await toggleSubsidiaryStatus(subsidiaryToToggle.id, subsidiaryToToggle.status)
+    setShowDeactivateConfirm(false)
+    setShowReactivateConfirm(false)
+    setSubsidiaryToToggle(null)
+  }
+
+  const handleManageLeaveTypesInner = () => {
+    toast({
+      title: "Leave Types Management",
+      description: "Opening leave types configuration...",
+    })
+  }
+
+  const handleManageAllowancesInner = () => {
+    toast({
+      title: "Allowances Management",
+      description: "Opening allowances configuration...",
+    })
+  }
+
+  const handleManageDeductionsInner = () => {
+    toast({
+      title: "Deductions Management",
+      description: "Opening deductions configuration...",
+    })
+  }
+
+  const handleManageSalaryGradesInner = () => {
+    toast({
+      title: "Salary Grades Management",
+      description: "Opening salary grades configuration...",
+    })
+  }
+
+  const handleAddEmailTemplateInner = () => {
+    toast({
+      title: "Add Email Template",
+      description: "Opening email template editor...",
+    })
+  }
+
+  const handleEditEmailTemplateInner = (templateName: string) => {
+    toast({
+      title: "Edit Email Template",
+      description: `Editing ${templateName} template...`,
+    })
+  }
+
+  const handleAddRoleInner = () => {
+    toast({
+      title: "Add Role",
+      description: "Opening role creation form...",
+    })
+  }
+
+  const handleEditRoleInner = (roleName: string) => {
+    toast({
+      title: "Edit Role",
+      description: `Editing ${roleName} role...`,
+    })
+  }
+
+  const handleBackupNowInner = async () => {
+    setIsBackingUp(true)
+    try {
+      // Simulate backup process
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      setLastBackupTime(new Date().toISOString())
+      toast({
+        title: "Backup Completed",
+        description: "System backup completed successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Backup Failed",
+        description: "Failed to complete system backup.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsBackingUp(false)
+    }
+  }
+
+  const handleSyncAllSettings = async () => {
+    console.log("[v0] Syncing all subsidiary settings")
+
+    if (isDemoMode()) {
+      toast({
+        title: "Syncing All Settings",
+        description: "Synchronizing settings across all subsidiaries... (Demo Mode)",
+      })
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from("subsidiaries")
+        .update({
+          settings_synced_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .neq("id", "00000000-0000-0000-0000-000000000000")
+
+      if (error) throw error
+
+      toast({
+        title: "Settings Synchronized",
+        description: "All subsidiary settings have been synchronized successfully",
+      })
+    } catch (error) {
+      console.error("Sync all settings error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to sync all subsidiary settings",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleExportSettingsTemplate = async () => {
+    console.log("[v0] Exporting settings template")
+
+    try {
+      const response = await fetch("/api/subsidiaries/export")
+
+      if (!response.ok) throw new Error("Export failed")
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = "subsidiaries_template.csv"
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      toast({
+        title: "Export Successful",
+        description: "Settings template has been downloaded",
+      })
+    } catch (error) {
+      console.error("Export error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to export settings template",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleImportSettings = async (file: File) => {
+    console.log("[v0] Importing settings from file:", file.name)
+
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const response = await fetch("/api/subsidiaries/import", {
+        method: "POST",
+        body: formData,
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) throw new Error(result.error)
+
+      toast({
+        title: "Import Successful",
+        description: result.message,
+      })
+
+      // Refresh subsidiaries list
+      await loadSubsidiaries()
+    } catch (error) {
+      console.error("Import error:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to import settings",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRefreshSubsidiaries = async () => {
+    console.log("[v0] Refreshing subsidiaries list")
+
+    try {
+      await loadSubsidiaries()
+      toast({
+        title: "Refreshed",
+        description: "Subsidiaries list has been refreshed",
+      })
+    } catch (error) {
+      console.error("Refresh error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to refresh subsidiaries",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleToggleSubsidiaryStatus = (subsidiary: Subsidiary) => {
     setSubsidiaryToToggle(subsidiary)
     if (subsidiary.status === "active") {
@@ -876,27 +1099,6 @@ const SettingsPage: FunctionComponent = () => {
     } finally {
       setIsBackingUp(false)
     }
-  }
-
-  const handleSyncAllSettings = () => {
-    toast({
-      title: "Syncing Settings",
-      description: "Synchronizing settings across all subsidiaries...",
-    })
-  }
-
-  const handleExportSettingsTemplate = () => {
-    toast({
-      title: "Exporting Template",
-      description: "Downloading settings template...",
-    })
-  }
-
-  const handleImportSettings = () => {
-    toast({
-      title: "Import Settings",
-      description: "Opening settings import dialog...",
-    })
   }
 
   return (
@@ -1347,7 +1549,7 @@ const SettingsPage: FunctionComponent = () => {
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                onClick={() => handleToggleSubsidiaryStatus(subsidiary)}
+                                onClick={() => handleToggleSubsidiaryStatusInner(subsidiary)}
                                 className={subsidiary.status === "active" ? "text-orange-600" : "text-green-600"}
                               >
                                 {subsidiary.status === "active" ? (
@@ -1420,6 +1622,7 @@ const SettingsPage: FunctionComponent = () => {
                       </div>
                       <div>
                         <h4 className="font-medium mb-2">Sync Actions</h4>
+
                         <div className="space-y-2">
                           <Button
                             variant="outline"
@@ -1443,10 +1646,19 @@ const SettingsPage: FunctionComponent = () => {
                             variant="outline"
                             size="sm"
                             className="w-full justify-start bg-transparent"
-                            onClick={handleImportSettings}
+                            onClick={() => setImportModal(true)}
                           >
                             <Upload className="w-4 h-4 mr-2" />
                             Import Settings
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={handleRefreshSubsidiaries}
+                          >
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Refresh
                           </Button>
                         </div>
                       </div>
@@ -1907,6 +2119,124 @@ const SettingsPage: FunctionComponent = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* View Employees Modal */}
+      <Dialog
+        open={viewEmployeesModal.isOpen}
+        onOpenChange={(open) => setViewEmployeesModal({ ...viewEmployeesModal, isOpen: open })}
+      >
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Subsidiary Employees</DialogTitle>
+            <DialogDescription>
+              Employees working at {subsidiaries.find((s) => s.id === viewEmployeesModal.subsidiaryId)?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {isDemoMode() ? (
+              <div className="grid gap-4">
+                {[
+                  {
+                    name: "John Doe",
+                    position: "Software Engineer",
+                    department: "Technology",
+                    email: "john@company.com",
+                  },
+                  {
+                    name: "Jane Smith",
+                    position: "Marketing Manager",
+                    department: "Marketing",
+                    email: "jane@company.com",
+                  },
+                  {
+                    name: "Mike Johnson",
+                    position: "HR Specialist",
+                    department: "Human Resources",
+                    email: "mike@company.com",
+                  },
+                ].map((employee, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <h4 className="font-medium">{employee.name}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {employee.position} • {employee.department}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{employee.email}</p>
+                    </div>
+                    <Button variant="outline" size="sm">
+                      View Profile
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {viewEmployeesModal.employees?.length ? (
+                  viewEmployeesModal.employees.map((employee) => (
+                    <div key={employee.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{employee.full_name}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {employee.position} • {employee.department}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{employee.corporate_email}</p>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        View Profile
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">No employees found for this subsidiary</p>
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Settings Modal */}
+      <Dialog open={importModal} onOpenChange={setImportModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Settings</DialogTitle>
+            <DialogDescription>
+              Upload a CSV file to import subsidiary settings. Download the template first if needed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    handleImportSettings(file)
+                    setImportModal(false)
+                  }
+                }}
+                className="hidden"
+                id="import-file"
+              />
+              <label htmlFor="import-file" className="cursor-pointer">
+                <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                <p className="text-sm text-gray-600">Click to upload CSV file</p>
+                <p className="text-xs text-gray-400 mt-1">Supports CSV, Excel formats</p>
+              </label>
+            </div>
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={handleExportSettingsTemplate}>
+                <Download className="w-4 h-4 mr-2" />
+                Download Template
+              </Button>
+              <Button variant="outline" onClick={() => setImportModal(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {showAddSubsidiary && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -2665,7 +2995,7 @@ const SettingsPage: FunctionComponent = () => {
               >
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={confirmToggleStatus}>
+              <Button variant="destructive" onClick={confirmToggleStatusInner}>
                 <Pause className="w-4 h-4 mr-2" />
                 Deactivate
               </Button>
@@ -2710,7 +3040,7 @@ const SettingsPage: FunctionComponent = () => {
               >
                 Cancel
               </Button>
-              <Button variant="default" onClick={confirmToggleStatus} className="bg-green-600 hover:bg-green-700">
+              <Button variant="default" onClick={confirmToggleStatusInner} className="bg-green-600 hover:bg-green-700">
                 <Play className="w-4 h-4 mr-2" />
                 Reactivate
               </Button>
