@@ -1926,15 +1926,6 @@ const SettingsPage: FunctionComponent = () => {
                             <Upload className="w-4 h-4 mr-2" />
                             Import Settings
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full justify-start bg-transparent"
-                            onClick={handleRefreshSubsidiaries}
-                          >
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                            Refresh
-                          </Button>
                         </div>
                       </div>
                     </div>
