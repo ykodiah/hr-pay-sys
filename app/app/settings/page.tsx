@@ -17,16 +17,12 @@ import {
   Edit,
   MoreVertical,
   Loader2,
-  Power,
-  Clock,
   Brain,
   Plus,
   RefreshCw,
   MapPin,
   Briefcase,
   Copy,
-  Pause,
-  Play,
   Download,
   Upload,
   ImageIcon,
@@ -39,7 +35,6 @@ import {
   TrendingUp,
   Trash2,
   FileText,
-  Minus,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -171,6 +166,22 @@ const SettingsPage: FunctionComponent = () => {
     performanceTracking: true,
   })
 
+  const [editingPolicy, setEditingPolicy] = useState({
+    name: "",
+    days: 0,
+    description: "",
+  })
+  const [showDocumentModal, setShowDocumentModal] = useState(false)
+  const [documentModalType, setDocumentModalType] = useState("add") // add, view, edit, delete
+  const [selectedDocument, setSelectedDocument] = useState(null)
+  const [uploadedFile, setUploadedFile] = useState(null)
+  const [documentName, setDocumentName] = useState("")
+  const [currentPolicies, setCurrentPolicies] = useState([
+    { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Annual vacation leave" },
+    { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness" },
+    { name: "Maternity Leave", days: 84, usage: "12%", trend: "stable", description: "Maternity and paternity leave" },
+  ])
+
   const [divisions, setDivisions] = useState<string[]>([])
   const [departments, setDepartments] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
@@ -224,6 +235,9 @@ const SettingsPage: FunctionComponent = () => {
     description: "",
     carryOver: false,
   })
+
+  const [isSavingPolicy, setIsSavingPolicy] = useState(false)
+  const [isSavingDocument, setIsSavingDocument] = useState(false)
 
   // Logo upload function
   const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
@@ -1309,54 +1323,40 @@ const SettingsPage: FunctionComponent = () => {
     setSubsidiaryToToggle(null)
   }
 
-  const handlePolicyAction = (action: string, policyName: string) => {
-    const policy = [
-      { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Standard annual leave entitlement" },
-      { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness" },
-      {
-        name: "Maternity Leave",
-        days: 84,
-        usage: "12%",
-        trend: "stable",
-        description: "Maternity and paternity leave",
-      },
-    ].find((p) => p.name === policyName)
-
-    setSelectedPolicy(policy)
-    setPolicyModalType(action)
-    setShowPolicyModal(true)
-  }
-
-  const handleManageLeaveTypes = () => {
-    setShowAddLeaveTypeModal(true)
-  }
-
   const handleAddLeaveType = async () => {
     setIsManagingLeaveTypes(true)
     try {
       await new Promise((resolve) => setTimeout(resolve, 1500))
 
-      // Add new leave type logic here
-      toast({
-        title: "Leave Type Added",
-        description: `${newLeaveType.name} has been added successfully`,
-      })
+      // Add new leave type to current policies
+      const newPolicy = {
+        name: newLeaveType.name,
+        days: Number.parseInt(newLeaveType.days),
+        usage: "0%",
+        trend: "stable",
+        description: newLeaveType.description,
+      }
+
+      setCurrentPolicies((prev) => [...prev, newPolicy])
 
       // Reset form
-      setNewLeaveType({ name: "", days: 0, description: "", carryOver: false })
+      setNewLeaveType({
+        name: "",
+        days: 0,
+        description: "",
+        carryOver: false,
+      })
+
       setShowAddLeaveTypeModal(false)
 
-      // Update AI insights
-      if (hrConfig.aiRecommendations) {
-        toast({
-          title: "AI Insights Updated",
-          description: "Leave policy recommendations have been refreshed",
-        })
-      }
+      toast({
+        title: "Leave Type Added",
+        description: `${newLeaveType.name} has been successfully added to your policies.`,
+      })
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to add leave type",
+        description: "Failed to add leave type. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -1364,108 +1364,137 @@ const SettingsPage: FunctionComponent = () => {
     }
   }
 
-  const handleAddDocument = () => {
-    const newDoc = {
-      id: Date.now(),
-      name: "New Document",
-      type: "PDF",
-      size: "0 MB",
-      visibleToAll: false,
+  const handlePolicyAction = (action, policyName) => {
+    const policy = currentPolicies.find((p) => p.name === policyName)
+
+    setSelectedPolicy(policy)
+    setPolicyModalType(action)
+
+    if (action === "edit") {
+      setEditingPolicy({
+        name: policy.name,
+        days: policy.days,
+        description: policy.description,
+      })
     }
-    setHrDocuments([...hrDocuments, newDoc])
+
+    setShowPolicyModal(true)
   }
 
-  const handleRemoveDocument = (id: number) => {
-    setHrDocuments(hrDocuments.filter((doc) => doc.id !== id))
-  }
-
-  const handleToggleDocumentVisibility = (id: number) => {
-    setHrDocuments(hrDocuments.map((doc) => (doc.id === id ? { ...doc, visibleToAll: !doc.visibleToAll } : doc)))
-  }
-
-  const handleManageAllowances = () => {
-    toast({
-      title: "Allowances Management",
-      description: "Opening allowances configuration...",
-    })
-  }
-
-  const handleManageDeductions = () => {
-    toast({
-      title: "Deductions Management",
-      description: "Opening deductions configuration...",
-    })
-  }
-
-  const handleManageSalaryGrades = () => {
-    toast({
-      title: "Salary Grades Management",
-      description: "Opening salary grades configuration...",
-    })
-  }
-
-  const handleAddEmailTemplate = () => {
-    toast({
-      title: "Add Email Template",
-      description: "Opening email template editor...",
-    })
-  }
-
-  const handleEditEmailTemplate = (templateName: string) => {
-    toast({
-      title: "Edit Email Template",
-      description: `Editing ${templateName} template...`,
-    })
-  }
-
-  const handleAddRole = () => {
-    toast({
-      title: "Add Role",
-      description: "Opening role creation form...",
-    })
-  }
-
-  const handleEditRole = (roleName: string) => {
-    toast({
-      title: "Edit Role",
-      description: `Editing ${roleName} role...`,
-    })
-  }
-
-  const handleBackupNow = async () => {
-    setIsBackingUp(true)
+  const handleSavePolicyChanges = async () => {
+    setIsSavingPolicy(true)
     try {
-      // Simulate backup process
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-      setLastBackupTime(new Date().toISOString())
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // Update the policy in current policies
+      setCurrentPolicies((prev) =>
+        prev.map((policy) =>
+          policy.name === selectedPolicy.name
+            ? { ...policy, name: editingPolicy.name, days: editingPolicy.days, description: editingPolicy.description }
+            : policy,
+        ),
+      )
+
+      setShowPolicyModal(false)
       toast({
-        title: "Backup Completed",
-        description: "System backup completed successfully.",
+        title: "Policy Updated",
+        description: `${editingPolicy.name} policy has been successfully updated.`,
       })
     } catch (error) {
       toast({
-        title: "Backup Failed",
-        description: "Failed to complete system backup.",
+        title: "Error",
+        description: "Failed to update policy. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setIsBackingUp(false)
+      setIsSavingPolicy(false)
     }
   }
 
-  const confirmDeactivateSubsidiary = (subsidiaryId: string) => {
-    const subsidiary = subsidiaries.find((s) => s.id === subsidiaryId)
-    if (subsidiary) {
-      setSubsidiaryToToggle(subsidiary)
-      setShowDeactivateConfirm(true)
+  const handleDocumentAction = (action, docId = null) => {
+    if (docId) {
+      const doc = hrDocuments.find((d) => d.id === docId)
+      setSelectedDocument(doc)
+    }
+    setDocumentModalType(action)
+    setShowDocumentModal(true)
+  }
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0]
+    if (file) {
+      setUploadedFile(file)
+      if (!documentName) {
+        setDocumentName(file.name.replace(/\.[^/.]+$/, ""))
+      }
     }
   }
 
-  const confirmReactivateSubsidiary = (subsidiaryId: string) => {
-    const subsidiary = subsidiaries.find((s) => s.id === subsidiaryId)
-    if (subsidiary) {
-      setSubsidiaryToToggle(subsidiary)
-      setShowReactivateConfirm(true)
+  const handleAddDocument = () => {
+    setDocumentName("")
+    setUploadedFile(null)
+    handleDocumentAction("add")
+  }
+
+  const handleSaveDocument = async () => {
+    if (!documentName || !uploadedFile) {
+      toast({
+        title: "Error",
+        description: "Please provide a document name and upload a file.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSavingDocument(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      const newDoc = {
+        id: Date.now(),
+        name: documentName,
+        type: uploadedFile.type.includes("pdf") ? "PDF" : "DOC",
+        size: `${(uploadedFile.size / (1024 * 1024)).toFixed(1)} MB`,
+        visibleToAll: false,
+      }
+
+      setHrDocuments((prev) => [...prev, newDoc])
+      setShowDocumentModal(false)
+      setDocumentName("")
+      setUploadedFile(null)
+
+      toast({
+        title: "Document Added",
+        description: `${documentName} has been successfully uploaded.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to upload document. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingDocument(false)
+    }
+  }
+
+  const handleDeleteDocument = async (docId) => {
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId))
+      setShowDocumentModal(false)
+      toast({
+        title: "Document Deleted",
+        description: "Document has been successfully removed.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete document. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingDocument(false)
     }
   }
 
@@ -1533,6 +1562,94 @@ const SettingsPage: FunctionComponent = () => {
       })
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const confirmDeactivateSubsidiary = (subsidiaryId: string) => {
+    setSubsidiaryToToggle(subsidiaries.find((s) => s.id === subsidiaryId) || null)
+    setShowDeactivateConfirm(true)
+  }
+
+  const confirmReactivateSubsidiary = (subsidiaryId: string) => {
+    setSubsidiaryToToggle(subsidiaries.find((s) => s.id === subsidiaryId) || null)
+    setShowReactivateConfirm(true)
+  }
+
+  const handleManageLeaveTypes = () => {
+    setShowAddLeaveTypeModal(true)
+  }
+
+  const handleToggleDocumentVisibility = (docId: number) => {
+    setHrDocuments((prev) => prev.map((doc) => (doc.id === docId ? { ...doc, visibleToAll: !doc.visibleToAll } : doc)))
+  }
+
+  const handleManageAllowances = () => {
+    toast({
+      title: "Allowances Management",
+      description: "Opening allowances configuration...",
+    })
+  }
+
+  const handleManageDeductions = () => {
+    toast({
+      title: "Deductions Management",
+      description: "Opening deductions configuration...",
+    })
+  }
+
+  const handleManageSalaryGrades = () => {
+    toast({
+      title: "Salary Grades Management",
+      description: "Opening salary grades configuration...",
+    })
+  }
+
+  const handleEditEmailTemplate = (templateName: string) => {
+    toast({
+      title: "Edit Email Template",
+      description: `Editing ${templateName} template...`,
+    })
+  }
+
+  const handleAddEmailTemplate = () => {
+    toast({
+      title: "Add Email Template",
+      description: "Opening email template editor...",
+    })
+  }
+
+  const handleAddRole = () => {
+    toast({
+      title: "Add Role",
+      description: "Opening role creation form...",
+    })
+  }
+
+  const handleEditRole = (roleName: string) => {
+    toast({
+      title: "Edit Role",
+      description: `Editing ${roleName} role...`,
+    })
+  }
+
+  const handleBackupNow = async () => {
+    setIsBackingUp(true)
+    try {
+      // Simulate backup process
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      setLastBackupTime(new Date().toISOString())
+      toast({
+        title: "Backup Completed",
+        description: "System backup completed successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Backup Failed",
+        description: "Failed to complete system backup.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsBackingUp(false)
     }
   }
 
@@ -2341,12 +2458,9 @@ const SettingsPage: FunctionComponent = () => {
                         </Badge>
                       )}
                     </h3>
+                    {/* Update the current policies rendering to use state */}
                     <div className="space-y-2">
-                      {[
-                        { name: "Annual Leave", days: 21, usage: "68%", trend: "up" },
-                        { name: "Sick Leave", days: 10, usage: "23%", trend: "down" },
-                        { name: "Maternity Leave", days: 84, usage: "12%", trend: "stable" },
-                      ].map((policy) => (
+                      {currentPolicies.map((policy) => (
                         <div
                           key={policy.name}
                           className="flex justify-between items-center p-3 border rounded hover:bg-gray-50 transition-colors"
@@ -2475,6 +2589,7 @@ const SettingsPage: FunctionComponent = () => {
                 <CardDescription>Manage HR policy documents and employee access</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Update HR documents rendering with 3-dot menus */}
                 <div className="space-y-3">
                   {hrDocuments.map((doc) => (
                     <div
@@ -2501,14 +2616,31 @@ const SettingsPage: FunctionComponent = () => {
                             onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
                           />
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveDocument(doc.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDocumentAction("view", doc.id)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDocumentAction("edit", doc.id)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleDocumentAction("delete", doc.id)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   ))}
@@ -2647,25 +2779,28 @@ const SettingsPage: FunctionComponent = () => {
                       <p className="text-sm text-gray-600">Welcome to Akwaaba Technologies</p>
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Welcome Email")}>
-                      <Edit className="h-4 w-4" />
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Template
                     </Button>
                   </div>
                   <div className="flex justify-between items-center p-3 border rounded">
                     <div>
-                      <span className="font-medium">Leave Approval</span>
-                      <p className="text-sm text-gray-600">Leave Request Approved</p>
+                      <span className="font-medium">Leave Request</span>
+                      <p className="text-sm text-gray-600">Notification for leave requests</p>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Leave Approval")}>
-                      <Edit className="h-4 w-4" />
+                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Leave Request")}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Template
                     </Button>
                   </div>
                   <div className="flex justify-between items-center p-3 border rounded">
                     <div>
-                      <span className="font-medium">Payroll Notification</span>
-                      <p className="text-sm text-gray-600">Payroll Processed</p>
+                      <span className="font-medium">Password Reset</span>
+                      <p className="text-sm text-gray-600">Instructions for resetting password</p>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Payroll Notification")}>
-                      <Edit className="h-4 w-4" />
+                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Password Reset")}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Template
                     </Button>
                   </div>
                 </div>
@@ -2675,25 +2810,19 @@ const SettingsPage: FunctionComponent = () => {
               </div>
 
               <div className="space-y-4">
-                <h3 className="font-semibold">Notification Settings</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="notificationEmail">Notification Email</Label>
-                    <Input
-                      id="notificationEmail"
-                      type="email"
-                      defaultValue="notifications@akwaaba.com"
-                      placeholder="Enter notification email"
-                    />
+                <h3 className="font-semibold">Notification Preferences</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Leave Request Notifications</span>
+                    <Switch defaultChecked />
                   </div>
-                  <div>
-                    <Label htmlFor="webhookUrl">Webhook URL</Label>
-                    <Input
-                      id="webhookUrl"
-                      type="url"
-                      defaultValue="https://api.akwaaba.com/webhooks/notifications"
-                      placeholder="Enter webhook URL"
-                    />
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Task Assignment Notifications</span>
+                    <Switch />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Meeting Reminders</span>
+                    <Switch defaultChecked />
                   </div>
                 </div>
               </div>
@@ -2704,46 +2833,49 @@ const SettingsPage: FunctionComponent = () => {
         <TabsContent value="roles">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5" />
-                  <span>Role Management</span>
-                </div>
-                <Button onClick={handleAddRole}>Add Role</Button>
+              <CardTitle className="flex items-center space-x-2">
+                <Shield className="w-5 h-5" />
+                <span>Roles & Permissions</span>
               </CardTitle>
-              <CardDescription>Manage user roles and permissions</CardDescription>
+              <CardDescription>Manage user roles and access permissions</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
               <div className="space-y-4">
-                {roles.map((role) => (
-                  <div key={role.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Current Roles</h3>
+                <div className="space-y-2">
+                  {roles.map((role) => (
+                    <div key={role.id} className="flex justify-between items-center p-3 border rounded">
                       <div>
-                        <h3 className="font-semibold">{role.name}</h3>
+                        <span className="font-medium">{role.name}</span>
                         <p className="text-sm text-gray-600">{role.description}</p>
-                        <p className="text-sm text-gray-500">{role.user_count} users assigned</p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleEditRole(role.name)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        <span className="text-sm text-gray-500">{role.user_count} Users</span>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm">
-                              <MoreVertical className="h-4 w-4" />
+                              <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem>View Permissions</DropdownMenuItem>
-                            <DropdownMenuItem>Edit Role</DropdownMenuItem>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditRole(role.name)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Role
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600">Delete Role</DropdownMenuItem>
+                            <DropdownMenuItem className="text-red-600">
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Role
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <Button variant="outline" size="sm" onClick={handleAddRole}>
+                  Add Role
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -2753,76 +2885,26 @@ const SettingsPage: FunctionComponent = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <Shield className="w-5 h-5" />
-                <span>Access Control</span>
+                <Users className="w-5 h-5" />
+                <span>Access Management</span>
               </CardTitle>
-              <CardDescription>Manage user access permissions and restrictions</CardDescription>
+              <CardDescription>Manage user access and authentication settings</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <h3 className="font-semibold">Permission Matrix</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-300">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-300 p-2 text-left">Role</th>
-                        <th className="border border-gray-300 p-2 text-center">Dashboard</th>
-                        <th className="border border-gray-300 p-2 text-center">Employees</th>
-                        <th className="border border-gray-300 p-2 text-center">Payroll</th>
-                        <th className="border border-gray-300 p-2 text-center">Reports</th>
-                        <th className="border border-gray-300 p-2 text-center">Settings</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="border border-gray-300 p-2 font-medium">Administrator</td>
-                        <td className="border border-gray-300 p-2 text-center">✓</td>
-                        <td className="border border-gray-300 p-2 text-center">✓</td>
-                        <td className="border border-gray-300 p-2 text-center">✓</td>
-                        <td className="border border-gray-300 p-2 text-center">✓</td>
-                        <td className="border border-gray-300 p-2 text-center">✓</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 p-2 font-medium">HR Manager</td>
-                        <td className="border border-gray-300 p-2 text-center">✓</td>
-                        <td className="border border-gray-300 p-2 text-center">✓</td>
-                        <td className="border border-gray-300 p-2 text-center">✓</td>
-                        <td className="border border-gray-300 p-2 text-center">✓</td>
-                        <td className="border border-gray-300 p-2 text-center">-</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 p-2 font-medium">Employee</td>
-                        <td className="border border-gray-300 p-2 text-center">✓</td>
-                        <td className="border border-gray-300 p-2 text-center">-</td>
-                        <td className="border border-gray-300 p-2 text-center">-</td>
-                        <td className="border border-gray-300 p-2 text-center">-</td>
-                        <td className="border border-gray-300 p-2 text-center">-</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="font-semibold">Access Restrictions</h3>
+                <h3 className="font-semibold">Authentication Methods</h3>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center p-3 border rounded">
-                    <span>IP Address Restrictions</span>
-                    <Button variant="outline" size="sm">
-                      Configure
-                    </Button>
+                    <span>Password Authentication</span>
+                    <Switch defaultChecked />
                   </div>
                   <div className="flex justify-between items-center p-3 border rounded">
-                    <span>Time-based Access</span>
-                    <Button variant="outline" size="sm">
-                      Configure
-                    </Button>
+                    <span>Two-Factor Authentication</span>
+                    <Switch />
                   </div>
                   <div className="flex justify-between items-center p-3 border rounded">
-                    <span>Device Restrictions</span>
-                    <Button variant="outline" size="sm">
-                      Configure
-                    </Button>
+                    <span>Social Login (Google, Facebook)</span>
+                    <Switch />
                   </div>
                 </div>
               </div>
@@ -2837,76 +2919,49 @@ const SettingsPage: FunctionComponent = () => {
                 <Shield className="w-5 h-5" />
                 <span>Security Settings</span>
               </CardTitle>
-              <CardDescription>Configure security policies and monitoring</CardDescription>
+              <CardDescription>Configure security settings and data backup options</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Password Policy</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <span>Minimum Length</span>
-                      <span className="font-semibold">8 characters</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <span>Require Special Characters</span>
-                      <span className="font-semibold">Yes</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <span>Password Expiry</span>
-                      <span className="font-semibold">90 days</span>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Update Policy
-                  </Button>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Security Actions</h3>
-                  <div className="space-y-2">
-                    <Button variant="outline" className="w-full justify-start bg-transparent">
-                      <Shield className="h-4 w-4 mr-2" />
-                      Change Admin Password
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start bg-transparent">
-                      <Clock className="h-4 w-4 mr-2" />
-                      View Activity Log
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start bg-transparent">
-                      <Brain className="h-4 w-4 mr-2" />
-                      Download Security Report
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
               <div className="space-y-4">
-                <h3 className="font-semibold">System Backup</h3>
-                <div className="flex items-center justify-between p-4 border rounded-lg">
+                <h3 className="font-semibold">Data Backup</h3>
+                <div className="flex justify-between items-center p-3 border rounded">
                   <div>
-                    <p className="font-medium">Last Backup</p>
+                    <span className="font-medium">Last Backup</span>
                     <p className="text-sm text-gray-600">
-                      {lastBackupTime ? new Date(lastBackupTime).toLocaleString() : "Never"}
+                      {lastBackupTime ? new Date(lastBackupTime).toLocaleString() : "No backup yet"}
                     </p>
                   </div>
-                  <Button
-                    onClick={handleBackupNow}
-                    disabled={isBackingUp}
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                  >
+                  <Button variant="outline" size="sm" onClick={handleBackupNow} disabled={isBackingUp}>
                     {isBackingUp ? (
                       <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Backing Up...
                       </>
                     ) : (
                       <>
-                        <Power className="h-4 w-4 mr-2" />
+                        <RefreshCw className="mr-2 h-4 w-4" />
                         Backup Now
                       </>
                     )}
                   </Button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Security Policies</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Password Expiry (90 days)</span>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>IP Address Whitelisting</span>
+                    <Switch />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Data Encryption</span>
+                    <Switch defaultChecked />
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -2914,460 +2969,263 @@ const SettingsPage: FunctionComponent = () => {
         </TabsContent>
       </Tabs>
 
-      <Dialog
-        open={viewEmployeesModal.isOpen}
-        onOpenChange={(open) => setViewEmployeesModal({ ...viewEmployeesModal, isOpen: open })}
-      >
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      {/* Add Subsidiary Modal */}
+      <Dialog open={showAddSubsidiary} onOpenChange={setShowAddSubsidiary}>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Subsidiary Employees</DialogTitle>
-            <DialogDescription>
-              Employees working at {subsidiaries.find((s) => s.id === viewEmployeesModal.subsidiaryId)?.name}
-            </DialogDescription>
+            <DialogTitle>Add New Subsidiary</DialogTitle>
+            <DialogDescription>Create a new subsidiary company</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            {isDemoMode() ? (
-              <div className="grid gap-4">
-                {[
-                  {
-                    name: "John Doe",
-                    position: "Software Engineer",
-                    department: "Technology",
-                    email: "john@company.com",
-                  },
-                  {
-                    name: "Jane Smith",
-                    position: "Marketing Manager",
-                    department: "Marketing",
-                    email: "jane@company.com",
-                  },
-                  {
-                    name: "Mike Johnson",
-                    position: "HR Specialist",
-                    department: "Human Resources",
-                    email: "mike@company.com",
-                  },
-                ].map((employee, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <h4 className="font-medium">{employee.name}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {employee.position} • {employee.department}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{employee.email}</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      View Profile
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {viewEmployeesModal.employees?.length ? (
-                  viewEmployeesModal.employees.map((employee) => (
-                    <div key={employee.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <h4 className="font-medium">{employee.full_name}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {employee.position} • {employee.department}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{employee.corporate_email}</p>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        View Profile
-                      </Button>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">No employees found for this subsidiary</p>
-                )}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={importModal} onOpenChange={setImportModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Import Settings</DialogTitle>
-            <DialogDescription>
-              Upload a CSV file to import subsidiary settings. Download the template first if needed.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-              <input
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) {
-                    handleImportSettings(file)
-                    setImportModal(false)
-                  }
-                }}
-                className="hidden"
-                id="import-file"
-              />
-              <label htmlFor="import-file" className="cursor-pointer">
-                <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                <p className="text-sm text-gray-600">Click to upload CSV file</p>
-                <p className="text-xs text-gray-400 mt-1">Supports CSV, Excel formats</p>
-              </label>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input id="name" defaultValue="" className="col-span-3" />
             </div>
-            <div className="flex justify-between">
-              <Button variant="outline" onClick={handleExportSettingsTemplate}>
-                <Download className="w-4 h-4 mr-2" />
-                Download Template
-              </Button>
-              <Button variant="outline" onClick={() => setImportModal(false)}>
-                Cancel
-              </Button>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="tax_id" className="text-right">
+                Tax ID
+              </Label>
+              <Input id="tax_id" defaultValue="" className="col-span-3" />
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {showAddSubsidiary && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Add New Subsidiary</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setShowAddSubsidiary(false)
-                  setSubsidiaryLogoPreview("")
-                }}
-              >
-                <X className="w-4 h-4" />
-              </Button>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="ssnit_number" className="text-right">
+                SSNIT Number
+              </Label>
+              <Input id="ssnit_number" defaultValue="" className="col-span-3" />
             </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                const formData = new FormData(e.target as HTMLFormElement)
-                const subsidiaryData = {
-                  name: formData.get("name") as string,
-                  legal_name: formData.get("legal_name") as string,
-                  tax_id: formData.get("tax_id") as string,
-                  ssnit_number: formData.get("ssnit_number") as string,
-                  address: formData.get("address") as string,
-                  city: formData.get("city") as string,
-                  region: formData.get("region") as string,
-                  country: formData.get("country") as string,
-                  phone: formData.get("phone") as string,
-                  email: formData.get("email") as string,
-                  website: formData.get("website") as string,
-                  industry: formData.get("industry") as string,
-                  status: "active",
-                  logo_url: subsidiaryLogoPreview,
-                  departments: formData.get("departments")
-                    ? (formData.get("departments") as string).split(",").map((d) => d.trim())
-                    : [],
-                  divisions: formData.get("divisions")
-                    ? (formData.get("divisions") as string).split(",").map((d) => d.trim())
-                    : [],
-                  locations: formData.get("locations")
-                    ? (formData.get("locations") as string).split(",").map((l) => l.trim())
-                    : [],
-                }
-                addNewSubsidiary(subsidiaryData)
-                setShowAddSubsidiary(false)
-                setSubsidiaryLogoPreview("")
-              }}
-            >
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-2">Company Logo</label>
-                <div className="flex items-center space-x-4">
-                  {subsidiaryLogoPreview ? (
-                    <div className="relative">
-                      <img
-                        src={subsidiaryLogoPreview || "/placeholder.svg"}
-                        alt="Subsidiary Logo"
-                        className="w-16 h-16 object-cover rounded-lg border"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-red-500 hover:bg-red-600 text-white"
-                        onClick={() => setSubsidiaryLogoPreview("")}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                      <ImageIcon className="w-6 h-6 text-gray-400" />
-                    </div>
-                  )}
-                  <div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) {
-                          handleLogoUpload(file, "subsidiary")
-                        }
-                      }}
-                      className="hidden"
-                      id="subsidiary-logo-upload"
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="industry" className="text-right">
+                Industry
+              </Label>
+              <Input id="industry" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="email_address" className="text-right">
+                Email
+              </Label>
+              <Input id="email_address" defaultValue="" className="col-span-3" type="email" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="phone_number" className="text-right">
+                Phone
+              </Label>
+              <Input id="phone_number" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="address" className="text-right">
+                Address
+              </Label>
+              <Textarea id="address" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Logo</Label>
+              <div className="col-span-3">
+                {subsidiaryLogoPreview ? (
+                  <div className="relative">
+                    <img
+                      src={subsidiaryLogoPreview || "/placeholder.svg"}
+                      alt="Subsidiary Logo"
+                      className="w-20 h-20 object-cover rounded-lg border"
                     />
                     <Button
-                      type="button"
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      onClick={() => document.getElementById("subsidiary-logo-upload")?.click()}
-                      disabled={isUploadingLogo}
-                      className="flex items-center space-x-2"
+                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                      onClick={() => setSubsidiaryLogoPreview("")}
                     >
-                      {isUploadingLogo ? (
-                        <>
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          <span>Uploading...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-3 h-3" />
-                          <span>Upload</span>
-                        </>
-                      )}
+                      <X className="h-3 w-3" />
                     </Button>
                   </div>
+                ) : (
+                  <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                    <ImageIcon className="w-8 h-8 text-gray-400" />
+                  </div>
+                )}
+                <div className="space-y-2 mt-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        handleLogoUpload(file, "subsidiary")
+                      }
+                    }}
+                    className="hidden"
+                    id="subsidiary-logo-upload"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => document.getElementById("subsidiary-logo-upload")?.click()}
+                    disabled={isUploadingLogo}
+                    className="flex items-center space-x-2"
+                  >
+                    {isUploadingLogo ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Uploading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        <span>Upload Logo</span>
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Company Name *</label>
-                  <input
-                    name="name"
-                    type="text"
-                    required
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter company name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Legal Name *</label>
-                  <input
-                    name="legal_name"
-                    type="text"
-                    required
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter legal name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Tax ID *</label>
-                  <input
-                    name="tax_id"
-                    type="text"
-                    required
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter tax ID"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">SSNIT Number</label>
-                  <input
-                    name="ssnit_number"
-                    type="text"
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter SSNIT number"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Address</label>
-                  <input
-                    name="address"
-                    type="text"
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter address"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">City</label>
-                  <input name="city" type="text" className="w-full p-2 border rounded-md" placeholder="Enter city" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Region</label>
-                  <input
-                    name="region"
-                    type="text"
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter region"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Country</label>
-                  <input
-                    name="country"
-                    type="text"
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter country"
-                    defaultValue="Ghana"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Phone</label>
-                  <input
-                    name="phone"
-                    type="tel"
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter phone number"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Email</label>
-                  <input name="email" type="email" className="w-full p-2 border rounded-md" placeholder="Enter email" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Website</label>
-                  <input
-                    name="website"
-                    type="url"
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter website URL"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Industry</label>
-                  <select name="industry" className="w-full p-2 border rounded-md">
-                    <option value="">Select industry</option>
-                    <option value="Technology">Technology</option>
-                    <option value="Finance">Finance</option>
-                    <option value="Healthcare">Healthcare</option>
-                    <option value="Manufacturing">Manufacturing</option>
-                    <option value="Retail">Retail</option>
-                    <option value="Education">Education</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Departments</label>
-                  <input
-                    name="departments"
-                    type="text"
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter departments (comma-separated)"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Divisions</label>
-                  <input
-                    name="divisions"
-                    type="text"
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter divisions (comma-separated)"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Locations</label>
-                  <input
-                    name="locations"
-                    type="text"
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter locations (comma-separated)"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-2 mt-6">
-                <Button type="button" variant="outline" onClick={() => setShowAddSubsidiary(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">Add Subsidiary</Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showEditSubsidiary && selectedSubsidiary && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Edit Subsidiary</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setShowEditSubsidiary(false)
-                  setSelectedSubsidiary(null)
-                  setSubsidiaryLogoPreview("")
-                }}
-              >
-                <X className="w-4 h-4" />
-              </Button>
             </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="submit"
+              onClick={async () => {
+                const name = (document.getElementById("name") as HTMLInputElement).value
+                const tax_id = (document.getElementById("tax_id") as HTMLInputElement).value
+                const ssnit_number = (document.getElementById("ssnit_number") as HTMLInputElement).value
+                const industry = (document.getElementById("industry") as HTMLInputElement).value
+                const email_address = (document.getElementById("email_address") as HTMLInputElement).value
+                const phone_number = (document.getElementById("phone_number") as HTMLInputElement).value
+                const address = (document.getElementById("address") as HTMLTextAreaElement).value
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                const formData = new FormData(e.target as HTMLFormElement)
-                const subsidiaryData = {
-                  name: formData.get("name") as string,
-                  legal_name: formData.get("legal_name") as string,
-                  tax_id: formData.get("tax_id") as string,
-                  ssnit_number: formData.get("ssnit_number") as string,
-                  address: formData.get("address") as string,
-                  city: formData.get("city") as string,
-                  region: formData.get("region") as string,
-                  country: formData.get("country") as string,
-                  phone: formData.get("phone") as string,
-                  email: formData.get("email") as string,
-                  website: formData.get("website") as string,
-                  industry: formData.get("industry") as string,
-                  departments: formData.get("departments")
-                    ? (formData.get("departments") as string).split(",").map((d) => d.trim())
-                    : [],
-                  divisions: formData.get("divisions")
-                    ? (formData.get("divisions") as string).split(",").map((d) => d.trim())
-                    : [],
-                  locations: formData.get("locations")
-                    ? (formData.get("locations") as string).split(",").map((l) => l.trim())
-                    : [],
-                  logo_url: subsidiaryLogoPreview || selectedSubsidiary.logo_url,
-                }
-                updateSubsidiary(selectedSubsidiary.id, subsidiaryData)
-                setShowEditSubsidiary(false)
-                setSelectedSubsidiary(null)
-                setSubsidiaryLogoPreview("")
+                setIsSavingSubsidiary(true)
+                await addNewSubsidiary({ name, tax_id, ssnit_number, industry, email_address, phone_number, address })
+                setShowAddSubsidiary(false)
+                setIsSavingSubsidiary(false)
               }}
+              disabled={isSavingSubsidiary}
             >
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-2">Company Logo</label>
-                <div className="flex items-center space-x-4">
+              {isSavingSubsidiary ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Create Subsidiary"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Subsidiary Modal */}
+      <Dialog open={showEditSubsidiary} onOpenChange={setShowEditSubsidiary}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Subsidiary</DialogTitle>
+            <DialogDescription>Edit details of the selected subsidiary</DialogDescription>
+          </DialogHeader>
+          {selectedSubsidiary && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_name" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="edit_name"
+                  defaultValue={selectedSubsidiary.name}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, name: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_tax_id" className="text-right">
+                  Tax ID
+                </Label>
+                <Input
+                  id="edit_tax_id"
+                  defaultValue={selectedSubsidiary.tax_id}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, tax_id: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_ssnit_number" className="text-right">
+                  SSNIT Number
+                </Label>
+                <Input
+                  id="edit_ssnit_number"
+                  defaultValue={selectedSubsidiary.ssnit_number}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, ssnit_number: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_industry" className="text-right">
+                  Industry
+                </Label>
+                <Input
+                  id="edit_industry"
+                  defaultValue={selectedSubsidiary.industry}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, industry: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_email_address" className="text-right">
+                  Email
+                </Label>
+                <Input
+                  id="edit_email_address"
+                  defaultValue={selectedSubsidiary.email_address}
+                  className="col-span-3"
+                  type="email"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, email_address: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_phone_number" className="text-right">
+                  Phone
+                </Label>
+                <Input
+                  id="edit_phone_number"
+                  defaultValue={selectedSubsidiary.phone_number}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, phone_number: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_address" className="text-right">
+                  Address
+                </Label>
+                <Textarea
+                  id="edit_address"
+                  defaultValue={selectedSubsidiary.address}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, address: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">Logo</Label>
+                <div className="col-span-3">
                   {subsidiaryLogoPreview || selectedSubsidiary.logo_url ? (
                     <div className="relative">
                       <img
                         src={subsidiaryLogoPreview || selectedSubsidiary.logo_url}
                         alt="Subsidiary Logo"
-                        className="w-16 h-16 object-cover rounded-lg border"
+                        className="w-20 h-20 object-cover rounded-lg border"
                       />
                       <Button
-                        type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-red-500 hover:bg-red-600 text-white"
-                        onClick={() => setSubsidiaryLogoPreview("")}
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                        onClick={() => {
+                          setSubsidiaryLogoPreview("")
+                          setSelectedSubsidiary({ ...selectedSubsidiary, logo_url: "" })
+                        }}
                       >
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
                   ) : (
-                    <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                      <ImageIcon className="w-6 h-6 text-gray-400" />
+                    <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                      <ImageIcon className="w-8 h-8 text-gray-400" />
                     </div>
                   )}
-                  <div>
+                  <div className="space-y-2 mt-2">
                     <input
                       type="file"
                       accept="image/*"
@@ -3381,610 +3239,526 @@ const SettingsPage: FunctionComponent = () => {
                       id="edit-subsidiary-logo-upload"
                     />
                     <Button
-                      type="button"
                       variant="outline"
-                      size="sm"
                       onClick={() => document.getElementById("edit-subsidiary-logo-upload")?.click()}
                       disabled={isUploadingLogo}
                       className="flex items-center space-x-2"
                     >
                       {isUploadingLogo ? (
                         <>
-                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin" />
                           <span>Uploading...</span>
                         </>
                       ) : (
                         <>
-                          <Upload className="w-3 h-3" />
-                          <span>Upload</span>
+                          <Upload className="w-4 h-4" />
+                          <span>Upload Logo</span>
                         </>
                       )}
                     </Button>
+                    <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
                   </div>
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Company Name *</label>
-                  <input
-                    name="name"
-                    type="text"
-                    required
-                    defaultValue={selectedSubsidiary.name}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter company name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Legal Name *</label>
-                  <input
-                    name="legal_name"
-                    type="text"
-                    required
-                    defaultValue={selectedSubsidiary.legal_name}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter legal name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Tax ID *</label>
-                  <input
-                    name="tax_id"
-                    type="text"
-                    required
-                    defaultValue={selectedSubsidiary.tax_id}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter tax ID"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">SSNIT Number</label>
-                  <input
-                    name="ssnit_number"
-                    type="text"
-                    defaultValue={selectedSubsidiary.ssnit_number || ""}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter SSNIT number"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Address</label>
-                  <input
-                    name="address"
-                    type="text"
-                    defaultValue={selectedSubsidiary.address || ""}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter address"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">City</label>
-                  <input
-                    name="city"
-                    type="text"
-                    defaultValue={selectedSubsidiary.city || ""}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter city"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Region</label>
-                  <input
-                    name="region"
-                    type="text"
-                    defaultValue={selectedSubsidiary.region || ""}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter region"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Country</label>
-                  <input
-                    name="country"
-                    type="text"
-                    defaultValue={selectedSubsidiary.country || "Ghana"}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter country"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Phone</label>
-                  <input
-                    name="phone"
-                    type="tel"
-                    defaultValue={selectedSubsidiary.phone || ""}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter phone number"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Email</label>
-                  <input
-                    name="email"
-                    type="email"
-                    defaultValue={selectedSubsidiary.email || ""}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter email"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Website</label>
-                  <input
-                    name="website"
-                    type="url"
-                    defaultValue={selectedSubsidiary.website || ""}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter website URL"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Industry</label>
-                  <select
-                    name="industry"
-                    defaultValue={selectedSubsidiary.industry || ""}
-                    className="w-full p-2 border rounded-md"
-                  >
-                    <option value="">Select industry</option>
-                    <option value="Technology">Technology</option>
-                    <option value="Finance">Finance</option>
-                    <option value="Healthcare">Healthcare</option>
-                    <option value="Manufacturing">Manufacturing</option>
-                    <option value="Retail">Retail</option>
-                    <option value="Education">Education</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Departments</label>
-                  <input
-                    name="departments"
-                    type="text"
-                    defaultValue={selectedSubsidiary.departments?.join(", ") || ""}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter departments (comma-separated)"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Divisions</label>
-                  <input
-                    name="divisions"
-                    type="text"
-                    defaultValue={selectedSubsidiary.divisions?.join(", ") || ""}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter divisions (comma-separated)"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Locations</label>
-                  <input
-                    name="locations"
-                    type="text"
-                    defaultValue={selectedSubsidiary.locations?.join(", ") || ""}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Enter locations (comma-separated)"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-2 mt-6">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setShowEditSubsidiary(false)
-                    setSelectedSubsidiary(null)
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit">Update Subsidiary</Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showSubsidiaryDetails && selectedSubsidiary && (
-        <Dialog open={showSubsidiaryDetails} onOpenChange={setShowSubsidiaryDetails}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center space-x-3">
-                {selectedSubsidiary?.logo_url ? (
-                  <img
-                    src={selectedSubsidiary.logo_url || "/placeholder.svg"}
-                    alt={`${selectedSubsidiary.name} logo`}
-                    className="w-8 h-8 object-cover rounded"
-                  />
-                ) : (
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded flex items-center justify-center text-white font-bold text-sm">
-                    {selectedSubsidiary?.name.charAt(0)}
-                  </div>
-                )}
-                <span>Subsidiary Details</span>
-              </DialogTitle>
-              <DialogDescription>Detailed information for {selectedSubsidiary?.name}</DialogDescription>
-            </DialogHeader>
-
-            {selectedSubsidiary && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Company Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Company Name</Label>
-                        <p className="text-sm">{selectedSubsidiary.name}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Legal Name</Label>
-                        <p className="text-sm">{selectedSubsidiary.legal_name || selectedSubsidiary.name}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Tax ID</Label>
-                        <p className="text-sm">{selectedSubsidiary.tax_id}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">SSNIT Number</Label>
-                        <p className="text-sm">{selectedSubsidiary.ssnit_number}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Industry</Label>
-                        <p className="text-sm">{selectedSubsidiary.industry}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Status</Label>
-                        <Badge variant={selectedSubsidiary.status === "active" ? "default" : "secondary"}>
-                          {selectedSubsidiary.status}
-                        </Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Contact Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Address</Label>
-                        <p className="text-sm">{selectedSubsidiary.address || "Not provided"}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">City</Label>
-                        <p className="text-sm">{selectedSubsidiary.city || "Not provided"}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Region</Label>
-                        <p className="text-sm">{selectedSubsidiary.region || "Not provided"}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Country</Label>
-                        <p className="text-sm">{selectedSubsidiary.country || "Ghana"}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Phone</Label>
-                        <p className="text-sm">{selectedSubsidiary.phone_number || "Not provided"}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Email</Label>
-                        <p className="text-sm">{selectedSubsidiary.email_address || "Not provided"}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Website</Label>
-                        <p className="text-sm">{selectedSubsidiary.website || "Not provided"}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <Card className="md:col-span-2">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Organization Statistics</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-600">{selectedSubsidiary.employee_count || 0}</div>
-                        <div className="text-sm text-gray-600">Employees</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">
-                          {selectedSubsidiary.divisions_count || selectedSubsidiary.divisions?.length || 0}
-                        </div>
-                        <div className="text-sm text-gray-600">Divisions</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-purple-600">
-                          {selectedSubsidiary.departments_count || selectedSubsidiary.departments?.length || 0}
-                        </div>
-                        <div className="text-sm text-gray-600">Departments</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-orange-600">
-                          {selectedSubsidiary.locations_count || selectedSubsidiary.locations?.length || 0}
-                        </div>
-                        <div className="text-sm text-gray-600">Locations</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <div className="flex justify-end space-x-2 mt-6">
-                  <Button
-                    onClick={() => {
-                      setShowSubsidiaryDetails(false)
-                      setSelectedSubsidiary(null)
-                    }}
-                  >
-                    Close
-                  </Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {showDeactivateConfirm && subsidiaryToToggle && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-orange-600">Confirm Deactivation</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setShowDeactivateConfirm(false)
-                  setSubsidiaryToToggle(null)
-                }}
-              >
-                <X className="w-4 h-4" />
-              </Button>
             </div>
-
-            <div className="mb-6">
-              <p className="text-gray-700 mb-2">
-                Are you sure you want to deactivate <strong>{subsidiaryToToggle.name}</strong>?
-              </p>
-              <p className="text-sm text-gray-600">
-                This will temporarily disable access to this subsidiary. You can reactivate it later.
-              </p>
-            </div>
-
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowDeactivateConfirm(false)
-                  setSubsidiaryToToggle(null)
-                }}
-              >
-                Cancel
-              </Button>
-              <Button variant="destructive" onClick={confirmToggleStatusInner}>
-                <Pause className="w-4 h-4 mr-2" />
-                Deactivate
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showReactivateConfirm && subsidiaryToToggle && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-green-600">Confirm Reactivation</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setShowReactivateConfirm(false)
-                  setSubsidiaryToToggle(null)
-                }}
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <div className="mb-6">
-              <p className="text-gray-700 mb-2">
-                Are you sure you want to reactivate <strong>{subsidiaryToToggle.name}</strong>?
-              </p>
-              <p className="text-sm text-gray-600">
-                This will restore full access to this subsidiary and its features.
-              </p>
-            </div>
-
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowReactivateConfirm(false)
-                  setSubsidiaryToToggle(null)
-                }}
-              >
-                Cancel
-              </Button>
-              <Button variant="default" onClick={confirmToggleStatusInner} className="bg-green-600 hover:bg-green-700">
-                <Play className="w-4 h-4 mr-2" />
-                Reactivate
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-      <Dialog open={showAddLeaveTypeModal} onOpenChange={setShowAddLeaveTypeModal}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Plus className="w-5 h-5" />
-              <span>Add New Leave Type</span>
-            </DialogTitle>
-            <DialogDescription>Create a new leave type with AI-powered policy recommendations</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="leaveTypeName">Leave Type Name</Label>
-              <Input
-                id="leaveTypeName"
-                value={newLeaveType.name}
-                onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
-                placeholder="e.g., Compassionate Leave"
-              />
-            </div>
-            <div>
-              <Label htmlFor="leaveDays">Number of Days</Label>
-              <Input
-                id="leaveDays"
-                type="number"
-                value={newLeaveType.days}
-                onChange={(e) => setNewLeaveType({ ...newLeaveType, days: Number.parseInt(e.target.value) })}
-                min="0"
-                max="365"
-              />
-            </div>
-            <div>
-              <Label htmlFor="leaveDescription">Description</Label>
-              <Input
-                id="leaveDescription"
-                value={newLeaveType.description}
-                onChange={(e) => setNewLeaveType({ ...newLeaveType, description: e.target.value })}
-                placeholder="Brief description of the leave type"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="carryOver"
-                checked={newLeaveType.carryOver}
-                onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, carryOver: checked })}
-              />
-              <Label htmlFor="carryOver">Allow carry over to next year</Label>
-            </div>
-            {hrConfig.aiRecommendations && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                <div className="flex items-start space-x-2">
-                  <Sparkles className="w-4 h-4 text-blue-600 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-blue-800">AI Recommendation</p>
-                    <p className="text-xs text-blue-600">
-                      Based on industry standards, consider 3-5 days for compassionate leave
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddLeaveTypeModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddLeaveType} disabled={isManagingLeaveTypes || !newLeaveType.name}>
-              {isManagingLeaveTypes ? (
+            <Button
+              type="submit"
+              onClick={async () => {
+                if (!selectedSubsidiary) return
+
+                setIsSavingSubsidiary(true)
+                await updateSubsidiary(selectedSubsidiary.id, selectedSubsidiary)
+                setShowEditSubsidiary(false)
+                setIsSavingSubsidiary(false)
+              }}
+              disabled={isSavingSubsidiary}
+            >
+              {isSavingSubsidiary ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding...
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
                 </>
               ) : (
-                <>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Leave Type
-                </>
+                "Save Changes"
               )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showPolicyModal} onOpenChange={setShowPolicyModal}>
-        <DialogContent className="sm:max-w-[500px]">
+      {/* Subsidiary Details Modal */}
+      <Dialog open={showSubsidiaryDetails} onOpenChange={setShowSubsidiaryDetails}>
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              {policyModalType === "view" && <Eye className="w-5 h-5" />}
-              {policyModalType === "edit" && <Edit className="w-5 h-5" />}
-              {policyModalType === "delete" && <Trash2 className="w-5 h-5 text-red-600" />}
-              <span>
-                {policyModalType === "view" && "View Policy Details"}
-                {policyModalType === "edit" && "Edit Policy"}
-                {policyModalType === "delete" && "Delete Policy"}
-              </span>
-            </DialogTitle>
+            <DialogTitle>Subsidiary Details</DialogTitle>
+            <DialogDescription>View detailed information about the selected subsidiary</DialogDescription>
+          </DialogHeader>
+          {selectedSubsidiary && (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center space-x-4">
+                <div className="w-20 h-20 rounded-lg flex items-center justify-center overflow-hidden">
+                  {selectedSubsidiary.logo_url ? (
+                    <img
+                      src={selectedSubsidiary.logo_url || "/placeholder.svg"}
+                      alt={`${selectedSubsidiary.name} logo`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                      {selectedSubsidiary.name.charAt(0)}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">{selectedSubsidiary.name}</h3>
+                  <p className="text-sm text-gray-600">{selectedSubsidiary.industry}</p>
+                  <Badge variant={selectedSubsidiary.status === "active" ? "default" : "secondary"} className="mt-1">
+                    {selectedSubsidiary.status}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium">Contact Information</h4>
+                  <p className="text-sm text-gray-600">Email: {selectedSubsidiary.email_address}</p>
+                  <p className="text-sm text-gray-600">Phone: {selectedSubsidiary.phone_number}</p>
+                  <p className="text-sm text-gray-600">Address: {selectedSubsidiary.address}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Registration Details</h4>
+                  <p className="text-sm text-gray-600">Tax ID: {selectedSubsidiary.tax_id}</p>
+                  <p className="text-sm text-gray-600">SSNIT: {selectedSubsidiary.ssnit_number}</p>
+                  <p className="text-sm text-gray-600">
+                    Created: {new Date(selectedSubsidiary.created_at || "").toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium">Organizational Structure</h4>
+                <p className="text-sm text-gray-600">Divisions: {selectedSubsidiary.divisions?.join(", ") || "N/A"}</p>
+                <p className="text-sm text-gray-600">
+                  Departments: {selectedSubsidiary.departments?.join(", ") || "N/A"}
+                </p>
+                <p className="text-sm text-gray-600">Locations: {selectedSubsidiary.locations?.join(", ") || "N/A"}</p>
+              </div>
+
+              <div>
+                <h4 className="font-medium">Employee Count</h4>
+                <p className="text-sm text-gray-600">Total Employees: {selectedSubsidiary.employee_count || 0}</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setShowSubsidiaryDetails(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Deactivate Subsidiary Modal */}
+      <Dialog open={showDeactivateConfirm} onOpenChange={setShowDeactivateConfirm}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Deactivate Subsidiary</DialogTitle>
             <DialogDescription>
-              {selectedPolicy?.name} - {selectedPolicy?.description}
+              Are you sure you want to deactivate this subsidiary? This action will prevent further access.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            {policyModalType === "view" && selectedPolicy && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-4">
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowDeactivateConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmToggleStatus}>
+              Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Reactivate Subsidiary Modal */}
+      <Dialog open={showReactivateConfirm} onOpenChange={setShowReactivateConfirm}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Reactivate Subsidiary</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to reactivate this subsidiary? This action will restore access.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowReactivateConfirm(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmToggleStatus}>Reactivate</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Employees Modal */}
+      <Dialog
+        open={viewEmployeesModal.isOpen}
+        onOpenChange={() => setViewEmployeesModal({ ...viewEmployeesModal, isOpen: false })}
+      >
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>
+              Employees of {subsidiaries.find((s) => s.id === viewEmployeesModal.subsidiaryId)?.name}
+            </DialogTitle>
+            <DialogDescription>View a list of employees associated with this subsidiary</DialogDescription>
+          </DialogHeader>
+          <div className="divide-y divide-gray-200">
+            {viewEmployeesModal.employees?.map((employee) => (
+              <div key={employee.id} className="py-4">
+                <div className="flex items-center justify-between">
                   <div>
-                    <Label>Policy Name</Label>
-                    <p className="text-sm font-medium">{selectedPolicy.name}</p>
+                    <p className="font-medium">{employee.name}</p>
+                    <p className="text-sm text-gray-600">
+                      {employee.position} - {employee.department}
+                    </p>
                   </div>
-                  <div>
-                    <Label>Days Allocated</Label>
-                    <p className="text-sm font-medium">{selectedPolicy.days} days</p>
-                  </div>
-                  <div>
-                    <Label>Current Usage</Label>
-                    <p className="text-sm font-medium">{selectedPolicy.usage}</p>
-                  </div>
-                  <div>
-                    <Label>Trend</Label>
-                    <p className="text-sm font-medium capitalize">{selectedPolicy.trend}</p>
-                  </div>
-                </div>
-                <div>
-                  <Label>Description</Label>
-                  <p className="text-sm">{selectedPolicy.description}</p>
+                  <p className="text-sm text-gray-500">{employee.email}</p>
                 </div>
               </div>
-            )}
-            {policyModalType === "edit" && selectedPolicy && (
-              <div className="space-y-3">
-                <div>
-                  <Label>Policy Name</Label>
-                  <Input defaultValue={selectedPolicy.name} />
-                </div>
-                <div>
-                  <Label>Days Allocated</Label>
-                  <Input type="number" defaultValue={selectedPolicy.days} />
-                </div>
-                <div>
-                  <Label>Description</Label>
-                  <Input defaultValue={selectedPolicy.description} />
-                </div>
-              </div>
-            )}
-            {policyModalType === "delete" && selectedPolicy && (
-              <div className="text-center space-y-3">
-                <div className="w-12 h-12 mx-auto bg-red-100 rounded-full flex items-center justify-center">
-                  <AlertTriangle className="w-6 h-6 text-red-600" />
-                </div>
-                <p className="text-sm">
-                  Are you sure you want to delete the <strong>{selectedPolicy.name}</strong> policy? This action cannot
-                  be undone.
-                </p>
-              </div>
+            ))}
+            {viewEmployeesModal.employees?.length === 0 && (
+              <div className="py-4 text-center text-gray-500">No employees found for this subsidiary.</div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPolicyModal(false)}>
+            <Button onClick={() => setViewEmployeesModal({ ...viewEmployeesModal, isOpen: false })}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Settings Modal */}
+      <Dialog open={importModal} onOpenChange={() => setImportModal(false)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Import Settings</DialogTitle>
+            <DialogDescription>Import settings from a CSV file</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <input
+              type="file"
+              accept=".csv"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  handleImportSettings(file)
+                  setImportModal(false)
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" onClick={() => setImportModal(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Leave Type Modal */}
+      <Dialog open={showAddLeaveTypeModal} onOpenChange={() => setShowAddLeaveTypeModal(false)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add New Leave Type</DialogTitle>
+            <DialogDescription>Create a new leave type for your organization</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="leaveTypeName" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="leaveTypeName"
+                value={newLeaveType.name}
+                onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="leaveTypeDays" className="text-right">
+                Days
+              </Label>
+              <Input
+                id="leaveTypeDays"
+                type="number"
+                value={newLeaveType.days}
+                onChange={(e) => setNewLeaveType({ ...newLeaveType, days: Number.parseInt(e.target.value) })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="leaveTypeDescription" className="text-right">
+                Description
+              </Label>
+              <Textarea
+                id="leaveTypeDescription"
+                value={newLeaveType.description}
+                onChange={(e) => setNewLeaveType({ ...newLeaveType, description: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="leaveTypeCarryOver" className="text-right">
+                Carry Over
+              </Label>
+              <Switch
+                id="leaveTypeCarryOver"
+                checked={newLeaveType.carryOver}
+                onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, carryOver: checked })}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowAddLeaveTypeModal(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" onClick={handleAddLeaveType} disabled={isManagingLeaveTypes}>
+              {isManagingLeaveTypes ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add Leave Type"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Policy Modal */}
+      <Dialog open={showPolicyModal} onOpenChange={() => setShowPolicyModal(false)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {policyModalType === "view"
+                ? "Policy Details"
+                : policyModalType === "edit"
+                  ? "Edit Policy"
+                  : "Delete Policy"}
+            </DialogTitle>
+            <DialogDescription>
+              {policyModalType === "view"
+                ? "View details of the selected policy"
+                : policyModalType === "edit"
+                  ? "Edit the selected policy"
+                  : "Delete the selected policy"}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedPolicy && policyModalType === "view" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right col-span-1">Name</Label>
+                <Input value={selectedPolicy.name} className="col-span-3" disabled />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right col-span-1">Days</Label>
+                <Input value={selectedPolicy.days} className="col-span-3" disabled />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right col-span-1">Description</Label>
+                <Textarea value={selectedPolicy.description} className="col-span-3" disabled />
+              </div>
+            </div>
+          )}
+          {selectedPolicy && policyModalType === "edit" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="editPolicyName" className="text-right col-span-1">
+                  Name
+                </Label>
+                <Input
+                  id="editPolicyName"
+                  value={editingPolicy.name}
+                  onChange={(e) => setEditingPolicy({ ...editingPolicy, name: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="editPolicyDays" className="text-right col-span-1">
+                  Days
+                </Label>
+                <Input
+                  id="editPolicyDays"
+                  type="number"
+                  value={editingPolicy.days}
+                  onChange={(e) => setEditingPolicy({ ...editingPolicy, days: Number.parseInt(e.target.value) })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="editPolicyDescription" className="text-right col-span-1">
+                  Description
+                </Label>
+                <Textarea
+                  id="editPolicyDescription"
+                  value={editingPolicy.description}
+                  onChange={(e) => setEditingPolicy({ ...editingPolicy, description: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+            </div>
+          )}
+          {selectedPolicy && policyModalType === "delete" && (
+            <div className="py-4">
+              <p>Are you sure you want to delete the {selectedPolicy.name} policy?</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowPolicyModal(false)}>
               Cancel
             </Button>
             {policyModalType === "edit" && (
-              <Button>
-                <Save className="mr-2 h-4 w-4" />
-                Save Changes
+              <Button type="submit" onClick={handleSavePolicyChanges} disabled={isSavingPolicy}>
+                {isSavingPolicy ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
               </Button>
             )}
             {policyModalType === "delete" && (
-              <Button variant="destructive">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Policy
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setCurrentPolicies((prev) => prev.filter((policy) => policy.name !== selectedPolicy.name))
+                  setShowPolicyModal(false)
+                  toast({
+                    title: "Policy Deleted",
+                    description: `${selectedPolicy.name} policy has been successfully deleted.`,
+                  })
+                }}
+              >
+                Delete
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Document Modal */}
+      <Dialog open={showDocumentModal} onOpenChange={() => setShowDocumentModal(false)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {documentModalType === "add"
+                ? "Add HR Policy Document"
+                : documentModalType === "view"
+                  ? "Document Details"
+                  : documentModalType === "edit"
+                    ? "Edit Document"
+                    : "Delete Document"}
+            </DialogTitle>
+            <DialogDescription>
+              {documentModalType === "add"
+                ? "Upload a new HR policy document"
+                : documentModalType === "view"
+                  ? "View details of the selected document"
+                  : documentModalType === "edit"
+                    ? "Edit the selected document"
+                    : "Delete the selected document"}
+            </DialogDescription>
+          </DialogHeader>
+          {documentModalType === "add" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="documentName" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="documentName"
+                  value={documentName}
+                  onChange={(e) => setDocumentName(e.target.value)}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="documentFile" className="text-right">
+                  File
+                </Label>
+                <input type="file" id="documentFile" onChange={handleFileUpload} className="col-span-3" />
+              </div>
+            </div>
+          )}
+          {selectedDocument && documentModalType === "view" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right col-span-1">Name</Label>
+                <Input value={selectedDocument.name} className="col-span-3" disabled />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right col-span-1">Type</Label>
+                <Input value={selectedDocument.type} className="col-span-3" disabled />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right col-span-1">Size</Label>
+                <Input value={selectedDocument.size} className="col-span-3" disabled />
+              </div>
+            </div>
+          )}
+          {selectedDocument && documentModalType === "edit" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="editDocumentName" className="text-right">
+                  Name
+                </Label>
+                <Input id="editDocumentName" defaultValue={selectedDocument.name} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="editDocumentFile" className="text-right">
+                  File
+                </Label>
+                <input type="file" id="editDocumentFile" onChange={handleFileUpload} className="col-span-3" />
+              </div>
+            </div>
+          )}
+          {selectedDocument && documentModalType === "delete" && (
+            <div className="py-4">
+              <p>Are you sure you want to delete the {selectedDocument.name} document?</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowDocumentModal(false)}>
+              Cancel
+            </Button>
+            {documentModalType === "add" && (
+              <Button type="submit" onClick={handleSaveDocument} disabled={isSavingDocument}>
+                {isSavingDocument ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Add Document"
+                )}
+              </Button>
+            )}
+            {documentModalType === "edit" && (
+              <Button
+                type="submit"
+                onClick={() => {
+                  setShowDocumentModal(false)
+                  toast({
+                    title: "Document Updated",
+                    description: "Document has been successfully updated.",
+                  })
+                }}
+              >
+                Save Changes
+              </Button>
+            )}
+            {documentModalType === "delete" && (
+              <Button variant="destructive" onClick={() => handleDeleteDocument(selectedDocument.id)}>
+                Delete
               </Button>
             )}
           </DialogFooter>
