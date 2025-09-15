@@ -174,6 +174,10 @@ const SettingsPage: FunctionComponent = () => {
 
   const [isSavingSubsidiary, setIsSavingSubsidiary] = useState(false)
 
+  const [isSavingSettings, setIsSavingSettings] = useState(false)
+
+  const [isSavingSubsidiaries, setIsSavingSubsidiaries] = useState(false)
+
   // Logo upload function
   const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
     if (!file) return
@@ -1124,12 +1128,17 @@ const SettingsPage: FunctionComponent = () => {
 
   const handleSaveSettings = async () => {
     console.log("[v0] Saving all settings changes")
+    setIsSavingSettings(true)
 
     if (isDemoMode()) {
+      // Simulate saving delay for demo
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
       toast({
         title: "Settings Saved",
         description: "All settings changes have been saved successfully (Demo Mode)",
       })
+      setIsSavingSettings(false)
       return
     }
 
@@ -1174,6 +1183,8 @@ const SettingsPage: FunctionComponent = () => {
         description: "Failed to save settings changes",
         variant: "destructive",
       })
+    } finally {
+      setIsSavingSettings(false)
     }
   }
 
@@ -1346,8 +1357,21 @@ const SettingsPage: FunctionComponent = () => {
 
   const handleSaveSubsidiaries = async () => {
     console.log("[v0] Saving subsidiaries changes")
+    setIsSavingSubsidiaries(true)
 
     try {
+      if (isDemoMode()) {
+        // Simulate saving delay for demo
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+
+        toast({
+          title: "Changes Saved",
+          description: "All subsidiary changes have been saved successfully (Demo Mode)",
+        })
+        setIsSavingSubsidiaries(false)
+        return
+      }
+
       // Save any pending changes to the database
       // This could include updated subsidiary information, organizational changes, etc.
 
@@ -1365,6 +1389,8 @@ const SettingsPage: FunctionComponent = () => {
         description: "Failed to save changes",
         variant: "destructive",
       })
+    } finally {
+      setIsSavingSubsidiaries(false)
     }
   }
 
@@ -1588,7 +1614,23 @@ const SettingsPage: FunctionComponent = () => {
               </div>
 
               <div className="flex justify-end">
-                <Button className="bg-emerald-600 hover:bg-emerald-700">Save Company Settings</Button>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveSettings}
+                  disabled={isSavingSettings}
+                >
+                  {isSavingSettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Company Settings
+                    </>
+                  )}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -1923,9 +1965,19 @@ const SettingsPage: FunctionComponent = () => {
                             size="sm"
                             className="w-full justify-start bg-transparent"
                             onClick={handleSaveSettings}
+                            disabled={isSavingSettings}
                           >
-                            <Save className="w-4 h-4 mr-2" />
-                            Save Settings
+                            {isSavingSettings ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-4 h-4 mr-2" />
+                                Save Settings
+                              </>
+                            )}
                           </Button>
                           <Button
                             variant="outline"
