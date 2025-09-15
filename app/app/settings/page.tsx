@@ -172,6 +172,8 @@ const SettingsPage: FunctionComponent = () => {
 
   const [importModal, setImportModal] = useState(false)
 
+  const [isSavingSubsidiary, setIsSavingSubsidiary] = useState(false)
+
   // Logo upload function
   const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
     if (!file) return
@@ -1175,18 +1177,24 @@ const SettingsPage: FunctionComponent = () => {
     }
   }
 
+  // Enhanced Save button with loading state and better feedback
   const handleSaveSubsidiaryChanges = async () => {
     console.log("[v0] Saving subsidiary changes")
-
-    if (isDemoMode()) {
-      toast({
-        title: "Changes Saved",
-        description: "Subsidiary changes have been saved successfully (Demo Mode)",
-      })
-      return
-    }
+    setIsSavingSubsidiary(true)
 
     try {
+      if (isDemoMode()) {
+        // Simulate saving delay for demo
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+
+        toast({
+          title: "Changes Saved",
+          description: "Subsidiary changes have been saved successfully (Demo Mode)",
+        })
+        setIsSavingSubsidiary(false)
+        return
+      }
+
       // Save any pending subsidiary changes
       await loadSubsidiaries()
 
@@ -1198,9 +1206,11 @@ const SettingsPage: FunctionComponent = () => {
       console.error("Save subsidiary changes error:", error)
       toast({
         title: "Error",
-        description: "Failed to save subsidiary changes",
+        description: "Failed to save subsidiary changes. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setIsSavingSubsidiary(false)
     }
   }
 
@@ -1598,9 +1608,18 @@ const SettingsPage: FunctionComponent = () => {
                     <Plus className="w-4 h-4 mr-2" />
                     Add Subsidiary
                   </Button>
-                  <Button variant="outline" onClick={handleSaveSubsidiaryChanges}>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save
+                  <Button variant="outline" onClick={handleSaveSubsidiaryChanges} disabled={isSavingSubsidiary}>
+                    {isSavingSubsidiary ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardTitle>
