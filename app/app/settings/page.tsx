@@ -33,6 +33,14 @@ import {
   AlertTriangle,
   CheckCircle,
   Save,
+  Settings,
+  Calendar,
+  Sparkles,
+  TrendingUp,
+  Trash2,
+  BarChart3,
+  UserCheck,
+  Building,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -46,6 +54,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 
 interface Company {
   id: string
@@ -143,6 +153,18 @@ const SettingsPage: FunctionComponent = () => {
     locations: [],
   })
 
+  const [hrConfig, setHrConfig] = useState({
+    leaveYearStart: "January",
+    probationPeriod: 3,
+    workingHoursPerDay: 8,
+    workingDaysPerWeek: 5,
+    autoApproveLeave: false,
+    emailNotifications: true,
+    aiRecommendations: true,
+    smartScheduling: false,
+    performanceTracking: true,
+  })
+
   const [divisions, setDivisions] = useState<string[]>([])
   const [departments, setDepartments] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
@@ -177,6 +199,11 @@ const SettingsPage: FunctionComponent = () => {
   const [isSavingSettings, setIsSavingSettings] = useState(false)
 
   const [isSavingSubsidiaries, setIsSavingSubsidiaries] = useState(false)
+
+  const [isManagingLeaveTypes, setIsManagingLeaveTypes] = useState(false)
+  const [selectedPolicy, setSelectedPolicy] = useState<string | null>(null)
+
+  const [isSaving, setIsSaving] = useState(false)
 
   // Logo upload function
   const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
@@ -1262,11 +1289,56 @@ const SettingsPage: FunctionComponent = () => {
     setSubsidiaryToToggle(null)
   }
 
-  const handleManageLeaveTypes = () => {
-    toast({
-      title: "Leave Types Management",
-      description: "Opening leave types configuration...",
-    })
+  const handleManageLeaveTypes = async () => {
+    setIsManagingLeaveTypes(true)
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      toast({
+        title: "Leave Types Management",
+        description: "Leave types configuration opened successfully",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to open leave types management",
+        variant: "destructive",
+      })
+    } finally {
+      setIsManagingLeaveTypes(false)
+    }
+  }
+
+  const handlePolicyAction = async (action: "edit" | "view" | "delete", policyName: string) => {
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      switch (action) {
+        case "edit":
+          toast({
+            title: "Edit Policy",
+            description: `Editing ${policyName} policy...`,
+          })
+          break
+        case "view":
+          toast({
+            title: "View Policy",
+            description: `Viewing ${policyName} policy details...`,
+          })
+          break
+        case "delete":
+          toast({
+            title: "Delete Policy",
+            description: `${policyName} policy deleted successfully`,
+          })
+          break
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to ${action} policy`,
+        variant: "destructive",
+      })
+    }
   }
 
   const handleManageAllowances = () => {
@@ -1391,6 +1463,34 @@ const SettingsPage: FunctionComponent = () => {
       })
     } finally {
       setIsSavingSubsidiaries(false)
+    }
+  }
+
+  const handleSaveHRConfig = async () => {
+    setIsSaving(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      if (isDemoMode) {
+        toast({
+          title: "HR Configuration Saved",
+          description: "HR settings updated successfully (Demo Mode)",
+        })
+      } else {
+        // Real database update would go here
+        toast({
+          title: "HR Configuration Saved",
+          description: "HR settings updated successfully",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save HR configuration",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -2007,62 +2107,353 @@ const SettingsPage: FunctionComponent = () => {
           </Card>
         </TabsContent>
 
-        {/* HR Settings */}
         <TabsContent value="hr">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Users className="w-5 h-5" />
-                <span>HR Settings</span>
-              </CardTitle>
-              <CardDescription>Configure human resources policies and employee management settings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Leave Policies</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center p-3 border rounded">
-                      <span>Annual Leave</span>
-                      <span className="text-sm text-gray-600">21 days</span>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Settings className="w-5 h-5" />
+                  <span>HR Configuration</span>
+                </CardTitle>
+                <CardDescription>Configure core HR settings and policies</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="leaveYearStart">Leave Year Start</Label>
+                      <Select
+                        value={hrConfig.leaveYearStart}
+                        onValueChange={(value) => setHrConfig({ ...hrConfig, leaveYearStart: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="January">January</SelectItem>
+                          <SelectItem value="April">April</SelectItem>
+                          <SelectItem value="July">July</SelectItem>
+                          <SelectItem value="October">October</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <div className="flex justify-between items-center p-3 border rounded">
-                      <span>Sick Leave</span>
-                      <span className="text-sm text-gray-600">10 days</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 border rounded">
-                      <span>Maternity Leave</span>
-                      <span className="text-sm text-gray-600">84 days</span>
+
+                    <div>
+                      <Label htmlFor="workingHours">Working Hours/Day</Label>
+                      <Input
+                        id="workingHours"
+                        type="number"
+                        value={hrConfig.workingHoursPerDay}
+                        onChange={(e) =>
+                          setHrConfig({ ...hrConfig, workingHoursPerDay: Number.parseInt(e.target.value) })
+                        }
+                        min="1"
+                        max="24"
+                      />
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" onClick={handleManageLeaveTypes}>
-                    Manage Leave Types
-                  </Button>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="probationPeriod">Probation Period (months)</Label>
+                      <Input
+                        id="probationPeriod"
+                        type="number"
+                        value={hrConfig.probationPeriod}
+                        onChange={(e) => setHrConfig({ ...hrConfig, probationPeriod: Number.parseInt(e.target.value) })}
+                        min="0"
+                        max="12"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="workingDays">Working Days/Week</Label>
+                      <Input
+                        id="workingDays"
+                        type="number"
+                        value={hrConfig.workingDaysPerWeek}
+                        onChange={(e) =>
+                          setHrConfig({ ...hrConfig, workingDaysPerWeek: Number.parseInt(e.target.value) })
+                        }
+                        min="1"
+                        max="7"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
-                  <h3 className="font-semibold">Employee Statistics</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <span>Total Employees</span>
-                      <span className="font-semibold">{employees.length}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Auto-approve leave requests</Label>
+                      <p className="text-sm text-muted-foreground">Automatically approve requests within policy</p>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <span>Active Employees</span>
-                      <span className="font-semibold">{employees.filter((emp) => emp.status === "active").length}</span>
+                    <Switch
+                      checked={hrConfig.autoApproveLeave}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, autoApproveLeave: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Email notifications</Label>
+                      <p className="text-sm text-muted-foreground">Send email updates for HR activities</p>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <span>Departments</span>
-                      <span className="font-semibold">{departments.length}</span>
+                    <Switch
+                      checked={hrConfig.emailNotifications}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, emailNotifications: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center space-x-2">
+                        <Sparkles className="w-4 h-4 text-purple-500" />
+                        <span>AI Recommendations</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground">Get AI-powered insights for HR decisions</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.aiRecommendations}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, aiRecommendations: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center space-x-2">
+                        <Brain className="w-4 h-4 text-blue-500" />
+                        <span>Smart Scheduling</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground">AI-optimized shift and leave scheduling</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.smartScheduling}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, smartScheduling: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center space-x-2">
+                        <TrendingUp className="w-4 h-4 text-green-500" />
+                        <span>Performance Tracking</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground">AI-enhanced performance analytics</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.performanceTracking}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, performanceTracking: checked })}
+                    />
+                  </div>
+                </div>
+
+                <Button onClick={handleSaveHRConfig} disabled={isSaving} className="w-full">
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving Configuration...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save HR Configuration
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Calendar className="w-5 h-5" />
+                  <span>Leave Policies</span>
+                </CardTitle>
+                <CardDescription>Manage leave types and policies with AI insights</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h3 className="font-semibold flex items-center space-x-2">
+                      <span>Current Policies</span>
+                      {hrConfig.aiRecommendations && (
+                        <Badge variant="secondary" className="text-xs">
+                          <Sparkles className="w-3 h-3 mr-1" />
+                          AI Enhanced
+                        </Badge>
+                      )}
+                    </h3>
+                    <div className="space-y-2">
+                      {[
+                        { name: "Annual Leave", days: 21, usage: "68%", trend: "up" },
+                        { name: "Sick Leave", days: 10, usage: "23%", trend: "down" },
+                        { name: "Maternity Leave", days: 84, usage: "12%", trend: "stable" },
+                      ].map((policy) => (
+                        <div
+                          key={policy.name}
+                          className="flex justify-between items-center p-3 border rounded hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium">{policy.name}</span>
+                              {hrConfig.aiRecommendations && (
+                                <Badge
+                                  variant={
+                                    policy.trend === "up"
+                                      ? "destructive"
+                                      : policy.trend === "down"
+                                        ? "default"
+                                        : "secondary"
+                                  }
+                                  className="text-xs"
+                                >
+                                  {policy.usage}
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="text-sm text-gray-600">{policy.days} days</span>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handlePolicyAction("view", policy.name)}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handlePolicyAction("edit", policy.name)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Policy
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handlePolicyAction("delete", policy.name)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete Policy
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleManageLeaveTypes}
+                      disabled={isManagingLeaveTypes}
+                      className="w-full bg-transparent"
+                    >
+                      {isManagingLeaveTypes ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          <Settings className="mr-2 h-4 w-4" />
+                          Manage Leave Types
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold flex items-center space-x-2">
+                      <Sparkles className="w-4 h-4 text-purple-500" />
+                      <span>AI Insights</span>
+                    </h3>
+                    {hrConfig.aiRecommendations ? (
+                      <div className="space-y-3">
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                          <div className="flex items-start space-x-2">
+                            <TrendingUp className="w-4 h-4 text-blue-600 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-medium text-blue-800">High Annual Leave Usage</p>
+                              <p className="text-xs text-blue-600">Consider reviewing leave allocation policies</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-3 bg-green-50 border border-green-200 rounded">
+                          <div className="flex items-start space-x-2">
+                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-medium text-green-800">Optimal Sick Leave Usage</p>
+                              <p className="text-xs text-green-600">Current policy is well-balanced</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded">
+                          <div className="flex items-start space-x-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-medium text-amber-800">Upcoming Peak Season</p>
+                              <p className="text-xs text-amber-600">Restrict leave approvals for Q4</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 text-center text-gray-500 border-2 border-dashed rounded">
+                        <Brain className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                        <p className="text-sm">Enable AI Recommendations to see insights</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <BarChart3 className="w-5 h-5" />
+                  <span>Employee Analytics</span>
+                </CardTitle>
+                <CardDescription>Real-time employee statistics and trends</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-blue-600">Total Employees</p>
+                        <p className="text-2xl font-bold text-blue-800">{employees.length}</p>
+                      </div>
+                      <Users className="w-8 h-8 text-blue-500" />
+                    </div>
+                  </div>
+                  <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-green-600">Active Employees</p>
+                        <p className="text-2xl font-bold text-green-800">
+                          {employees.filter((emp) => emp.status === "active").length}
+                        </p>
+                      </div>
+                      <UserCheck className="w-8 h-8 text-green-500" />
+                    </div>
+                  </div>
+                  <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-purple-600">Departments</p>
+                        <p className="text-2xl font-bold text-purple-800">{departments.length}</p>
+                      </div>
+                      <Building className="w-8 h-8 text-purple-500" />
                     </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
-        {/* Payroll Settings */}
         <TabsContent value="payroll">
           <Card>
             <CardHeader>
@@ -2167,7 +2558,6 @@ const SettingsPage: FunctionComponent = () => {
           </Card>
         </TabsContent>
 
-        {/* Notifications */}
         <TabsContent value="notifications">
           <Card>
             <CardHeader>
@@ -2241,7 +2631,6 @@ const SettingsPage: FunctionComponent = () => {
           </Card>
         </TabsContent>
 
-        {/* Roles */}
         <TabsContent value="roles">
           <Card>
             <CardHeader>
@@ -2290,7 +2679,6 @@ const SettingsPage: FunctionComponent = () => {
           </Card>
         </TabsContent>
 
-        {/* Access Control */}
         <TabsContent value="access">
           <Card>
             <CardHeader>
@@ -2372,7 +2760,6 @@ const SettingsPage: FunctionComponent = () => {
           </Card>
         </TabsContent>
 
-        {/* Security */}
         <TabsContent value="security">
           <Card>
             <CardHeader>
@@ -2457,7 +2844,6 @@ const SettingsPage: FunctionComponent = () => {
         </TabsContent>
       </Tabs>
 
-      {/* View Employees Modal */}
       <Dialog
         open={viewEmployeesModal.isOpen}
         onOpenChange={(open) => setViewEmployeesModal({ ...viewEmployeesModal, isOpen: open })}
@@ -2532,7 +2918,6 @@ const SettingsPage: FunctionComponent = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Import Settings Modal */}
       <Dialog open={importModal} onOpenChange={setImportModal}>
         <DialogContent>
           <DialogHeader>
@@ -3131,7 +3516,6 @@ const SettingsPage: FunctionComponent = () => {
       )}
 
       {showSubsidiaryDetails && selectedSubsidiary && (
-        // Enhanced subsidiary details modal with logo display and updated statistics
         <Dialog open={showSubsidiaryDetails} onOpenChange={setShowSubsidiaryDetails}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -3155,7 +3539,6 @@ const SettingsPage: FunctionComponent = () => {
             {selectedSubsidiary && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Company Information */}
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-lg">Company Information</CardTitle>
@@ -3190,7 +3573,6 @@ const SettingsPage: FunctionComponent = () => {
                     </CardContent>
                   </Card>
 
-                  {/* Contact Information */}
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-lg">Contact Information</CardTitle>
