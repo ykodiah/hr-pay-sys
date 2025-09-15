@@ -608,16 +608,16 @@ const SettingsPage: FunctionComponent = () => {
           address: "15 Liberation Road, Ridge, Accra, Ghana",
           status: "active",
           industry: "Digital Marketing & Web Development",
-          divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
-          departments: ["Marketing", "Development", "Design", "Sales"],
-          locations: ["Accra - Ridge", "Kumasi Branch"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
+          divisions: ["Digital Marketing", "Web Development", "Mobile Apps", "UI/UX Design", "E-commerce Solutions"],
+          departments: ["Marketing", "Development", "Design", "Sales", "Customer Support", "Quality Assurance"],
+          locations: ["Accra - Ridge", "Kumasi Branch", "Takoradi Office"],
+          divisions_count: 5,
+          departments_count: 6,
+          locations_count: 3,
           employee_count: 45,
           created_at: new Date().toISOString(),
           location: "Accra",
-          logo: "/placeholder.svg",
+          logo: "/digital-solutions-logo.jpg",
         },
         {
           id: "sub-002",
@@ -630,16 +630,22 @@ const SettingsPage: FunctionComponent = () => {
           address: "8 Airport Residential Area, Accra, Ghana",
           status: "active",
           industry: "Business Consulting & Strategy",
-          divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
-          departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
-          locations: ["Accra - Airport", "Tema Office"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
+          divisions: [
+            "Strategy Consulting",
+            "Digital Transformation",
+            "Process Optimization",
+            "Change Management",
+            "Business Intelligence",
+          ],
+          departments: ["Consulting", "Strategy", "Operations", "Client Relations", "Research & Analytics"],
+          locations: ["Accra - Airport", "Tema Office", "Cape Coast Branch"],
+          divisions_count: 5,
+          departments_count: 5,
+          locations_count: 3,
           employee_count: 32,
           created_at: new Date().toISOString(),
           location: "Accra",
-          logo: "/placeholder.svg",
+          logo: "/consulting-group-logo.jpg",
         },
         {
           id: "sub-003",
@@ -652,16 +658,29 @@ const SettingsPage: FunctionComponent = () => {
           address: "25 Independence Avenue, Accra, Ghana",
           status: "active",
           industry: "Financial Technology & Services",
-          divisions: ["Fintech Solutions", "Payment Processing", "Financial Advisory"],
-          departments: ["Finance", "Technology", "Compliance", "Customer Service"],
-          locations: ["Accra - Independence Ave", "Ho Regional Office"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
+          divisions: [
+            "Fintech Solutions",
+            "Payment Processing",
+            "Financial Advisory",
+            "Investment Management",
+            "Insurance Services",
+          ],
+          departments: [
+            "Finance",
+            "Technology",
+            "Compliance",
+            "Customer Service",
+            "Risk Management",
+            "Investment Advisory",
+          ],
+          locations: ["Accra - Independence Ave", "Ho Regional Office", "Sunyani Branch"],
+          divisions_count: 5,
+          departments_count: 6,
+          locations_count: 3,
           employee_count: 28,
           created_at: new Date().toISOString(),
           location: "Accra",
-          logo: "/placeholder.svg",
+          logo: "/financial-services-logo.png",
         },
         {
           id: "sub-004",
@@ -674,16 +693,29 @@ const SettingsPage: FunctionComponent = () => {
           address: "12 Spintex Road, Accra, Ghana",
           status: "active",
           industry: "Supply Chain & Logistics",
-          divisions: ["Transportation", "Warehousing", "Supply Chain Management"],
-          departments: ["Operations", "Fleet Management", "Warehousing", "Customer Service"],
-          locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 3,
+          divisions: [
+            "Transportation",
+            "Warehousing",
+            "Supply Chain Management",
+            "Freight Forwarding",
+            "Last Mile Delivery",
+          ],
+          departments: [
+            "Operations",
+            "Fleet Management",
+            "Warehousing",
+            "Customer Service",
+            "Procurement",
+            "Maintenance",
+          ],
+          locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub", "Bolgatanga Depot"],
+          divisions_count: 5,
+          departments_count: 6,
+          locations_count: 4,
           employee_count: 67,
           created_at: new Date().toISOString(),
           location: "Accra",
-          logo: "/placeholder.svg",
+          logo: "/logistics-company-logo.png",
         },
         {
           id: "sub-005",
@@ -696,56 +728,145 @@ const SettingsPage: FunctionComponent = () => {
           address: "5 Cantonments Road, Accra, Ghana",
           status: "active",
           industry: "Education & Professional Training",
-          divisions: ["Corporate Training", "IT Certification", "Professional Development"],
-          departments: ["Training", "Curriculum Development", "Student Services", "Administration"],
-          locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 3,
+          divisions: [
+            "Corporate Training",
+            "IT Certification",
+            "Professional Development",
+            "Leadership Training",
+            "Skills Assessment",
+          ],
+          departments: [
+            "Training",
+            "Curriculum Development",
+            "Student Services",
+            "Administration",
+            "Assessment & Evaluation",
+          ],
+          locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform", "Tamale Center"],
+          divisions_count: 5,
+          departments_count: 5,
+          locations_count: 4,
           employee_count: 23,
           created_at: new Date().toISOString(),
           location: "Accra",
-          logo: "/placeholder.svg",
+          logo: "/training-institute-logo.jpg",
+        },
+        {
+          id: "sub-006",
+          company_id: "comp-001",
+          name: "Akwaaba Manufacturing Co.",
+          email_address: "manufacturing@akwaabamanuf.com",
+          phone_number: "+233 30 276 5437",
+          tax_id: "TIN-AMC-2023-006",
+          ssnit_number: "SSNIT-AMC-789017",
+          address: "45 Industrial Area, Tema, Ghana",
+          status: "active",
+          industry: "Manufacturing & Production",
+          divisions: [
+            "Product Manufacturing",
+            "Quality Control",
+            "Research & Development",
+            "Supply Chain",
+            "Export Operations",
+          ],
+          departments: ["Production", "Quality Assurance", "Engineering", "Maintenance", "Procurement", "Export Sales"],
+          locations: ["Tema - Industrial Area", "Kumasi Factory", "Takoradi Processing Plant"],
+          divisions_count: 5,
+          departments_count: 6,
+          locations_count: 3,
+          employee_count: 89,
+          created_at: new Date().toISOString(),
+          location: "Tema",
+          logo: "/manufacturing-company-logo.png",
+        },
+        {
+          id: "sub-007",
+          company_id: "comp-001",
+          name: "Akwaaba Healthcare Services",
+          email_address: "healthcare@akwaabahealthcare.com",
+          phone_number: "+233 30 276 5438",
+          tax_id: "TIN-AHS-2023-007",
+          ssnit_number: "SSNIT-AHS-789018",
+          address: "18 Ring Road East, Accra, Ghana",
+          status: "active",
+          industry: "Healthcare & Medical Services",
+          divisions: [
+            "Primary Healthcare",
+            "Specialized Medicine",
+            "Diagnostic Services",
+            "Pharmacy Services",
+            "Health Insurance",
+          ],
+          departments: ["Medical Services", "Nursing", "Pharmacy", "Administration", "Laboratory", "Patient Relations"],
+          locations: ["Accra - Ring Road", "Kumasi Medical Center", "Ho Clinic", "Tamale Health Post"],
+          divisions_count: 5,
+          departments_count: 6,
+          locations_count: 4,
+          employee_count: 56,
+          created_at: new Date().toISOString(),
+          location: "Accra",
+          logo: "/healthcare-services-logo.jpg",
         },
       ])
       return
     }
 
     try {
-      // Load subsidiaries with employee counts
+      console.log("[v0] Fetching subsidiaries from database...")
       const { data: subsidiariesData, error: subsidiariesError } = await supabase
-        .from("subsidiaries")
-        .select(`
-          *,
-          employees:employees(count)
-        `)
+        .from("subsidiary_statistics")
+        .select("*")
         .order("created_at", { ascending: false })
 
-      if (subsidiariesError) throw subsidiariesError
+      if (subsidiariesError) {
+        console.error("[v0] Subsidiaries query error:", subsidiariesError)
+        throw subsidiariesError
+      }
 
-      // Process the data to add computed fields
-      const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => ({
-        ...sub,
-        divisions: Array.isArray(sub.divisions) ? sub.divisions : [],
-        departments: Array.isArray(sub.departments) ? sub.departments : [],
-        locations: Array.isArray(sub.locations) ? sub.locations : [],
-        divisions_count: Array.isArray(sub.divisions) ? sub.divisions.length : 0,
-        departments_count: Array.isArray(sub.departments) ? sub.departments.length : 0,
-        locations_count: Array.isArray(sub.locations) ? sub.locations.length : 0,
-        employee_count: sub.employees?.[0]?.count || 0,
-        location: sub.locations?.[0] || "Accra",
-        logo: sub.logo_url || "/placeholder.svg",
-      }))
+      console.log("[v0] Raw subsidiaries data:", subsidiariesData)
 
+      const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => {
+        const divisions = Array.isArray(sub.divisions)
+          ? sub.divisions
+          : typeof sub.divisions === "string"
+            ? JSON.parse(sub.divisions)
+            : []
+        const departments = Array.isArray(sub.departments)
+          ? sub.departments
+          : typeof sub.departments === "string"
+            ? JSON.parse(sub.departments)
+            : []
+        const locations = Array.isArray(sub.locations)
+          ? sub.locations
+          : typeof sub.locations === "string"
+            ? JSON.parse(sub.locations)
+            : []
+
+        return {
+          ...sub,
+          divisions,
+          departments,
+          locations,
+          divisions_count: divisions.length,
+          departments_count: departments.length,
+          locations_count: locations.length,
+          employee_count: sub.employee_count || 0,
+          location: locations[0] || "Accra",
+          logo: sub.logo_url || "/generic-company-logo.png",
+        }
+      })
+
+      console.log("[v0] Processed subsidiaries:", processedSubsidiaries)
       setSubsidiaries(processedSubsidiaries)
-      console.log("[v0] Loaded subsidiaries:", processedSubsidiaries.length)
+      console.log("[v0] Successfully loaded", processedSubsidiaries.length, "subsidiaries")
     } catch (error) {
-      console.error("Subsidiaries loading error:", error)
+      console.error("[v0] Subsidiaries loading error:", error)
       toast({
         title: "Error",
-        description: "Failed to load subsidiaries",
+        description: "Failed to load subsidiaries. Please try again.",
         variant: "destructive",
       })
+      setSubsidiaries([])
     }
   }
 
