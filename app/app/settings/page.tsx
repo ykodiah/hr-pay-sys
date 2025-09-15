@@ -38,9 +38,8 @@ import {
   Sparkles,
   TrendingUp,
   Trash2,
-  BarChart3,
-  UserCheck,
-  Building,
+  FileText,
+  Minus,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -53,7 +52,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 
@@ -204,6 +210,20 @@ const SettingsPage: FunctionComponent = () => {
   const [selectedPolicy, setSelectedPolicy] = useState<string | null>(null)
 
   const [isSaving, setIsSaving] = useState(false)
+
+  const [hrDocuments, setHrDocuments] = useState([
+    { id: 1, name: "Employee Handbook", type: "PDF", size: "2.4 MB", visibleToAll: true },
+    { id: 2, name: "Code of Conduct", type: "PDF", size: "1.8 MB", visibleToAll: false },
+  ])
+  const [showAddLeaveTypeModal, setShowAddLeaveTypeModal] = useState(false)
+  const [showPolicyModal, setShowPolicyModal] = useState(false)
+  const [policyModalType, setPolicyModalType] = useState("view") // view, edit, delete
+  const [newLeaveType, setNewLeaveType] = useState({
+    name: "",
+    days: 0,
+    description: "",
+    carryOver: false,
+  })
 
   // Logo upload function
   const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
@@ -1289,19 +1309,54 @@ const SettingsPage: FunctionComponent = () => {
     setSubsidiaryToToggle(null)
   }
 
-  const handleManageLeaveTypes = async () => {
+  const handlePolicyAction = (action: string, policyName: string) => {
+    const policy = [
+      { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Standard annual leave entitlement" },
+      { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness" },
+      {
+        name: "Maternity Leave",
+        days: 84,
+        usage: "12%",
+        trend: "stable",
+        description: "Maternity and paternity leave",
+      },
+    ].find((p) => p.name === policyName)
+
+    setSelectedPolicy(policy)
+    setPolicyModalType(action)
+    setShowPolicyModal(true)
+  }
+
+  const handleManageLeaveTypes = () => {
+    setShowAddLeaveTypeModal(true)
+  }
+
+  const handleAddLeaveType = async () => {
     setIsManagingLeaveTypes(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      // Add new leave type logic here
       toast({
-        title: "Leave Types Management",
-        description: "Leave types configuration opened successfully",
+        title: "Leave Type Added",
+        description: `${newLeaveType.name} has been added successfully`,
       })
+
+      // Reset form
+      setNewLeaveType({ name: "", days: 0, description: "", carryOver: false })
+      setShowAddLeaveTypeModal(false)
+
+      // Update AI insights
+      if (hrConfig.aiRecommendations) {
+        toast({
+          title: "AI Insights Updated",
+          description: "Leave policy recommendations have been refreshed",
+        })
+      }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to open leave types management",
+        description: "Failed to add leave type",
         variant: "destructive",
       })
     } finally {
@@ -1309,36 +1364,23 @@ const SettingsPage: FunctionComponent = () => {
     }
   }
 
-  const handlePolicyAction = async (action: "edit" | "view" | "delete", policyName: string) => {
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      switch (action) {
-        case "edit":
-          toast({
-            title: "Edit Policy",
-            description: `Editing ${policyName} policy...`,
-          })
-          break
-        case "view":
-          toast({
-            title: "View Policy",
-            description: `Viewing ${policyName} policy details...`,
-          })
-          break
-        case "delete":
-          toast({
-            title: "Delete Policy",
-            description: `${policyName} policy deleted successfully`,
-          })
-          break
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: `Failed to ${action} policy`,
-        variant: "destructive",
-      })
+  const handleAddDocument = () => {
+    const newDoc = {
+      id: Date.now(),
+      name: "New Document",
+      type: "PDF",
+      size: "0 MB",
+      visibleToAll: false,
     }
+    setHrDocuments([...hrDocuments, newDoc])
+  }
+
+  const handleRemoveDocument = (id: number) => {
+    setHrDocuments(hrDocuments.filter((doc) => doc.id !== id))
+  }
+
+  const handleToggleDocumentVisibility = (id: number) => {
+    setHrDocuments(hrDocuments.map((doc) => (doc.id === id ? { ...doc, visibleToAll: !doc.visibleToAll } : doc)))
   }
 
   const handleManageAllowances = () => {
@@ -2111,11 +2153,32 @@ const SettingsPage: FunctionComponent = () => {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Settings className="w-5 h-5" />
-                  <span>HR Configuration</span>
-                </CardTitle>
-                <CardDescription>Configure core HR settings and policies</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Settings className="w-5 h-5" />
+                      <span>HR Configuration</span>
+                    </CardTitle>
+                    <CardDescription>Configure core HR settings and policies</CardDescription>
+                  </div>
+                  <Button
+                    onClick={handleSaveHRConfig}
+                    disabled={isSaving}
+                    className="bg-black text-white hover:bg-gray-800"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save HR Configuration
+                      </>
+                    )}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2131,9 +2194,17 @@ const SettingsPage: FunctionComponent = () => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="January">January</SelectItem>
+                          <SelectItem value="February">February</SelectItem>
+                          <SelectItem value="March">March</SelectItem>
                           <SelectItem value="April">April</SelectItem>
+                          <SelectItem value="May">May</SelectItem>
+                          <SelectItem value="June">June</SelectItem>
                           <SelectItem value="July">July</SelectItem>
+                          <SelectItem value="August">August</SelectItem>
+                          <SelectItem value="September">September</SelectItem>
                           <SelectItem value="October">October</SelectItem>
+                          <SelectItem value="November">November</SelectItem>
+                          <SelectItem value="December">December</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -2247,20 +2318,6 @@ const SettingsPage: FunctionComponent = () => {
                     />
                   </div>
                 </div>
-
-                <Button onClick={handleSaveHRConfig} disabled={isSaving} className="w-full">
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving Configuration...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      Save HR Configuration
-                    </>
-                  )}
-                </Button>
               </CardContent>
             </Card>
 
@@ -2356,8 +2413,8 @@ const SettingsPage: FunctionComponent = () => {
                         </>
                       ) : (
                         <>
-                          <Settings className="mr-2 h-4 w-4" />
-                          Manage Leave Types
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Leave Types
                         </>
                       )}
                     </Button>
@@ -2412,45 +2469,58 @@ const SettingsPage: FunctionComponent = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <BarChart3 className="w-5 h-5" />
-                  <span>Employee Analytics</span>
+                  <FileText className="w-5 h-5" />
+                  <span>HR Policy Documents</span>
                 </CardTitle>
-                <CardDescription>Real-time employee statistics and trends</CardDescription>
+                <CardDescription>Manage HR policy documents and employee access</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-blue-600">Total Employees</p>
-                        <p className="text-2xl font-bold text-blue-800">{employees.length}</p>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  {hrDocuments.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between p-3 border rounded hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <FileText className="w-5 h-5 text-gray-500" />
+                        <div>
+                          <p className="font-medium">{doc.name}</p>
+                          <p className="text-sm text-gray-500">
+                            {doc.type} • {doc.size}
+                          </p>
+                        </div>
                       </div>
-                      <Users className="w-8 h-8 text-blue-500" />
-                    </div>
-                  </div>
-                  <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-green-600">Active Employees</p>
-                        <p className="text-2xl font-bold text-green-800">
-                          {employees.filter((emp) => emp.status === "active").length}
-                        </p>
+                      <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2">
+                          <Label htmlFor={`visible-${doc.id}`} className="text-sm">
+                            Visible to all employees
+                          </Label>
+                          <Switch
+                            id={`visible-${doc.id}`}
+                            checked={doc.visibleToAll}
+                            onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
+                          />
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveDocument(doc.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </Button>
                       </div>
-                      <UserCheck className="w-8 h-8 text-green-500" />
                     </div>
-                  </div>
-                  <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-purple-600">Departments</p>
-                        <p className="text-2xl font-bold text-purple-800">{departments.length}</p>
-                      </div>
-                      <Building className="w-8 h-8 text-purple-500" />
-                    </div>
-                  </div>
+                  ))}
                 </div>
+                <Button variant="outline" onClick={handleAddDocument} className="w-full bg-transparent">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add HR Policy Document
+                </Button>
               </CardContent>
             </Card>
+
+            {/* Employee Analytics card removed as requested */}
           </div>
         </TabsContent>
 
@@ -3747,6 +3817,179 @@ const SettingsPage: FunctionComponent = () => {
           </div>
         </div>
       )}
+      <Dialog open={showAddLeaveTypeModal} onOpenChange={setShowAddLeaveTypeModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Plus className="w-5 h-5" />
+              <span>Add New Leave Type</span>
+            </DialogTitle>
+            <DialogDescription>Create a new leave type with AI-powered policy recommendations</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="leaveTypeName">Leave Type Name</Label>
+              <Input
+                id="leaveTypeName"
+                value={newLeaveType.name}
+                onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
+                placeholder="e.g., Compassionate Leave"
+              />
+            </div>
+            <div>
+              <Label htmlFor="leaveDays">Number of Days</Label>
+              <Input
+                id="leaveDays"
+                type="number"
+                value={newLeaveType.days}
+                onChange={(e) => setNewLeaveType({ ...newLeaveType, days: Number.parseInt(e.target.value) })}
+                min="0"
+                max="365"
+              />
+            </div>
+            <div>
+              <Label htmlFor="leaveDescription">Description</Label>
+              <Input
+                id="leaveDescription"
+                value={newLeaveType.description}
+                onChange={(e) => setNewLeaveType({ ...newLeaveType, description: e.target.value })}
+                placeholder="Brief description of the leave type"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="carryOver"
+                checked={newLeaveType.carryOver}
+                onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, carryOver: checked })}
+              />
+              <Label htmlFor="carryOver">Allow carry over to next year</Label>
+            </div>
+            {hrConfig.aiRecommendations && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                <div className="flex items-start space-x-2">
+                  <Sparkles className="w-4 h-4 text-blue-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">AI Recommendation</p>
+                    <p className="text-xs text-blue-600">
+                      Based on industry standards, consider 3-5 days for compassionate leave
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddLeaveTypeModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddLeaveType} disabled={isManagingLeaveTypes || !newLeaveType.name}>
+              {isManagingLeaveTypes ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Leave Type
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPolicyModal} onOpenChange={setShowPolicyModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              {policyModalType === "view" && <Eye className="w-5 h-5" />}
+              {policyModalType === "edit" && <Edit className="w-5 h-5" />}
+              {policyModalType === "delete" && <Trash2 className="w-5 h-5 text-red-600" />}
+              <span>
+                {policyModalType === "view" && "View Policy Details"}
+                {policyModalType === "edit" && "Edit Policy"}
+                {policyModalType === "delete" && "Delete Policy"}
+              </span>
+            </DialogTitle>
+            <DialogDescription>
+              {selectedPolicy?.name} - {selectedPolicy?.description}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {policyModalType === "view" && selectedPolicy && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Policy Name</Label>
+                    <p className="text-sm font-medium">{selectedPolicy.name}</p>
+                  </div>
+                  <div>
+                    <Label>Days Allocated</Label>
+                    <p className="text-sm font-medium">{selectedPolicy.days} days</p>
+                  </div>
+                  <div>
+                    <Label>Current Usage</Label>
+                    <p className="text-sm font-medium">{selectedPolicy.usage}</p>
+                  </div>
+                  <div>
+                    <Label>Trend</Label>
+                    <p className="text-sm font-medium capitalize">{selectedPolicy.trend}</p>
+                  </div>
+                </div>
+                <div>
+                  <Label>Description</Label>
+                  <p className="text-sm">{selectedPolicy.description}</p>
+                </div>
+              </div>
+            )}
+            {policyModalType === "edit" && selectedPolicy && (
+              <div className="space-y-3">
+                <div>
+                  <Label>Policy Name</Label>
+                  <Input defaultValue={selectedPolicy.name} />
+                </div>
+                <div>
+                  <Label>Days Allocated</Label>
+                  <Input type="number" defaultValue={selectedPolicy.days} />
+                </div>
+                <div>
+                  <Label>Description</Label>
+                  <Input defaultValue={selectedPolicy.description} />
+                </div>
+              </div>
+            )}
+            {policyModalType === "delete" && selectedPolicy && (
+              <div className="text-center space-y-3">
+                <div className="w-12 h-12 mx-auto bg-red-100 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
+                <p className="text-sm">
+                  Are you sure you want to delete the <strong>{selectedPolicy.name}</strong> policy? This action cannot
+                  be undone.
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPolicyModal(false)}>
+              Cancel
+            </Button>
+            {policyModalType === "edit" && (
+              <Button>
+                <Save className="mr-2 h-4 w-4" />
+                Save Changes
+              </Button>
+            )}
+            {policyModalType === "delete" && (
+              <Button variant="destructive">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Policy
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
