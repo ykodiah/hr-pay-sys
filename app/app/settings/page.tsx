@@ -35,6 +35,7 @@ import {
   TrendingUp,
   Trash2,
   FileText,
+  EyeOff,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -238,6 +239,10 @@ const SettingsPage: FunctionComponent = () => {
 
   const [isSavingPolicy, setIsSavingPolicy] = useState(false)
   const [isSavingDocument, setIsSavingDocument] = useState(false)
+
+  const [showDocumentPreview, setShowDocumentPreview] = useState(false)
+  const [documentPreviewContent, setDocumentPreviewContent] = useState("")
+  const [leaveTypeAIInsights, setLeaveTypeAIInsights] = useState<string[]>([])
 
   // Logo upload function
   const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
@@ -1409,6 +1414,53 @@ const SettingsPage: FunctionComponent = () => {
     } finally {
       setIsSavingPolicy(false)
     }
+  }
+
+  const generateLeaveTypeInsights = (name: string, days: number, description: string) => {
+    const insights = []
+
+    if (days > 30) {
+      insights.push("⚠️ Consider if this extended leave period aligns with industry standards")
+    }
+    if (days < 5) {
+      insights.push("💡 Short leave periods may require frequent approvals - consider automation")
+    }
+    if (name.toLowerCase().includes("sick")) {
+      insights.push("🏥 Recommend integrating with health insurance policies")
+    }
+    if (name.toLowerCase().includes("maternity") || name.toLowerCase().includes("paternity")) {
+      insights.push("👶 Ensure compliance with local family leave regulations")
+    }
+    if (description.length < 20) {
+      insights.push("📝 Consider adding more detailed policy description for clarity")
+    }
+
+    insights.push("✨ AI suggests reviewing similar policies in your industry for benchmarking")
+
+    return insights
+  }
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document)
+    setDocumentModalType("view")
+    setShowDocumentModal(true)
+
+    // Simulate document content loading
+    setTimeout(() => {
+      setDocumentPreviewContent(`
+      Document: ${document.name}
+      
+      This is a preview of the ${document.name} document. 
+      
+      Key sections include:
+      • Company policies and procedures
+      • Employee rights and responsibilities  
+      • Code of conduct guidelines
+      • Compliance requirements
+      
+      [Document content would be displayed here in a real implementation]
+    `)
+    }, 500)
   }
 
   const handleDocumentAction = (action, docId = null) => {
@@ -2623,7 +2675,7 @@ const SettingsPage: FunctionComponent = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleDocumentAction("view", doc.id)}>
+                            <DropdownMenuItem onClick={() => handleDocumentView(doc)}>
                               <Eye className="w-4 h-4 mr-2" />
                               View
                             </DropdownMenuItem>
@@ -3462,7 +3514,7 @@ const SettingsPage: FunctionComponent = () => {
 
       {/* Add Leave Type Modal */}
       <Dialog open={showAddLeaveTypeModal} onOpenChange={() => setShowAddLeaveTypeModal(false)}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Add New Leave Type</DialogTitle>
             <DialogDescription>Create a new leave type for your organization</DialogDescription>
@@ -3475,7 +3527,12 @@ const SettingsPage: FunctionComponent = () => {
               <Input
                 id="leaveTypeName"
                 value={newLeaveType.name}
-                onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
+                onChange={(e) => {
+                  setNewLeaveType({ ...newLeaveType, name: e.target.value })
+                  setLeaveTypeAIInsights(
+                    generateLeaveTypeInsights(e.target.value, newLeaveType.days, newLeaveType.description),
+                  )
+                }}
                 className="col-span-3"
               />
             </div>
@@ -3487,7 +3544,11 @@ const SettingsPage: FunctionComponent = () => {
                 id="leaveTypeDays"
                 type="number"
                 value={newLeaveType.days}
-                onChange={(e) => setNewLeaveType({ ...newLeaveType, days: Number.parseInt(e.target.value) })}
+                onChange={(e) => {
+                  const days = Number.parseInt(e.target.value)
+                  setNewLeaveType({ ...newLeaveType, days })
+                  setLeaveTypeAIInsights(generateLeaveTypeInsights(newLeaveType.name, days, newLeaveType.description))
+                }}
                 className="col-span-3"
               />
             </div>
@@ -3498,7 +3559,12 @@ const SettingsPage: FunctionComponent = () => {
               <Textarea
                 id="leaveTypeDescription"
                 value={newLeaveType.description}
-                onChange={(e) => setNewLeaveType({ ...newLeaveType, description: e.target.value })}
+                onChange={(e) => {
+                  setNewLeaveType({ ...newLeaveType, description: e.target.value })
+                  setLeaveTypeAIInsights(
+                    generateLeaveTypeInsights(newLeaveType.name, newLeaveType.days, e.target.value),
+                  )
+                }}
                 className="col-span-3"
               />
             </div>
@@ -3513,6 +3579,24 @@ const SettingsPage: FunctionComponent = () => {
                 className="col-span-3"
               />
             </div>
+
+            {leaveTypeAIInsights.length > 0 && (
+              <div className="col-span-4 mt-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-900">AI Insights</span>
+                  </div>
+                  <div className="space-y-1">
+                    {leaveTypeAIInsights.map((insight, index) => (
+                      <p key={index} className="text-xs text-blue-800">
+                        {insight}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setShowAddLeaveTypeModal(false)}>
@@ -3647,7 +3731,7 @@ const SettingsPage: FunctionComponent = () => {
 
       {/* Document Modal */}
       <Dialog open={showDocumentModal} onOpenChange={() => setShowDocumentModal(false)}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className={documentModalType === "view" ? "sm:max-w-[700px]" : "sm:max-w-[425px]"}>
           <DialogHeader>
             <DialogTitle>
               {documentModalType === "add"
@@ -3685,7 +3769,16 @@ const SettingsPage: FunctionComponent = () => {
                 <Label htmlFor="documentFile" className="text-right">
                   File
                 </Label>
-                <input type="file" id="documentFile" onChange={handleFileUpload} className="col-span-3" />
+                <div className="col-span-3">
+                  <input type="file" id="documentFile" onChange={handleFileUpload} className="hidden" />
+                  <label
+                    htmlFor="documentFile"
+                    className="flex items-center justify-center w-full h-10 px-3 py-2 text-sm border border-input bg-background hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-md transition-colors"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File No file chosen
+                  </label>
+                </div>
               </div>
             </div>
           )}
@@ -3703,6 +3796,33 @@ const SettingsPage: FunctionComponent = () => {
                 <Label className="text-right col-span-1">Size</Label>
                 <Input value={selectedDocument.size} className="col-span-3" disabled />
               </div>
+
+              <div className="col-span-4 mt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-sm font-medium">Document Preview</Label>
+                  <Button variant="outline" size="sm" onClick={() => setShowDocumentPreview(!showDocumentPreview)}>
+                    {showDocumentPreview ? (
+                      <>
+                        <EyeOff className="w-4 h-4 mr-2" />
+                        Hide Preview
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="w-4 h-4 mr-2" />
+                        Show Preview
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {showDocumentPreview && (
+                  <div className="border rounded-lg p-4 bg-gray-50 max-h-64 overflow-y-auto">
+                    <pre className="text-sm whitespace-pre-wrap text-gray-700">
+                      {documentPreviewContent || "Loading document preview..."}
+                    </pre>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           {selectedDocument && documentModalType === "edit" && (
@@ -3717,7 +3837,16 @@ const SettingsPage: FunctionComponent = () => {
                 <Label htmlFor="editDocumentFile" className="text-right">
                   File
                 </Label>
-                <input type="file" id="editDocumentFile" onChange={handleFileUpload} className="col-span-3" />
+                <div className="col-span-3">
+                  <input type="file" id="editDocumentFile" onChange={handleFileUpload} className="hidden" />
+                  <label
+                    htmlFor="editDocumentFile"
+                    className="flex items-center justify-center w-full h-10 px-3 py-2 text-sm border border-input bg-background hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-md transition-colors"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose File No file chosen
+                  </label>
+                </div>
               </div>
             </div>
           )}
