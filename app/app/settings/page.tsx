@@ -8,8 +8,10 @@ import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import {
   Building2,
+  Shield,
   Users,
   DollarSign,
+  Bell,
   X,
   Eye,
   Edit,
@@ -138,229 +140,173 @@ const isDemoMode = () => {
 
 const SettingsPage: FunctionComponent = () => {
   console.log("[v0] SettingsPage component initializing...")
-  \
-  const { toast }
-}
-from
-useToast()
-const supabase = createClient()
 
-const [companyData, setCompanyData] = useState<Company>({
-  id: "",
-  name: "",
-  email_address: "",
-  tax_id: "",
-  ssnit_number: "",
-  industry: "",
-  address: "",
-  phone_number: "",
-  divisions: [],
-  departments: [],
-  locations: [],
-})
+  const { toast } = useToast()
+  const supabase = createClient()
 
-const [hrConfig, setHrConfig] = useState({
-  leaveYearStart: "January",
-  probationPeriod: 3,
-  workingHoursPerDay: 8,
-  workingDaysPerWeek: 5,
-  autoApproveLeave: false,
-  emailNotifications: true,
-  aiRecommendations: true,
-  smartScheduling: false,
-  performanceTracking: true,
-})
+  const [companyData, setCompanyData] = useState<Company>({
+    id: "",
+    name: "",
+    email_address: "",
+    tax_id: "",
+    ssnit_number: "",
+    industry: "",
+    address: "",
+    phone_number: "",
+    divisions: [],
+    departments: [],
+    locations: [],
+  })
 
-const [editingPolicy, setEditingPolicy] = useState({
-  name: "",
-  days: 0,
-  description: "",
-})
-const [isSavingPolicy, setIsSavingPolicy] = useState(false)
-const [isSavingDocument, setIsSavingDocument] = useState(false)
-const [showDocumentPreview, setShowDocumentPreview] = useState(false)
-const [documentPreviewContent, setDocumentPreviewContent] = useState("")
+  const [hrConfig, setHrConfig] = useState({
+    leaveYearStart: "January",
+    probationPeriod: 3,
+    workingHoursPerDay: 8,
+    workingDaysPerWeek: 5,
+    autoApproveLeave: false,
+    emailNotifications: true,
+    aiRecommendations: true,
+    smartScheduling: false,
+    performanceTracking: true,
+  })
 
-const [showDocumentModal, setShowDocumentModal] = useState(false)
-const [documentModalType, setDocumentModalType] = useState("add") // add, view, edit, delete
-const [selectedDocument, setSelectedDocument] = useState(null)
-const [uploadedFile, setUploadedFile] = useState(null)
-const [documentName, setDocumentName] = useState("")
-const [currentPolicies, setCurrentPolicies] = useState([
-  { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Annual vacation leave" },
-  { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness" },
-  { name: "Maternity Leave", days: 84, usage: "12%", trend: "stable", description: "Maternity and paternity leave" },
-])
+  const [editingPolicy, setEditingPolicy] = useState({
+    name: "",
+    days: 0,
+    description: "",
+  })
+  const [isSavingPolicy, setIsSavingPolicy] = useState(false)
+  const [isSavingDocument, setIsSavingDocument] = useState(false)
+  const [showDocumentPreview, setShowDocumentPreview] = useState(false)
+  const [documentPreviewContent, setDocumentPreviewContent] = useState("")
 
-const [divisions, setDivisions] = useState<string[]>([])
-const [departments, setDepartments] = useState<string[]>([])
-const [locations, setLocations] = useState<string[]>([])
-const [logoPreview, setLogoPreview] = useState<string>("")
-const [employees, setEmployees] = useState<Employee[]>([])
-const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([])
-const [roles, setRoles] = useState<Role[]>([])
-const [isBackingUp, setIsBackingUp] = useState<boolean>(false)
-const [lastBackupTime, setLastBackupTime] = useState<string | null>(null)
-const [showAddSubsidiary, setShowAddSubsidiary] = useState<boolean>(false)
-const [showEditSubsidiary, setShowEditSubsidiary] = useState<boolean>(false)
-const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState<boolean>(false)
-const [selectedSubsidiary, setSelectedSubsidiary] = useState<Subsidiary | null>(null)
-const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<boolean>(false)
-const [showReactivateConfirm, setShowReactivateConfirm] = useState<boolean>(false)
-const [subsidiaryToToggle, setSubsidiaryToToggle] = useState<Subsidiary | null>(null)
+  const [showDocumentModal, setShowDocumentModal] = useState(false)
+  const [documentModalType, setDocumentModalType] = useState("add") // add, view, edit, delete
+  const [selectedDocument, setSelectedDocument] = useState(null)
+  const [uploadedFile, setUploadedFile] = useState(null)
+  const [documentName, setDocumentName] = useState("")
+  const [currentPolicies, setCurrentPolicies] = useState([
+    { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Annual vacation leave" },
+    { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness" },
+    { name: "Maternity Leave", days: 84, usage: "12%", trend: "stable", description: "Maternity and paternity leave" },
+  ])
 
-const [companyLogoPreview, setCompanyLogoPreview] = useState<string>("")
-const [subsidiaryLogoPreview, setSubsidiaryLogoPreview] = useState<string>("")
-const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false)
+  const [divisions, setDivisions] = useState<string[]>([])
+  const [departments, setDepartments] = useState<string[]>([])
+  const [locations, setLocations] = useState<string[]>([])
+  const [logoPreview, setLogoPreview] = useState<string>("")
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([])
+  const [roles, setRoles] = useState<Role[]>([])
+  const [isBackingUp, setIsBackingUp] = useState<boolean>(false)
+  const [lastBackupTime, setLastBackupTime] = useState<string | null>(null)
+  const [showAddSubsidiary, setShowAddSubsidiary] = useState<boolean>(false)
+  const [showEditSubsidiary, setShowEditSubsidiary] = useState<boolean>(false)
+  const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState<boolean>(false)
+  const [selectedSubsidiary, setSelectedSubsidiary] = useState<Subsidiary | null>(null)
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<boolean>(false)
+  const [showReactivateConfirm, setShowReactivateConfirm] = useState<boolean>(false)
+  const [subsidiaryToToggle, setSubsidiaryToToggle] = useState<Subsidiary | null>(null)
 
-const [viewEmployeesModal, setViewEmployeesModal] = useState<{
-  isOpen: boolean
-  subsidiaryId: string
-  employees?: any[]
-}>({ isOpen: false, subsidiaryId: "" })
+  const [companyLogoPreview, setCompanyLogoPreview] = useState<string>("")
+  const [subsidiaryLogoPreview, setSubsidiaryLogoPreview] = useState<string>("")
+  const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false)
 
-const [importModal, setImportModal] = useState(false)
+  const [viewEmployeesModal, setViewEmployeesModal] = useState<{
+    isOpen: boolean
+    subsidiaryId: string
+    employees?: any[]
+  }>({ isOpen: false, subsidiaryId: "" })
 
-const [isSavingSubsidiary, setIsSavingSubsidiary] = useState(false)
+  const [importModal, setImportModal] = useState(false)
 
-const [isSavingSettings, setIsSavingSettings] = useState(false)
+  const [isSavingSubsidiary, setIsSavingSubsidiary] = useState(false)
 
-const [isSavingSubsidiaries, setIsSavingSubsidiaries] = useState(false)
+  const [isSavingSettings, setIsSavingSettings] = useState(false)
 
-const [isManagingLeaveTypes, setIsManagingLeaveTypes] = useState(false)
-const [selectedPolicy, setSelectedPolicy] = useState<string | null>(null)
+  const [isSavingSubsidiaries, setIsSavingSubsidiaries] = useState(false)
 
-const [isSaving, setIsSaving] = useState(false)
+  const [isManagingLeaveTypes, setIsManagingLeaveTypes] = useState(false)
+  const [selectedPolicy, setSelectedPolicy] = useState<string | null>(null)
 
-const [hrDocuments, setHrDocuments] = useState([
-  { id: 1, name: "Employee Handbook", type: "PDF", size: "2.4 MB", visibleToAll: true },
-  { id: 2, name: "Code of Conduct", type: "PDF", size: "1.8 MB", visibleToAll: false },
-])
-const [showAddLeaveTypeModal, setShowAddLeaveTypeModal] = useState(false)
-const [showPolicyModal, setShowPolicyModal] = useState(false)
-const [policyModalType, setPolicyModalType] = useState("view") // view, edit, delete
-const [newLeaveType, setNewLeaveType] = useState({
-  name: "",
-  days: 0,
-  description: "",
-  carryOver: false,
-})
+  const [isSaving, setIsSaving] = useState(false)
 
-const [leaveTypeAIInsights, setLeaveTypeAIInsights] = useState<string[]>([])
+  const [hrDocuments, setHrDocuments] = useState([
+    { id: 1, name: "Employee Handbook", type: "PDF", size: "2.4 MB", visibleToAll: true },
+    { id: 2, name: "Code of Conduct", type: "PDF", size: "1.8 MB", visibleToAll: false },
+  ])
+  const [showAddLeaveTypeModal, setShowAddLeaveTypeModal] = useState(false)
+  const [showPolicyModal, setShowPolicyModal] = useState(false)
+  const [policyModalType, setPolicyModalType] = useState("view") // view, edit, delete
+  const [newLeaveType, setNewLeaveType] = useState({
+    name: "",
+    days: 0,
+    description: "",
+    carryOver: false,
+  })
 
-// Logo upload function
-const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
-  if (!file) return
+  const [leaveTypeAIInsights, setLeaveTypeAIInsights] = useState<string[]>([])
 
-  setIsUploadingLogo(true)
-  try {
-    // Create form data for blob upload
-    const formData = new FormData()
-    formData.append("file", file)
+  // Logo upload function
+  const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
+    if (!file) return
 
-    // Upload to Vercel Blob
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    })
+    setIsUploadingLogo(true)
+    try {
+      // Create form data for blob upload
+      const formData = new FormData()
+      formData.append("file", file)
 
-    if (!response.ok) {
-      throw new Error("Upload failed")
-    }
-
-    const { url } = await response.json()
-
-    // Set preview based on type
-    if (type === "company") {
-      setCompanyLogoPreview(url)
-      setCompanyData({ ...companyData, logo_url: url })
-    } else {
-      setSubsidiaryLogoPreview(url)
-      if (selectedSubsidiary) {
-        const updatedSubsidiary = { ...selectedSubsidiary, logo_url: url }
-        setSelectedSubsidiary(updatedSubsidiary)
-        // Also update the subsidiary in the main list
-        setSubsidiaries((prev) =>
-          prev.map((sub) => (sub.id === selectedSubsidiary.id ? { ...sub, logo_url: url } : sub)),
-        )
-      }
-    }
-
-    toast({
-      title: "Logo uploaded successfully",
-      description: "Your logo has been uploaded and is ready to use.",
-    })
-  } catch (error) {
-    console.error("Logo upload error:", error)
-    toast({
-      title: "Upload failed",
-      description: "Failed to upload logo. Please try again.",
-      variant: "destructive",
-    })
-  } finally {
-    setIsUploadingLogo(false)
-  }
-}
-
-// Load functions
-const loadCompanyData = async () => {
-  console.log("[v0] Loading company data...")
-
-  if (isDemoMode()) {
-    console.log("[v0] Demo mode detected, using mock company data")
-    setCompanyData({
-      id: "demo-company-001",
-      name: "Akwaaba Technologies Ltd",
-      email_address: "ykodiah@gmail.com",
-      tax_id: "C0012345678",
-      ssnit_number: "1234567890",
-      industry: "Technology",
-      status: "active",
-      address: "123 Liberation Road, Labone, Accra, Ghana",
-      phone_number: "0249397960",
-      divisions: ["Head Office", "Regional Office"],
-      departments: ["Technology", "Human Resources", "Finance"],
-      locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-    })
-    setDivisions(["Head Office", "Regional Office"])
-    setDepartments(["Technology", "Human Resources", "Finance"])
-    setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-    return
-  }
-
-  try {
-    const { data, error } = await supabase.from("companies").select("*").single()
-
-    if (error) throw error
-
-    if (data) {
-      setCompanyData({
-        id: data.id,
-        name: data.name || "",
-        email_address: data.email_address || "",
-        tax_id: data.tax_id || "",
-        ssnit_number: data.ssnit_number || "",
-        industry: data.industry || "",
-        status: "active",
-        address: data.address || "",
-        phone_number: data.phone_number || "",
-        divisions: data.divisions || [],
-        departments: data.departments || [],
-        locations: data.locations || [],
+      // Upload to Vercel Blob
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
       })
 
-      setDivisions(data.divisions || [])
-      setDepartments(data.departments || [])
-      setLocations(data.locations || [])
-      setLogoPreview(data.logo_url || "")
+      if (!response.ok) {
+        throw new Error("Upload failed")
+      }
+
+      const { url } = await response.json()
+
+      // Set preview based on type
+      if (type === "company") {
+        setCompanyLogoPreview(url)
+        setCompanyData({ ...companyData, logo_url: url })
+      } else {
+        setSubsidiaryLogoPreview(url)
+        if (selectedSubsidiary) {
+          const updatedSubsidiary = { ...selectedSubsidiary, logo_url: url }
+          setSelectedSubsidiary(updatedSubsidiary)
+          // Also update the subsidiary in the main list
+          setSubsidiaries((prev) =>
+            prev.map((sub) => (sub.id === selectedSubsidiary.id ? { ...sub, logo_url: url } : sub)),
+          )
+        }
+      }
+
+      toast({
+        title: "Logo uploaded successfully",
+        description: "Your logo has been uploaded and is ready to use.",
+      })
+    } catch (error) {
+      console.error("Logo upload error:", error)
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload logo. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingLogo(false)
     }
-  } catch (error) {
-    console.error("[v0] Error loading company data:", error)
-    if (error.message && error.message.includes("infinite recursion detected in policy")) {
-      console.log("[v0] Database policy error detected, falling back to demo mode")
-      // Set demo session cookie to prevent future database calls
-      document.cookie = "demo-session=active; path=/; max-age=86400"
-      // Load demo data
+  }
+
+  // Load functions
+  const loadCompanyData = async () => {
+    console.log("[v0] Loading company data...")
+
+    if (isDemoMode()) {
+      console.log("[v0] Demo mode detected, using mock company data")
       setCompanyData({
         id: "demo-company-001",
         name: "Akwaaba Technologies Ltd",
@@ -380,56 +326,72 @@ const loadCompanyData = async () => {
       setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
       return
     }
-    toast({
-      title: "Error",
-      description: "Failed to load company data",
-      variant: "destructive",
-    })
+
+    try {
+      const { data, error } = await supabase.from("companies").select("*").single()
+
+      if (error) throw error
+
+      if (data) {
+        setCompanyData({
+          id: data.id,
+          name: data.name || "",
+          email_address: data.email_address || "",
+          tax_id: data.tax_id || "",
+          ssnit_number: data.ssnit_number || "",
+          industry: data.industry || "",
+          status: "active",
+          address: data.address || "",
+          phone_number: data.phone_number || "",
+          divisions: data.divisions || [],
+          departments: data.departments || [],
+          locations: data.locations || [],
+        })
+
+        setDivisions(data.divisions || [])
+        setDepartments(data.departments || [])
+        setLocations(data.locations || [])
+        setLogoPreview(data.logo_url || "")
+      }
+    } catch (error) {
+      console.error("[v0] Error loading company data:", error)
+      if (error.message && error.message.includes("infinite recursion detected in policy")) {
+        console.log("[v0] Database policy error detected, falling back to demo mode")
+        // Set demo session cookie to prevent future database calls
+        document.cookie = "demo-session=active; path=/; max-age=86400"
+        // Load demo data
+        setCompanyData({
+          id: "demo-company-001",
+          name: "Akwaaba Technologies Ltd",
+          email_address: "ykodiah@gmail.com",
+          tax_id: "C0012345678",
+          ssnit_number: "1234567890",
+          industry: "Technology",
+          status: "active",
+          address: "123 Liberation Road, Labone, Accra, Ghana",
+          phone_number: "0249397960",
+          divisions: ["Head Office", "Regional Office"],
+          departments: ["Technology", "Human Resources", "Finance"],
+          locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
+        })
+        setDivisions(["Head Office", "Regional Office"])
+        setDepartments(["Technology", "Human Resources", "Finance"])
+        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+        return
+      }
+      toast({
+        title: "Error",
+        description: "Failed to load company data",
+        variant: "destructive",
+      })
+    }
   }
-}
 
-const loadEmployees = async () => {
-  console.log("[v0] Loading employees...")
+  const loadEmployees = async () => {
+    console.log("[v0] Loading employees...")
 
-  if (isDemoMode()) {
-    console.log("[v0] Demo mode detected, using mock employees data")
-    setEmployees([
-      {
-        id: "emp-001",
-        first_name: "John",
-        last_name: "Doe",
-        full_name: "John Doe",
-        corporate_email: "john.doe@akwaaba.com",
-        personal_email: "john.doe@gmail.com",
-        position: "Software Engineer",
-        department: "Technology",
-        status: "active",
-      },
-      {
-        id: "emp-002",
-        first_name: "Jane",
-        last_name: "Smith",
-        full_name: "Jane Smith",
-        corporate_email: "jane.smith@akwaaba.com",
-        personal_email: "jane.smith@gmail.com",
-        position: "HR Manager",
-        department: "Human Resources",
-        status: "active",
-      },
-    ])
-    return
-  }
-
-  try {
-    const { data, error } = await supabase.from("employees").select("*").order("created_at", { ascending: false })
-
-    if (error) throw error
-    setEmployees(data || [])
-  } catch (error) {
-    console.error("Error loading employees:", error)
-    if (error.message && error.message.includes("infinite recursion detected in policy")) {
-      console.log("[v0] Database policy error detected, falling back to demo mode for employees")
-      document.cookie = "demo-session=active; path=/; max-age=86400"
+    if (isDemoMode()) {
+      console.log("[v0] Demo mode detected, using mock employees data")
       setEmployees([
         {
           id: "emp-001",
@@ -456,1063 +418,1100 @@ const loadEmployees = async () => {
       ])
       return
     }
-    toast({
-      title: "Error",
-      description: "Failed to load employees",
-      variant: "destructive",
-    })
-  }
-}
 
-const loadSubsidiaries = async () => {
-  console.log("[v0] Loading subsidiaries...")
+    try {
+      const { data, error } = await supabase.from("employees").select("*").order("created_at", { ascending: false })
 
-  if (isDemoMode()) {
-    console.log("[v0] Demo mode detected, using mock subsidiaries data")
-    setSubsidiaries([
-      {
-        id: "sub-001",
-        company_id: "comp-001",
-        name: "Akwaaba Digital Solutions",
-        email_address: "info@akwaabadigital.com",
-        phone_number: "+233 30 276 5432",
-        tax_id: "TIN-ADS-2023-001",
-        ssnit_number: "SSNIT-ADS-789012",
-        address: "15 Liberation Road, Ridge, Accra, Ghana",
-        status: "active",
-        industry: "Digital Marketing & Web Development",
-        divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
-        departments: ["Marketing", "Development", "Design", "Sales"],
-        locations: ["Accra - Ridge", "Kumasi Branch"],
-        divisions_count: 3,
-        departments_count: 4,
-        locations_count: 2,
-        employee_count: 45,
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: "sub-002",
-        company_id: "comp-001",
-        name: "Akwaaba Consulting Group",
-        email_address: "consulting@akwaaba.com",
-        phone_number: "+233 30 276 5433",
-        tax_id: "TIN-ACG-2023-002",
-        ssnit_number: "SSNIT-ACG-789013",
-        address: "8 Airport Residential Area, Accra, Ghana",
-        status: "active",
-        industry: "Business Consulting & Strategy",
-        divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
-        departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
-        locations: ["Accra - Airport", "Tema Office"],
-        divisions_count: 3,
-        departments_count: 4,
-        locations_count: 2,
-        employee_count: 32,
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: "sub-003",
-        company_id: "comp-001",
-        name: "Akwaaba Financial Services",
-        email_address: "finance@akwaabafs.com",
-        phone_number: "+233 30 276 5434",
-        tax_id: "TIN-AFS-2023-003",
-        ssnit_number: "SSNIT-AFS-789014",
-        address: "25 Independence Avenue, Accra, Ghana",
-        status: "active",
-        industry: "Financial Technology & Services",
-        divisions: ["Fintech Solutions", "Payment Processing", "Financial Advisory"],
-        departments: ["Finance", "Technology", "Compliance", "Customer Service"],
-        locations: ["Accra - Independence Ave", "Ho Regional Office"],
-        divisions_count: 3,
-        departments_count: 4,
-        locations_count: 2,
-        employee_count: 28,
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: "sub-004",
-        company_id: "comp-001",
-        name: "Akwaaba Logistics Ltd",
-        email_address: "logistics@akwaabalog.com",
-        phone_number: "+233 30 276 5435",
-        tax_id: "TIN-ALL-2023-004",
-        ssnit_number: "SSNIT-ALL-789015",
-        address: "12 Spintex Road, Accra, Ghana",
-        status: "active",
-        industry: "Supply Chain & Logistics",
-        divisions: ["Transportation", "Warehousing", "Supply Chain Management"],
-        departments: ["Operations", "Fleet Management", "Warehousing", "Customer Service"],
-        locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub"],
-        divisions_count: 3,
-        departments_count: 4,
-        locations_count: 3,
-        employee_count: 67,
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: "sub-005",
-        company_id: "comp-001",
-        name: "Akwaaba Training Institute",
-        email_address: "training@akwaabainstitute.com",
-        phone_number: "+233 30 276 5436",
-        tax_id: "TIN-ATI-2023-005",
-        ssnit_number: "SSNIT-ATI-789016",
-        address: "5 Cantonments Road, Accra, Ghana",
-        status: "active",
-        industry: "Education & Professional Training",
-        divisions: ["Corporate Training", "IT Certification", "Professional Development"],
-        departments: ["Training", "Curriculum Development", "Student Services", "Administration"],
-        locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform"],
-        divisions_count: 3,
-        departments_count: 4,
-        locations_count: 3,
-        employee_count: 23,
-        created_at: new Date().toISOString(),
-      },
-    ])
-    return
+      if (error) throw error
+      setEmployees(data || [])
+    } catch (error) {
+      console.error("Error loading employees:", error)
+      if (error.message && error.message.includes("infinite recursion detected in policy")) {
+        console.log("[v0] Database policy error detected, falling back to demo mode for employees")
+        document.cookie = "demo-session=active; path=/; max-age=86400"
+        setEmployees([
+          {
+            id: "emp-001",
+            first_name: "John",
+            last_name: "Doe",
+            full_name: "John Doe",
+            corporate_email: "john.doe@akwaaba.com",
+            personal_email: "john.doe@gmail.com",
+            position: "Software Engineer",
+            department: "Technology",
+            status: "active",
+          },
+          {
+            id: "emp-002",
+            first_name: "Jane",
+            last_name: "Smith",
+            full_name: "Jane Smith",
+            corporate_email: "jane.smith@akwaaba.com",
+            personal_email: "jane.smith@gmail.com",
+            position: "HR Manager",
+            department: "Human Resources",
+            status: "active",
+          },
+        ])
+        return
+      }
+      toast({
+        title: "Error",
+        description: "Failed to load employees",
+        variant: "destructive",
+      })
+    }
   }
 
-  try {
-    // Load subsidiaries with employee counts
-    const { data: subsidiariesData, error: subsidiariesError } = await supabase
-      .from("subsidiaries")
-      .select(`
-          *,
-          employees:employees(count)
-        `)
-      .order("created_at", { ascending: false })
+  const loadSubsidiaries = async () => {
+    console.log("[v0] Loading subsidiaries...")
 
-    if (subsidiariesError) throw subsidiariesError
-
-    // Process the data to add computed fields
-    const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => ({
-      ...sub,
-      divisions: Array.isArray(sub.divisions) ? sub.divisions : [],
-      departments: Array.isArray(sub.departments) ? sub.departments : [],
-      locations: Array.isArray(sub.locations) ? sub.locations : [],
-      divisions_count: Array.isArray(sub.divisions) ? sub.divisions.length : 0,
-      departments_count: Array.isArray(sub.departments) ? sub.departments.length : 0,
-      locations_count: Array.isArray(sub.locations) ? sub.locations.length : 0,
-      employee_count: sub.employees?.[0]?.count || 0,
-    }))
-
-    setSubsidiaries(processedSubsidiaries)
-    console.log("[v0] Loaded subsidiaries:", processedSubsidiaries.length)
-  } catch (error) {
-    console.error("Subsidiaries loading error:", error)
-    toast({
-      title: "Error",
-      description: "Failed to load subsidiaries",
-      variant: "destructive",
-    })
-  }
-}
-
-const loadRoles = async () => {
-  console.log("[v0] Loading roles...")
-
-  if (isDemoMode()) {
-    console.log("[v0] Demo mode detected, using mock roles data")
-    setRoles([
-      {
-        id: "role-001",
-        name: "Administrator",
-        description: "Full system access and management capabilities",
-        permissions: ["all"],
-        user_count: 2,
-      },
-      {
-        id: "role-002",
-        name: "HR Manager",
-        description: "Human resources management and employee oversight",
-        permissions: ["hr", "employees", "reports"],
-        user_count: 3,
-      },
-      {
-        id: "role-003",
-        name: "Employee",
-        description: "Standard employee access to personal information",
-        permissions: ["profile", "payslip", "leave"],
-        user_count: 45,
-      },
-    ])
-    return
-  }
-
-  try {
-    const { data, error } = await supabase.from("roles").select("*").order("created_at", { ascending: false })
-
-    if (error) throw error
-    setRoles(data || [])
-  } catch (error) {
-    console.error("Error loading roles:", error)
-    if (error.message && error.message.includes("infinite recursion detected in policy")) {
-      console.log("[v0] Database policy error detected, falling back to demo mode for roles")
-      document.cookie = "demo-session=active; path=/; max-age=86400"
-      setRoles([
+    if (isDemoMode()) {
+      console.log("[v0] Demo mode detected, using mock subsidiaries data")
+      setSubsidiaries([
         {
-          id: "role-001",
-          name: "Administrator",
-          description: "Full system access",
-          permissions: ["read", "write", "delete", "admin"],
+          id: "sub-001",
+          company_id: "comp-001",
+          name: "Akwaaba Digital Solutions",
+          email_address: "info@akwaabadigital.com",
+          phone_number: "+233 30 276 5432",
+          tax_id: "TIN-ADS-2023-001",
+          ssnit_number: "SSNIT-ADS-789012",
+          address: "15 Liberation Road, Ridge, Accra, Ghana",
           status: "active",
+          industry: "Digital Marketing & Web Development",
+          divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
+          departments: ["Marketing", "Development", "Design", "Sales"],
+          locations: ["Accra - Ridge", "Kumasi Branch"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 2,
+          employee_count: 45,
+          created_at: new Date().toISOString(),
         },
         {
-          id: "role-002",
-          name: "HR Manager",
-          description: "Human Resources management",
-          permissions: ["read", "write"],
+          id: "sub-002",
+          company_id: "comp-001",
+          name: "Akwaaba Consulting Group",
+          email_address: "consulting@akwaaba.com",
+          phone_number: "+233 30 276 5433",
+          tax_id: "TIN-ACG-2023-002",
+          ssnit_number: "SSNIT-ACG-789013",
+          address: "8 Airport Residential Area, Accra, Ghana",
           status: "active",
+          industry: "Business Consulting & Strategy",
+          divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
+          departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
+          locations: ["Accra - Airport", "Tema Office"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 2,
+          employee_count: 32,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "sub-003",
+          company_id: "comp-001",
+          name: "Akwaaba Financial Services",
+          email_address: "finance@akwaabafs.com",
+          phone_number: "+233 30 276 5434",
+          tax_id: "TIN-AFS-2023-003",
+          ssnit_number: "SSNIT-AFS-789014",
+          address: "25 Independence Avenue, Accra, Ghana",
+          status: "active",
+          industry: "Financial Technology & Services",
+          divisions: ["Fintech Solutions", "Payment Processing", "Financial Advisory"],
+          departments: ["Finance", "Technology", "Compliance", "Customer Service"],
+          locations: ["Accra - Independence Ave", "Ho Regional Office"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 2,
+          employee_count: 28,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "sub-004",
+          company_id: "comp-001",
+          name: "Akwaaba Logistics Ltd",
+          email_address: "logistics@akwaabalog.com",
+          phone_number: "+233 30 276 5435",
+          tax_id: "TIN-ALL-2023-004",
+          ssnit_number: "SSNIT-ALL-789015",
+          address: "12 Spintex Road, Accra, Ghana",
+          status: "active",
+          industry: "Supply Chain & Logistics",
+          divisions: ["Transportation", "Warehousing", "Supply Chain Management"],
+          departments: ["Operations", "Fleet Management", "Warehousing", "Customer Service"],
+          locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 3,
+          employee_count: 67,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "sub-005",
+          company_id: "comp-001",
+          name: "Akwaaba Training Institute",
+          email_address: "training@akwaabainstitute.com",
+          phone_number: "+233 30 276 5436",
+          tax_id: "TIN-ATI-2023-005",
+          ssnit_number: "SSNIT-ATI-789016",
+          address: "5 Cantonments Road, Accra, Ghana",
+          status: "active",
+          industry: "Education & Professional Training",
+          divisions: ["Corporate Training", "IT Certification", "Professional Development"],
+          departments: ["Training", "Curriculum Development", "Student Services", "Administration"],
+          locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 3,
+          employee_count: 23,
+          created_at: new Date().toISOString(),
         },
       ])
       return
     }
-    toast({
-      title: "Error",
-      description: "Failed to load roles",
-      variant: "destructive",
-    })
-  }
-}
 
-const loadAllData = async () => {
-  console.log("[v0] Loading all settings data...")
-  try {
-    await Promise.all([loadCompanyData(), loadEmployees(), loadSubsidiaries(), loadRoles()])
-    console.log("[v0] All settings data loaded successfully")
-  } catch (error) {
-    console.error("[v0] Error loading settings data:", error)
-  }
-}
+    try {
+      // Load subsidiaries with employee counts
+      const { data: subsidiariesData, error: subsidiariesError } = await supabase
+        .from("subsidiaries")
+        .select(`
+          *,
+          employees:employees(count)
+        `)
+        .order("created_at", { ascending: false })
 
-useEffect(() => {
-  loadAllData()
-}, [])
+      if (subsidiariesError) throw subsidiariesError
 
-// Subsidiary Management Functions
-const syncSubsidiarySettings = async (subsidiaryId: string) => {
-  console.log("[v0] Syncing settings for subsidiary:", subsidiaryId)
+      // Process the data to add computed fields
+      const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => ({
+        ...sub,
+        divisions: Array.isArray(sub.divisions) ? sub.divisions : [],
+        departments: Array.isArray(sub.departments) ? sub.departments : [],
+        locations: Array.isArray(sub.locations) ? sub.locations : [],
+        divisions_count: Array.isArray(sub.divisions) ? sub.divisions.length : 0,
+        departments_count: Array.isArray(sub.departments) ? sub.departments.length : 0,
+        locations_count: Array.isArray(sub.locations) ? sub.locations.length : 0,
+        employee_count: sub.employees?.[0]?.count || 0,
+      }))
 
-  if (isDemoMode()) {
-    toast({
-      title: "Settings Synced",
-      description: "Subsidiary settings synchronized successfully (Demo Mode)",
-    })
-    return
-  }
-
-  try {
-    // Simulate settings sync process
-    const { error } = await supabase
-      .from("subsidiaries")
-      .update({
-        settings_synced_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+      setSubsidiaries(processedSubsidiaries)
+      console.log("[v0] Loaded subsidiaries:", processedSubsidiaries.length)
+    } catch (error) {
+      console.error("Subsidiaries loading error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load subsidiaries",
+        variant: "destructive",
       })
-      .eq("id", subsidiaryId)
-
-    if (error) throw error
-
-    toast({
-      title: "Settings Synced",
-      description: "Subsidiary settings synchronized successfully",
-    })
-  } catch (error) {
-    console.error("Sync settings error:", error)
-    toast({
-      title: "Error",
-      description: "Failed to sync subsidiary settings",
-      variant: "destructive",
-    })
-  }
-}
-
-const viewSubsidiaryEmployees = async (subsidiaryId: string) => {
-  console.log("[v0] Viewing employees for subsidiary:", subsidiaryId)
-
-  if (isDemoMode()) {
-    const mockEmployees = [
-      {
-        id: "emp-1",
-        name: "John Doe",
-        position: "Software Engineer",
-        department: "Technology",
-        email: "john@company.com",
-      },
-      {
-        id: "emp-2",
-        name: "Jane Smith",
-        position: "Marketing Manager",
-        department: "Marketing",
-        email: "jane@company.com",
-      },
-      {
-        id: "emp-3",
-        name: "Mike Johnson",
-        position: "HR Specialist",
-        department: "Human Resources",
-        email: "mike@company.com",
-      },
-    ]
-
-    // Update employee count in subsidiary
-    const updatedSubsidiaries = subsidiaries.map((sub) =>
-      sub.id === subsidiaryId ? { ...sub, employee_count: mockEmployees.length } : sub,
-    )
-    setSubsidiaries(updatedSubsidiaries)
-
-    // Update selectedSubsidiary if it matches
-    if (selectedSubsidiary?.id === subsidiaryId) {
-      setSelectedSubsidiary({ ...selectedSubsidiary, employee_count: mockEmployees.length })
     }
-
-    setViewEmployeesModal({
-      isOpen: true,
-      subsidiaryId,
-      employees: mockEmployees,
-    })
-    return
   }
 
-  try {
-    const { data: employees, error } = await supabase.from("employees").select("*").eq("subsidiary_id", subsidiaryId)
+  const loadRoles = async () => {
+    console.log("[v0] Loading roles...")
 
-    if (error) throw error
-
-    // Update employee count in subsidiary
-    const employeeCount = employees?.length || 0
-    await updateSubsidiary(subsidiaryId, { employee_count: employeeCount })
-
-    setViewEmployeesModal({
-      isOpen: true,
-      subsidiaryId,
-      employees: employees || [],
-    })
-  } catch (error) {
-    console.error("View employees error:", error)
-    toast({
-      title: "Error",
-      description: "Failed to load subsidiary employees",
-      variant: "destructive",
-    })
-  }
-}
-
-const addNewSubsidiary = async (subsidiaryData: Partial<Subsidiary>) => {
-  console.log("[v0] Adding new subsidiary:", subsidiaryData)
-
-  if (isDemoMode()) {
-    const newSubsidiary: Subsidiary = {
-      id: `sub-${Date.now()}`,
-      company_id: "comp-001",
-      name: subsidiaryData.name || "New Subsidiary",
-      tax_id: subsidiaryData.tax_id || `TIN-${Date.now()}`,
-      ssnit_number: subsidiaryData.ssnit_number || `SSNIT-${Date.now()}`,
-      address: subsidiaryData.address || "",
-      phone_number: subsidiaryData.phone_number || "",
-      email_address: subsidiaryData.email_address || "",
-      status: "active",
-      industry: subsidiaryData.industry || "",
-      divisions: subsidiaryData.divisions || [],
-      departments: subsidiaryData.departments || [],
-      locations: subsidiaryData.locations || [],
-      divisions_count: 0,
-      departments_count: 0,
-      locations_count: 0,
-      employee_count: 0,
-      created_at: new Date().toISOString(),
-      logo_url: subsidiaryLogoPreview || "", // Include uploaded logo URL
-    }
-    setSubsidiaries((prev) => [newSubsidiary, ...prev])
-
-    setSubsidiaryLogoPreview("")
-
-    toast({
-      title: "Subsidiary Added",
-      description: "New subsidiary created successfully (Demo Mode)",
-    })
-    return
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from("subsidiaries")
-      .insert([
+    if (isDemoMode()) {
+      console.log("[v0] Demo mode detected, using mock roles data")
+      setRoles([
         {
-          company_id: companyData?.id,
-          name: subsidiaryData.name,
-          tax_id: subsidiaryData.tax_id,
-          ssnit_number: subsidiaryData.ssnit_number,
-          address: subsidiaryData.address,
-          phone_number: subsidiaryData.phone_number,
-          email_address: subsidiaryData.email_address,
-          industry: subsidiaryData.industry,
-          status: "active",
-          divisions: subsidiaryData.divisions || [],
-          departments: subsidiaryData.departments || [],
-          locations: subsidiaryData.locations || [],
-          logo_url: subsidiaryLogoPreview || "", // Include uploaded logo URL
+          id: "role-001",
+          name: "Administrator",
+          description: "Full system access and management capabilities",
+          permissions: ["all"],
+          user_count: 2,
+        },
+        {
+          id: "role-002",
+          name: "HR Manager",
+          description: "Human resources management and employee oversight",
+          permissions: ["hr", "employees", "reports"],
+          user_count: 3,
+        },
+        {
+          id: "role-003",
+          name: "Employee",
+          description: "Standard employee access to personal information",
+          permissions: ["profile", "payslip", "leave"],
+          user_count: 45,
         },
       ])
-      .select()
+      return
+    }
 
-    if (error) throw error
+    try {
+      const { data, error } = await supabase.from("roles").select("*").order("created_at", { ascending: false })
 
-    await loadSubsidiaries() // Reload the list
-
-    setSubsidiaryLogoPreview("")
-
-    toast({
-      title: "Subsidiary Added",
-      description: "New subsidiary created successfully",
-    })
-  } catch (error) {
-    console.error("Add subsidiary error:", error)
-    toast({
-      title: "Error",
-      description: "Failed to add subsidiary",
-      variant: "destructive",
-    })
+      if (error) throw error
+      setRoles(data || [])
+    } catch (error) {
+      console.error("Error loading roles:", error)
+      if (error.message && error.message.includes("infinite recursion detected in policy")) {
+        console.log("[v0] Database policy error detected, falling back to demo mode for roles")
+        document.cookie = "demo-session=active; path=/; max-age=86400"
+        setRoles([
+          {
+            id: "role-001",
+            name: "Administrator",
+            description: "Full system access",
+            permissions: ["read", "write", "delete", "admin"],
+            status: "active",
+          },
+          {
+            id: "role-002",
+            name: "HR Manager",
+            description: "Human Resources management",
+            permissions: ["read", "write"],
+            status: "active",
+          },
+        ])
+        return
+      }
+      toast({
+        title: "Error",
+        description: "Failed to load roles",
+        variant: "destructive",
+      })
+    }
   }
-}
 
-const updateSubsidiary = async (subsidiaryId: string, updates: Partial<Subsidiary>) => {
-  console.log("[v0] Updating subsidiary:", subsidiaryId, updates)
+  const loadAllData = async () => {
+    console.log("[v0] Loading all settings data...")
+    try {
+      await Promise.all([loadCompanyData(), loadEmployees(), loadSubsidiaries(), loadRoles()])
+      console.log("[v0] All settings data loaded successfully")
+    } catch (error) {
+      console.error("[v0] Error loading settings data:", error)
+    }
+  }
 
-  if (isDemoMode()) {
-    const updatedSubsidiaries = subsidiaries.map((sub) => {
-      if (sub.id === subsidiaryId) {
-        const updatedSub = {
-          ...sub,
-          ...updates,
-          // Recalculate statistics based on updated data
-          divisions_count: updates.divisions?.length || sub.divisions?.length || 0,
-          departments_count: updates.departments?.length || sub.departments?.length || 0,
-          locations_count: updates.locations?.length || sub.locations?.length || 0,
+  useEffect(() => {
+    loadAllData()
+  }, [])
+
+  // Subsidiary Management Functions
+  const syncSubsidiarySettings = async (subsidiaryId: string) => {
+    console.log("[v0] Syncing settings for subsidiary:", subsidiaryId)
+
+    if (isDemoMode()) {
+      toast({
+        title: "Settings Synced",
+        description: "Subsidiary settings synchronized successfully (Demo Mode)",
+      })
+      return
+    }
+
+    try {
+      // Simulate settings sync process
+      const { error } = await supabase
+        .from("subsidiaries")
+        .update({
+          settings_synced_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", subsidiaryId)
+
+      if (error) throw error
+
+      toast({
+        title: "Settings Synced",
+        description: "Subsidiary settings synchronized successfully",
+      })
+    } catch (error) {
+      console.error("Sync settings error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to sync subsidiary settings",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const viewSubsidiaryEmployees = async (subsidiaryId: string) => {
+    console.log("[v0] Viewing employees for subsidiary:", subsidiaryId)
+
+    if (isDemoMode()) {
+      const mockEmployees = [
+        {
+          id: "emp-1",
+          name: "John Doe",
+          position: "Software Engineer",
+          department: "Technology",
+          email: "john@company.com",
+        },
+        {
+          id: "emp-2",
+          name: "Jane Smith",
+          position: "Marketing Manager",
+          department: "Marketing",
+          email: "jane@company.com",
+        },
+        {
+          id: "emp-3",
+          name: "Mike Johnson",
+          position: "HR Specialist",
+          department: "Human Resources",
+          email: "mike@company.com",
+        },
+      ]
+
+      // Update employee count in subsidiary
+      const updatedSubsidiaries = subsidiaries.map((sub) =>
+        sub.id === subsidiaryId ? { ...sub, employee_count: mockEmployees.length } : sub,
+      )
+      setSubsidiaries(updatedSubsidiaries)
+
+      // Update selectedSubsidiary if it matches
+      if (selectedSubsidiary?.id === subsidiaryId) {
+        setSelectedSubsidiary({ ...selectedSubsidiary, employee_count: mockEmployees.length })
+      }
+
+      setViewEmployeesModal({
+        isOpen: true,
+        subsidiaryId,
+        employees: mockEmployees,
+      })
+      return
+    }
+
+    try {
+      const { data: employees, error } = await supabase.from("employees").select("*").eq("subsidiary_id", subsidiaryId)
+
+      if (error) throw error
+
+      // Update employee count in subsidiary
+      const employeeCount = employees?.length || 0
+      await updateSubsidiary(subsidiaryId, { employee_count: employeeCount })
+
+      setViewEmployeesModal({
+        isOpen: true,
+        subsidiaryId,
+        employees: employees || [],
+      })
+    } catch (error) {
+      console.error("View employees error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load subsidiary employees",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const addNewSubsidiary = async (subsidiaryData: Partial<Subsidiary>) => {
+    console.log("[v0] Adding new subsidiary:", subsidiaryData)
+
+    if (isDemoMode()) {
+      const newSubsidiary: Subsidiary = {
+        id: `sub-${Date.now()}`,
+        company_id: "comp-001",
+        name: subsidiaryData.name || "New Subsidiary",
+        tax_id: subsidiaryData.tax_id || `TIN-${Date.now()}`,
+        ssnit_number: subsidiaryData.ssnit_number || `SSNIT-${Date.now()}`,
+        address: subsidiaryData.address || "",
+        phone_number: subsidiaryData.phone_number || "",
+        email_address: subsidiaryData.email_address || "",
+        status: "active",
+        industry: subsidiaryData.industry || "",
+        divisions: subsidiaryData.divisions || [],
+        departments: subsidiaryData.departments || [],
+        locations: subsidiaryData.locations || [],
+        divisions_count: 0,
+        departments_count: 0,
+        locations_count: 0,
+        employee_count: 0,
+        created_at: new Date().toISOString(),
+        logo_url: subsidiaryLogoPreview || "", // Include uploaded logo URL
+      }
+      setSubsidiaries((prev) => [newSubsidiary, ...prev])
+
+      setSubsidiaryLogoPreview("")
+
+      toast({
+        title: "Subsidiary Added",
+        description: "New subsidiary created successfully (Demo Mode)",
+      })
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("subsidiaries")
+        .insert([
+          {
+            company_id: companyData?.id,
+            name: subsidiaryData.name,
+            tax_id: subsidiaryData.tax_id,
+            ssnit_number: subsidiaryData.ssnit_number,
+            address: subsidiaryData.address,
+            phone_number: subsidiaryData.phone_number,
+            email_address: subsidiaryData.email_address,
+            industry: subsidiaryData.industry,
+            status: "active",
+            divisions: subsidiaryData.divisions || [],
+            departments: subsidiaryData.departments || [],
+            locations: subsidiaryData.locations || [],
+            logo_url: subsidiaryLogoPreview || "", // Include uploaded logo URL
+          },
+        ])
+        .select()
+
+      if (error) throw error
+
+      await loadSubsidiaries() // Reload the list
+
+      setSubsidiaryLogoPreview("")
+
+      toast({
+        title: "Subsidiary Added",
+        description: "New subsidiary created successfully",
+      })
+    } catch (error) {
+      console.error("Add subsidiary error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add subsidiary",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const updateSubsidiary = async (subsidiaryId: string, updates: Partial<Subsidiary>) => {
+    console.log("[v0] Updating subsidiary:", subsidiaryId, updates)
+
+    if (isDemoMode()) {
+      const updatedSubsidiaries = subsidiaries.map((sub) => {
+        if (sub.id === subsidiaryId) {
+          const updatedSub = {
+            ...sub,
+            ...updates,
+            // Recalculate statistics based on updated data
+            divisions_count: updates.divisions?.length || sub.divisions?.length || 0,
+            departments_count: updates.departments?.length || sub.departments?.length || 0,
+            locations_count: updates.locations?.length || sub.locations?.length || 0,
+          }
+          return updatedSub
         }
-        return updatedSub
-      }
-      return sub
-    })
-
-    setSubsidiaries(updatedSubsidiaries)
-
-    // Update selectedSubsidiary if it's the one being updated
-    if (selectedSubsidiary?.id === subsidiaryId) {
-      const updatedSelected = updatedSubsidiaries.find((sub) => sub.id === subsidiaryId)
-      if (updatedSelected) {
-        setSelectedSubsidiary(updatedSelected)
-      }
-    }
-
-    toast({
-      title: "Subsidiary updated",
-      description: "Subsidiary information has been updated successfully.",
-    })
-    return
-  }
-
-  try {
-    const { error } = await supabase.from("subsidiaries").update(updates).eq("id", subsidiaryId)
-
-    if (error) throw error
-
-    // Reload subsidiaries to get fresh data with updated statistics
-    await loadSubsidiaries()
-
-    // Update selectedSubsidiary with fresh data
-    if (selectedSubsidiary?.id === subsidiaryId) {
-      const updatedSub = subsidiaries.find((sub) => sub.id === subsidiaryId)
-      if (updatedSub) {
-        setSelectedSubsidiary(updatedSub)
-      }
-    }
-
-    toast({
-      title: "Subsidiary updated",
-      description: "Subsidiary information has been updated successfully.",
-    })
-  } catch (error) {
-    console.error("Update subsidiary error:", error)
-    toast({
-      title: "Error",
-      description: "Failed to update subsidiary information",
-      variant: "destructive",
-    })
-  }
-}
-
-const toggleSubsidiaryStatus = async (subsidiaryId: string, currentStatus: string) => {
-  const newStatus = currentStatus === "active" ? "inactive" : "active"
-  await updateSubsidiary(subsidiaryId, { status: newStatus })
-}
-
-const duplicateSubsidiary = async (subsidiary: Subsidiary) => {
-  const duplicatedData = {
-    ...subsidiary,
-    name: `${subsidiary.name} (Copy)`,
-    tax_id: `${subsidiary.tax_id}-COPY`,
-    ssnit_number: `${subsidiary.ssnit_number}-COPY`,
-  }
-  delete duplicatedData.id
-  delete duplicatedData.company_id
-  delete duplicatedData.created_at
-  delete duplicatedData.updated_at
-
-  await addNewSubsidiary(duplicatedData)
-}
-
-const deleteSubsidiary = async (subsidiaryId: string) => {
-  console.log("[v0] Deleting subsidiary:", subsidiaryId)
-
-  if (!confirm("Are you sure you want to delete this subsidiary? This action cannot be undone.")) {
-    return
-  }
-
-  if (isDemoMode()) {
-    setSubsidiaries((prev) => prev.filter((s) => s.id !== subsidiaryId))
-    toast({
-      title: "Subsidiary Deleted",
-      description: "Subsidiary has been deleted successfully (Demo Mode)",
-    })
-    return
-  }
-
-  try {
-    const { error } = await supabase.from("subsidiaries").delete().eq("id", subsidiaryId)
-
-    if (error) throw error
-
-    setSubsidiaries((prev) => prev.filter((s) => s.id !== subsidiaryId))
-    toast({
-      title: "Subsidiary Deleted",
-      description: "Subsidiary has been deleted successfully",
-    })
-  } catch (error) {
-    console.error("Subsidiary deletion error:", error)
-    toast({
-      title: "Error",
-      description: "Failed to delete subsidiary",
-      variant: "destructive",
-    })
-  }
-}
-
-const handleToggleSubsidiaryStatusInner = (subsidiary: Subsidiary) => {
-  setSubsidiaryToToggle(subsidiary)
-  if (subsidiary.status === "active") {
-    setShowDeactivateConfirm(true)
-  } else {
-    setShowReactivateConfirm(true)
-  }
-}
-
-const confirmToggleStatusInner = async () => {
-  if (!subsidiaryToToggle) return
-
-  await toggleSubsidiaryStatus(subsidiaryToToggle.id, subsidiaryToToggle.status)
-  setShowDeactivateConfirm(false)
-  setShowReactivateConfirm(false)
-  setSubsidiaryToToggle(null)
-}
-
-const handleManageLeaveTypesInner = () => {
-  toast({
-    title: "Leave Types Management",
-    description: "Opening leave types configuration...",
-  })
-}
-
-const handleManageAllowancesInner = () => {
-  toast({
-    title: "Allowances Management",
-    description: "Opening allowances configuration...",
-  })
-}
-
-const handleManageDeductionsInner = () => {
-  toast({
-    title: "Deductions Management",
-    description: "Opening deductions configuration...",
-  })
-}
-
-const handleManageSalaryGradesInner = () => {
-  toast({
-    title: "Salary Grades Management",
-    description: "Opening salary grades configuration...",
-  })
-}
-
-const handleAddEmailTemplateInner = () => {
-  toast({
-    title: "Add Email Template",
-    description: "Opening email template editor...",
-  })
-}
-
-const handleEditEmailTemplateInner = (templateName: string) => {
-  toast({
-    title: "Edit Email Template",
-    description: `Editing ${templateName} template...`,
-  })
-}
-
-const handleAddRoleInner = () => {
-  toast({
-    title: "Add Role",
-    description: "Opening role creation form...",
-  })
-}
-
-const handleEditRoleInner = (roleName: string) => {
-  toast({
-    title: "Edit Role",
-    description: `Editing ${roleName} role...`,
-  })
-}
-
-const handleBackupNowInner = async () => {
-  setIsBackingUp(true)
-  try {
-    // Simulate backup process
-    await new Promise((resolve) => setTimeout(resolve, 3000))
-    setLastBackupTime(new Date().toISOString())
-    toast({
-      title: "Backup Completed",
-      description: "System backup completed successfully.",
-    })
-  } catch (error) {
-    toast({
-      title: "Backup Failed",
-      description: "Failed to complete system backup.",
-      variant: "destructive",
-    })
-  } finally {
-    setIsBackingUp(false)
-  }
-}
-
-const handleSyncAllSettings = async () => {
-  console.log("[v0] Syncing all subsidiary settings")
-
-  if (isDemoMode()) {
-    toast({
-      title: "Syncing All Settings",
-      description: "Synchronizing settings across all subsidiaries... (Demo Mode)",
-    })
-    return
-  }
-
-  try {
-    const { error } = await supabase
-      .from("subsidiaries")
-      .update({
-        settings_synced_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        return sub
       })
-      .neq("id", "00000000-0000-0000-0000-000000000000")
 
-    if (error) throw error
+      setSubsidiaries(updatedSubsidiaries)
 
-    toast({
-      title: "Settings Synchronized",
-      description: "All subsidiary settings have been synchronized successfully",
-    })
-  } catch (error) {
-    console.error("Sync all settings error:", error)
-    toast({
-      title: "Error",
-      description: "Failed to sync all subsidiary settings",
-      variant: "destructive",
-    })
-  }
-}
+      // Update selectedSubsidiary if it's the one being updated
+      if (selectedSubsidiary?.id === subsidiaryId) {
+        const updatedSelected = updatedSubsidiaries.find((sub) => sub.id === subsidiaryId)
+        if (updatedSelected) {
+          setSelectedSubsidiary(updatedSelected)
+        }
+      }
 
-const handleExportSettingsTemplate = async () => {
-  console.log("[v0] Exporting settings template")
-
-  try {
-    const response = await fetch("/api/subsidiaries/export")
-
-    if (!response.ok) throw new Error("Export failed")
-
-    const blob = await response.blob()
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "subsidiaries_template.csv"
-    document.body.appendChild(a)
-    a.click()
-    window.URL.revokeObjectURL(url)
-    document.body.removeChild(a)
-
-    toast({
-      title: "Export Successful",
-      description: "Settings template has been downloaded",
-    })
-  } catch (error) {
-    console.error("Export error:", error)
-    toast({
-      title: "Error",
-      description: "Failed to export settings template",
-      variant: "destructive",
-    })
-  }
-}
-
-const handleImportSettings = async (file: File) => {
-  console.log("[v0] Importing settings from file:", file.name)
-
-  try {
-    const formData = new FormData()
-    formData.append("file", file)
-
-    const response = await fetch("/api/subsidiaries/import", {
-      method: "POST",
-      body: formData,
-    })
-
-    const result = await response.json()
-
-    if (!response.ok) throw new Error(result.error)
-
-    toast({
-      title: "Import Successful",
-      description: result.message,
-    })
-
-    // Refresh subsidiaries list
-    await loadSubsidiaries()
-  } catch (error) {
-    console.error("Import error:", error)
-    toast({
-      title: "Error",
-      description: error instanceof Error ? error.message : "Failed to import settings",
-      variant: "destructive",
-    })
-  }
-}
-
-const handleSaveSettings = async () => {
-  console.log("[v0] Saving all settings changes")
-  setIsSavingSettings(true)
-
-  if (isDemoMode()) {
-    // Simulate saving delay for demo
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
-    toast({
-      title: "Settings Saved",
-      description: "All settings changes have been saved successfully (Demo Mode)",
-    })
-    setIsSavingSettings(false)
-    return
-  }
-
-  try {
-    // Save any pending changes to subsidiaries
-    const { error: subsidiaryError } = await supabase
-      .from("subsidiaries")
-      .update({
-        updated_at: new Date().toISOString(),
+      toast({
+        title: "Subsidiary updated",
+        description: "Subsidiary information has been updated successfully.",
       })
-      .neq("id", "00000000-0000-0000-0000-000000000000")
-
-    if (subsidiaryError) throw subsidiaryError
-
-    // Save sync options to company settings
-    const syncOptions = {
-      hr_policies: true,
-      payroll_configuration: true,
-      leave_types: true,
-      roles_permissions: false,
+      return
     }
 
-    const { error: settingsError } = await supabase.from("company_settings").upsert({
-      id: "sync_options",
-      settings: syncOptions,
-      updated_at: new Date().toISOString(),
-    })
+    try {
+      const { error } = await supabase.from("subsidiaries").update(updates).eq("id", subsidiaryId)
 
-    if (settingsError) throw settingsError
+      if (error) throw error
 
-    // Refresh data to show updates
-    await loadAllData()
+      // Reload subsidiaries to get fresh data with updated statistics
+      await loadSubsidiaries()
 
-    toast({
-      title: "Settings Saved",
-      description: "All settings changes have been saved and updated successfully",
-    })
-  } catch (error) {
-    console.error("Save settings error:", error)
-    toast({
-      title: "Error",
-      description: "Failed to save settings changes",
-      variant: "destructive",
-    })
-  } finally {
-    setIsSavingSettings(false)
+      // Update selectedSubsidiary with fresh data
+      if (selectedSubsidiary?.id === subsidiaryId) {
+        const updatedSub = subsidiaries.find((sub) => sub.id === subsidiaryId)
+        if (updatedSub) {
+          setSelectedSubsidiary(updatedSub)
+        }
+      }
+
+      toast({
+        title: "Subsidiary updated",
+        description: "Subsidiary information has been updated successfully.",
+      })
+    } catch (error) {
+      console.error("Update subsidiary error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update subsidiary information",
+        variant: "destructive",
+      })
+    }
   }
-}
 
-// Enhanced Save button with loading state and better feedback
-const handleSaveSubsidiaryChanges = async () => {
-  console.log("[v0] Saving subsidiary changes")
-  setIsSavingSubsidiary(true)
+  const toggleSubsidiaryStatus = async (subsidiaryId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active"
+    await updateSubsidiary(subsidiaryId, { status: newStatus })
+  }
 
-  try {
+  const duplicateSubsidiary = async (subsidiary: Subsidiary) => {
+    const duplicatedData = {
+      ...subsidiary,
+      name: `${subsidiary.name} (Copy)`,
+      tax_id: `${subsidiary.tax_id}-COPY`,
+      ssnit_number: `${subsidiary.ssnit_number}-COPY`,
+    }
+    delete duplicatedData.id
+    delete duplicatedData.company_id
+    delete duplicatedData.created_at
+    delete duplicatedData.updated_at
+
+    await addNewSubsidiary(duplicatedData)
+  }
+
+  const deleteSubsidiary = async (subsidiaryId: string) => {
+    console.log("[v0] Deleting subsidiary:", subsidiaryId)
+
+    if (!confirm("Are you sure you want to delete this subsidiary? This action cannot be undone.")) {
+      return
+    }
+
+    if (isDemoMode()) {
+      setSubsidiaries((prev) => prev.filter((s) => s.id !== subsidiaryId))
+      toast({
+        title: "Subsidiary Deleted",
+        description: "Subsidiary has been deleted successfully (Demo Mode)",
+      })
+      return
+    }
+
+    try {
+      const { error } = await supabase.from("subsidiaries").delete().eq("id", subsidiaryId)
+
+      if (error) throw error
+
+      setSubsidiaries((prev) => prev.filter((s) => s.id !== subsidiaryId))
+      toast({
+        title: "Subsidiary Deleted",
+        description: "Subsidiary has been deleted successfully",
+      })
+    } catch (error) {
+      console.error("Subsidiary deletion error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete subsidiary",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleToggleSubsidiaryStatusInner = (subsidiary: Subsidiary) => {
+    setSubsidiaryToToggle(subsidiary)
+    if (subsidiary.status === "active") {
+      setShowDeactivateConfirm(true)
+    } else {
+      setShowReactivateConfirm(true)
+    }
+  }
+
+  const confirmToggleStatusInner = async () => {
+    if (!subsidiaryToToggle) return
+
+    await toggleSubsidiaryStatus(subsidiaryToToggle.id, subsidiaryToToggle.status)
+    setShowDeactivateConfirm(false)
+    setShowReactivateConfirm(false)
+    setSubsidiaryToToggle(null)
+  }
+
+  const handleManageLeaveTypesInner = () => {
+    toast({
+      title: "Leave Types Management",
+      description: "Opening leave types configuration...",
+    })
+  }
+
+  const handleManageAllowancesInner = () => {
+    toast({
+      title: "Allowances Management",
+      description: "Opening allowances configuration...",
+    })
+  }
+
+  const handleManageDeductionsInner = () => {
+    toast({
+      title: "Deductions Management",
+      description: "Opening deductions configuration...",
+    })
+  }
+
+  const handleManageSalaryGradesInner = () => {
+    toast({
+      title: "Salary Grades Management",
+      description: "Opening salary grades configuration...",
+    })
+  }
+
+  const handleAddEmailTemplateInner = () => {
+    toast({
+      title: "Add Email Template",
+      description: "Opening email template editor...",
+    })
+  }
+
+  const handleEditEmailTemplateInner = (templateName: string) => {
+    toast({
+      title: "Edit Email Template",
+      description: `Editing ${templateName} template...`,
+    })
+  }
+
+  const handleAddRoleInner = () => {
+    toast({
+      title: "Add Role",
+      description: "Opening role creation form...",
+    })
+  }
+
+  const handleEditRoleInner = (roleName: string) => {
+    toast({
+      title: "Edit Role",
+      description: `Editing ${roleName} role...`,
+    })
+  }
+
+  const handleBackupNowInner = async () => {
+    setIsBackingUp(true)
+    try {
+      // Simulate backup process
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      setLastBackupTime(new Date().toISOString())
+      toast({
+        title: "Backup Completed",
+        description: "System backup completed successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Backup Failed",
+        description: "Failed to complete system backup.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsBackingUp(false)
+    }
+  }
+
+  const handleSyncAllSettings = async () => {
+    console.log("[v0] Syncing all subsidiary settings")
+
+    if (isDemoMode()) {
+      toast({
+        title: "Syncing All Settings",
+        description: "Synchronizing settings across all subsidiaries... (Demo Mode)",
+      })
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from("subsidiaries")
+        .update({
+          settings_synced_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .neq("id", "00000000-0000-0000-0000-000000000000")
+
+      if (error) throw error
+
+      toast({
+        title: "Settings Synchronized",
+        description: "All subsidiary settings have been synchronized successfully",
+      })
+    } catch (error) {
+      console.error("Sync all settings error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to sync all subsidiary settings",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleExportSettingsTemplate = async () => {
+    console.log("[v0] Exporting settings template")
+
+    try {
+      const response = await fetch("/api/subsidiaries/export")
+
+      if (!response.ok) throw new Error("Export failed")
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = "subsidiaries_template.csv"
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      toast({
+        title: "Export Successful",
+        description: "Settings template has been downloaded",
+      })
+    } catch (error) {
+      console.error("Export error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to export settings template",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleImportSettings = async (file: File) => {
+    console.log("[v0] Importing settings from file:", file.name)
+
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const response = await fetch("/api/subsidiaries/import", {
+        method: "POST",
+        body: formData,
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) throw new Error(result.error)
+
+      toast({
+        title: "Import Successful",
+        description: result.message,
+      })
+
+      // Refresh subsidiaries list
+      await loadSubsidiaries()
+    } catch (error) {
+      console.error("Import error:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to import settings",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSaveSettings = async () => {
+    console.log("[v0] Saving all settings changes")
+    setIsSavingSettings(true)
+
     if (isDemoMode()) {
       // Simulate saving delay for demo
       await new Promise((resolve) => setTimeout(resolve, 1500))
 
       toast({
-        title: "Changes Saved",
-        description: "Subsidiary changes have been saved successfully (Demo Mode)",
+        title: "Settings Saved",
+        description: "All settings changes have been saved successfully (Demo Mode)",
       })
-      setIsSavingSubsidiary(false)
+      setIsSavingSettings(false)
       return
     }
 
-    // Save any pending subsidiary changes
-    await loadSubsidiaries()
+    try {
+      // Save any pending changes to subsidiaries
+      const { error: subsidiaryError } = await supabase
+        .from("subsidiaries")
+        .update({
+          updated_at: new Date().toISOString(),
+        })
+        .neq("id", "00000000-0000-0000-0000-000000000000")
 
-    toast({
-      title: "Changes Saved",
-      description: "Subsidiary changes have been saved and updated successfully",
-    })
-  } catch (error) {
-    console.error("Save subsidiary changes error:", error)
-    toast({
-      title: "Error",
-      description: "Failed to save subsidiary changes. Please try again.",
-      variant: "destructive",
-    })
-  } finally {
-    setIsSavingSubsidiary(false)
-  }
-}
+      if (subsidiaryError) throw subsidiaryError
 
-const handleRefreshSubsidiaries = async () => {
-  console.log("[v0] Refreshing subsidiaries list")
+      // Save sync options to company settings
+      const syncOptions = {
+        hr_policies: true,
+        payroll_configuration: true,
+        leave_types: true,
+        roles_permissions: false,
+      }
 
-  try {
-    await loadSubsidiaries()
-    toast({
-      title: "Refreshed",
-      description: "Subsidiaries list has been refreshed",
-    })
-  } catch (error) {
-    console.error("Refresh error:", error)
-    toast({
-      title: "Error",
-      description: "Failed to refresh subsidiaries",
-      variant: "destructive",
-    })
-  }
-}
+      const { error: settingsError } = await supabase.from("company_settings").upsert({
+        id: "sync_options",
+        settings: syncOptions,
+        updated_at: new Date().toISOString(),
+      })
 
-const handleDeletePolicy = async (policyName: string) => {
-  try {
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+      if (settingsError) throw settingsError
 
-    setCurrentPolicies((prev) => prev.filter((policy) => policy.name !== policyName))
-    setShowPolicyModal(false)
+      // Refresh data to show updates
+      await loadAllData()
 
-    toast({
-      title: "Policy Deleted",
-      description: `${policyName} policy has been successfully removed.`,
-    })
-  } catch (error) {
-    toast({
-      title: "Error",
-      description: "Failed to delete policy. Please try again.",
-      variant: "destructive",
-    })
-  } finally {
-    setIsSavingPolicy(false)
-  }
-}
-
-const handleToggleDocumentVisibility = (docId: number) => {
-  setHrDocuments((prev) => prev.map((doc) => (doc.id === docId ? { ...doc, visibleToAll: !doc.visibleToAll } : doc)))
-
-  const doc = hrDocuments.find((d) => d.id === docId)
-  toast({
-    title: "Visibility Updated",
-    description: `${doc?.name} is now ${doc?.visibleToAll ? "hidden from" : "visible to"} all employees.`,
-  })
-}
-
-const handleEditDocument = async () => {
-  if (!documentName) {
-    toast({
-      title: "Error",
-      description: "Please provide a document name.",
-      variant: "destructive",
-    })
-    return
+      toast({
+        title: "Settings Saved",
+        description: "All settings changes have been saved and updated successfully",
+      })
+    } catch (error) {
+      console.error("Save settings error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save settings changes",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingSettings(false)
+    }
   }
 
-  setIsSavingDocument(true)
-  try {
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+  // Enhanced Save button with loading state and better feedback
+  const handleSaveSubsidiaryChanges = async () => {
+    console.log("[v0] Saving subsidiary changes")
+    setIsSavingSubsidiary(true)
 
-    setHrDocuments((prev) => prev.map((doc) => (doc.id === selectedDocument.id ? { ...doc, name: documentName } : doc)))
+    try {
+      if (isDemoMode()) {
+        // Simulate saving delay for demo
+        await new Promise((resolve) => setTimeout(resolve, 1500))
 
-    setShowDocumentModal(false)
-    toast({
-      title: "Document Updated",
-      description: `${documentName} has been successfully updated.`,
-    })
-  } catch (error) {
-    toast({
-      title: "Error",
-      description: "Failed to update document. Please try again.",
-      variant: "destructive",
-    })
-  } finally {
-    setIsSavingDocument(false)
+        toast({
+          title: "Changes Saved",
+          description: "Subsidiary changes have been saved successfully (Demo Mode)",
+        })
+        setIsSavingSubsidiary(false)
+        return
+      }
+
+      // Save any pending subsidiary changes
+      await loadSubsidiaries()
+
+      toast({
+        title: "Changes Saved",
+        description: "Subsidiary changes have been saved and updated successfully",
+      })
+    } catch (error) {
+      console.error("Save subsidiary changes error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save subsidiary changes. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingSubsidiary(false)
+    }
   }
-}
 
-const handleToggleSubsidiaryStatus = (subsidiary: Subsidiary) => {
-  setSubsidiaryToToggle(subsidiary)
-  if (subsidiary.status === "active") {
-    setShowDeactivateConfirm(true)
-  } else {
-    setShowReactivateConfirm(true)
+  const handleRefreshSubsidiaries = async () => {
+    console.log("[v0] Refreshing subsidiaries list")
+
+    try {
+      await loadSubsidiaries()
+      toast({
+        title: "Refreshed",
+        description: "Subsidiaries list has been refreshed",
+      })
+    } catch (error) {
+      console.error("Refresh error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to refresh subsidiaries",
+        variant: "destructive",
+      })
+    }
   }
-}
 
-const confirmToggleStatus = async () => {
-  if (!subsidiaryToToggle) return
+  const handleDeletePolicy = async (policyName: string) => {
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
-  await toggleSubsidiaryStatus(subsidiaryToToggle.id, subsidiaryToToggle.status)
-  setShowDeactivateConfirm(false)
-  setShowReactivateConfirm(false)
-  setSubsidiaryToToggle(null)
-}
+      setCurrentPolicies((prev) => prev.filter((policy) => policy.name !== policyName))
+      setShowPolicyModal(false)
 
-const handleAddLeaveType = async () => {
-  setIsManagingLeaveTypes(true)
-  try {
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+      toast({
+        title: "Policy Deleted",
+        description: `${policyName} policy has been successfully removed.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete policy. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
 
-    // Add new leave type to current policies
-    const newPolicy = {
-      name: newLeaveType.name,
-      days: Number.parseInt(newLeaveType.days),
-      usage: "0%",
-      trend: "stable",
-      description: newLeaveType.description,
+  const handleToggleDocumentVisibility = (docId: number) => {
+    setHrDocuments((prev) => prev.map((doc) => (doc.id === docId ? { ...doc, visibleToAll: !doc.visibleToAll } : doc)))
+
+    const doc = hrDocuments.find((d) => d.id === docId)
+    toast({
+      title: "Visibility Updated",
+      description: `${doc?.name} is now ${doc?.visibleToAll ? "hidden from" : "visible to"} all employees.`,
+    })
+  }
+
+  const handleEditDocument = async () => {
+    if (!documentName) {
+      toast({
+        title: "Error",
+        description: "Please provide a document name.",
+        variant: "destructive",
+      })
+      return
     }
 
-    setCurrentPolicies((prev) => [...prev, newPolicy])
+    setIsSavingDocument(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
-    // Reset form
-    setNewLeaveType({
-      name: "",
-      days: 0,
-      description: "",
-      carryOver: false,
-    })
+      setHrDocuments((prev) =>
+        prev.map((doc) => (doc.id === selectedDocument.id ? { ...doc, name: documentName } : doc)),
+      )
 
-    setShowAddLeaveTypeModal(false)
-
-    toast({
-      title: "Leave Type Added",
-      description: `${newLeaveType.name} has been successfully added to your policies.`,
-    })
-  } catch (error) {
-    toast({
-      title: "Error",
-      description: "Failed to add leave type. Please try again.",
-      variant: "destructive",
-    })
-  } finally {
-    setIsManagingLeaveTypes(false)
-  }
-}
-
-const handlePolicyAction = (action, policyName) => {
-  const policy = currentPolicies.find((p) => p.name === policyName)
-
-  setSelectedPolicy(policy)
-  setPolicyModalType(action)
-
-  if (action === "edit") {
-    setEditingPolicy({
-      name: policy.name,
-      days: policy.days,
-      description: policy.description,
-    })
+      setShowDocumentModal(false)
+      toast({
+        title: "Document Updated",
+        description: `${documentName} has been successfully updated.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update document. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingDocument(false)
+    }
   }
 
-  setShowPolicyModal(true)
-}
-
-const handleSavePolicyChanges = async () => {
-  setIsSavingPolicy(true)
-  try {
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // Update the policy in current policies
-    setCurrentPolicies((prev) =>
-      prev.map((policy) =>
-        policy.name === selectedPolicy.name
-          ? { ...policy, name: editingPolicy.name, days: editingPolicy.days, description: editingPolicy.description }
-          : policy,
-      ),
-    )
-
-    setShowPolicyModal(false)
-    toast({
-      title: "Policy Updated",
-      description: `${editingPolicy.name} policy has been successfully updated.`,
-    })
-  } catch (error) {
-    toast({
-      title: "Error",
-      description: "Failed to update policy. Please try again.",
-      variant: "destructive",
-    })
-  } finally {
-    setIsSavingPolicy(false)
-  }
-}
-
-const generateLeaveTypeInsights = (name: string, days: number, description: string) => {
-  const insights = []
-
-  if (days > 30) {
-    insights.push("⚠️ Consider if this extended leave period aligns with industry standards")
-  }
-  if (days < 5) {
-    insights.push("💡 Short leave periods may require frequent approvals - consider automation")
-  }
-  if (name.toLowerCase().includes("sick")) {
-    insights.push("🏥 Recommend integrating with health insurance policies")
-  }
-  if (name.toLowerCase().includes("maternity") || name.toLowerCase().includes("paternity")) {
-    insights.push("👶 Ensure compliance with local family leave regulations")
-  }
-  if (description.length < 20) {
-    insights.push("📝 Consider adding more detailed policy description for clarity")
+  const handleToggleSubsidiaryStatus = (subsidiary: Subsidiary) => {
+    setSubsidiaryToToggle(subsidiary)
+    if (subsidiary.status === "active") {
+      setShowDeactivateConfirm(true)
+    } else {
+      setShowReactivateConfirm(true)
+    }
   }
 
-  insights.push("✨ AI suggests reviewing similar policies in your industry for benchmarking")
+  const confirmToggleStatus = async () => {
+    if (!subsidiaryToToggle) return
 
-  return insights
-}
+    await toggleSubsidiaryStatus(subsidiaryToToggle.id, subsidiaryToToggle.status)
+    setShowDeactivateConfirm(false)
+    setShowReactivateConfirm(false)
+    setSubsidiaryToToggle(null)
+  }
 
-const parseDocumentContent = (document: any) => {
-  // Simulate different document types with realistic content
-  const documentTemplates = {
-    "Code of Conduct": {
-      content: `Document: Code of Conduct
+  const handleAddLeaveType = async () => {
+    setIsManagingLeaveTypes(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      // Add new leave type to current policies
+      const newPolicy = {
+        name: newLeaveType.name,
+        days: Number.parseInt(newLeaveType.days),
+        usage: "0%",
+        trend: "stable",
+        description: newLeaveType.description,
+      }
+
+      setCurrentPolicies((prev) => [...prev, newPolicy])
+
+      // Reset form
+      setNewLeaveType({
+        name: "",
+        days: 0,
+        description: "",
+        carryOver: false,
+      })
+
+      setShowAddLeaveTypeModal(false)
+
+      toast({
+        title: "Leave Type Added",
+        description: `${newLeaveType.name} has been successfully added to your policies.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add leave type. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsManagingLeaveTypes(false)
+    }
+  }
+
+  const handlePolicyAction = (action, policyName) => {
+    const policy = currentPolicies.find((p) => p.name === policyName)
+
+    setSelectedPolicy(policy)
+    setPolicyModalType(action)
+
+    if (action === "edit") {
+      setEditingPolicy({
+        name: policy.name,
+        days: policy.days,
+        description: policy.description,
+      })
+    }
+
+    setShowPolicyModal(true)
+  }
+
+  const handleSavePolicyChanges = async () => {
+    setIsSavingPolicy(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // Update the policy in current policies
+      setCurrentPolicies((prev) =>
+        prev.map((policy) =>
+          policy.name === selectedPolicy.name
+            ? { ...policy, name: editingPolicy.name, days: editingPolicy.days, description: editingPolicy.description }
+            : policy,
+        ),
+      )
+
+      setShowPolicyModal(false)
+      toast({
+        title: "Policy Updated",
+        description: `${editingPolicy.name} policy has been successfully updated.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update policy. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingPolicy(false)
+    }
+  }
+
+  const generateLeaveTypeInsights = (name: string, days: number, description: string) => {
+    const insights = []
+
+    if (days > 30) {
+      insights.push("⚠️ Consider if this extended leave period aligns with industry standards")
+    }
+    if (days < 5) {
+      insights.push("💡 Short leave periods may require frequent approvals - consider automation")
+    }
+    if (name.toLowerCase().includes("sick")) {
+      insights.push("🏥 Recommend integrating with health insurance policies")
+    }
+    if (name.toLowerCase().includes("maternity") || name.toLowerCase().includes("paternity")) {
+      insights.push("👶 Ensure compliance with local family leave regulations")
+    }
+    if (description.length < 20) {
+      insights.push("📝 Consider adding more detailed policy description for clarity")
+    }
+
+    insights.push("✨ AI suggests reviewing similar policies in your industry for benchmarking")
+
+    return insights
+  }
+
+  const parseDocumentContent = (document: any) => {
+    // Simulate different document types with realistic content
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `Document: Code of Conduct
 
 This is a comprehensive Code of Conduct document outlining the ethical standards and behavioral expectations for all employees.
 
@@ -1540,9 +1539,9 @@ All employees must comply with applicable laws, regulations, and company policie
 Employees are encouraged to report any violations of this code through appropriate channels.
 
 This document serves as a guide for ethical decision-making and professional behavior within our organization.`,
-    },
-    "Employee Handbook": {
-      content: `Document: Employee Handbook
+      },
+      "Employee Handbook": {
+        content: `Document: Employee Handbook
 
 Welcome to our organization! This handbook provides essential information about company policies, procedures, and benefits.
 
@@ -1580,9 +1579,9 @@ LEAVE POLICIES
 - Maternity/Paternity Leave: As per local regulations
 
 This handbook is updated regularly to reflect current policies and procedures.`,
-    },
-    "Safety Manual": {
-      content: `Document: Safety Manual
+      },
+      "Safety Manual": {
+        content: `Document: Safety Manual
 
 This safety manual outlines procedures and guidelines to ensure a safe working environment for all employees.
 
@@ -1610,308 +1609,308 @@ HEALTH AND WELLNESS
 - Health Screenings
 
 Remember: When in doubt, prioritize safety over productivity.`,
-    },
-  }
-
-  // Return specific content based on document name, or generate generic content
-  if (documentTemplates[document.name]) {
-    return documentTemplates[document.name].content
-  }
-
-  // Generate content based on document type
-  const fileExtension = document.type.toLowerCase()
-  let content = `Document: ${document.name}\n\n`
-
-  if (fileExtension === "pdf") {
-    content += `This is a PDF document containing important company information.\n\n`
-    content += `Key sections may include:\n`
-    content += `• Policy guidelines and procedures\n`
-    content += `• Regulatory compliance information\n`
-    content += `• Employee responsibilities\n\n`
-    content += `• Contact information and resources\n\n`
-    content += `[PDF content would be extracted and displayed here in a production environment]\n\n`
-    content += `Document size: ${document.size}\n`
-    content += `Last modified: ${new Date().toLocaleDateString()}`
-  } else if (fileExtension === "doc" || fileExtension === "docx") {
-    content += `This is a Word document containing structured company information.\n\n`
-    content += `Document structure:\n`
-    content += `• Header with company branding\n`
-    content += `• Table of contents\n`
-    content += `• Main content sections\n`
-    content += `• Appendices and references\n\n`
-    content += `[Word document content would be parsed and displayed here]\n\n`
-    content += `Document properties:\n`
-    content += `- File size: ${document.size}\n`
-    content += `- Format: Microsoft Word Document\n`
-    content += `- Created: ${new Date().toLocaleDateString()}`
-  } else {
-    content += `This document contains important company information and policies.\n\n`
-    content += `Content overview:\n`
-    content += `• Company policies and procedures\n`
-    content += `• Employee guidelines and expectations\n`
-    content += `• Compliance and regulatory information\n`
-    content += `• Contact information and resources\n\n`
-    content += `[Document content would be processed and displayed based on file type]\n\n`
-    content += `File information:\n`
-    content += `- Size: ${document.size}\n`
-    content += `- Type: ${document.type}\n`
-    content += `- Status: Available for viewing`
-  }
-
-  return content
-}
-
-const handleDocumentView = (document: any) => {
-  setSelectedDocument(document)
-  setDocumentModalType("view")
-  setShowDocumentModal(true)
-  setShowDocumentPreview(false) // Reset preview state
-
-  setTimeout(() => {
-    const parsedContent = parseDocumentContent(document)
-    setDocumentPreviewContent(parsedContent)
-  }, 500)
-}
-
-const handleDocumentAction = (action, docId = null) => {
-  if (docId) {
-    const doc = hrDocuments.find((d) => d.id === docId)
-    setSelectedDocument(doc)
-  }
-  setDocumentModalType(action)
-  setShowDocumentModal(true)
-}
-
-const handleFileUpload = (event) => {
-  const file = event.target.files[0]
-  if (file) {
-    setUploadedFile(file)
-    if (!documentName) {
-      setDocumentName(file.name.replace(/\.[^/.]+$/, ""))
-    }
-  }
-}
-
-const handleAddDocument = () => {
-  setDocumentName("")
-  setUploadedFile(null)
-  handleDocumentAction("add")
-}
-
-const handleSaveDocument = async () => {
-  if (!documentName || !uploadedFile) {
-    toast({
-      title: "Error",
-      description: "Please provide a document name and upload a file.",
-      variant: "destructive",
-    })
-    return
-  }
-
-  setIsSavingDocument(true)
-  try {
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
-    const newDoc = {
-      id: Date.now(),
-      name: documentName,
-      type: uploadedFile.type.includes("pdf") ? "PDF" : "DOC",
-      size: `${(uploadedFile.size / (1024 * 1024)).toFixed(1)} MB`,
-      visibleToAll: false,
+      },
     }
 
-    setHrDocuments((prev) => [...prev, newDoc])
-    setShowDocumentModal(false)
+    // Return specific content based on document name, or generate generic content
+    if (documentTemplates[document.name]) {
+      return documentTemplates[document.name].content
+    }
+
+    // Generate content based on document type
+    const fileExtension = document.type.toLowerCase()
+    let content = `Document: ${document.name}\n\n`
+
+    if (fileExtension === "pdf") {
+      content += `This is a PDF document containing important company information.\n\n`
+      content += `Key sections may include:\n`
+      content += `• Policy guidelines and procedures\n`
+      content += `• Regulatory compliance information\n`
+      content += `• Employee responsibilities\n`
+      content += `• Contact information and resources\n\n`
+      content += `[PDF content would be extracted and displayed here in a production environment]\n\n`
+      content += `Document size: ${document.size}\n`
+      content += `Last modified: ${new Date().toLocaleDateString()}`
+    } else if (fileExtension === "doc" || fileExtension === "docx") {
+      content += `This is a Word document containing structured company information.\n\n`
+      content += `Document structure:\n`
+      content += `• Header with company branding\n`
+      content += `• Table of contents\n`
+      content += `• Main content sections\n`
+      content += `• Appendices and references\n\n`
+      content += `[Word document content would be parsed and displayed here]\n\n`
+      content += `Document properties:\n`
+      content += `- File size: ${document.size}\n`
+      content += `- Format: Microsoft Word Document\n`
+      content += `- Created: ${new Date().toLocaleDateString()}`
+    } else {
+      content += `This document contains important company information and policies.\n\n`
+      content += `Content overview:\n`
+      content += `• Company policies and procedures\n`
+      content += `• Employee guidelines and expectations\n`
+      content += `• Compliance and regulatory information\n`
+      content += `• Contact information and resources\n\n`
+      content += `[Document content would be processed and displayed based on file type]\n\n`
+      content += `File information:\n`
+      content += `- Size: ${document.size}\n`
+      content += `- Type: ${document.type}\n`
+      content += `- Status: Available for viewing`
+    }
+
+    return content
+  }
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document)
+    setDocumentModalType("view")
+    setShowDocumentModal(true)
+    setShowDocumentPreview(false) // Reset preview state
+
+    setTimeout(() => {
+      const parsedContent = parseDocumentContent(document)
+      setDocumentPreviewContent(parsedContent)
+    }, 500)
+  }
+
+  const handleDocumentAction = (action, docId = null) => {
+    if (docId) {
+      const doc = hrDocuments.find((d) => d.id === docId)
+      setSelectedDocument(doc)
+    }
+    setDocumentModalType(action)
+    setShowDocumentModal(true)
+  }
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0]
+    if (file) {
+      setUploadedFile(file)
+      if (!documentName) {
+        setDocumentName(file.name.replace(/\.[^/.]+$/, ""))
+      }
+    }
+  }
+
+  const handleAddDocument = () => {
     setDocumentName("")
     setUploadedFile(null)
-
-    toast({
-      title: "Document Added",
-      description: `${documentName} has been successfully uploaded.`,
-    })
-  } catch (error) {
-    toast({
-      title: "Error",
-      description: "Failed to upload document. Please try again.",
-      variant: "destructive",
-    })
-  } finally {
-    setIsSavingDocument(false)
+    handleDocumentAction("add")
   }
-}
 
-const handleDeleteDocument = async (docId) => {
-  try {
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId))
-    setShowDocumentModal(false)
-    toast({
-      title: "Document Deleted",
-      description: "Document has been successfully removed.",
-    })
-  } catch (error) {
-    toast({
-      title: "Error",
-      description: "Failed to delete document. Please try again.",
-      variant: "destructive",
-    })
-  } finally {
-    setIsSavingDocument(false)
-  }
-}
-
-const handleSaveSubsidiaries = async () => {
-  console.log("[v0] Saving subsidiaries changes")
-  setIsSavingSubsidiaries(true)
-
-  try {
-    if (isDemoMode()) {
-      // Simulate saving delay for demo
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
+  const handleSaveDocument = async () => {
+    if (!documentName || !uploadedFile) {
       toast({
-        title: "Changes Saved",
-        description: "All subsidiary changes have been saved successfully (Demo Mode)",
+        title: "Error",
+        description: "Please provide a document name and upload a file.",
+        variant: "destructive",
       })
-      setIsSavingSubsidiaries(false)
       return
     }
 
-    // Save any pending changes to the database
-    // This could include updated subsidiary information, organizational changes, etc.
+    setIsSavingDocument(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
 
-    // For now, we'll refresh the data to ensure consistency
-    await loadSubsidiaries()
+      const newDoc = {
+        id: Date.now(),
+        name: documentName,
+        type: uploadedFile.type.includes("pdf") ? "PDF" : "DOC",
+        size: `${(uploadedFile.size / (1024 * 1024)).toFixed(1)} MB`,
+        visibleToAll: false,
+      }
 
-    toast({
-      title: "Changes Saved",
-      description: "All subsidiary changes have been saved successfully",
-    })
-  } catch (error) {
-    console.error("Save error:", error)
-    toast({
-      title: "Error",
-      description: "Failed to save changes",
-      variant: "destructive",
-    })
-  } finally {
-    setIsSavingSubsidiaries(false)
-  }
-}
+      setHrDocuments((prev) => [...prev, newDoc])
+      setShowDocumentModal(false)
+      setDocumentName("")
+      setUploadedFile(null)
 
-const handleSaveHRConfig = async () => {
-  setIsSaving(true)
-  try {
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
-    if (isDemoMode) {
       toast({
-        title: "HR Configuration Saved",
-        description: "HR settings updated successfully (Demo Mode)",
+        title: "Document Added",
+        description: `${documentName} has been successfully uploaded.`,
       })
-    } else {
-      // Real database update would go here
+    } catch (error) {
       toast({
-        title: "HR Configuration Saved",
-        description: "HR settings updated successfully",
+        title: "Error",
+        description: "Failed to upload document. Please try again.",
+        variant: "destructive",
       })
+    } finally {
+      setIsSavingDocument(false)
     }
-  } catch (error) {
-    toast({
-      title: "Error",
-      description: "Failed to save HR configuration",
-      variant: "destructive",
-    })
-  } finally {
-    setIsSaving(false)
   }
-}
 
-const confirmDeactivateSubsidiary = (subsidiaryId: string) => {
-  setSubsidiaryToToggle(subsidiaries.find((s) => s.id === subsidiaryId) || null)
-  setShowDeactivateConfirm(true)
-}
-
-const confirmReactivateSubsidiary = (subsidiaryId: string) => {
-  setSubsidiaryToToggle(subsidiaries.find((s) => s.id === subsidiaryId) || null)
-  setShowReactivateConfirm(true)
-}
-
-const handleManageLeaveTypes = () => {
-  setShowAddLeaveTypeModal(true)
-}
-
-const handleManageAllowances = () => {
-  toast({
-    title: "Allowances Management",
-    description: "Opening allowances configuration...",
-  })
-}
-
-const handleManageDeductions = () => {
-  toast({
-    title: "Deductions Management",
-    description: "Opening deductions configuration...",
-  })
-}
-
-const handleManageSalaryGrades = () => {
-  toast({
-    title: "Salary Grades Management",
-    description: "Opening salary grades configuration...",
-  })
-}
-
-const handleEditEmailTemplate = (templateName: string) => {
-  toast({
-    title: "Edit Email Template",
-    description: `Editing ${templateName} template...`,
-  })
-}
-
-const handleAddEmailTemplate = () => {
-  toast({
-    title: "Add Email Template",
-    description: "Opening email template editor...",
-  })
-}
-
-const handleAddRole = () => {
-  toast({
-    title: "Add Role",
-    description: "Opening role creation form...",
-  })
-}
-
-const handleEditRole = (roleName: string) => {
-  toast({
-    title: "Edit Role",
-    description: `Editing ${roleName} role...`,
-  })
-}
-
-const handleBackupNow = async () => {
-  setIsBackingUp(true)
-  try {
-    // Simulate backup process
-    await new Promise((resolve) => setTimeout(resolve, 3000))
-    setLastBackupTime(new Date().toISOString())
-    toast({
-      title: "Backup Completed",
-      description: "System backup completed successfully.",
-    })
-  } catch (error) {
-    toast({
-      title: "Backup Failed",
-      description: "Failed to complete system backup.",
-      variant: "destructive",
-    })
-  } finally {
-    setIsBackingUp(false)
+  const handleDeleteDocument = async (docId) => {
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId))
+      setShowDocumentModal(false)
+      toast({
+        title: "Document Deleted",
+        description: "Document has been successfully removed.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete document. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingDocument(false)
+    }
   }
-}
 
-return (
+  const handleSaveSubsidiaries = async () => {
+    console.log("[v0] Saving subsidiaries changes")
+    setIsSavingSubsidiaries(true)
+
+    try {
+      if (isDemoMode()) {
+        // Simulate saving delay for demo
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+
+        toast({
+          title: "Changes Saved",
+          description: "All subsidiary changes have been saved successfully (Demo Mode)",
+        })
+        setIsSavingSubsidiaries(false)
+        return
+      }
+
+      // Save any pending changes to the database
+      // This could include updated subsidiary information, organizational changes, etc.
+
+      // For now, we'll refresh the data to ensure consistency
+      await loadSubsidiaries()
+
+      toast({
+        title: "Changes Saved",
+        description: "All subsidiary changes have been saved successfully",
+      })
+    } catch (error) {
+      console.error("Save error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save changes",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingSubsidiaries(false)
+    }
+  }
+
+  const handleSaveHRConfig = async () => {
+    setIsSaving(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      if (isDemoMode) {
+        toast({
+          title: "HR Configuration Saved",
+          description: "HR settings updated successfully (Demo Mode)",
+        })
+      } else {
+        // Real database update would go here
+        toast({
+          title: "HR Configuration Saved",
+          description: "HR settings updated successfully",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save HR configuration",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const confirmDeactivateSubsidiary = (subsidiaryId: string) => {
+    setSubsidiaryToToggle(subsidiaries.find((s) => s.id === subsidiaryId) || null)
+    setShowDeactivateConfirm(true)
+  }
+
+  const confirmReactivateSubsidiary = (subsidiaryId: string) => {
+    setSubsidiaryToToggle(subsidiaries.find((s) => s.id === subsidiaryId) || null)
+    setShowReactivateConfirm(true)
+  }
+
+  const handleManageLeaveTypes = () => {
+    setShowAddLeaveTypeModal(true)
+  }
+
+  const handleManageAllowances = () => {
+    toast({
+      title: "Allowances Management",
+      description: "Opening allowances configuration...",
+    })
+  }
+
+  const handleManageDeductions = () => {
+    toast({
+      title: "Deductions Management",
+      description: "Opening deductions configuration...",
+    })
+  }
+
+  const handleManageSalaryGrades = () => {
+    toast({
+      title: "Salary Grades Management",
+      description: "Opening salary grades configuration...",
+    })
+  }
+
+  const handleEditEmailTemplate = (templateName: string) => {
+    toast({
+      title: "Edit Email Template",
+      description: `Editing ${templateName} template...`,
+    })
+  }
+
+  const handleAddEmailTemplate = () => {
+    toast({
+      title: "Add Email Template",
+      description: "Opening email template editor...",
+    })
+  }
+
+  const handleAddRole = () => {
+    toast({
+      title: "Add Role",
+      description: "Opening role creation form...",
+    })
+  }
+
+  const handleEditRole = (roleName: string) => {
+    toast({
+      title: "Edit Role",
+      description: `Editing ${roleName} role...`,
+    })
+  }
+
+  const handleBackupNow = async () => {
+    setIsBackingUp(true)
+    try {
+      // Simulate backup process
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      setLastBackupTime(new Date().toISOString())
+      toast({
+        title: "Backup Completed",
+        description: "System backup completed successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Backup Failed",
+        description: "Failed to complete system backup.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsBackingUp(false)
+    }
+  }
+
+  return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -2864,7 +2863,8 @@ return (
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Label htmlFor={`visible-${doc.id}`} className="text-sm">
+                        <div className="flex items-center space-x-2">
+                          <Label htmlFor={`visible-${doc.id}`} className="text-sm">
                             Visible to all employees
                           </Label>
                           <Switch
@@ -3100,156 +3100,130 @@ return (
                       </div>
 
                       {showDocumentPreview && (
-                        <div className="border rounded-lg bg-white shadow-lg overflow-hidden">
+                        <div className="border rounded-lg bg-white shadow-sm">
                           {/* Document Viewer Header */}
-                          <div className="bg-gray-100 border-b px-4 py-2 flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                              <div className="flex items-center space-x-2">
-                                <FileText className="w-4 h-4 text-gray-600" />
-                                <span className="text-sm font-medium text-gray-700">{selectedDocument.name}</span>
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {selectedDocument.type} • {selectedDocument.size}
-                              </div>
+                          <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50">
+                            <div className="flex items-center space-x-2">
+                              <FileText className="w-4 h-4 text-gray-600" />
+                              <span className="text-sm font-medium text-gray-700">{selectedDocument.name}</span>
+                              <span className="text-xs text-gray-500">({selectedDocument.type})</span>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                              <Button variant="ghost" size="sm" className="h-7 px-2">
                                 <ZoomIn className="w-3 h-3" />
                               </Button>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                              <Button variant="ghost" size="sm" className="h-7 px-2">
                                 <ZoomOut className="w-3 h-3" />
                               </Button>
-                              <div className="text-xs text-gray-500 px-2">100%</div>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                              <Button variant="ghost" size="sm" className="h-7 px-2">
                                 <Download className="w-3 h-3" />
                               </Button>
                             </div>
                           </div>
 
                           {/* Document Content Area */}
-                          <div className="bg-gray-200 p-4">
-                            <div className="bg-white shadow-md rounded-sm mx-auto max-w-4xl min-h-[500px]">
-                              {/* Document Page */}
-                              <div className="p-8 font-serif leading-relaxed">
+                          <div className="max-h-[500px] overflow-y-auto bg-gray-100 p-4">
+                            {/* Document Page Container */}
+                            <div className="max-w-4xl mx-auto">
+                              <div className="bg-white shadow-lg rounded-sm border border-gray-200 min-h-[600px]">
                                 {/* Document Header */}
-                                <div className="text-center mb-8 border-b pb-6">
-                                  <h1 className="text-2xl font-bold text-gray-900 mb-2">{selectedDocument.name}</h1>
-                                  <div className="text-sm text-gray-600">
-                                    Document Version 1.0 | Effective Date: {new Date().toLocaleDateString()}
+                                <div className="px-12 pt-12 pb-6 border-b border-gray-100">
+                                  <div className="text-center">
+                                    <h1 className="text-2xl font-bold text-gray-900 mb-2">{selectedDocument.name}</h1>
+                                    <div className="text-sm text-gray-500 space-y-1">
+                                      <p>Document Type: {selectedDocument.type}</p>
+                                      <p>File Size: {selectedDocument.size}</p>
+                                      <p>Last Updated: {new Date().toLocaleDateString()}</p>
+                                    </div>
                                   </div>
                                 </div>
 
-                                {/* Document Content */}
-                                <div className="space-y-6 text-gray-800">
-                                  {selectedDocument.name === "Code of Conduct" && (
-                                    <>
-                                      <div className="mb-6">
-                                        <p className="text-base leading-7">
-                                          This is a comprehensive Code of Conduct document outlining the ethical
-                                          standards and behavioral expectations for all employees.
-                                        </p>
-                                      </div>
+                                {/* Document Body */}
+                                <div className="px-12 py-8">
+                                  <div className="prose prose-lg max-w-none">
+                                    {documentPreviewContent.split("\n\n").map((paragraph, index) => {
+                                      // Handle different content types
+                                      if (paragraph.startsWith("Document:")) {
+                                        return (
+                                          <div key={index} className="mb-8">
+                                            <h2 className="text-xl font-semibold text-gray-900 border-b-2 border-blue-500 pb-2 mb-4">
+                                              {paragraph.replace("Document: ", "")}
+                                            </h2>
+                                          </div>
+                                        )
+                                      } else if (paragraph.includes("•")) {
+                                        // Handle bullet points
+                                        const lines = paragraph.split("\n")
+                                        const title = lines[0]
+                                        const bullets = lines.slice(1).filter((line) => line.includes("•"))
 
-                                      <div className="space-y-4">
-                                        <h2 className="text-lg font-semibold text-gray-900 border-l-4 border-blue-500 pl-3">
-                                          Key Sections Include:
-                                        </h2>
-                                        <ul className="space-y-3 ml-4">
-                                          <li className="flex items-start">
-                                            <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                                            <span>Company policies and procedures</span>
-                                          </li>
-                                          <li className="flex items-start">
-                                            <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                                            <span>Employee rights and responsibilities</span>
-                                          </li>
-                                          <li className="flex items-start">
-                                            <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                                            <span>Code of conduct guidelines</span>
-                                          </li>
-                                          <li className="flex items-start">
-                                            <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                                            <span>Compliance requirements</span>
-                                          </li>
-                                        </ul>
-                                      </div>
+                                        return (
+                                          <div key={index} className="mb-6">
+                                            {title && !title.includes("•") && (
+                                              <h3 className="text-lg font-medium text-gray-800 mb-3">{title}</h3>
+                                            )}
+                                            <ul className="space-y-2 ml-4">
+                                              {bullets.map((bullet, bulletIndex) => (
+                                                <li key={bulletIndex} className="flex items-start">
+                                                  <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                                                  <span className="text-gray-700">
+                                                    {bullet.replace("•", "").trim()}
+                                                  </span>
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )
+                                      } else if (paragraph.match(/^\d+\./)) {
+                                        // Handle numbered sections
+                                        const lines = paragraph.split("\n")
+                                        const sectionTitle = lines[0]
+                                        const content = lines.slice(1).join(" ")
 
-                                      <div className="bg-blue-50 border-l-4 border-blue-400 p-4 my-6">
-                                        <h3 className="font-semibold text-blue-900 mb-2">1. PROFESSIONAL CONDUCT</h3>
-                                        <p className="text-blue-800 text-sm leading-6">
-                                          All employees are expected to maintain the highest standards of professional
-                                          conduct in their interactions with colleagues, clients, and stakeholders.
-                                        </p>
-                                      </div>
-
-                                      <div className="bg-green-50 border-l-4 border-green-400 p-4 my-6">
-                                        <h3 className="font-semibold text-green-900 mb-2">2. CONFIDENTIALITY</h3>
-                                        <p className="text-green-800 text-sm leading-6">
-                                          Employees must protect confidential information and proprietary data belonging
-                                          to the company and its clients.
-                                        </p>
-                                      </div>
-
-                                      <div className="bg-orange-50 border-l-4 border-orange-400 p-4 my-6">
-                                        <h3 className="font-semibold text-orange-900 mb-2">3. CONFLICT OF INTEREST</h3>
-                                        <p className="text-orange-800 text-sm leading-6">
-                                          Employees must avoid situations that create or appear to create conflicts of
-                                          interest with their duties and responsibilities.
-                                        </p>
-                                      </div>
-                                    </>
-                                  )}
-
-                                  {selectedDocument.name === "Employee Handbook" && (
-                                    <>
-                                      <div className="mb-6">
-                                        <p className="text-base leading-7">
-                                          Welcome to our comprehensive Employee Handbook. This document serves as your
-                                          guide to company policies, procedures, and benefits.
-                                        </p>
-                                      </div>
-
-                                      <div className="grid grid-cols-2 gap-6">
-                                        <div className="bg-gray-50 p-4 rounded-lg">
-                                          <h3 className="font-semibold text-gray-900 mb-3">Company Overview</h3>
-                                          <ul className="text-sm space-y-2 text-gray-700">
-                                            <li>• Mission & Vision</li>
-                                            <li>• Core Values</li>
-                                            <li>• Organizational Structure</li>
-                                          </ul>
-                                        </div>
-                                        <div className="bg-gray-50 p-4 rounded-lg">
-                                          <h3 className="font-semibold text-gray-900 mb-3">Employment Policies</h3>
-                                          <ul className="text-sm space-y-2 text-gray-700">
-                                            <li>• Working Hours</li>
-                                            <li>• Leave Policies</li>
-                                            <li>• Performance Reviews</li>
-                                          </ul>
-                                        </div>
-                                      </div>
-                                    </>
-                                  )}
-
-                                  {!["Code of Conduct", "Employee Handbook"].includes(selectedDocument.name) && (
-                                    <div className="space-y-4">
-                                      <p className="text-base leading-7">
-                                        This document contains important information regarding company policies and
-                                        procedures. Please review carefully and ensure compliance with all outlined
-                                        requirements.
-                                      </p>
-                                      <div className="bg-gray-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-600 italic">
-                                          Document content would be parsed and displayed here in a real implementation.
-                                        </p>
-                                      </div>
-                                    </div>
-                                  )}
+                                        return (
+                                          <div key={index} className="mb-6">
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm mr-3">
+                                                {sectionTitle.split(".")[0]}
+                                              </span>
+                                              {sectionTitle.split(".").slice(1).join(".").trim()}
+                                            </h3>
+                                            <p className="text-gray-700 leading-relaxed pl-12">{content}</p>
+                                          </div>
+                                        )
+                                      } else if (paragraph.toUpperCase() === paragraph && paragraph.length > 5) {
+                                        // Handle section headers (all caps)
+                                        return (
+                                          <div key={index} className="mb-4">
+                                            <h3 className="text-lg font-bold text-gray-900 bg-gray-50 px-4 py-2 rounded-md border-l-4 border-blue-500">
+                                              {paragraph}
+                                            </h3>
+                                          </div>
+                                        )
+                                      } else if (paragraph.trim()) {
+                                        // Handle regular paragraphs
+                                        return (
+                                          <div key={index} className="mb-4">
+                                            <p className="text-gray-700 leading-relaxed text-justify">{paragraph}</p>
+                                          </div>
+                                        )
+                                      }
+                                      return null
+                                    })}
+                                  </div>
                                 </div>
 
                                 {/* Document Footer */}
-                                <div className="mt-12 pt-6 border-t text-center">
-                                  <div className="text-xs text-gray-500">
-                                    Page 1 of 1 | {selectedDocument.name} | © 2024 Company Name
+                                <div className="px-12 py-6 border-t border-gray-100 bg-gray-50">
+                                  <div className="flex justify-between items-center text-sm text-gray-500">
+                                    <div>
+                                      <p>© 2024 Company Name. All rights reserved.</p>
+                                    </div>
+                                    <div className="flex items-center space-x-4">
+                                      <span>Page 1 of 1</span>
+                                      <span>•</span>
+                                      <span>Confidential Document</span>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -3257,20 +3231,20 @@ return (
                           </div>
 
                           {/* Document Viewer Footer */}
-                          <div className="bg-gray-100 border-t px-4 py-2 flex items-center justify-between">
+                          <div className="flex items-center justify-between px-4 py-2 border-t bg-gray-50">
+                            <div className="flex items-center space-x-2 text-sm text-gray-600">
+                              <span>Zoom: 100%</span>
+                              <span>•</span>
+                              <span>Fit to width</span>
+                            </div>
                             <div className="flex items-center space-x-2">
                               <Button variant="ghost" size="sm" className="h-7 px-2">
-                                <ChevronLeft className="w-3 h-3 mr-1" />
-                                Previous
+                                <ChevronLeft className="w-3 h-3" />
                               </Button>
-                              <div className="text-xs text-gray-500 px-2">1 / 1</div>
+                              <span className="text-sm text-gray-600">1 / 1</span>
                               <Button variant="ghost" size="sm" className="h-7 px-2">
-                                Next
-                                <ChevronRight className="w-3 h-3 ml-1" />
+                                <ChevronRight className="w-3 h-3" />
                               </Button>
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Last modified: {new Date().toLocaleDateString()}
                             </div>
                           </div>
                         </div>
@@ -3431,4 +3405,882 @@ return (
                         <td className="border border-gray-300 p-2">Mid Level</td>
                         <td className="border border-gray-300 p-2">₵4,000</td>
                         <td className="border border-gray-300 p-2">₵4,500</td>
-\
+                        <td className="border border-gray-300 p-2">₵5,000</td>
+                        <td className="border border-gray-300 p-2">₵5,500</td>
+                        <td className="border border-gray-300 p-2">₵6,000</td>
+                      </tr>
+                      <tr>
+                        <td className="border border-gray-300 p-2">Senior Level</td>
+                        <td className="border border-gray-300 p-2">₵7,000</td>
+                        <td className="border border-gray-300 p-2">₵8,000</td>
+                        <td className="border border-gray-300 p-2">₵9,000</td>
+                        <td className="border border-gray-300 p-2">₵10,000</td>
+                        <td className="border border-gray-300 p-2">₵11,000</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleManageSalaryGrades}>
+                  Manage Salary Grades
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Bell className="w-5 h-5" />
+                <span>Notification Settings</span>
+              </CardTitle>
+              <CardDescription>Configure email templates and notification preferences</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Email Templates</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <div>
+                      <span className="font-medium">Welcome Email</span>
+                      <p className="text-sm text-gray-600">Welcome to Akwaaba Technologies</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Welcome Email")}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Template
+                    </Button>
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <div>
+                      <span className="font-medium">Leave Request</span>
+                      <p className="text-sm text-gray-600">Notification for leave requests</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Leave Request")}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Template
+                    </Button>
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <div>
+                      <span className="font-medium">Password Reset</span>
+                      <p className="text-sm text-gray-600">Instructions for resetting password</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Password Reset")}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Template
+                    </Button>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleAddEmailTemplate}>
+                  Add Email Template
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Notification Preferences</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Leave Request Notifications</span>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Task Assignment Notifications</span>
+                    <Switch />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Meeting Reminders</span>
+                    <Switch defaultChecked />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="roles">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Shield className="w-5 h-5" />
+                <span>Roles & Permissions</span>
+              </CardTitle>
+              <CardDescription>Manage user roles and access permissions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Current Roles</h3>
+                <div className="space-y-2">
+                  {roles.map((role) => (
+                    <div key={role.id} className="flex justify-between items-center p-3 border rounded">
+                      <div>
+                        <span className="font-medium">{role.name}</span>
+                        <p className="text-sm text-gray-600">{role.description}</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-500">{role.user_count} Users</span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditRole(role.name)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Role
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-red-600">
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Role
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" size="sm" onClick={handleAddRole}>
+                  Add Role
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="access">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Users className="w-5 h-5" />
+                <span>Access Management</span>
+              </CardTitle>
+              <CardDescription>Manage user access and authentication settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Authentication Methods</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Password Authentication</span>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Two-Factor Authentication</span>
+                    <Switch />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Social Login (Google, Facebook)</span>
+                    <Switch />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="security">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Shield className="w-5 h-5" />
+                <span>Security Settings</span>
+              </CardTitle>
+              <CardDescription>Configure security settings and data backup options</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Data Backup</h3>
+                <div className="flex justify-between items-center p-3 border rounded">
+                  <div>
+                    <span className="font-medium">Last Backup</span>
+                    <p className="text-sm text-gray-600">
+                      {lastBackupTime ? new Date(lastBackupTime).toLocaleString() : "No backup yet"}
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleBackupNow} disabled={isBackingUp}>
+                    {isBackingUp ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Backing Up...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Backup Now
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Security Policies</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Password Expiry (90 days)</span>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>IP Address Whitelisting</span>
+                    <Switch />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Data Encryption</span>
+                    <Switch defaultChecked />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Add Subsidiary Modal */}
+      <Dialog open={showAddSubsidiary} onOpenChange={setShowAddSubsidiary}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add New Subsidiary</DialogTitle>
+            <DialogDescription>Create a new subsidiary company</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input id="name" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="tax_id" className="text-right">
+                Tax ID
+              </Label>
+              <Input id="tax_id" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="ssnit_number" className="text-right">
+                SSNIT Number
+              </Label>
+              <Input id="ssnit_number" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="industry" className="text-right">
+                Industry
+              </Label>
+              <Input id="industry" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="email_address" className="text-right">
+                Email
+              </Label>
+              <Input id="email_address" defaultValue="" className="col-span-3" type="email" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="phone_number" className="text-right">
+                Phone
+              </Label>
+              <Input id="phone_number" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="address" className="text-right">
+                Address
+              </Label>
+              <Textarea id="address" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Logo</Label>
+              <div className="col-span-3">
+                {subsidiaryLogoPreview ? (
+                  <div className="relative">
+                    <img
+                      src={subsidiaryLogoPreview || "/placeholder.svg"}
+                      alt="Subsidiary Logo"
+                      className="w-20 h-20 object-cover rounded-lg border"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                      onClick={() => setSubsidiaryLogoPreview("")}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                    <ImageIcon className="w-8 h-8 text-gray-400" />
+                  </div>
+                )}
+                <div className="space-y-2 mt-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        handleLogoUpload(file, "subsidiary")
+                      }
+                    }}
+                    className="hidden"
+                    id="subsidiary-logo-upload"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => document.getElementById("subsidiary-logo-upload")?.click()}
+                    disabled={isUploadingLogo}
+                    className="flex items-center space-x-2"
+                  >
+                    {isUploadingLogo ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Uploading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        <span>Upload Logo</span>
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="submit"
+              onClick={async () => {
+                const name = (document.getElementById("name") as HTMLInputElement).value
+                const tax_id = (document.getElementById("tax_id") as HTMLInputElement).value
+                const ssnit_number = (document.getElementById("ssnit_number") as HTMLInputElement).value
+                const industry = (document.getElementById("industry") as HTMLInputElement).value
+                const email_address = (document.getElementById("email_address") as HTMLInputElement).value
+                const phone_number = (document.getElementById("phone_number") as HTMLInputElement).value
+                const address = (document.getElementById("address") as HTMLTextAreaElement).value
+
+                setIsSavingSubsidiary(true)
+                await addNewSubsidiary({ name, tax_id, ssnit_number, industry, email_address, phone_number, address })
+                setShowAddSubsidiary(false)
+                setIsSavingSubsidiary(false)
+              }}
+              disabled={isSavingSubsidiary}
+            >
+              {isSavingSubsidiary ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Create Subsidiary"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Subsidiary Modal */}
+      <Dialog open={showEditSubsidiary} onOpenChange={setShowEditSubsidiary}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Subsidiary</DialogTitle>
+            <DialogDescription>Edit details of the selected subsidiary</DialogDescription>
+          </DialogHeader>
+          {selectedSubsidiary && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_name" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="edit_name"
+                  defaultValue={selectedSubsidiary.name}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, name: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_tax_id" className="text-right">
+                  Tax ID
+                </Label>
+                <Input
+                  id="edit_tax_id"
+                  defaultValue={selectedSubsidiary.tax_id}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, tax_id: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_ssnit_number" className="text-right">
+                  SSNIT Number
+                </Label>
+                <Input
+                  id="edit_ssnit_number"
+                  defaultValue={selectedSubsidiary.ssnit_number}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, ssnit_number: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_industry" className="text-right">
+                  Industry
+                </Label>
+                <Input
+                  id="edit_industry"
+                  defaultValue={selectedSubsidiary.industry}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, industry: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_email_address" className="text-right">
+                  Email
+                </Label>
+                <Input
+                  id="edit_email_address"
+                  defaultValue={selectedSubsidiary.email_address}
+                  className="col-span-3"
+                  type="email"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, email_address: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_phone_number" className="text-right">
+                  Phone
+                </Label>
+                <Input
+                  id="edit_phone_number"
+                  defaultValue={selectedSubsidiary.phone_number}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, phone_number: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_address" className="text-right">
+                  Address
+                </Label>
+                <Textarea
+                  id="edit_address"
+                  defaultValue={selectedSubsidiary.address}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, address: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">Logo</Label>
+                <div className="col-span-3">
+                  {subsidiaryLogoPreview || selectedSubsidiary.logo_url ? (
+                    <div className="relative">
+                      <img
+                        src={subsidiaryLogoPreview || selectedSubsidiary.logo_url}
+                        alt="Subsidiary Logo"
+                        className="w-20 h-20 object-cover rounded-lg border"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                        onClick={() => {
+                          setSubsidiaryLogoPreview("")
+                          setSelectedSubsidiary({ ...selectedSubsidiary, logo_url: "" })
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                      <ImageIcon className="w-8 h-8 text-gray-400" />
+                    </div>
+                  )}
+                  <div className="space-y-2 mt-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleLogoUpload(file, "subsidiary")
+                        }
+                      }}
+                      className="hidden"
+                      id="edit-subsidiary-logo-upload"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => document.getElementById("edit-subsidiary-logo-upload")?.click()}
+                      disabled={isUploadingLogo}
+                      className="flex items-center space-x-2"
+                    >
+                      {isUploadingLogo ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" />
+                          <span>Upload Logo</span>
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              type="submit"
+              onClick={async () => {
+                if (!selectedSubsidiary) return
+
+                setIsSavingSubsidiary(true)
+                await updateSubsidiary(selectedSubsidiary.id, selectedSubsidiary)
+                setShowEditSubsidiary(false)
+                setIsSavingSubsidiary(false)
+              }}
+              disabled={isSavingSubsidiary}
+            >
+              {isSavingSubsidiary ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Subsidiary Details Modal */}
+      <Dialog open={showSubsidiaryDetails} onOpenChange={setShowSubsidiaryDetails}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Subsidiary Details</DialogTitle>
+            <DialogDescription>View detailed information about the selected subsidiary</DialogDescription>
+          </DialogHeader>
+          {selectedSubsidiary && (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center space-x-4">
+                <div className="w-20 h-20 rounded-lg flex items-center justify-center overflow-hidden">
+                  {selectedSubsidiary.logo_url ? (
+                    <img
+                      src={selectedSubsidiary.logo_url || "/placeholder.svg"}
+                      alt={`${selectedSubsidiary.name} logo`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                      {selectedSubsidiary.name.charAt(0)}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">{selectedSubsidiary.name}</h3>
+                  <p className="text-sm text-gray-600">{selectedSubsidiary.industry}</p>
+                  <Badge variant={selectedSubsidiary.status === "active" ? "default" : "secondary"} className="mt-1">
+                    {selectedSubsidiary.status}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium">Contact Information</h4>
+                  <p className="text-sm text-gray-600">Email: {selectedSubsidiary.email_address}</p>
+                  <p className="text-sm text-gray-600">Phone: {selectedSubsidiary.phone_number}</p>
+                  <p className="text-sm text-gray-600">Address: {selectedSubsidiary.address}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Registration Details</h4>
+                  <p className="text-sm text-gray-600">Tax ID: {selectedSubsidiary.tax_id}</p>
+                  <p className="text-sm text-gray-600">SSNIT: {selectedSubsidiary.ssnit_number}</p>
+                  <p className="text-sm text-gray-600">
+                    Created: {new Date(selectedSubsidiary.created_at || "").toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium">Organizational Structure</h4>
+                <p className="text-sm text-gray-600">Divisions: {selectedSubsidiary.divisions?.join(", ") || "N/A"}</p>
+                <p className="text-sm text-gray-600">
+                  Departments: {selectedSubsidiary.departments?.join(", ") || "N/A"}
+                </p>
+                <p className="text-sm text-gray-600">Locations: {selectedSubsidiary.locations?.join(", ") || "N/A"}</p>
+              </div>
+
+              <div>
+                <h4 className="font-medium">Employee Count</h4>
+                <p className="text-sm text-gray-600">Total Employees: {selectedSubsidiary.employee_count || 0}</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setShowSubsidiaryDetails(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Deactivate Subsidiary Modal */}
+      <Dialog open={showDeactivateConfirm} onOpenChange={setShowDeactivateConfirm}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Deactivate Subsidiary</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate this subsidiary? This action will prevent further access.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowDeactivateConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmToggleStatus}>
+              Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Reactivate Subsidiary Modal */}
+      <Dialog open={showReactivateConfirm} onOpenChange={setShowReactivateConfirm}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Reactivate Subsidiary</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to reactivate this subsidiary? This action will restore access.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowReactivateConfirm(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmToggleStatus}>Reactivate</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Employees Modal */}
+      <Dialog
+        open={viewEmployeesModal.isOpen}
+        onOpenChange={() => setViewEmployeesModal({ ...viewEmployeesModal, isOpen: false })}
+      >
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>
+              Employees of {subsidiaries.find((s) => s.id === viewEmployeesModal.subsidiaryId)?.name}
+            </DialogTitle>
+            <DialogDescription>View a list of employees associated with this subsidiary</DialogDescription>
+          </DialogHeader>
+          <div className="divide-y divide-gray-200">
+            {viewEmployeesModal.employees?.map((employee) => (
+              <div key={employee.id} className="py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{employee.name}</p>
+                    <p className="text-sm text-gray-600">
+                      {employee.position} - {employee.department}
+                    </p>
+                  </div>
+                  <p className="text-sm text-gray-500">{employee.email}</p>
+                </div>
+              </div>
+            ))}
+            {viewEmployeesModal.employees?.length === 0 && (
+              <div className="py-4 text-center text-gray-500">No employees found for this subsidiary.</div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setViewEmployeesModal({ ...viewEmployeesModal, isOpen: false })}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Settings Modal */}
+      <Dialog open={importModal} onOpenChange={() => setImportModal(false)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Import Settings</DialogTitle>
+            <DialogDescription>Import settings from a CSV file</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <input
+              type="file"
+              accept=".csv"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  handleImportSettings(file)
+                  setImportModal(false)
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" onClick={() => setImportModal(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Leave Type Modal */}
+      <Dialog open={showAddLeaveTypeModal} onOpenChange={() => setShowAddLeaveTypeModal(false)}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="text-xl font-semibold">Add New Leave Type</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Create a new leave type for your organization with detailed configuration options
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-6">
+            {/* Basic Information Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-foreground border-b pb-2">Basic Information</h3>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="leaveTypeName" className="text-sm font-medium">
+                    Leave Type Name *
+                  </Label>
+                  <Input
+                    id="leaveTypeName"
+                    placeholder="e.g., Personal Leave, Study Leave, Compassionate Leave"
+                    value={newLeaveType.name}
+                    onChange={(e) => {
+                      setNewLeaveType({ ...newLeaveType, name: e.target.value })
+                      setLeaveTypeAIInsights(
+                        generateLeaveTypeInsights(e.target.value, newLeaveType.days, newLeaveType.description),
+                      )
+                    }}
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="leaveTypeDays" className="text-sm font-medium">
+                      Days Allocated *
+                    </Label>
+                    <Input
+                      id="leaveTypeDays"
+                      type="number"
+                      min="0"
+                      max="365"
+                      placeholder="0"
+                      value={newLeaveType.days}
+                      onChange={(e) => {
+                        const days = Number.parseInt(e.target.value) || 0
+                        setNewLeaveType({ ...newLeaveType, days })
+                        setLeaveTypeAIInsights(
+                          generateLeaveTypeInsights(newLeaveType.name, days, newLeaveType.description),
+                        )
+                      }}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-muted-foreground">Maximum days per year</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Carry Over Policy</Label>
+                    <div className="flex items-center space-x-3 pt-2">
+                      <Switch
+                        id="leaveTypeCarryOver"
+                        checked={newLeaveType.carryOver}
+                        onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, carryOver: checked })}
+                      />
+                      <Label htmlFor="leaveTypeCarryOver" className="text-sm text-muted-foreground">
+                        Allow unused days to carry over to next year
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Description Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-foreground border-b pb-2">Description & Guidelines</h3>
+
+              <div className="space-y-2">
+                <Label htmlFor="leaveTypeDescription" className="text-sm font-medium">
+                  Policy Description
+                </Label>
+                <Textarea
+                  id="leaveTypeDescription"
+                  placeholder="Describe the purpose, eligibility criteria, and any special conditions for this leave type..."
+                  value={newLeaveType.description}
+                  onChange={(e) => {
+                    setNewLeaveType({ ...newLeaveType, description: e.target.value })
+                    setLeaveTypeAIInsights(
+                      generateLeaveTypeInsights(newLeaveType.name, newLeaveType.days, e.target.value),
+                    )
+                  }}
+                  className="w-full min-h-[100px] resize-none"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Provide clear guidelines to help employees understand when and how to use this leave type
+                </p>
+              </div>
+            </div>
+
+            {/* AI Insights Section */}
+            {leaveTypeAIInsights.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-foreground border-b pb-2">AI Recommendations</h3>
+
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-1 bg-blue-100 rounded-full">
+                      <Sparkles className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <span className="text-sm font-medium text-blue-900">Smart Insights</span>
+                  </div>
+                  <div className="space-y-2">
+                    {leaveTypeAIInsights.map((insight, index) => (
+                      <div key={index} className="flex items-start gap-2">
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
+                        <p className="text-sm text-blue-800 leading-relaxed">{insight}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-3 pt-6 border-t">
+            <Button variant="outline" onClick={() => setShowAddLeaveTypeModal(false)} className="flex-1 sm:flex-none">
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              onClick={handleAddLeaveType}
+              disabled={isManagingLeaveTypes || !newLeaveType.name.trim() || newLeaveType.days <= 0}
+              className="flex-1 sm:flex-none"
+            >
+              {isManagingLeaveTypes ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating Leave Type...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Leave Type
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+export default SettingsPage
