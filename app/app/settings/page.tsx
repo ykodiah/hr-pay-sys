@@ -171,6 +171,11 @@ const SettingsPage: FunctionComponent = () => {
     days: 0,
     description: "",
   })
+  const [isSavingPolicy, setIsSavingPolicy] = useState(false)
+  const [isSavingDocument, setIsSavingDocument] = useState(false)
+  const [showDocumentPreview, setShowDocumentPreview] = useState(false)
+  const [documentPreviewContent, setDocumentPreviewContent] = useState("")
+
   const [showDocumentModal, setShowDocumentModal] = useState(false)
   const [documentModalType, setDocumentModalType] = useState("add") // add, view, edit, delete
   const [selectedDocument, setSelectedDocument] = useState(null)
@@ -236,11 +241,6 @@ const SettingsPage: FunctionComponent = () => {
     carryOver: false,
   })
 
-  const [isSavingPolicy, setIsSavingPolicy] = useState(false)
-  const [isSavingDocument, setIsSavingDocument] = useState(false)
-
-  const [showDocumentPreview, setShowDocumentPreview] = useState(false)
-  const [documentPreviewContent, setDocumentPreviewContent] = useState("")
   const [leaveTypeAIInsights, setLeaveTypeAIInsights] = useState<string[]>([])
 
   // Logo upload function
@@ -1222,7 +1222,7 @@ const SettingsPage: FunctionComponent = () => {
       const syncOptions = {
         hr_policies: true,
         payroll_configuration: true,
-        leave_types: false,
+        leave_types: true,
         roles_permissions: false,
       }
 
@@ -1306,6 +1306,70 @@ const SettingsPage: FunctionComponent = () => {
         description: "Failed to refresh subsidiaries",
         variant: "destructive",
       })
+    }
+  }
+
+  const handleDeletePolicy = async (policyName: string) => {
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      setCurrentPolicies((prev) => prev.filter((policy) => policy.name !== policyName))
+      setShowPolicyModal(false)
+
+      toast({
+        title: "Policy Deleted",
+        description: `${policyName} policy has been successfully removed.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete policy. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleToggleDocumentVisibility = (docId: number) => {
+    setHrDocuments((prev) => prev.map((doc) => (doc.id === docId ? { ...doc, visibleToAll: !doc.visibleToAll } : doc)))
+
+    const doc = hrDocuments.find((d) => d.id === docId)
+    toast({
+      title: "Visibility Updated",
+      description: `${doc?.name} is now ${doc?.visibleToAll ? "hidden from" : "visible to"} all employees.`,
+    })
+  }
+
+  const handleEditDocument = async () => {
+    if (!documentName) {
+      toast({
+        title: "Error",
+        description: "Please provide a document name.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSavingDocument(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      setHrDocuments((prev) =>
+        prev.map((doc) => (doc.id === selectedDocument.id ? { ...doc, name: documentName } : doc)),
+      )
+
+      setShowDocumentModal(false)
+      toast({
+        title: "Document Updated",
+        description: `${documentName} has been successfully updated.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update document. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingDocument(false)
     }
   }
 
@@ -1770,10 +1834,6 @@ Remember: When in doubt, prioritize safety over productivity.`,
 
   const handleManageLeaveTypes = () => {
     setShowAddLeaveTypeModal(true)
-  }
-
-  const handleToggleDocumentVisibility = (docId: number) => {
-    setHrDocuments((prev) => prev.map((doc) => (doc.id === docId ? { ...doc, visibleToAll: !doc.visibleToAll } : doc)))
   }
 
   const handleManageAllowances = () => {
@@ -2844,6 +2904,274 @@ Remember: When in doubt, prioritize safety over productivity.`,
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Policy Modal */}
+            {showPolicyModal && selectedPolicy && (
+              <Dialog open={showPolicyModal} onOpenChange={setShowPolicyModal}>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {policyModalType === "view" && "Policy Details"}
+                      {policyModalType === "edit" && "Edit Policy"}
+                      {policyModalType === "delete" && "Delete Policy"}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {policyModalType === "view" && "View details of the selected policy"}
+                      {policyModalType === "edit" && "Edit the selected policy"}
+                      {policyModalType === "delete" && "Are you sure you want to delete this policy?"}
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {policyModalType === "view" && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium">Policy Name</Label>
+                          <p className="text-sm text-gray-600 mt-1">{selectedPolicy.name}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium">Days Allocated</Label>
+                          <p className="text-sm text-gray-600 mt-1">{selectedPolicy.days} days</p>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Description</Label>
+                        <p className="text-sm text-gray-600 mt-1">{selectedPolicy.description}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Current Usage</Label>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {selectedPolicy.usage} of employees have used this leave type
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {policyModalType === "edit" && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="policy-name">Policy Name</Label>
+                        <Input
+                          id="policy-name"
+                          value={editingPolicy.name}
+                          onChange={(e) => setEditingPolicy({ ...editingPolicy, name: e.target.value })}
+                          placeholder="Enter policy name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="policy-days">Days Allocated</Label>
+                        <Input
+                          id="policy-days"
+                          type="number"
+                          value={editingPolicy.days}
+                          onChange={(e) =>
+                            setEditingPolicy({ ...editingPolicy, days: Number.parseInt(e.target.value) || 0 })
+                          }
+                          placeholder="Enter number of days"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="policy-description">Description</Label>
+                        <Textarea
+                          id="policy-description"
+                          value={editingPolicy.description}
+                          onChange={(e) => setEditingPolicy({ ...editingPolicy, description: e.target.value })}
+                          placeholder="Enter policy description"
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {policyModalType === "delete" && (
+                    <div className="space-y-4">
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-center space-x-2">
+                          <AlertTriangle className="w-5 h-5 text-red-600" />
+                          <p className="text-sm text-red-800">
+                            This action cannot be undone. This will permanently delete the "{selectedPolicy.name}"
+                            policy.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowPolicyModal(false)}>
+                      Cancel
+                    </Button>
+                    {policyModalType === "edit" && (
+                      <Button onClick={handleSavePolicyChanges} disabled={isSavingPolicy}>
+                        {isSavingPolicy ? "Saving..." : "Save Changes"}
+                      </Button>
+                    )}
+                    {policyModalType === "delete" && (
+                      <Button variant="destructive" onClick={() => handleDeletePolicy(selectedPolicy.name)}>
+                        Delete Policy
+                      </Button>
+                    )}
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+
+            {/* Document Modal */}
+            {showDocumentModal && (
+              <Dialog open={showDocumentModal} onOpenChange={setShowDocumentModal}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {documentModalType === "add" && "Add HR Policy Document"}
+                      {documentModalType === "view" && "Document Details"}
+                      {documentModalType === "edit" && "Edit Document"}
+                      {documentModalType === "delete" && "Delete Document"}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {documentModalType === "add" && "Upload a new HR policy document"}
+                      {documentModalType === "view" && "View details of the selected document"}
+                      {documentModalType === "edit" && "Edit the selected document"}
+                      {documentModalType === "delete" && "Are you sure you want to delete this document?"}
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {documentModalType === "add" && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="document-name">Document Name</Label>
+                        <Input
+                          id="document-name"
+                          value={documentName}
+                          onChange={(e) => setDocumentName(e.target.value)}
+                          placeholder="Enter document name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="document-file">File</Label>
+                        <div className="mt-1">
+                          <Input
+                            id="document-file"
+                            type="file"
+                            onChange={handleFileUpload}
+                            accept=".pdf,.doc,.docx"
+                            className="cursor-pointer hover:bg-gray-50"
+                          />
+                        </div>
+                        {uploadedFile && (
+                          <p className="text-sm text-gray-600 mt-2">
+                            Selected: {uploadedFile.name} ({(uploadedFile.size / (1024 * 1024)).toFixed(1)} MB)
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {documentModalType === "view" && selectedDocument && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium">Name</Label>
+                          <p className="text-sm text-gray-600 mt-1">{selectedDocument.name}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium">Type</Label>
+                          <p className="text-sm text-gray-600 mt-1">{selectedDocument.type}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium">Size</Label>
+                          <p className="text-sm text-gray-600 mt-1">{selectedDocument.size}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Document Preview</Label>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowDocumentPreview(!showDocumentPreview)}
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          {showDocumentPreview ? "Hide Preview" : "Show Preview"}
+                        </Button>
+                      </div>
+
+                      {showDocumentPreview && (
+                        <div className="border rounded-lg p-4 bg-gray-50 max-h-96 overflow-y-auto">
+                          <div className="prose prose-sm max-w-none">
+                            <div dangerouslySetInnerHTML={{ __html: documentPreviewContent }} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {documentModalType === "edit" && selectedDocument && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="edit-document-name">Document Name</Label>
+                        <Input
+                          id="edit-document-name"
+                          value={documentName}
+                          onChange={(e) => setDocumentName(e.target.value)}
+                          placeholder="Enter document name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-document-file">File (optional)</Label>
+                        <div className="mt-1">
+                          <Input
+                            id="edit-document-file"
+                            type="file"
+                            onChange={handleFileUpload}
+                            accept=".pdf,.doc,.docx"
+                            className="cursor-pointer hover:bg-gray-50"
+                          />
+                        </div>
+                        <p className="text-sm text-gray-500 mt-1">Leave empty to keep the current file</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {documentModalType === "delete" && selectedDocument && (
+                    <div className="space-y-4">
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-center space-x-2">
+                          <AlertTriangle className="w-5 h-5 text-red-600" />
+                          <p className="text-sm text-red-800">
+                            This action cannot be undone. This will permanently delete "{selectedDocument.name}".
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowDocumentModal(false)}>
+                      Cancel
+                    </Button>
+                    {documentModalType === "add" && (
+                      <Button onClick={handleSaveDocument} disabled={isSavingDocument}>
+                        {isSavingDocument ? "Uploading..." : "Add Document"}
+                      </Button>
+                    )}
+                    {documentModalType === "edit" && (
+                      <Button onClick={handleEditDocument} disabled={isSavingDocument}>
+                        {isSavingDocument ? "Saving..." : "Save Changes"}
+                      </Button>
+                    )}
+                    {documentModalType === "delete" && (
+                      <Button
+                        variant="destructive"
+                        onClick={() => handleDeleteDocument(selectedDocument.id)}
+                        disabled={isSavingDocument}
+                      >
+                        {isSavingDocument ? "Deleting..." : "Delete Document"}
+                      </Button>
+                    )}
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
 
             {/* Employee Analytics card removed as requested */}
           </div>
