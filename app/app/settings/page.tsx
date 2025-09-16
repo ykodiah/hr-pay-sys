@@ -1,46 +1,63 @@
 "use client"
 import type { FunctionComponent } from "react"
 import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Building2,
+  Shield,
+  Users,
+  DollarSign,
+  Bell,
+  X,
+  Eye,
+  Edit,
+  MoreVertical,
+  Loader2,
+  Brain,
+  Plus,
+  RefreshCw,
+  MapPin,
+  Briefcase,
+  Copy,
+  Download,
+  Upload,
+  ImageIcon,
+  AlertTriangle,
+  CheckCircle,
+  Save,
+  Settings,
+  Calendar,
+  Sparkles,
+  TrendingUp,
+  Trash2,
+  FileText,
+  EyeOff,
+} from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Button } from "@/components/ui/button"
 import {
-  Building2,
-  Building,
-  Users,
-  Calculator,
-  Bell,
-  Shield,
-  Key,
-  Lock,
-  Upload,
-  Plus,
-  X,
-  Save,
-  Loader2,
-  MoreHorizontal,
-  Edit,
-  UserX,
-  UserCheck,
-  Settings,
-  Sparkles,
-  Calendar,
-  TrendingUp,
-  FileText,
-  Eye,
-  Trash2,
-  Minus,
-  AlertTriangle,
-  CheckCircle,
-} from "lucide-react"
-import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 
 interface Company {
   id: string
@@ -57,10 +74,6 @@ interface Company {
   departments?: string[]
   locations?: string[]
   status?: string
-  logo?: string
-  email?: string
-  phone?: string
-  website?: string
 }
 
 interface Employee {
@@ -103,8 +116,6 @@ interface Subsidiary {
   country?: string
   phone?: string
   website?: string
-  location?: string
-  logo?: string
 }
 
 interface Role {
@@ -142,10 +153,6 @@ const SettingsPage: FunctionComponent = () => {
     divisions: [],
     departments: [],
     locations: [],
-    email: "",
-    phone: "",
-    website: "",
-    logo: "",
   })
 
   const [hrConfig, setHrConfig] = useState({
@@ -158,68 +165,6 @@ const SettingsPage: FunctionComponent = () => {
     aiRecommendations: true,
     smartScheduling: false,
     performanceTracking: true,
-  })
-
-  const [payrollConfig, setPayrollConfig] = useState({
-    frequency: "monthly",
-    currency: "USD",
-    autoTaxCalculation: true,
-  })
-
-  const [notificationSettings, setNotificationSettings] = useState({
-    email: true,
-    push: false,
-    sms: false,
-  })
-
-  const [accessSettings, setAccessSettings] = useState({
-    sso: false,
-    mfa: true,
-    passwordComplexity: true,
-  })
-
-  const [securitySettings, setSecuritySettings] = useState({
-    dataEncryption: true,
-    auditLogging: true,
-    intrusionDetection: false,
-    twoFactorAuth: false,
-    ipRestrictions: false,
-    sessionTimeout: false,
-  })
-
-  const [newSubsidiary, setNewSubsidiary] = useState({
-    name: "",
-    location: "",
-    logo: "",
-  })
-
-  const [editSubsidiaryData, setEditSubsidiaryData] = useState({
-    name: "",
-    location: "",
-  })
-
-  const [newRole, setNewRole] = useState({
-    name: "",
-    description: "",
-    permissions: [],
-  })
-
-  const [selectedRole, setSelectedRole] = useState(null)
-
-  const [editPolicyData, setEditPolicyData] = useState({
-    name: "",
-    days: 0,
-    description: "",
-  })
-
-  const [newDocumentData, setNewDocumentData] = useState({
-    name: "",
-    file: null,
-  })
-
-  const [editDocumentData, setEditDocumentData] = useState({
-    name: "",
-    file: null,
   })
 
   const [editingPolicy, setEditingPolicy] = useState({
@@ -274,7 +219,7 @@ const SettingsPage: FunctionComponent = () => {
   const [isSavingSubsidiaries, setIsSavingSubsidiaries] = useState(false)
 
   const [isManagingLeaveTypes, setIsManagingLeaveTypes] = useState(false)
-  const [selectedPolicy, setSelectedPolicy] = useState<any>(null)
+  const [selectedPolicy, setSelectedPolicy] = useState<string | null>(null)
 
   const [isSaving, setIsSaving] = useState(false)
 
@@ -298,70 +243,6 @@ const SettingsPage: FunctionComponent = () => {
   const [showDocumentPreview, setShowDocumentPreview] = useState(false)
   const [documentPreviewContent, setDocumentPreviewContent] = useState("")
   const [leaveTypeAIInsights, setLeaveTypeAIInsights] = useState<string[]>([])
-
-  const [activeTab, setActiveTab] = useState("company")
-  const [activeSubsidiaryTab, setActiveSubsidiaryTab] = useState("access")
-
-  const [newDivision, setNewDivision] = useState("")
-  const [newDepartment, setNewDepartment] = useState("")
-  const [newLocation, setNewLocation] = useState("")
-
-  const [showAddLeaveType, setShowAddLeaveType] = useState(false)
-  const [showViewPolicy, setShowViewPolicy] = useState(false)
-  const [showEditPolicy, setShowEditPolicy] = useState(false)
-  const [showDeletePolicy, setShowDeletePolicy] = useState(false)
-
-  const [showAddDocument, setShowAddDocument] = useState(false)
-  const [showDocumentDetails, setShowDocumentDetails] = useState(false)
-  const [showEditDocument, setShowEditDocument] = useState(false)
-  const [showDeleteDocument, setShowDeleteDocument] = useState(false)
-
-  const [isSavingCompany, setIsSavingCompany] = useState(false)
-  const [isSavingHR, setIsSavingHR] = useState(false)
-
-  const [showAddRole, setShowAddRole] = useState(false)
-  const [showEditRole, setShowEditRole] = useState(false)
-  const [showDeleteRole, setShowDeleteRole] = useState(false)
-
-  const availablePermissions = [
-    "read",
-    "write",
-    "delete",
-    "admin",
-    "hr",
-    "employees",
-    "reports",
-    "profile",
-    "payslip",
-    "leave",
-  ]
-
-  const leavePolicies = [
-    {
-      id: "annual",
-      name: "Annual Leave",
-      days: 21,
-      usage: 68,
-      trend: "up",
-      description: "Annual vacation leave",
-    },
-    {
-      id: "sick",
-      name: "Sick Leave",
-      days: 10,
-      usage: 23,
-      trend: "down",
-      description: "Medical leave for illness",
-    },
-    {
-      id: "maternity",
-      name: "Maternity Leave",
-      days: 84,
-      usage: 12,
-      trend: "stable",
-      description: "Maternity and paternity leave",
-    },
-  ]
 
   // Logo upload function
   const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
@@ -436,10 +317,6 @@ const SettingsPage: FunctionComponent = () => {
         divisions: ["Head Office", "Regional Office"],
         departments: ["Technology", "Human Resources", "Finance"],
         locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-        email: "ykodiah@gmail.com",
-        phone: "0249397960",
-        website: "akwaabatech.com",
-        logo: "/placeholder.svg",
       })
       setDivisions(["Head Office", "Regional Office"])
       setDepartments(["Technology", "Human Resources", "Finance"])
@@ -466,10 +343,6 @@ const SettingsPage: FunctionComponent = () => {
           divisions: data.divisions || [],
           departments: data.departments || [],
           locations: data.locations || [],
-          email: data.email_address || "",
-          phone: data.phone_number || "",
-          website: "https://company.com",
-          logo: data.logo_url || "/placeholder.svg",
         })
 
         setDivisions(data.divisions || [])
@@ -497,10 +370,6 @@ const SettingsPage: FunctionComponent = () => {
           divisions: ["Head Office", "Regional Office"],
           departments: ["Technology", "Human Resources", "Finance"],
           locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-          email: "ykodiah@gmail.com",
-          phone: "0249397960",
-          website: "akwaabatech.com",
-          logo: "/placeholder.svg",
         })
         setDivisions(["Head Office", "Regional Office"])
         setDepartments(["Technology", "Human Resources", "Finance"])
@@ -608,16 +477,14 @@ const SettingsPage: FunctionComponent = () => {
           address: "15 Liberation Road, Ridge, Accra, Ghana",
           status: "active",
           industry: "Digital Marketing & Web Development",
-          divisions: ["Digital Marketing", "Web Development", "Mobile Apps", "UI/UX Design", "E-commerce Solutions"],
-          departments: ["Marketing", "Development", "Design", "Sales", "Customer Support", "Quality Assurance"],
-          locations: ["Accra - Ridge", "Kumasi Branch", "Takoradi Office"],
-          divisions_count: 5,
-          departments_count: 6,
-          locations_count: 3,
+          divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
+          departments: ["Marketing", "Development", "Design", "Sales"],
+          locations: ["Accra - Ridge", "Kumasi Branch"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 2,
           employee_count: 45,
           created_at: new Date().toISOString(),
-          location: "Accra",
-          logo: "/digital-solutions-logo.jpg",
         },
         {
           id: "sub-002",
@@ -630,22 +497,14 @@ const SettingsPage: FunctionComponent = () => {
           address: "8 Airport Residential Area, Accra, Ghana",
           status: "active",
           industry: "Business Consulting & Strategy",
-          divisions: [
-            "Strategy Consulting",
-            "Digital Transformation",
-            "Process Optimization",
-            "Change Management",
-            "Business Intelligence",
-          ],
-          departments: ["Consulting", "Strategy", "Operations", "Client Relations", "Research & Analytics"],
-          locations: ["Accra - Airport", "Tema Office", "Cape Coast Branch"],
-          divisions_count: 5,
-          departments_count: 5,
-          locations_count: 3,
+          divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
+          departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
+          locations: ["Accra - Airport", "Tema Office"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 2,
           employee_count: 32,
           created_at: new Date().toISOString(),
-          location: "Accra",
-          logo: "/consulting-group-logo.jpg",
         },
         {
           id: "sub-003",
@@ -658,29 +517,14 @@ const SettingsPage: FunctionComponent = () => {
           address: "25 Independence Avenue, Accra, Ghana",
           status: "active",
           industry: "Financial Technology & Services",
-          divisions: [
-            "Fintech Solutions",
-            "Payment Processing",
-            "Financial Advisory",
-            "Investment Management",
-            "Insurance Services",
-          ],
-          departments: [
-            "Finance",
-            "Technology",
-            "Compliance",
-            "Customer Service",
-            "Risk Management",
-            "Investment Advisory",
-          ],
-          locations: ["Accra - Independence Ave", "Ho Regional Office", "Sunyani Branch"],
-          divisions_count: 5,
-          departments_count: 6,
-          locations_count: 3,
+          divisions: ["Fintech Solutions", "Payment Processing", "Financial Advisory"],
+          departments: ["Finance", "Technology", "Compliance", "Customer Service"],
+          locations: ["Accra - Independence Ave", "Ho Regional Office"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 2,
           employee_count: 28,
           created_at: new Date().toISOString(),
-          location: "Accra",
-          logo: "/financial-services-logo.png",
         },
         {
           id: "sub-004",
@@ -693,29 +537,14 @@ const SettingsPage: FunctionComponent = () => {
           address: "12 Spintex Road, Accra, Ghana",
           status: "active",
           industry: "Supply Chain & Logistics",
-          divisions: [
-            "Transportation",
-            "Warehousing",
-            "Supply Chain Management",
-            "Freight Forwarding",
-            "Last Mile Delivery",
-          ],
-          departments: [
-            "Operations",
-            "Fleet Management",
-            "Warehousing",
-            "Customer Service",
-            "Procurement",
-            "Maintenance",
-          ],
-          locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub", "Bolgatanga Depot"],
-          divisions_count: 5,
-          departments_count: 6,
-          locations_count: 4,
+          divisions: ["Transportation", "Warehousing", "Supply Chain Management"],
+          departments: ["Operations", "Fleet Management", "Warehousing", "Customer Service"],
+          locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 3,
           employee_count: 67,
           created_at: new Date().toISOString(),
-          location: "Accra",
-          logo: "/logistics-company-logo.png",
         },
         {
           id: "sub-005",
@@ -728,145 +557,52 @@ const SettingsPage: FunctionComponent = () => {
           address: "5 Cantonments Road, Accra, Ghana",
           status: "active",
           industry: "Education & Professional Training",
-          divisions: [
-            "Corporate Training",
-            "IT Certification",
-            "Professional Development",
-            "Leadership Training",
-            "Skills Assessment",
-          ],
-          departments: [
-            "Training",
-            "Curriculum Development",
-            "Student Services",
-            "Administration",
-            "Assessment & Evaluation",
-          ],
-          locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform", "Tamale Center"],
-          divisions_count: 5,
-          departments_count: 5,
-          locations_count: 4,
+          divisions: ["Corporate Training", "IT Certification", "Professional Development"],
+          departments: ["Training", "Curriculum Development", "Student Services", "Administration"],
+          locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 3,
           employee_count: 23,
           created_at: new Date().toISOString(),
-          location: "Accra",
-          logo: "/training-institute-logo.jpg",
-        },
-        {
-          id: "sub-006",
-          company_id: "comp-001",
-          name: "Akwaaba Manufacturing Co.",
-          email_address: "manufacturing@akwaabamanuf.com",
-          phone_number: "+233 30 276 5437",
-          tax_id: "TIN-AMC-2023-006",
-          ssnit_number: "SSNIT-AMC-789017",
-          address: "45 Industrial Area, Tema, Ghana",
-          status: "active",
-          industry: "Manufacturing & Production",
-          divisions: [
-            "Product Manufacturing",
-            "Quality Control",
-            "Research & Development",
-            "Supply Chain",
-            "Export Operations",
-          ],
-          departments: ["Production", "Quality Assurance", "Engineering", "Maintenance", "Procurement", "Export Sales"],
-          locations: ["Tema - Industrial Area", "Kumasi Factory", "Takoradi Processing Plant"],
-          divisions_count: 5,
-          departments_count: 6,
-          locations_count: 3,
-          employee_count: 89,
-          created_at: new Date().toISOString(),
-          location: "Tema",
-          logo: "/manufacturing-company-logo.png",
-        },
-        {
-          id: "sub-007",
-          company_id: "comp-001",
-          name: "Akwaaba Healthcare Services",
-          email_address: "healthcare@akwaabahealthcare.com",
-          phone_number: "+233 30 276 5438",
-          tax_id: "TIN-AHS-2023-007",
-          ssnit_number: "SSNIT-AHS-789018",
-          address: "18 Ring Road East, Accra, Ghana",
-          status: "active",
-          industry: "Healthcare & Medical Services",
-          divisions: [
-            "Primary Healthcare",
-            "Specialized Medicine",
-            "Diagnostic Services",
-            "Pharmacy Services",
-            "Health Insurance",
-          ],
-          departments: ["Medical Services", "Nursing", "Pharmacy", "Administration", "Laboratory", "Patient Relations"],
-          locations: ["Accra - Ring Road", "Kumasi Medical Center", "Ho Clinic", "Tamale Health Post"],
-          divisions_count: 5,
-          departments_count: 6,
-          locations_count: 4,
-          employee_count: 56,
-          created_at: new Date().toISOString(),
-          location: "Accra",
-          logo: "/healthcare-services-logo.jpg",
         },
       ])
       return
     }
 
     try {
-      console.log("[v0] Fetching subsidiaries from database...")
+      // Load subsidiaries with employee counts
       const { data: subsidiariesData, error: subsidiariesError } = await supabase
-        .from("subsidiary_statistics")
-        .select("*")
+        .from("subsidiaries")
+        .select(`
+          *,
+          employees:employees(count)
+        `)
         .order("created_at", { ascending: false })
 
-      if (subsidiariesError) {
-        console.error("[v0] Subsidiaries query error:", subsidiariesError)
-        throw subsidiariesError
-      }
+      if (subsidiariesError) throw subsidiariesError
 
-      console.log("[v0] Raw subsidiaries data:", subsidiariesData)
+      // Process the data to add computed fields
+      const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => ({
+        ...sub,
+        divisions: Array.isArray(sub.divisions) ? sub.divisions : [],
+        departments: Array.isArray(sub.departments) ? sub.departments : [],
+        locations: Array.isArray(sub.locations) ? sub.locations : [],
+        divisions_count: Array.isArray(sub.divisions) ? sub.divisions.length : 0,
+        departments_count: Array.isArray(sub.departments) ? sub.departments.length : 0,
+        locations_count: Array.isArray(sub.locations) ? sub.locations.length : 0,
+        employee_count: sub.employees?.[0]?.count || 0,
+      }))
 
-      const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => {
-        const divisions = Array.isArray(sub.divisions)
-          ? sub.divisions
-          : typeof sub.divisions === "string"
-            ? JSON.parse(sub.divisions)
-            : []
-        const departments = Array.isArray(sub.departments)
-          ? sub.departments
-          : typeof sub.departments === "string"
-            ? JSON.parse(sub.departments)
-            : []
-        const locations = Array.isArray(sub.locations)
-          ? sub.locations
-          : typeof sub.locations === "string"
-            ? JSON.parse(sub.locations)
-            : []
-
-        return {
-          ...sub,
-          divisions,
-          departments,
-          locations,
-          divisions_count: divisions.length,
-          departments_count: departments.length,
-          locations_count: locations.length,
-          employee_count: sub.employee_count || 0,
-          location: locations[0] || "Accra",
-          logo: sub.logo_url || "/generic-company-logo.png",
-        }
-      })
-
-      console.log("[v0] Processed subsidiaries:", processedSubsidiaries)
       setSubsidiaries(processedSubsidiaries)
-      console.log("[v0] Successfully loaded", processedSubsidiaries.length, "subsidiaries")
+      console.log("[v0] Loaded subsidiaries:", processedSubsidiaries.length)
     } catch (error) {
-      console.error("[v0] Subsidiaries loading error:", error)
+      console.error("Subsidiaries loading error:", error)
       toast({
         title: "Error",
-        description: "Failed to load subsidiaries. Please try again.",
+        description: "Failed to load subsidiaries",
         variant: "destructive",
       })
-      setSubsidiaries([])
     }
   }
 
@@ -1704,116 +1440,178 @@ const SettingsPage: FunctionComponent = () => {
     return insights
   }
 
-  const handleDocumentView = async (document: any) => {
-    setSelectedDocument(document)
-    setDocumentModalType("view")
-    setShowDocumentModal(true)
-    setDocumentPreviewContent("Loading document content...")
+  const parseDocumentContent = (document: any) => {
+    // Simulate different document types with realistic content
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `Document: Code of Conduct
 
-    // Simulate real document parsing based on file type
-    setTimeout(() => {
-      let content = ""
-
-      if (document.type === "PDF") {
-        // Simulate PDF content extraction
-        content = `Document: ${document.name}
-
-TENANCY AGREEMENT - ELIX EVENTS
-
-This is a comprehensive tenancy agreement document outlining the terms and conditions for property rental.
-
-SECTION 1: PARTIES TO THE AGREEMENT
-This agreement is entered into between ELIX EVENTS (the Landlord) and the Tenant(s) as specified herein.
-
-SECTION 2: PROPERTY DETAILS
-The property subject to this agreement is located at the address specified in Schedule A, including all fixtures and fittings as detailed in the inventory.
-
-SECTION 3: RENTAL TERMS
-- Monthly Rent: As specified in Schedule B
-- Security Deposit: Equivalent to two months' rent
-- Payment Due Date: 1st of each month
-- Late Payment Fee: 5% of monthly rent after 7 days
-
-SECTION 4: TENANT OBLIGATIONS
-• Maintain the property in good condition
-• Pay rent and utilities on time
-• Comply with building rules and regulations
-• Obtain landlord consent for modifications
-• Provide proper notice for termination
-
-SECTION 5: LANDLORD OBLIGATIONS
-• Ensure property is habitable
-• Maintain structural integrity
-• Provide 24-hour notice for inspections
-• Return security deposit as per legal requirements
-
-SECTION 6: TERMINATION CLAUSE
-Either party may terminate this agreement with 30 days written notice, subject to the terms outlined in this document.
-
-This document contains additional clauses regarding insurance, maintenance responsibilities, and dispute resolution procedures.`
-      } else if (document.type === "DOC") {
-        // Simulate DOC content extraction
-        content = `Document: ${document.name}
-
-EMPLOYEE HANDBOOK - COMPANY POLICIES
-
-Welcome to our organization! This handbook contains important information about company policies and procedures.
-
-TABLE OF CONTENTS:
-1. Company Overview
-2. Employment Policies
-3. Code of Conduct
-4. Benefits and Compensation
-5. Leave Policies
-6. Performance Management
-7. Health and Safety
-
-COMPANY OVERVIEW:
-Our company is committed to providing a positive work environment that promotes professional growth and development.
-
-EMPLOYMENT POLICIES:
-• Equal Opportunity Employment
-• Anti-Discrimination Policy
-• Workplace Harassment Prevention
-• Confidentiality Agreements
-
-CODE OF CONDUCT:
-All employees are expected to maintain the highest standards of professional conduct, including:
-- Respect for colleagues and clients
-- Integrity in all business dealings
-- Compliance with company policies
-- Protection of company assets
-
-BENEFITS AND COMPENSATION:
-Our comprehensive benefits package includes health insurance, retirement plans, and professional development opportunities.
-
-LEAVE POLICIES:
-- Annual Leave: 21 days per year
-- Sick Leave: 10 days per year
-- Maternity/Paternity Leave: As per local regulations
-- Emergency Leave: Available upon approval
-
-For questions about any policy, please contact the HR department.`
-      } else {
-        // Default content for other file types
-        content = `Document: ${document.name}
-
-This document contains important company information and policies.
+This is a comprehensive Code of Conduct document outlining the ethical standards and behavioral expectations for all employees.
 
 Key sections include:
 • Company policies and procedures
 • Employee rights and responsibilities
 • Code of conduct guidelines
 • Compliance requirements
-• Operational procedures
+• Disciplinary procedures
+• Reporting mechanisms
 
-Please review this document carefully and contact HR if you have any questions about the content or policies outlined herein.
+1. PROFESSIONAL CONDUCT
+All employees are expected to maintain the highest standards of professional conduct in their interactions with colleagues, clients, and stakeholders.
 
-[Additional document content would be displayed here based on the actual file content]`
-      }
+2. CONFIDENTIALITY
+Employees must protect confidential information and proprietary data belonging to the company and its clients.
 
-      setDocumentPreviewContent(content)
-    }, 800)
+3. CONFLICT OF INTEREST
+Employees must avoid situations that create or appear to create conflicts between personal interests and company interests.
+
+4. COMPLIANCE WITH LAWS
+All employees must comply with applicable laws, regulations, and company policies.
+
+5. REPORTING VIOLATIONS
+Employees are encouraged to report any violations of this code through appropriate channels.
+
+This document serves as a guide for ethical decision-making and professional behavior within our organization.`,
+      },
+      "Employee Handbook": {
+        content: `Document: Employee Handbook
+
+Welcome to our organization! This handbook provides essential information about company policies, procedures, and benefits.
+
+Table of Contents:
+• Welcome Message
+• Company Overview
+• Employment Policies
+• Benefits and Compensation
+• Leave Policies
+• Performance Management
+• Safety and Security
+• Technology Usage
+
+WELCOME MESSAGE
+We are pleased to welcome you to our team. This handbook will help you understand our company culture and expectations.
+
+COMPANY OVERVIEW
+Our mission is to provide exceptional service while maintaining the highest standards of integrity and professionalism.
+
+EMPLOYMENT POLICIES
+- Equal Opportunity Employment
+- Anti-Discrimination Policy
+- Harassment Prevention
+- Work Schedule and Attendance
+
+BENEFITS AND COMPENSATION
+- Health Insurance
+- Retirement Plans
+- Paid Time Off
+- Professional Development
+
+LEAVE POLICIES
+- Annual Leave: 21 days per year
+- Sick Leave: 10 days per year
+- Maternity/Paternity Leave: As per local regulations
+
+This handbook is updated regularly to reflect current policies and procedures.`,
+      },
+      "Safety Manual": {
+        content: `Document: Safety Manual
+
+This safety manual outlines procedures and guidelines to ensure a safe working environment for all employees.
+
+SAFETY PRINCIPLES
+1. Safety is everyone's responsibility
+2. All accidents are preventable
+3. Safety training is mandatory
+4. Report all hazards immediately
+
+EMERGENCY PROCEDURES
+- Fire Emergency: Exit procedures and assembly points
+- Medical Emergency: First aid and emergency contacts
+- Security Emergency: Lockdown procedures
+
+WORKPLACE SAFETY
+- Personal Protective Equipment (PPE)
+- Equipment Operation Guidelines
+- Hazard Identification and Reporting
+- Incident Investigation Procedures
+
+HEALTH AND WELLNESS
+- Ergonomic Guidelines
+- Mental Health Resources
+- Wellness Programs
+- Health Screenings
+
+Remember: When in doubt, prioritize safety over productivity.`,
+      },
+    }
+
+    // Return specific content based on document name, or generate generic content
+    if (documentTemplates[document.name]) {
+      return documentTemplates[document.name].content
+    }
+
+    // Generate content based on document type
+    const fileExtension = document.type.toLowerCase()
+    let content = `Document: ${document.name}\n\n`
+
+    if (fileExtension === "pdf") {
+      content += `This is a PDF document containing important company information.\n\n`
+      content += `Key sections may include:\n`
+      content += `• Policy guidelines and procedures\n`
+      content += `• Regulatory compliance information\n`
+      content += `• Employee responsibilities\n`
+      content += `• Contact information and resources\n\n`
+      content += `[PDF content would be extracted and displayed here in a production environment]\n\n`
+      content += `Document size: ${document.size}\n`
+      content += `Last modified: ${new Date().toLocaleDateString()}`
+    } else if (fileExtension === "doc" || fileExtension === "docx") {
+      content += `This is a Word document containing structured company information.\n\n`
+      content += `Document structure:\n`
+      content += `• Header with company branding\n`
+      content += `• Table of contents\n`
+      content += `• Main content sections\n`
+      content += `• Appendices and references\n\n`
+      content += `[Word document content would be parsed and displayed here]\n\n`
+      content += `Document properties:\n`
+      content += `- File size: ${document.size}\n`
+      content += `- Format: Microsoft Word Document\n`
+      content += `- Created: ${new Date().toLocaleDateString()}`
+    } else {
+      content += `This document contains important company information and policies.\n\n`
+      content += `Content overview:\n`
+      content += `• Company policies and procedures\n`
+      content += `• Employee guidelines and expectations\n`
+      content += `• Compliance and regulatory information\n`
+      content += `• Contact information and resources\n\n`
+      content += `[Document content would be processed and displayed based on file type]\n\n`
+      content += `File information:\n`
+      content += `- Size: ${document.size}\n`
+      content += `- Type: ${document.type}\n`
+      content += `- Status: Available for viewing`
+    }
+
+    return content
+  }
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document)
+    setDocumentModalType("view")
+    setShowDocumentModal(true)
+    setShowDocumentPreview(false) // Reset preview state
+
+    setTimeout(() => {
+      const parsedContent = parseDocumentContent(document)
+      setDocumentPreviewContent(parsedContent)
+    }, 500)
+  }
+
+  const handleDocumentAction = (action, docId = null) => {
+    if (docId) {
+      const doc = hrDocuments.find((d) => d.id === docId)
+      setSelectedDocument(doc)
+    }
+    setDocumentModalType(action)
+    setShowDocumentModal(true)
   }
 
   const handleFileUpload = (event) => {
@@ -1823,19 +1621,14 @@ Please review this document carefully and contact HR if you have any questions a
       if (!documentName) {
         setDocumentName(file.name.replace(/\.[^/.]+$/, ""))
       }
-
-      // Store file content for future preview (in real implementation, this would parse the actual file)
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        // In a real implementation, you would use libraries like pdf-parse, mammoth, etc.
-        // For now, we'll store a reference to enable preview functionality
-        console.log("[v0] File loaded for preview capability")
-      }
-      reader.readAsText(file)
     }
   }
 
-  const handleDocumentAction = () => {}
+  const handleAddDocument = () => {
+    setDocumentName("")
+    setUploadedFile(null)
+    handleDocumentAction("add")
+  }
 
   const handleSaveDocument = async () => {
     if (!documentName || !uploadedFile) {
@@ -1846,769 +1639,440 @@ Please review this document carefully and contact HR if you have any questions a
       })
       return
     }
-    // Additional code for saving document can be added here
-  }
 
-  const handleSaveCompanyChanges = async () => {
-    console.log("[v0] Saving company changes")
-    setIsSavingCompany(true)
-
+    setIsSavingDocument(true)
     try {
-      if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
+      await new Promise((resolve) => setTimeout(resolve, 1500))
 
-        toast({
-          title: "Changes Saved",
-          description: "Company changes have been saved successfully (Demo Mode)",
-        })
-        setIsSavingCompany(false)
-        return
+      const newDoc = {
+        id: Date.now(),
+        name: documentName,
+        type: uploadedFile.type.includes("pdf") ? "PDF" : "DOC",
+        size: `${(uploadedFile.size / (1024 * 1024)).toFixed(1)} MB`,
+        visibleToAll: false,
       }
 
-      // Save any pending company changes
-      await loadCompanyData()
+      setHrDocuments((prev) => [...prev, newDoc])
+      setShowDocumentModal(false)
+      setDocumentName("")
+      setUploadedFile(null)
 
       toast({
-        title: "Changes Saved",
-        description: "Company changes have been saved and updated successfully",
+        title: "Document Added",
+        description: `${documentName} has been successfully uploaded.`,
       })
     } catch (error) {
-      console.error("Save company changes error:", error)
       toast({
         title: "Error",
-        description: "Failed to save company changes. Please try again.",
+        description: "Failed to upload document. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setIsSavingCompany(false)
+      setIsSavingDocument(false)
     }
   }
 
-  const handleSaveHRConfiguration = async () => {
-    console.log("[v0] Saving HR configuration")
-    setIsSavingHR(true)
-
+  const handleDeleteDocument = async (docId) => {
     try {
-      if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
-        toast({
-          title: "Changes Saved",
-          description: "HR configuration have been saved successfully (Demo Mode)",
-        })
-        setIsSavingHR(false)
-        return
-      }
-
-      // Save any pending HR configuration changes
-      await loadCompanyData()
-
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId))
+      setShowDocumentModal(false)
       toast({
-        title: "Changes Saved",
-        description: "HR configuration have been saved and updated successfully",
+        title: "Document Deleted",
+        description: "Document has been successfully removed.",
       })
     } catch (error) {
-      console.error("Save HR configuration error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to save HR configuration. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSavingHR(false)
-    }
-  }
-
-  const handleAddSubsidiary = async () => {
-    console.log("[v0] Adding subsidiary")
-
-    try {
-      if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
-        toast({
-          title: "Changes Saved",
-          description: "Subsidiary have been added successfully (Demo Mode)",
-        })
-        setShowAddSubsidiary(false)
-        return
-      }
-
-      // Save any pending HR configuration changes
-      await loadCompanyData()
-
-      toast({
-        title: "Changes Saved",
-        description: "Subsidiary have been added and updated successfully",
-      })
-    } catch (error) {
-      console.error("Save HR configuration error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to add subsidiary. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setShowAddSubsidiary(false)
-    }
-  }
-
-  const handleEditSubsidiary = async () => {
-    console.log("[v0] Editing subsidiary")
-
-    try {
-      if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
-        toast({
-          title: "Changes Saved",
-          description: "Subsidiary have been edited successfully (Demo Mode)",
-        })
-        setShowEditSubsidiary(false)
-        return
-      }
-
-      // Save any pending HR configuration changes
-      await loadCompanyData()
-
-      toast({
-        title: "Changes Saved",
-        description: "Subsidiary have been edited and updated successfully",
-      })
-    } catch (error) {
-      console.error("Save HR configuration error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to edit subsidiary. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setShowEditSubsidiary(false)
-    }
-  }
-
-  const handleAddRole = async () => {
-    console.log("[v0] Adding role")
-
-    try {
-      if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
-        toast({
-          title: "Changes Saved",
-          description: "Role have been added successfully (Demo Mode)",
-        })
-        setShowAddRole(false)
-        return
-      }
-
-      // Save any pending HR configuration changes
-      await loadCompanyData()
-
-      toast({
-        title: "Changes Saved",
-        description: "Role have been added and updated successfully",
-      })
-    } catch (error) {
-      console.error("Save HR configuration error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to add role. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setShowAddRole(false)
-    }
-  }
-
-  const handleEditRole = async () => {
-    console.log("[v0] Editing role")
-
-    try {
-      if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
-        toast({
-          title: "Changes Saved",
-          description: "Role have been edited successfully (Demo Mode)",
-        })
-        setShowEditRole(false)
-        return
-      }
-
-      // Save any pending HR configuration changes
-      await loadCompanyData()
-
-      toast({
-        title: "Changes Saved",
-        description: "Role have been edited and updated successfully",
-      })
-    } catch (error) {
-      console.error("Save HR configuration error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to edit role. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setShowEditRole(false)
-    }
-  }
-
-  const handleDeleteRole = async () => {
-    console.log("[v0] Deleting role")
-
-    try {
-      if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
-        toast({
-          title: "Changes Saved",
-          description: "Role have been deleted successfully (Demo Mode)",
-        })
-        setShowDeleteRole(false)
-        return
-      }
-
-      // Save any pending HR configuration changes
-      await loadCompanyData()
-
-      toast({
-        title: "Changes Saved",
-        description: "Role have been deleted and updated successfully",
-      })
-    } catch (error) {
-      console.error("Save HR configuration error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete role. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setShowDeleteRole(false)
-    }
-  }
-
-  const handleEditPolicy = async () => {
-    console.log("[v0] Editing policy")
-
-    try {
-      if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
-        toast({
-          title: "Changes Saved",
-          description: "Policy have been edited successfully (Demo Mode)",
-        })
-        setShowEditPolicy(false)
-        return
-      }
-
-      // Save any pending HR configuration changes
-      await loadCompanyData()
-
-      toast({
-        title: "Changes Saved",
-        description: "Policy have been edited and updated successfully",
-      })
-    } catch (error) {
-      console.error("Save HR configuration error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to edit policy. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setShowEditPolicy(false)
-    }
-  }
-
-  const handleDeletePolicy = async () => {
-    console.log("[v0] Deleting policy")
-
-    try {
-      if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
-        toast({
-          title: "Changes Saved",
-          description: "Policy have been deleted successfully (Demo Mode)",
-        })
-        setShowDeletePolicy(false)
-        return
-      }
-
-      // Save any pending HR configuration changes
-      await loadCompanyData()
-
-      toast({
-        title: "Changes Saved",
-        description: "Policy have been deleted and updated successfully",
-      })
-    } catch (error) {
-      console.error("Save HR configuration error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete policy. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setShowDeletePolicy(false)
-    }
-  }
-
-  const handleAddDocument = async () => {
-    console.log("[v0] Adding document")
-
-    try {
-      if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
-        toast({
-          title: "Changes Saved",
-          description: "Document have been added successfully (Demo Mode)",
-        })
-        setShowAddDocument(false)
-        return
-      }
-
-      // Save any pending HR configuration changes
-      await loadCompanyData()
-
-      toast({
-        title: "Changes Saved",
-        description: "Document have been added and updated successfully",
-      })
-    } catch (error) {
-      console.error("Save HR configuration error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setShowAddDocument(false)
-    }
-  }
-
-  const handleEditDocument = async () => {
-    console.log("[v0] Editing document")
-
-    try {
-      if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
-        toast({
-          title: "Changes Saved",
-          description: "Document have been edited successfully (Demo Mode)",
-        })
-        setShowEditDocument(false)
-        return
-      }
-
-      // Save any pending HR configuration changes
-      await loadCompanyData()
-
-      toast({
-        title: "Changes Saved",
-        description: "Document have been edited and updated successfully",
-      })
-    } catch (error) {
-      console.error("Save HR configuration error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to edit document. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setShowEditDocument(false)
-    }
-  }
-
-  const handleDeleteDocument = async () => {
-    console.log("[v0] Deleting document")
-
-    try {
-      if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
-        toast({
-          title: "Changes Saved",
-          description: "Document have been deleted successfully (Demo Mode)",
-        })
-        setShowDeleteDocument(false)
-        return
-      }
-
-      // Save any pending HR configuration changes
-      await loadCompanyData()
-
-      toast({
-        title: "Changes Saved",
-        description: "Document have been deleted and updated successfully",
-      })
-    } catch (error) {
-      console.error("Save HR configuration error:", error)
       toast({
         title: "Error",
         description: "Failed to delete document. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setShowDeleteDocument(false)
+      setIsSavingDocument(false)
     }
   }
 
-  const getDocumentPreviewContent = (document: any) => {
-    // Simulate document content retrieval
-    return `This is a placeholder for the document content.
-    Document Name: ${document.name}
-    Document Type: ${document.type}
-    Document Size: ${document.size}`
+  const handleSaveSubsidiaries = async () => {
+    console.log("[v0] Saving subsidiaries changes")
+    setIsSavingSubsidiaries(true)
+
+    try {
+      if (isDemoMode()) {
+        // Simulate saving delay for demo
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+
+        toast({
+          title: "Changes Saved",
+          description: "All subsidiary changes have been saved successfully (Demo Mode)",
+        })
+        setIsSavingSubsidiaries(false)
+        return
+      }
+
+      // Save any pending changes to the database
+      // This could include updated subsidiary information, organizational changes, etc.
+
+      // For now, we'll refresh the data to ensure consistency
+      await loadSubsidiaries()
+
+      toast({
+        title: "Changes Saved",
+        description: "All subsidiary changes have been saved successfully",
+      })
+    } catch (error) {
+      console.error("Save error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save changes",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingSubsidiaries(false)
+    }
+  }
+
+  const handleSaveHRConfig = async () => {
+    setIsSaving(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      if (isDemoMode) {
+        toast({
+          title: "HR Configuration Saved",
+          description: "HR settings updated successfully (Demo Mode)",
+        })
+      } else {
+        // Real database update would go here
+        toast({
+          title: "HR Configuration Saved",
+          description: "HR settings updated successfully",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save HR configuration",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const confirmDeactivateSubsidiary = (subsidiaryId: string) => {
+    setSubsidiaryToToggle(subsidiaries.find((s) => s.id === subsidiaryId) || null)
+    setShowDeactivateConfirm(true)
+  }
+
+  const confirmReactivateSubsidiary = (subsidiaryId: string) => {
+    setSubsidiaryToToggle(subsidiaries.find((s) => s.id === subsidiaryId) || null)
+    setShowReactivateConfirm(true)
+  }
+
+  const handleManageLeaveTypes = () => {
+    setShowAddLeaveTypeModal(true)
+  }
+
+  const handleToggleDocumentVisibility = (docId: number) => {
+    setHrDocuments((prev) => prev.map((doc) => (doc.id === docId ? { ...doc, visibleToAll: !doc.visibleToAll } : doc)))
+  }
+
+  const handleManageAllowances = () => {
+    toast({
+      title: "Allowances Management",
+      description: "Opening allowances configuration...",
+    })
+  }
+
+  const handleManageDeductions = () => {
+    toast({
+      title: "Deductions Management",
+      description: "Opening deductions configuration...",
+    })
+  }
+
+  const handleManageSalaryGrades = () => {
+    toast({
+      title: "Salary Grades Management",
+      description: "Opening salary grades configuration...",
+    })
+  }
+
+  const handleEditEmailTemplate = (templateName: string) => {
+    toast({
+      title: "Edit Email Template",
+      description: `Editing ${templateName} template...`,
+    })
+  }
+
+  const handleAddEmailTemplate = () => {
+    toast({
+      title: "Add Email Template",
+      description: "Opening email template editor...",
+    })
+  }
+
+  const handleAddRole = () => {
+    toast({
+      title: "Add Role",
+      description: "Opening role creation form...",
+    })
+  }
+
+  const handleEditRole = (roleName: string) => {
+    toast({
+      title: "Edit Role",
+      description: `Editing ${roleName} role...`,
+    })
+  }
+
+  const handleBackupNow = async () => {
+    setIsBackingUp(true)
+    try {
+      // Simulate backup process
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      setLastBackupTime(new Date().toISOString())
+      toast({
+        title: "Backup Completed",
+        description: "System backup completed successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Backup Failed",
+        description: "Failed to complete system backup.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsBackingUp(false)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-600 mt-2">Manage your organization settings and configurations</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+          <p className="text-gray-600">Manage your organization settings and configurations</p>
         </div>
+      </div>
 
-        {/* Settings Navigation Tabs */}
-        <div className="mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              {[
-                { id: "company", label: "Company", icon: Building2 },
-                { id: "multi-company", label: "Multi-Company", icon: Building },
-                { id: "hr", label: "HR", icon: Users },
-                { id: "payroll", label: "Payroll", icon: Calculator },
-                { id: "notifications", label: "Notifications", icon: Bell },
-                { id: "roles", label: "Roles", icon: Shield },
-                { id: "access", label: "Access", icon: Key },
-                { id: "security", label: "Security", icon: Lock },
-              ].map((tab) => {
-                const Icon = tab.icon
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === tab.id
-                        ? "border-teal-500 text-teal-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    }`}
-                  >
-                    <Icon className="w-5 h-5 mr-2" />
-                    {tab.label}
-                  </button>
-                )
-              })}
-            </nav>
-          </div>
-        </div>
+      <Tabs defaultValue="company" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-8">
+          <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="subsidiaries">Multi-Company</TabsTrigger>
+          <TabsTrigger value="hr">HR</TabsTrigger>
+          <TabsTrigger value="payroll">Payroll</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="roles">Roles</TabsTrigger>
+          <TabsTrigger value="access">Access</TabsTrigger>
+          <TabsTrigger value="security">Security</TabsTrigger>
+        </TabsList>
 
-        {/* Tab Content */}
-        {activeTab === "company" && (
-          <div className="space-y-8">
-            {/* Company Information Card */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="w-5 h-5" />
-                    Company Information
-                  </CardTitle>
-                  <CardDescription>Update your company details and branding</CardDescription>
-                </div>
-                <Button
-                  onClick={handleSaveCompanyChanges}
-                  disabled={isSavingCompany}
-                  className="bg-black text-white hover:bg-gray-800"
-                >
-                  {isSavingCompany ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Changes
-                    </>
-                  )}
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName">Company Name</Label>
-                    <Input
-                      id="companyName"
-                      value={companyData.name}
-                      onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
-                      placeholder="Enter company name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="companyEmail">Email</Label>
-                    <Input
-                      id="companyEmail"
-                      type="email"
-                      value={companyData.email}
-                      onChange={(e) => setCompanyData({ ...companyData, email: e.target.value })}
-                      placeholder="company@example.com"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="companyPhone">Phone</Label>
-                    <Input
-                      id="companyPhone"
-                      value={companyData.phone}
-                      onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })}
-                      placeholder="+1 (555) 123-4567"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="companyWebsite">Website</Label>
-                    <Input
-                      id="companyWebsite"
-                      value={companyData.website}
-                      onChange={(e) => setCompanyData({ ...companyData, website: e.target.value })}
-                      placeholder="https://company.com"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="companyAddress">Address</Label>
-                  <Textarea
-                    id="companyAddress"
-                    value={companyData.address}
-                    onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
-                    placeholder="Enter company address"
-                    rows={3}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Company Logo</Label>
-                  <div className="flex items-center space-x-4">
-                    {companyData.logo && (
-                      <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                        <img
-                          src={companyData.logo || "/placeholder.svg"}
-                          alt="Company Logo"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) handleLogoUpload(file, "company")
-                        }}
-                        className="hidden"
-                        id="company-logo-upload"
+        {/* Company Settings */}
+        <TabsContent value="company">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Building2 className="w-5 h-5" />
+                <span>Company Settings</span>
+              </CardTitle>
+              <CardDescription>Manage your company information and organizational structure</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <Label>Company Logo</Label>
+                <div className="flex items-center space-x-4">
+                  {companyLogoPreview || companyData.logo_url ? (
+                    <div className="relative">
+                      <img
+                        src={companyLogoPreview || companyData.logo_url}
+                        alt="Company Logo"
+                        className="w-20 h-20 object-cover rounded-lg border"
                       />
                       <Button
-                        variant="outline"
-                        onClick={() => document.getElementById("company-logo-upload")?.click()}
-                        disabled={isUploadingLogo}
+                        variant="ghost"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                        onClick={() => {
+                          setCompanyLogoPreview("")
+                          setCompanyData({ ...companyData, logo_url: "" })
+                        }}
                       >
-                        {isUploadingLogo ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Uploading...
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="w-4 h-4 mr-2" />
-                            Upload Logo
-                          </>
-                        )}
+                        <X className="h-3 w-3" />
                       </Button>
                     </div>
+                  ) : (
+                    <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                      <ImageIcon className="w-8 h-8 text-gray-400" />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleLogoUpload(file, "company")
+                        }
+                      }}
+                      className="hidden"
+                      id="company-logo-upload"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => document.getElementById("company-logo-upload")?.click()}
+                      disabled={isUploadingLogo}
+                      className="flex items-center space-x-2"
+                    >
+                      {isUploadingLogo ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" />
+                          <span>Upload Logo</span>
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Organization Structure Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building className="w-5 h-5" />
-                  Organization Structure
-                </CardTitle>
-                <CardDescription>Manage divisions, departments, and locations</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <Label>Divisions</Label>
-                    <div className="space-y-2">
-                      {divisions.map((division, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <span className="text-sm">{division}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDivisions(divisions.filter((_, i) => i !== index))}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Add division"
-                          value={newDivision}
-                          onChange={(e) => setNewDivision(e.target.value)}
-                          onKeyPress={(e) => {
-                            if (e.key === "Enter" && newDivision.trim()) {
-                              setDivisions([...divisions, newDivision.trim()])
-                              setNewDivision("")
-                            }
-                          }}
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            if (newDivision.trim()) {
-                              setDivisions([...divisions, newDivision.trim()])
-                              setNewDivision("")
-                            }
-                          }}
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Departments</Label>
-                    <div className="space-y-2">
-                      {departments.map((department, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <span className="text-sm">{department}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDepartments(departments.filter((_, i) => i !== index))}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Add department"
-                          value={newDepartment}
-                          onChange={(e) => setNewDepartment(e.target.value)}
-                          onKeyPress={(e) => {
-                            if (e.key === "Enter" && newDepartment.trim()) {
-                              setDepartments([...departments, newDepartment.trim()])
-                              setNewDepartment("")
-                            }
-                          }}
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            if (newDepartment.trim()) {
-                              setDepartments([...departments, newDepartment.trim()])
-                              setNewDepartment("")
-                            }
-                          }}
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Locations</Label>
-                    <div className="space-y-2">
-                      {locations.map((location, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <span className="text-sm">{location}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setLocations(locations.filter((_, i) => i !== index))}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Add location"
-                          value={newLocation}
-                          onChange={(e) => setNewLocation(e.target.value)}
-                          onKeyPress={(e) => {
-                            if (e.key === "Enter" && newLocation.trim()) {
-                              setLocations([...locations, newLocation.trim()])
-                              setNewLocation("")
-                            }
-                          }}
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            if (newLocation.trim()) {
-                              setLocations([...locations, newLocation.trim()])
-                              setNewLocation("")
-                            }
-                          }}
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {activeTab === "multi-company" && (
-          <div className="space-y-8">
-            {/* Multi-Company Management Card */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building className="w-5 h-5" />
-                    Multi-Company Management
-                  </CardTitle>
-                  <CardDescription>Manage subsidiaries and multi-company operations</CardDescription>
+                  <Label htmlFor="companyName">Company Name</Label>
+                  <Input
+                    id="companyName"
+                    value={companyData.name}
+                    onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
+                  />
                 </div>
+                <div>
+                  <Label htmlFor="industry">Industry</Label>
+                  <Input
+                    id="industry"
+                    value={companyData.industry}
+                    onChange={(e) => setCompanyData({ ...companyData, industry: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="taxId">Tax ID</Label>
+                  <Input
+                    id="taxId"
+                    value={companyData.tax_id}
+                    onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="ssnitNumber">SSNIT Number</Label>
+                  <Input
+                    id="ssnitNumber"
+                    value={companyData.ssnit_number}
+                    onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={companyData.email_address}
+                    onChange={(e) => setCompanyData({ ...companyData, email_address: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={companyData.phone_number}
+                    onChange={(e) => setCompanyData({ ...companyData, phone_number: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="address">Address</Label>
+                <Textarea
+                  id="address"
+                  value={companyData.address}
+                  onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <Label>Departments</Label>
+                  <div className="space-y-2">
+                    {departments.map((dept, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Input
+                          value={dept}
+                          onChange={(e) => {
+                            const newDepts = [...departments]
+                            newDepts[index] = e.target.value
+                            setDepartments(newDepts)
+                          }}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDepartments(departments.filter((_, i) => i !== index))}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDepartments([...departments, "New Department"])}
+                    >
+                      Add Department
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Locations</Label>
+                  <div className="space-y-2">
+                    {locations.map((location, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Input
+                          value={location}
+                          onChange={(e) => {
+                            const newLocations = [...locations]
+                            newLocations[index] = e.target.value
+                            setLocations(newLocations)
+                          }}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setLocations(locations.filter((_, i) => i !== index))}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={() => setLocations([...locations, "New Location"])}>
+                      Add Location
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
                 <Button
-                  onClick={handleSaveSubsidiaryChanges}
-                  disabled={isSavingSubsidiary}
-                  className="bg-black text-white hover:bg-gray-800"
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveSettings}
+                  disabled={isSavingSettings}
                 >
-                  {isSavingSubsidiary ? (
+                  {isSavingSettings ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Saving...
@@ -2616,324 +2080,548 @@ Please review this document carefully and contact HR if you have any questions a
                   ) : (
                     <>
                       <Save className="w-4 h-4 mr-2" />
-                      Save
+                      Save Company Settings
                     </>
                   )}
                 </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-6">
-                  <div className="border-b border-gray-200">
-                    <nav className="-mb-px flex space-x-8">
-                      <button
-                        onClick={() => setActiveSubsidiaryTab("access")}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                          activeSubsidiaryTab === "access"
-                            ? "border-teal-500 text-teal-600"
-                            : "border-transparent text-gray-500 hover:text-gray-700"
-                        }`}
-                      >
-                        Access
-                      </button>
-                      <button
-                        onClick={() => setActiveSubsidiaryTab("security")}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                          activeSubsidiaryTab === "security"
-                            ? "border-teal-500 text-teal-600"
-                            : "border-transparent text-gray-500 hover:text-gray-700"
-                        }`}
-                      >
-                        Security
-                      </button>
-                    </nav>
-                  </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Multi-Company Management */}
+        <TabsContent value="subsidiaries">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Building2 className="w-5 h-5" />
+                  <span>Multi-Company Management</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button onClick={() => setShowAddSubsidiary(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Subsidiary
+                  </Button>
+                  <Button variant="outline" onClick={handleSaveSubsidiaryChanges} disabled={isSavingSubsidiary}>
+                    {isSavingSubsidiary ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardTitle>
+              <CardDescription>
+                Manage subsidiary companies, their organizational structure, and synchronize settings across entities
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Company Overview Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Building2 className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <p className="text-sm font-medium">Total Subsidiaries</p>
+                          <p className="text-2xl font-bold">{subsidiaries.length}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Users className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="text-sm font-medium">Active Companies</p>
+                          <p className="text-2xl font-bold">
+                            {subsidiaries.filter((s) => s.status === "active").length}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <MapPin className="w-5 h-5 text-purple-600" />
+                        <div>
+                          <p className="text-sm font-medium">Total Locations</p>
+                          <p className="text-2xl font-bold">
+                            {subsidiaries.reduce((acc, s) => acc + (s.locations?.length || 0), 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Briefcase className="w-5 h-5 text-orange-600" />
+                        <div>
+                          <p className="text-sm font-medium">Total Departments</p>
+                          <p className="text-2xl font-bold">
+                            {subsidiaries.reduce((acc, s) => acc + (s.departments?.length || 0), 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
 
-                {activeSubsidiaryTab === "access" && (
-                  <div className="space-y-6">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-medium">Subsidiaries</h3>
-                      <Button onClick={() => setShowAddSubsidiary(true)}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Subsidiary
-                      </Button>
-                    </div>
-                    <div className="space-y-4">
-                      {subsidiaries.map((subsidiary) => (
-                        <div key={subsidiary.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center space-x-4">
-                            {subsidiary.logo && (
-                              <img
-                                src={subsidiary.logo || "/placeholder.svg"}
-                                alt={subsidiary.name}
-                                className="w-10 h-10 rounded"
-                              />
-                            )}
-                            <div>
-                              <h4 className="font-medium">{subsidiary.name}</h4>
-                              <p className="text-sm text-gray-500">{subsidiary.location}</p>
+                {/* Subsidiaries List */}
+                <div className="space-y-3">
+                  {subsidiaries.map((subsidiary) => (
+                    // Updated subsidiary card to show logo and removed Edit button
+                    <Card key={subsidiary.id} className="border-l-4 border-l-blue-500">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
+                                {subsidiary.logo_url ? (
+                                  <img
+                                    src={subsidiary.logo_url || "/placeholder.svg"}
+                                    alt={`${subsidiary.name} logo`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                                    {subsidiary.name.charAt(0)}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h3 className="text-base font-semibold">{subsidiary.name}</h3>
+                                    <p className="text-xs text-gray-600">{subsidiary.industry}</p>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Badge
+                                      variant={subsidiary.status === "active" ? "default" : "secondary"}
+                                      className="text-xs"
+                                    >
+                                      {subsidiary.status}
+                                    </Badge>
+                                    <span className="text-xs text-gray-500">Tax ID: {subsidiary.tax_id}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                              <div>
+                                <p className="text-xs font-medium text-gray-700 mb-1">Contact Information</p>
+                                <div className="space-y-0.5">
+                                  <p className="text-xs text-gray-600">{subsidiary.email_address}</p>
+                                  <p className="text-xs text-gray-600">{subsidiary.phone_number}</p>
+                                  <p className="text-xs text-gray-600 truncate">{subsidiary.address}</p>
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-700 mb-1">Organizational Structure</p>
+                                <div className="flex items-center space-x-3 text-xs text-gray-600">
+                                  <span>
+                                    {subsidiary.divisions_count || subsidiary.divisions?.length || 0} Divisions
+                                  </span>
+                                  <span>
+                                    {subsidiary.departments_count || subsidiary.departments?.length || 0} Departments
+                                  </span>
+                                  <span>
+                                    {subsidiary.locations_count || subsidiary.locations?.length || 0} Locations
+                                  </span>
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-700 mb-1">Registration Details</p>
+                                <div className="space-y-0.5">
+                                  <p className="text-xs text-gray-600">SSNIT: {subsidiary.ssnit_number}</p>
+                                  <p className="text-xs text-gray-600">
+                                    Created:{" "}
+                                    {subsidiary.created_at
+                                      ? new Date(subsidiary.created_at).toLocaleDateString()
+                                      : "N/A"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowSubsidiaryDetails(true)
+                                }}
+                              >
+                                <Eye className="w-3 h-3 mr-1" />
+                                View Details
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowEditSubsidiary(true)
+                                }}
+                              >
+                                <Edit className="w-3 h-3 mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
+                                onClick={() => syncSubsidiarySettings(subsidiary.id)}
+                              >
+                                <RefreshCw className="w-3 h-3 mr-1" />
+                                Sync Settings
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
+                                onClick={() => viewSubsidiaryEmployees(subsidiary.id)}
+                              >
+                                <Users className="w-3 h-3 mr-1" />
+                                View Employees ({subsidiary.employee_count || 0})
+                              </Button>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${
-                                subsidiary.status === "active"
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-red-100 text-red-800"
-                              }`}
-                            >
-                              {subsidiary.status}
-                            </span>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setSelectedSubsidiary(subsidiary)
-                                    setShowEditSubsidiary(true)
-                                  }}
-                                >
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setSubsidiaryToToggle(subsidiary)
-                                    if (subsidiary.status === "active") {
-                                      setShowDeactivateConfirm(true)
-                                    } else {
-                                      setShowReactivateConfirm(true)
-                                    }
-                                  }}
-                                >
-                                  {subsidiary.status === "active" ? (
-                                    <>
-                                      <UserX className="w-4 h-4 mr-2" />
-                                      Deactivate
-                                    </>
-                                  ) : (
-                                    <>
-                                      <UserCheck className="w-4 h-4 mr-2" />
-                                      Reactivate
-                                    </>
-                                  )}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
-                {activeSubsidiaryTab === "security" && (
-                  <div className="space-y-6">
-                    <h3 className="text-lg font-medium">Security Settings</h3>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-base">Two-Factor Authentication</Label>
-                          <p className="text-sm text-gray-500">Require 2FA for all subsidiary access</p>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                <MoreVertical className="h-3 w-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowSubsidiaryDetails(true)
+                                }}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowEditSubsidiary(true)
+                                }}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Subsidiary
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => syncSubsidiarySettings(subsidiary.id)}>
+                                <RefreshCw className="w-4 h-4 mr-2" />
+                                Sync Settings
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => duplicateSubsidiary(subsidiary)}>
+                                <Copy className="w-4 h-4 mr-2" />
+                                Duplicate
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              {subsidiary.status === "active" ? (
+                                <DropdownMenuItem
+                                  onClick={() => confirmDeactivateSubsidiary(subsidiary.id)}
+                                  className="text-orange-600"
+                                >
+                                  <AlertTriangle className="w-4 h-4 mr-2" />
+                                  Deactivate
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem
+                                  onClick={() => confirmReactivateSubsidiary(subsidiary.id)}
+                                  className="text-green-600"
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-2" />
+                                  Reactivate
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
-                        <Switch
-                          checked={securitySettings.twoFactorAuth}
-                          onCheckedChange={(checked) =>
-                            setSecuritySettings({ ...securitySettings, twoFactorAuth: checked })
-                          }
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-base">IP Restrictions</Label>
-                          <p className="text-sm text-gray-500">Restrict access to specific IP addresses</p>
-                        </div>
-                        <Switch
-                          checked={securitySettings.ipRestrictions}
-                          onCheckedChange={(checked) =>
-                            setSecuritySettings({ ...securitySettings, ipRestrictions: checked })
-                          }
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-base">Session Timeout</Label>
-                          <p className="text-sm text-gray-500">Automatically log out inactive users</p>
-                        </div>
-                        <Switch
-                          checked={securitySettings.sessionTimeout}
-                          onCheckedChange={(checked) =>
-                            setSecuritySettings({ ...securitySettings, sessionTimeout: checked })
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                      </CardContent>
+                    </Card>
+                  ))}
 
-        {activeTab === "hr" && (
-          <div className="space-y-8">
-            {/* HR Configuration Card */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Settings className="w-5 h-5" />
-                    HR Configuration
-                  </CardTitle>
-                  <CardDescription>Configure core HR settings and policies</CardDescription>
-                </div>
-                <Button
-                  onClick={handleSaveHRConfiguration}
-                  disabled={isSavingHR}
-                  className="bg-black text-white hover:bg-gray-800"
-                >
-                  {isSavingHR ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save HR Configuration
-                    </>
+                  {subsidiaries.length === 0 && (
+                    <Card>
+                      <CardContent className="p-8 text-center">
+                        <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Subsidiaries Found</h3>
+                        <p className="text-gray-600 mb-4">
+                          Get started by adding your first subsidiary company to manage multiple entities.
+                        </p>
+                        <Button onClick={() => setShowAddSubsidiary(true)}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add First Subsidiary
+                        </Button>
+                      </CardContent>
+                    </Card>
                   )}
-                </Button>
+                </div>
+
+                {/* Settings Synchronization Panel */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <RefreshCw className="w-5 h-5" />
+                      <span>Settings Synchronization</span>
+                    </CardTitle>
+                    <CardDescription>Synchronize settings across all subsidiary companies</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="font-medium mb-2">Sync Options</h4>
+                        <div className="space-y-2">
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" defaultChecked />
+                            <span className="text-sm">HR Policies</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" defaultChecked />
+                            <span className="text-sm">Payroll Configuration</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" />
+                            <span className="text-sm">Leave Types</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" />
+                            <span className="text-sm">Roles & Permissions</span>
+                          </label>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-2">Sync Actions</h4>
+
+                        <div className="space-y-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={handleSaveSettings}
+                            disabled={isSavingSettings}
+                          >
+                            {isSavingSettings ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-4 h-4 mr-2" />
+                                Save Settings
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={handleExportSettingsTemplate}
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Export Settings Template
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={() => setImportModal(true)}
+                          >
+                            <Upload className="w-4 h-4 mr-2" />
+                            Import Settings
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="hr">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Settings className="w-5 h-5" />
+                      <span>HR Configuration</span>
+                    </CardTitle>
+                    <CardDescription>Configure core HR settings and policies</CardDescription>
+                  </div>
+                  <Button
+                    onClick={handleSaveHRConfig}
+                    disabled={isSaving}
+                    className="bg-black text-white hover:bg-gray-800"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save HR Configuration
+                      </>
+                    )}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="leaveYearStart">Leave Year Start</Label>
-                    <Select
-                      value={hrConfig.leaveYearStart}
-                      onValueChange={(value) => setHrConfig({ ...hrConfig, leaveYearStart: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select month" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[
-                          "January",
-                          "February",
-                          "March",
-                          "April",
-                          "May",
-                          "June",
-                          "July",
-                          "August",
-                          "September",
-                          "October",
-                          "November",
-                          "December",
-                        ].map((month) => (
-                          <SelectItem key={month} value={month}>
-                            {month}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="leaveYearStart">Leave Year Start</Label>
+                      <Select
+                        value={hrConfig.leaveYearStart}
+                        onValueChange={(value) => setHrConfig({ ...hrConfig, leaveYearStart: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="January">January</SelectItem>
+                          <SelectItem value="February">February</SelectItem>
+                          <SelectItem value="March">March</SelectItem>
+                          <SelectItem value="April">April</SelectItem>
+                          <SelectItem value="May">May</SelectItem>
+                          <SelectItem value="June">June</SelectItem>
+                          <SelectItem value="July">July</SelectItem>
+                          <SelectItem value="August">August</SelectItem>
+                          <SelectItem value="September">September</SelectItem>
+                          <SelectItem value="October">October</SelectItem>
+                          <SelectItem value="November">November</SelectItem>
+                          <SelectItem value="December">December</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="workingHours">Working Hours/Day</Label>
+                      <Input
+                        id="workingHours"
+                        type="number"
+                        value={hrConfig.workingHoursPerDay}
+                        onChange={(e) =>
+                          setHrConfig({ ...hrConfig, workingHoursPerDay: Number.parseInt(e.target.value) })
+                        }
+                        min="1"
+                        max="24"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="probationPeriod">Probation Period (months)</Label>
-                    <Input
-                      id="probationPeriod"
-                      type="number"
-                      value={hrConfig.probationPeriod}
-                      onChange={(e) =>
-                        setHrConfig({ ...hrConfig, probationPeriod: Number.parseInt(e.target.value) || 0 })
-                      }
-                      placeholder="3"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="workingHoursPerDay">Working Hours/Day</Label>
-                    <Input
-                      id="workingHoursPerDay"
-                      type="number"
-                      value={hrConfig.workingHoursPerDay}
-                      onChange={(e) =>
-                        setHrConfig({ ...hrConfig, workingHoursPerDay: Number.parseInt(e.target.value) || 0 })
-                      }
-                      placeholder="8"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="workingDaysPerWeek">Working Days/Week</Label>
-                    <Input
-                      id="workingDaysPerWeek"
-                      type="number"
-                      value={hrConfig.workingDaysPerWeek}
-                      onChange={(e) =>
-                        setHrConfig({ ...hrConfig, workingDaysPerWeek: Number.parseInt(e.target.value) || 0 })
-                      }
-                      placeholder="5"
-                    />
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="probationPeriod">Probation Period (months)</Label>
+                      <Input
+                        id="probationPeriod"
+                        type="number"
+                        value={hrConfig.probationPeriod}
+                        onChange={(e) => setHrConfig({ ...hrConfig, probationPeriod: Number.parseInt(e.target.value) })}
+                        min="0"
+                        max="12"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="workingDays">Working Days/Week</Label>
+                      <Input
+                        id="workingDays"
+                        type="number"
+                        value={hrConfig.workingDaysPerWeek}
+                        onChange={(e) =>
+                          setHrConfig({ ...hrConfig, workingDaysPerWeek: Number.parseInt(e.target.value) })
+                        }
+                        min="1"
+                        max="7"
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base">Auto-approve leave requests</Label>
-                      <p className="text-sm text-gray-500">Automatically approve requests within policy</p>
+                    <div className="space-y-0.5">
+                      <Label>Auto-approve leave requests</Label>
+                      <p className="text-sm text-muted-foreground">Automatically approve requests within policy</p>
                     </div>
                     <Switch
                       checked={hrConfig.autoApproveLeave}
                       onCheckedChange={(checked) => setHrConfig({ ...hrConfig, autoApproveLeave: checked })}
                     />
                   </div>
+
                   <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base">Email notifications</Label>
-                      <p className="text-sm text-gray-500">Send email updates for HR activities</p>
+                    <div className="space-y-0.5">
+                      <Label>Email notifications</Label>
+                      <p className="text-sm text-muted-foreground">Send email updates for HR activities</p>
                     </div>
                     <Switch
                       checked={hrConfig.emailNotifications}
                       onCheckedChange={(checked) => setHrConfig({ ...hrConfig, emailNotifications: checked })}
                     />
                   </div>
+
                   <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base flex items-center gap-2">
-                        <Sparkles className="w-4 h-4" />
-                        AI Recommendations
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center space-x-2">
+                        <Sparkles className="w-4 h-4 text-purple-500" />
+                        <span>AI Recommendations</span>
                       </Label>
-                      <p className="text-sm text-gray-500">Get AI-powered insights for HR decisions</p>
+                      <p className="text-sm text-muted-foreground">Get AI-powered insights for HR decisions</p>
                     </div>
                     <Switch
                       checked={hrConfig.aiRecommendations}
                       onCheckedChange={(checked) => setHrConfig({ ...hrConfig, aiRecommendations: checked })}
                     />
                   </div>
+
                   <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        Smart Scheduling
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center space-x-2">
+                        <Brain className="w-4 h-4 text-blue-500" />
+                        <span>Smart Scheduling</span>
                       </Label>
-                      <p className="text-sm text-gray-500">AI-optimized shift and leave scheduling</p>
+                      <p className="text-sm text-muted-foreground">AI-optimized shift and leave scheduling</p>
                     </div>
                     <Switch
                       checked={hrConfig.smartScheduling}
                       onCheckedChange={(checked) => setHrConfig({ ...hrConfig, smartScheduling: checked })}
                     />
                   </div>
+
                   <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4" />
-                        Performance Tracking
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center space-x-2">
+                        <TrendingUp className="w-4 h-4 text-green-500" />
+                        <span>Performance Tracking</span>
                       </Label>
-                      <p className="text-sm text-gray-500">AI-enhanced performance analytics</p>
+                      <p className="text-sm text-muted-foreground">AI-enhanced performance analytics</p>
                     </div>
                     <Switch
                       checked={hrConfig.performanceTracking}
@@ -2944,77 +2632,71 @@ Please review this document carefully and contact HR if you have any questions a
               </CardContent>
             </Card>
 
-            {/* Leave Policies Card */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center space-x-2">
                   <Calendar className="w-5 h-5" />
-                  Leave Policies
+                  <span>Leave Policies</span>
                 </CardTitle>
                 <CardDescription>Manage leave types and policies with AI insights</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-medium flex items-center gap-2">
-                        Current Policies
-                        <Badge variant="secondary" className="flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" />
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h3 className="font-semibold flex items-center space-x-2">
+                      <span>Current Policies</span>
+                      {hrConfig.aiRecommendations && (
+                        <Badge variant="secondary" className="text-xs">
+                          <Sparkles className="w-3 h-3 mr-1" />
                           AI Enhanced
                         </Badge>
-                      </h3>
-                    </div>
-                    <div className="space-y-4">
-                      {leavePolicies.map((policy) => (
-                        <div key={policy.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center space-x-4">
-                            <div>
-                              <h4 className="font-medium">{policy.name}</h4>
-                              <p className="text-sm text-gray-500">{policy.days} days</p>
+                      )}
+                    </h3>
+                    {/* Update the current policies rendering to use state */}
+                    <div className="space-y-2">
+                      {currentPolicies.map((policy) => (
+                        <div
+                          key={policy.name}
+                          className="flex justify-between items-center p-3 border rounded hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium">{policy.name}</span>
+                              {hrConfig.aiRecommendations && (
+                                <Badge
+                                  variant={
+                                    policy.trend === "up"
+                                      ? "destructive"
+                                      : policy.trend === "down"
+                                        ? "default"
+                                        : "secondary"
+                                  }
+                                  className="text-xs"
+                                >
+                                  {policy.usage}
+                                </Badge>
+                              )}
                             </div>
-                            <Badge
-                              variant={policy.usage > 70 ? "destructive" : policy.usage > 40 ? "default" : "secondary"}
-                              className="ml-2"
-                            >
-                              {policy.usage}%
-                            </Badge>
+                            <span className="text-sm text-gray-600">{policy.days} days</span>
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="w-4 h-4" />
+                                <MoreVertical className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedPolicy(policy)
-                                  setShowViewPolicy(true)
-                                }}
-                              >
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handlePolicyAction("view", policy.name)}>
                                 <Eye className="w-4 h-4 mr-2" />
                                 View Details
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedPolicy(policy)
-                                  setEditPolicyData({
-                                    name: policy.name,
-                                    days: policy.days,
-                                    description: policy.description || "",
-                                  })
-                                  setShowEditPolicy(true)
-                                }}
-                              >
+                              <DropdownMenuItem onClick={() => handlePolicyAction("edit", policy.name)}>
                                 <Edit className="w-4 h-4 mr-2" />
                                 Edit Policy
                               </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedPolicy(policy)
-                                  setShowDeletePolicy(true)
-                                }}
+                                onClick={() => handlePolicyAction("delete", policy.name)}
                                 className="text-red-600"
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />
@@ -3027,117 +2709,125 @@ Please review this document carefully and contact HR if you have any questions a
                     </div>
                     <Button
                       variant="outline"
-                      className="w-full mt-4 bg-transparent"
-                      onClick={() => setShowAddLeaveType(true)}
+                      size="sm"
+                      onClick={handleManageLeaveTypes}
+                      disabled={isManagingLeaveTypes}
+                      className="w-full bg-transparent"
                     >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Leave Types
+                      {isManagingLeaveTypes ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Leave Types
+                        </>
+                      )}
                     </Button>
                   </div>
 
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Sparkles className="w-5 h-5 text-purple-600" />
-                      <h3 className="text-lg font-medium">AI Insights</h3>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <TrendingUp className="w-4 h-4 text-blue-600" />
-                          <span className="font-medium text-blue-900">High Annual Leave Usage</span>
+                    <h3 className="font-semibold flex items-center space-x-2">
+                      <Sparkles className="w-4 h-4 text-purple-500" />
+                      <span>AI Insights</span>
+                    </h3>
+                    {hrConfig.aiRecommendations ? (
+                      <div className="space-y-3">
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                          <div className="flex items-start space-x-2">
+                            <TrendingUp className="w-4 h-4 text-blue-600 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-medium text-blue-800">High Annual Leave Usage</p>
+                              <p className="text-xs text-blue-600">Consider reviewing leave allocation policies</p>
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-sm text-blue-700">Consider reviewing leave allocation policies</p>
-                      </div>
-                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                          <span className="font-medium text-green-900">Optimal Sick Leave Usage</span>
+                        <div className="p-3 bg-green-50 border border-green-200 rounded">
+                          <div className="flex items-start space-x-2">
+                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-medium text-green-800">Optimal Sick Leave Usage</p>
+                              <p className="text-xs text-green-600">Current policy is well-balanced</p>
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-sm text-green-700">Current policy is well-balanced</p>
-                      </div>
-                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                          <span className="font-medium text-yellow-900">Upcoming Peak Season</span>
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded">
+                          <div className="flex items-start space-x-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-medium text-amber-800">Upcoming Peak Season</p>
+                              <p className="text-xs text-amber-600">Restrict leave approvals for Q4</p>
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-sm text-yellow-700">Restrict leave approvals for Q4</p>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="p-4 text-center text-gray-500 border-2 border-dashed rounded">
+                        <Brain className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                        <p className="text-sm">Enable AI Recommendations to see insights</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* HR Policy Documents Card */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center space-x-2">
                   <FileText className="w-5 h-5" />
-                  HR Policy Documents
+                  <span>HR Policy Documents</span>
                 </CardTitle>
                 <CardDescription>Manage HR policy documents and employee access</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {hrDocuments.map((document) => (
-                    <div key={document.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <FileText className="w-8 h-8 text-gray-400" />
+              <CardContent className="space-y-4">
+                {/* Update HR documents rendering with 3-dot menus */}
+                <div className="space-y-3">
+                  {hrDocuments.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between p-3 border rounded hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <FileText className="w-5 h-5 text-gray-500" />
                         <div>
-                          <h4 className="font-medium">{document.name}</h4>
+                          <p className="font-medium">{doc.name}</p>
                           <p className="text-sm text-gray-500">
-                            {document.type.toUpperCase()} • {document.size}
+                            {doc.type} • {doc.size}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-2">
                         <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-600">Visible to all employees</span>
+                          <Label htmlFor={`visible-${doc.id}`} className="text-sm">
+                            Visible to all employees
+                          </Label>
                           <Switch
-                            checked={document.visibleToAll}
-                            onCheckedChange={(checked) => {
-                              setHrDocuments(
-                                hrDocuments.map((doc) =>
-                                  doc.id === document.id ? { ...doc, visibleToAll: checked } : doc,
-                                ),
-                              )
-                            }}
+                            id={`visible-${doc.id}`}
+                            checked={doc.visibleToAll}
+                            onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
                           />
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="w-4 h-4" />
+                              <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedDocument(document)
-                                setShowDocumentDetails(true)
-                              }}
-                            >
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDocumentView(doc)}>
                               <Eye className="w-4 h-4 mr-2" />
                               View
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedDocument(document)
-                                setEditDocumentData({
-                                  name: document.name,
-                                  file: null,
-                                })
-                                setShowEditDocument(true)
-                              }}
-                            >
+                            <DropdownMenuItem onClick={() => handleDocumentAction("edit", doc.id)}>
                               <Edit className="w-4 h-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedDocument(document)
-                                setShowDeleteDocument(true)
-                              }}
+                              onClick={() => handleDocumentAction("delete", doc.id)}
                               className="text-red-600"
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
@@ -3145,205 +2835,231 @@ Please review this document carefully and contact HR if you have any questions a
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setHrDocuments(hrDocuments.filter((doc) => doc.id !== document.id))
-                          }}
-                        >
-                          <Minus className="w-4 h-4" />
-                        </Button>
                       </div>
                     </div>
                   ))}
                 </div>
-                <Button
-                  variant="outline"
-                  className="w-full mt-4 bg-transparent"
-                  onClick={() => setShowAddDocument(true)}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
+                <Button variant="outline" onClick={handleAddDocument} className="w-full bg-transparent">
+                  <Plus className="mr-2 h-4 w-4" />
                   Add HR Policy Document
                 </Button>
               </CardContent>
             </Card>
-          </div>
-        )}
 
-        {activeTab === "payroll" && (
-          <div className="space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calculator className="w-5 h-5" />
-                  Payroll Configuration
-                </CardTitle>
-                <CardDescription>Configure payroll settings and tax information</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="payrollFrequency">Payroll Frequency</Label>
-                    <Select
-                      value={payrollConfig.frequency}
-                      onValueChange={(value) => setPayrollConfig({ ...payrollConfig, frequency: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select frequency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="currency">Currency</Label>
-                    <Select
-                      value={payrollConfig.currency}
-                      onValueChange={(value) => setPayrollConfig({ ...payrollConfig, currency: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select currency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="USD">USD - US Dollar</SelectItem>
-                        <SelectItem value="GHS">GHS - Ghana Cedi</SelectItem>
-                        <SelectItem value="EUR">EUR - Euro</SelectItem>
-                        <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-base">Automatic Tax Calculations</Label>
-                    <p className="text-sm text-gray-500">Enable automatic tax and deduction calculations</p>
-                  </div>
-                  <Switch
-                    checked={payrollConfig.autoTaxCalculation}
-                    onCheckedChange={(checked) => setPayrollConfig({ ...payrollConfig, autoTaxCalculation: checked })}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+            {/* Employee Analytics card removed as requested */}
           </div>
-        )}
+        </TabsContent>
 
-        {activeTab === "notifications" && (
-          <div className="space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bell className="w-5 h-5" />
-                  Notification Settings
-                </CardTitle>
-                <CardDescription>Configure how and when you receive notifications</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
+        <TabsContent value="payroll">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <DollarSign className="w-5 h-5" />
+                <span>Payroll Settings</span>
+              </CardTitle>
+              <CardDescription>Configure payroll calculations, allowances, and deductions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base">Email Notifications</Label>
-                      <p className="text-sm text-gray-500">Receive notifications via email</p>
+                  <h3 className="font-semibold">Allowances</h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center p-3 border rounded">
+                      <span>Transport Allowance</span>
+                      <span className="text-sm text-gray-600">₵200.00</span>
                     </div>
-                    <Switch
-                      checked={notificationSettings.email}
-                      onCheckedChange={(checked) =>
-                        setNotificationSettings({ ...notificationSettings, email: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base">Push Notifications</Label>
-                      <p className="text-sm text-gray-500">Receive push notifications in browser</p>
+                    <div className="flex justify-between items-center p-3 border rounded">
+                      <span>Housing Allowance</span>
+                      <span className="text-sm text-gray-600">15%</span>
                     </div>
-                    <Switch
-                      checked={notificationSettings.push}
-                      onCheckedChange={(checked) => setNotificationSettings({ ...notificationSettings, push: checked })}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base">SMS Notifications</Label>
-                      <p className="text-sm text-gray-500">Receive notifications via SMS</p>
+                    <div className="flex justify-between items-center p-3 border rounded">
+                      <span>Meal Allowance</span>
+                      <span className="text-sm text-gray-600">₵150.00</span>
                     </div>
-                    <Switch
-                      checked={notificationSettings.sms}
-                      onCheckedChange={(checked) => setNotificationSettings({ ...notificationSettings, sms: checked })}
-                    />
                   </div>
+                  <Button variant="outline" size="sm" onClick={handleManageAllowances}>
+                    Manage Allowances
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
 
-        {activeTab === "roles" && (
-          <div className="space-y-8">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5" />
-                    Role Management
-                  </CardTitle>
-                  <CardDescription>Manage user roles and permissions</CardDescription>
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Deductions</h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center p-3 border rounded">
+                      <span>SSNIT (Employee)</span>
+                      <span className="text-sm text-gray-600">5.5%</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 border rounded">
+                      <span>Income Tax</span>
+                      <span className="text-sm text-gray-600">Variable</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 border rounded">
+                      <span>Staff Loan</span>
+                      <span className="text-sm text-gray-600">₵500.00</span>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleManageDeductions}>
+                    Manage Deductions
+                  </Button>
                 </div>
-                <Button onClick={() => setShowAddRole(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Role
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Salary Grades</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-300">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-300 p-2 text-left">Grade</th>
+                        <th className="border border-gray-300 p-2 text-left">Step 1</th>
+                        <th className="border border-gray-300 p-2 text-left">Step 2</th>
+                        <th className="border border-gray-300 p-2 text-left">Step 3</th>
+                        <th className="border border-gray-300 p-2 text-left">Step 4</th>
+                        <th className="border border-gray-300 p-2 text-left">Step 5</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="border border-gray-300 p-2">Junior Level</td>
+                        <td className="border border-gray-300 p-2">₵2,500</td>
+                        <td className="border border-gray-300 p-2">₵2,750</td>
+                        <td className="border border-gray-300 p-2">₵3,000</td>
+                        <td className="border border-gray-300 p-2">₵3,250</td>
+                        <td className="border border-gray-300 p-2">₵3,500</td>
+                      </tr>
+                      <tr>
+                        <td className="border border-gray-300 p-2">Mid Level</td>
+                        <td className="border border-gray-300 p-2">₵4,000</td>
+                        <td className="border border-gray-300 p-2">₵4,500</td>
+                        <td className="border border-gray-300 p-2">₵5,000</td>
+                        <td className="border border-gray-300 p-2">₵5,500</td>
+                        <td className="border border-gray-300 p-2">₵6,000</td>
+                      </tr>
+                      <tr>
+                        <td className="border border-gray-300 p-2">Senior Level</td>
+                        <td className="border border-gray-300 p-2">₵7,000</td>
+                        <td className="border border-gray-300 p-2">₵8,000</td>
+                        <td className="border border-gray-300 p-2">₵9,000</td>
+                        <td className="border border-gray-300 p-2">₵10,000</td>
+                        <td className="border border-gray-300 p-2">₵11,000</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleManageSalaryGrades}>
+                  Manage Salary Grades
                 </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Bell className="w-5 h-5" />
+                <span>Notification Settings</span>
+              </CardTitle>
+              <CardDescription>Configure email templates and notification preferences</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Email Templates</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <div>
+                      <span className="font-medium">Welcome Email</span>
+                      <p className="text-sm text-gray-600">Welcome to Akwaaba Technologies</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Welcome Email")}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Template
+                    </Button>
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <div>
+                      <span className="font-medium">Leave Request</span>
+                      <p className="text-sm text-gray-600">Notification for leave requests</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Leave Request")}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Template
+                    </Button>
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <div>
+                      <span className="font-medium">Password Reset</span>
+                      <p className="text-sm text-gray-600">Instructions for resetting password</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Password Reset")}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Template
+                    </Button>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleAddEmailTemplate}>
+                  Add Email Template
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Notification Preferences</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Leave Request Notifications</span>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Task Assignment Notifications</span>
+                    <Switch />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Meeting Reminders</span>
+                    <Switch defaultChecked />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="roles">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Shield className="w-5 h-5" />
+                <span>Roles & Permissions</span>
+              </CardTitle>
+              <CardDescription>Manage user roles and access permissions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Current Roles</h3>
+                <div className="space-y-2">
                   {roles.map((role) => (
-                    <div key={role.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div key={role.id} className="flex justify-between items-center p-3 border rounded">
                       <div>
-                        <h4 className="font-medium">{role.name}</h4>
-                        <p className="text-sm text-gray-500">{role.description}</p>
-                        <div className="flex gap-1 mt-2">
-                          {role.permissions.slice(0, 3).map((permission, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              {permission}
-                            </Badge>
-                          ))}
-                          {role.permissions.length > 3 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{role.permissions.length - 3} more
-                            </Badge>
-                          )}
-                        </div>
+                        <span className="font-medium">{role.name}</span>
+                        <p className="text-sm text-gray-600">{role.description}</p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-500">{role.userCount} users</span>
+                        <span className="text-sm text-gray-500">{role.user_count} Users</span>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="w-4 h-4" />
+                              <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedRole(role)
-                                setShowEditRole(true)
-                              }}
-                            >
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditRole(role.name)}>
                               <Edit className="w-4 h-4 mr-2" />
-                              Edit
+                              Edit Role
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedRole(role)
-                                setShowDeleteRole(true)
-                              }}
-                            >
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-red-600">
                               <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
+                              Delete Role
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -3351,155 +3067,185 @@ Please review this document carefully and contact HR if you have any questions a
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                <Button variant="outline" size="sm" onClick={handleAddRole}>
+                  Add Role
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-        {activeTab === "access" && (
-          <div className="space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="w-5 h-5" />
-                  Access Control
-                </CardTitle>
-                <CardDescription>Manage system access and permissions</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base">Single Sign-On (SSO)</Label>
-                      <p className="text-sm text-gray-500">Enable SSO authentication</p>
-                    </div>
-                    <Switch
-                      checked={accessSettings.sso}
-                      onCheckedChange={(checked) => setAccessSettings({ ...accessSettings, sso: checked })}
-                    />
+        <TabsContent value="access">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Users className="w-5 h-5" />
+                <span>Access Management</span>
+              </CardTitle>
+              <CardDescription>Manage user access and authentication settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Authentication Methods</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Password Authentication</span>
+                    <Switch defaultChecked />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base">Multi-Factor Authentication</Label>
-                      <p className="text-sm text-gray-500">Require MFA for all users</p>
-                    </div>
-                    <Switch
-                      checked={accessSettings.mfa}
-                      onCheckedChange={(checked) => setAccessSettings({ ...accessSettings, mfa: checked })}
-                    />
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Two-Factor Authentication</span>
+                    <Switch />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base">Password Complexity</Label>
-                      <p className="text-sm text-gray-500">Enforce strong password requirements</p>
-                    </div>
-                    <Switch
-                      checked={accessSettings.passwordComplexity}
-                      onCheckedChange={(checked) =>
-                        setAccessSettings({ ...accessSettings, passwordComplexity: checked })
-                      }
-                    />
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Social Login (Google, Facebook)</span>
+                    <Switch />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-        {activeTab === "security" && (
-          <div className="space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lock className="w-5 h-5" />
-                  Security Settings
-                </CardTitle>
-                <CardDescription>Configure security policies and monitoring</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base">Data Encryption</Label>
-                      <p className="text-sm text-gray-500">Encrypt sensitive data at rest</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.dataEncryption}
-                      onCheckedChange={(checked) =>
-                        setSecuritySettings({ ...securitySettings, dataEncryption: checked })
-                      }
-                    />
+        <TabsContent value="security">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Shield className="w-5 h-5" />
+                <span>Security Settings</span>
+              </CardTitle>
+              <CardDescription>Configure security settings and data backup options</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Data Backup</h3>
+                <div className="flex justify-between items-center p-3 border rounded">
+                  <div>
+                    <span className="font-medium">Last Backup</span>
+                    <p className="text-sm text-gray-600">
+                      {lastBackupTime ? new Date(lastBackupTime).toLocaleString() : "No backup yet"}
+                    </p>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base">Audit Logging</Label>
-                      <p className="text-sm text-gray-500">Log all system activities</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.auditLogging}
-                      onCheckedChange={(checked) => setSecuritySettings({ ...securitySettings, auditLogging: checked })}
-                    />
+                  <Button variant="outline" size="sm" onClick={handleBackupNow} disabled={isBackingUp}>
+                    {isBackingUp ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Backing Up...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Backup Now
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Security Policies</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Password Expiry (90 days)</span>
+                    <Switch defaultChecked />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base">Intrusion Detection</Label>
-                      <p className="text-sm text-gray-500">Monitor for suspicious activities</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.intrusionDetection}
-                      onCheckedChange={(checked) =>
-                        setSecuritySettings({ ...securitySettings, intrusionDetection: checked })
-                      }
-                    />
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>IP Address Whitelisting</span>
+                    <Switch />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Data Encryption</span>
+                    <Switch defaultChecked />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-      </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-      {/* Modals */}
-      {showAddSubsidiary && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Add Subsidiary</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowAddSubsidiary(false)}>
-                <X className="w-4 h-4" />
-              </Button>
+      {/* Add Subsidiary Modal */}
+      <Dialog open={showAddSubsidiary} onOpenChange={setShowAddSubsidiary}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add New Subsidiary</DialogTitle>
+            <DialogDescription>Create a new subsidiary company</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input id="name" defaultValue="" className="col-span-3" />
             </div>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="subsidiaryName">Name</Label>
-                <Input
-                  id="subsidiaryName"
-                  value={newSubsidiary.name}
-                  onChange={(e) => setNewSubsidiary({ ...newSubsidiary, name: e.target.value })}
-                  placeholder="Subsidiary name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="subsidiaryLocation">Location</Label>
-                <Input
-                  id="subsidiaryLocation"
-                  value={newSubsidiary.location}
-                  onChange={(e) => setNewSubsidiary({ ...newSubsidiary, location: e.target.value })}
-                  placeholder="Location"
-                />
-              </div>
-              <div>
-                <Label>Logo</Label>
-                <div className="flex items-center space-x-4">
-                  {newSubsidiary.logo && (
-                    <img src={newSubsidiary.logo || "/placeholder.svg"} alt="Logo" className="w-12 h-12 rounded" />
-                  )}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="tax_id" className="text-right">
+                Tax ID
+              </Label>
+              <Input id="tax_id" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="ssnit_number" className="text-right">
+                SSNIT Number
+              </Label>
+              <Input id="ssnit_number" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="industry" className="text-right">
+                Industry
+              </Label>
+              <Input id="industry" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="email_address" className="text-right">
+                Email
+              </Label>
+              <Input id="email_address" defaultValue="" className="col-span-3" type="email" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="phone_number" className="text-right">
+                Phone
+              </Label>
+              <Input id="phone_number" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="address" className="text-right">
+                Address
+              </Label>
+              <Textarea id="address" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Logo</Label>
+              <div className="col-span-3">
+                {subsidiaryLogoPreview ? (
+                  <div className="relative">
+                    <img
+                      src={subsidiaryLogoPreview || "/placeholder.svg"}
+                      alt="Subsidiary Logo"
+                      className="w-20 h-20 object-cover rounded-lg border"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                      onClick={() => setSubsidiaryLogoPreview("")}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                    <ImageIcon className="w-8 h-8 text-gray-400" />
+                  </div>
+                )}
+                <div className="space-y-2 mt-2">
                   <input
                     type="file"
                     accept="image/*"
                     onChange={(e) => {
                       const file = e.target.files?.[0]
-                      if (file) handleLogoUpload(file, "subsidiary")
+                      if (file) {
+                        handleLogoUpload(file, "subsidiary")
+                      }
                     }}
                     className="hidden"
                     id="subsidiary-logo-upload"
@@ -3508,690 +3254,794 @@ Please review this document carefully and contact HR if you have any questions a
                     variant="outline"
                     onClick={() => document.getElementById("subsidiary-logo-upload")?.click()}
                     disabled={isUploadingLogo}
+                    className="flex items-center space-x-2"
                   >
                     {isUploadingLogo ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Uploading...
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Uploading...</span>
                       </>
                     ) : (
                       <>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload Logo
+                        <Upload className="w-4 h-4" />
+                        <span>Upload Logo</span>
                       </>
                     )}
                   </Button>
+                  <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
                 </div>
               </div>
             </div>
-            <div className="flex justify-end space-x-2 mt-6">
-              <Button variant="outline" onClick={() => setShowAddSubsidiary(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddSubsidiary}>Add Subsidiary</Button>
-            </div>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button
+              type="submit"
+              onClick={async () => {
+                const name = (document.getElementById("name") as HTMLInputElement).value
+                const tax_id = (document.getElementById("tax_id") as HTMLInputElement).value
+                const ssnit_number = (document.getElementById("ssnit_number") as HTMLInputElement).value
+                const industry = (document.getElementById("industry") as HTMLInputElement).value
+                const email_address = (document.getElementById("email_address") as HTMLInputElement).value
+                const phone_number = (document.getElementById("phone_number") as HTMLInputElement).value
+                const address = (document.getElementById("address") as HTMLTextAreaElement).value
 
-      {showEditSubsidiary && selectedSubsidiary && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Edit Subsidiary</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowEditSubsidiary(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="editSubsidiaryName">Name</Label>
+                setIsSavingSubsidiary(true)
+                await addNewSubsidiary({ name, tax_id, ssnit_number, industry, email_address, phone_number, address })
+                setShowAddSubsidiary(false)
+                setIsSavingSubsidiary(false)
+              }}
+              disabled={isSavingSubsidiary}
+            >
+              {isSavingSubsidiary ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Create Subsidiary"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Subsidiary Modal */}
+      <Dialog open={showEditSubsidiary} onOpenChange={setShowEditSubsidiary}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Subsidiary</DialogTitle>
+            <DialogDescription>Edit details of the selected subsidiary</DialogDescription>
+          </DialogHeader>
+          {selectedSubsidiary && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_name" className="text-right">
+                  Name
+                </Label>
                 <Input
-                  id="editSubsidiaryName"
-                  value={selectedSubsidiary.name}
+                  id="edit_name"
+                  defaultValue={selectedSubsidiary.name}
+                  className="col-span-3"
                   onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, name: e.target.value })}
-                  placeholder="Subsidiary name"
                 />
               </div>
-              <div>
-                <Label htmlFor="editSubsidiaryLocation">Location</Label>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_tax_id" className="text-right">
+                  Tax ID
+                </Label>
                 <Input
-                  id="editSubsidiaryLocation"
-                  value={selectedSubsidiary.location}
-                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, location: e.target.value })}
-                  placeholder="Location"
+                  id="edit_tax_id"
+                  defaultValue={selectedSubsidiary.tax_id}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, tax_id: e.target.value })}
                 />
               </div>
-            </div>
-            <div className="flex justify-end space-x-2 mt-6">
-              <Button variant="outline" onClick={() => setShowEditSubsidiary(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleEditSubsidiary}>Save Changes</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showDeactivateConfirm && subsidiaryToToggle && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Deactivate Subsidiary</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowDeactivateConfirm(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to deactivate "{subsidiaryToToggle.name}"? This will restrict access to this
-              subsidiary.
-            </p>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowDeactivateConfirm(false)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" onClick={confirmToggleStatus}>
-                Deactivate
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showReactivateConfirm && subsidiaryToToggle && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Reactivate Subsidiary</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowReactivateConfirm(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to reactivate "{subsidiaryToToggle.name}"? This will restore access to this
-              subsidiary.
-            </p>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowReactivateConfirm(false)}>
-                Cancel
-              </Button>
-              <Button onClick={confirmToggleStatus}>Reactivate</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showAddRole && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Add Role</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowAddRole(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="roleName">Role Name</Label>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_ssnit_number" className="text-right">
+                  SSNIT Number
+                </Label>
                 <Input
-                  id="roleName"
-                  value={newRole.name}
-                  onChange={(e) => setNewRole({ ...newRole, name: e.target.value })}
-                  placeholder="Enter role name"
+                  id="edit_ssnit_number"
+                  defaultValue={selectedSubsidiary.ssnit_number}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, ssnit_number: e.target.value })}
                 />
               </div>
-              <div>
-                <Label htmlFor="roleDescription">Description</Label>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_industry" className="text-right">
+                  Industry
+                </Label>
+                <Input
+                  id="edit_industry"
+                  defaultValue={selectedSubsidiary.industry}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, industry: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_email_address" className="text-right">
+                  Email
+                </Label>
+                <Input
+                  id="edit_email_address"
+                  defaultValue={selectedSubsidiary.email_address}
+                  className="col-span-3"
+                  type="email"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, email_address: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_phone_number" className="text-right">
+                  Phone
+                </Label>
+                <Input
+                  id="edit_phone_number"
+                  defaultValue={selectedSubsidiary.phone_number}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, phone_number: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_address" className="text-right">
+                  Address
+                </Label>
                 <Textarea
-                  id="roleDescription"
-                  value={newRole.description}
-                  onChange={(e) => setNewRole({ ...newRole, description: e.target.value })}
-                  placeholder="Enter role description"
-                  rows={3}
+                  id="edit_address"
+                  defaultValue={selectedSubsidiary.address}
+                  className="col-span-3"
+                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, address: e.target.value })}
                 />
               </div>
-              <div>
-                <Label>Permissions</Label>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {availablePermissions.map((permission) => (
-                    <div key={permission} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={permission}
-                        checked={newRole.permissions.includes(permission)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setNewRole({ ...newRole, permissions: [...newRole.permissions, permission] })
-                          } else {
-                            setNewRole({ ...newRole, permissions: newRole.permissions.filter((p) => p !== permission) })
-                          }
-                        }}
-                        className="rounded"
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">Logo</Label>
+                <div className="col-span-3">
+                  {subsidiaryLogoPreview || selectedSubsidiary.logo_url ? (
+                    <div className="relative">
+                      <img
+                        src={subsidiaryLogoPreview || selectedSubsidiary.logo_url}
+                        alt="Subsidiary Logo"
+                        className="w-20 h-20 object-cover rounded-lg border"
                       />
-                      <Label htmlFor={permission} className="text-sm">
-                        {permission}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end space-x-2 mt-6">
-              <Button variant="outline" onClick={() => setShowAddRole(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddRole}>Add Role</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showEditRole && selectedRole && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Edit Role</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowEditRole(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="editRoleName">Role Name</Label>
-                <Input
-                  id="editRoleName"
-                  value={selectedRole.name}
-                  onChange={(e) => setSelectedRole({ ...selectedRole, name: e.target.value })}
-                  placeholder="Enter role name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="editRoleDescription">Description</Label>
-                <Textarea
-                  id="editRoleDescription"
-                  value={selectedRole.description}
-                  onChange={(e) => setSelectedRole({ ...selectedRole, description: e.target.value })}
-                  placeholder="Enter role description"
-                  rows={3}
-                />
-              </div>
-              <div>
-                <Label>Permissions</Label>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {availablePermissions.map((permission) => (
-                    <div key={permission} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`edit-${permission}`}
-                        checked={selectedRole.permissions.includes(permission)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedRole({ ...selectedRole, permissions: [...selectedRole.permissions, permission] })
-                          } else {
-                            setSelectedRole({
-                              ...selectedRole,
-                              permissions: selectedRole.permissions.filter((p) => p !== permission),
-                            })
-                          }
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                        onClick={() => {
+                          setSubsidiaryLogoPreview("")
+                          setSelectedSubsidiary({ ...selectedSubsidiary, logo_url: "" })
                         }}
-                        className="rounded"
-                      />
-                      <Label htmlFor={`edit-${permission}`} className="text-sm">
-                        {permission}
-                      </Label>
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                      <ImageIcon className="w-8 h-8 text-gray-400" />
+                    </div>
+                  )}
+                  <div className="space-y-2 mt-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleLogoUpload(file, "subsidiary")
+                        }
+                      }}
+                      className="hidden"
+                      id="edit-subsidiary-logo-upload"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => document.getElementById("edit-subsidiary-logo-upload")?.click()}
+                      disabled={isUploadingLogo}
+                      className="flex items-center space-x-2"
+                    >
+                      {isUploadingLogo ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" />
+                          <span>Upload Logo</span>
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="flex justify-end space-x-2 mt-6">
-              <Button variant="outline" onClick={() => setShowEditRole(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleEditRole}>Save Changes</Button>
-            </div>
-          </div>
-        </div>
-      )}
+          )}
+          <DialogFooter>
+            <Button
+              type="submit"
+              onClick={async () => {
+                if (!selectedSubsidiary) return
 
-      {showDeleteRole && selectedRole && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Delete Role</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowDeleteRole(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete the role "{selectedRole.name}"? This action cannot be undone.
-            </p>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowDeleteRole(false)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" onClick={handleDeleteRole}>
-                Delete Role
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+                setIsSavingSubsidiary(true)
+                await updateSubsidiary(selectedSubsidiary.id, selectedSubsidiary)
+                setShowEditSubsidiary(false)
+                setIsSavingSubsidiary(false)
+              }}
+              disabled={isSavingSubsidiary}
+            >
+              {isSavingSubsidiary ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Add Leave Type Modal */}
-      {showAddLeaveType && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Add New Leave Type</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowAddLeaveType(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-4">
-                <div>
-                  <Label htmlFor="leaveTypeName">Name</Label>
-                  <Input
-                    id="leaveTypeName"
-                    value={newLeaveType.name}
-                    onChange={(e) => {
-                      setNewLeaveType({ ...newLeaveType, name: e.target.value })
-                      generateLeaveTypeInsights(e.target.value, newLeaveType.days, newLeaveType.description)
-                    }}
-                    placeholder="Enter leave type name"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="leaveTypeDays">Days</Label>
-                  <Input
-                    id="leaveTypeDays"
-                    type="number"
-                    value={newLeaveType.days}
-                    onChange={(e) => {
-                      const days = Number.parseInt(e.target.value) || 0
-                      setNewLeaveType({ ...newLeaveType, days })
-                      generateLeaveTypeInsights(newLeaveType.name, days, newLeaveType.description)
-                    }}
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="leaveTypeDescription">Description</Label>
-                  <Textarea
-                    id="leaveTypeDescription"
-                    value={newLeaveType.description}
-                    onChange={(e) => {
-                      setNewLeaveType({ ...newLeaveType, description: e.target.value })
-                      generateLeaveTypeInsights(newLeaveType.name, newLeaveType.days, e.target.value)
-                    }}
-                    placeholder="Enter description"
-                    rows={3}
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="carryOver"
-                    checked={newLeaveType.carryOver}
-                    onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, carryOver: checked })}
-                  />
-                  <Label htmlFor="carryOver">Carry Over</Label>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <Sparkles className="w-5 h-5 text-purple-600" />
-                  <h4 className="font-medium">AI Insights</h4>
-                </div>
-                <div className="space-y-3">
-                  {leaveTypeAIInsights.map((insight, index) => (
-                    <div key={index} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-700">{insight}</p>
-                    </div>
-                  ))}
-                  {leaveTypeAIInsights.length === 0 && (
-                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                      <p className="text-sm text-gray-500">Start typing to get AI recommendations...</p>
+      {/* Subsidiary Details Modal */}
+      <Dialog open={showSubsidiaryDetails} onOpenChange={setShowSubsidiaryDetails}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Subsidiary Details</DialogTitle>
+            <DialogDescription>View detailed information about the selected subsidiary</DialogDescription>
+          </DialogHeader>
+          {selectedSubsidiary && (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center space-x-4">
+                <div className="w-20 h-20 rounded-lg flex items-center justify-center overflow-hidden">
+                  {selectedSubsidiary.logo_url ? (
+                    <img
+                      src={selectedSubsidiary.logo_url || "/placeholder.svg"}
+                      alt={`${selectedSubsidiary.name} logo`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                      {selectedSubsidiary.name.charAt(0)}
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
-            <div className="flex justify-end space-x-2 mt-6">
-              <Button variant="outline" onClick={() => setShowAddLeaveType(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddLeaveType}>Add Leave Type</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* View Policy Modal */}
-      {showViewPolicy && selectedPolicy && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Policy Details</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowViewPolicy(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <Label className="font-medium">Policy Name</Label>
-                <p className="text-gray-600">{selectedPolicy.name}</p>
-              </div>
-              <div>
-                <Label className="font-medium">Days Allocated</Label>
-                <p className="text-gray-600">{selectedPolicy.days} days</p>
-              </div>
-              <div>
-                <Label className="font-medium">Usage</Label>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${
-                        selectedPolicy.usage > 70
-                          ? "bg-red-500"
-                          : selectedPolicy.usage > 40
-                            ? "bg-yellow-500"
-                            : "bg-green-500"
-                      }`}
-                      style={{ width: `${selectedPolicy.usage}%` }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium">{selectedPolicy.usage}%</span>
-                </div>
-              </div>
-              {selectedPolicy.description && (
                 <div>
-                  <Label className="font-medium">Description</Label>
-                  <p className="text-gray-600">{selectedPolicy.description}</p>
+                  <h3 className="text-lg font-semibold">{selectedSubsidiary.name}</h3>
+                  <p className="text-sm text-gray-600">{selectedSubsidiary.industry}</p>
+                  <Badge variant={selectedSubsidiary.status === "active" ? "default" : "secondary"} className="mt-1">
+                    {selectedSubsidiary.status}
+                  </Badge>
                 </div>
-              )}
-            </div>
-            <div className="flex justify-end mt-6">
-              <Button onClick={() => setShowViewPolicy(false)}>Close</Button>
-            </div>
-          </div>
-        </div>
-      )}
+              </div>
 
-      {/* Edit Policy Modal */}
-      {showEditPolicy && selectedPolicy && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Edit Policy</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowEditPolicy(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium">Contact Information</h4>
+                  <p className="text-sm text-gray-600">Email: {selectedSubsidiary.email_address}</p>
+                  <p className="text-sm text-gray-600">Phone: {selectedSubsidiary.phone_number}</p>
+                  <p className="text-sm text-gray-600">Address: {selectedSubsidiary.address}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Registration Details</h4>
+                  <p className="text-sm text-gray-600">Tax ID: {selectedSubsidiary.tax_id}</p>
+                  <p className="text-sm text-gray-600">SSNIT: {selectedSubsidiary.ssnit_number}</p>
+                  <p className="text-sm text-gray-600">
+                    Created: {new Date(selectedSubsidiary.created_at || "").toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
               <div>
-                <Label htmlFor="editPolicyName">Policy Name</Label>
+                <h4 className="font-medium">Organizational Structure</h4>
+                <p className="text-sm text-gray-600">Divisions: {selectedSubsidiary.divisions?.join(", ") || "N/A"}</p>
+                <p className="text-sm text-gray-600">
+                  Departments: {selectedSubsidiary.departments?.join(", ") || "N/A"}
+                </p>
+                <p className="text-sm text-gray-600">Locations: {selectedSubsidiary.locations?.join(", ") || "N/A"}</p>
+              </div>
+
+              <div>
+                <h4 className="font-medium">Employee Count</h4>
+                <p className="text-sm text-gray-600">Total Employees: {selectedSubsidiary.employee_count || 0}</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setShowSubsidiaryDetails(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Deactivate Subsidiary Modal */}
+      <Dialog open={showDeactivateConfirm} onOpenChange={setShowDeactivateConfirm}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Deactivate Subsidiary</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate this subsidiary? This action will prevent further access.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowDeactivateConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmToggleStatus}>
+              Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Reactivate Subsidiary Modal */}
+      <Dialog open={showReactivateConfirm} onOpenChange={setShowReactivateConfirm}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Reactivate Subsidiary</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to reactivate this subsidiary? This action will restore access.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowReactivateConfirm(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmToggleStatus}>Reactivate</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Employees Modal */}
+      <Dialog
+        open={viewEmployeesModal.isOpen}
+        onOpenChange={() => setViewEmployeesModal({ ...viewEmployeesModal, isOpen: false })}
+      >
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>
+              Employees of {subsidiaries.find((s) => s.id === viewEmployeesModal.subsidiaryId)?.name}
+            </DialogTitle>
+            <DialogDescription>View a list of employees associated with this subsidiary</DialogDescription>
+          </DialogHeader>
+          <div className="divide-y divide-gray-200">
+            {viewEmployeesModal.employees?.map((employee) => (
+              <div key={employee.id} className="py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{employee.name}</p>
+                    <p className="text-sm text-gray-600">
+                      {employee.position} - {employee.department}
+                    </p>
+                  </div>
+                  <p className="text-sm text-gray-500">{employee.email}</p>
+                </div>
+              </div>
+            ))}
+            {viewEmployeesModal.employees?.length === 0 && (
+              <div className="py-4 text-center text-gray-500">No employees found for this subsidiary.</div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setViewEmployeesModal({ ...viewEmployeesModal, isOpen: false })}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Settings Modal */}
+      <Dialog open={importModal} onOpenChange={() => setImportModal(false)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Import Settings</DialogTitle>
+            <DialogDescription>Import settings from a CSV file</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <input
+              type="file"
+              accept=".csv"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  handleImportSettings(file)
+                  setImportModal(false)
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" onClick={() => setImportModal(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Leave Type Modal */}
+      <Dialog open={showAddLeaveTypeModal} onOpenChange={() => setShowAddLeaveTypeModal(false)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add New Leave Type</DialogTitle>
+            <DialogDescription>Create a new leave type for your organization</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="leaveTypeName" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="leaveTypeName"
+                value={newLeaveType.name}
+                onChange={(e) => {
+                  setNewLeaveType({ ...newLeaveType, name: e.target.value })
+                  setLeaveTypeAIInsights(
+                    generateLeaveTypeInsights(e.target.value, newLeaveType.days, newLeaveType.description),
+                  )
+                }}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="leaveTypeDays" className="text-right">
+                Days
+              </Label>
+              <Input
+                id="leaveTypeDays"
+                type="number"
+                value={newLeaveType.days}
+                onChange={(e) => {
+                  const days = Number.parseInt(e.target.value)
+                  setNewLeaveType({ ...newLeaveType, days })
+                  setLeaveTypeAIInsights(generateLeaveTypeInsights(newLeaveType.name, days, newLeaveType.description))
+                }}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="leaveTypeDescription" className="text-right">
+                Description
+              </Label>
+              <Textarea
+                id="leaveTypeDescription"
+                value={newLeaveType.description}
+                onChange={(e) => {
+                  setNewLeaveType({ ...newLeaveType, description: e.target.value })
+                  setLeaveTypeAIInsights(
+                    generateLeaveTypeInsights(newLeaveType.name, newLeaveType.days, e.target.value),
+                  )
+                }}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="leaveTypeCarryOver" className="text-right">
+                Carry Over
+              </Label>
+              <Switch
+                id="leaveTypeCarryOver"
+                checked={newLeaveType.carryOver}
+                onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, carryOver: checked })}
+                className="col-span-3"
+              />
+            </div>
+
+            {leaveTypeAIInsights.length > 0 && (
+              <div className="col-span-4 mt-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-900">AI Insights</span>
+                  </div>
+                  <div className="space-y-1">
+                    {leaveTypeAIInsights.map((insight, index) => (
+                      <p key={index} className="text-xs text-blue-800">
+                        {insight}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowAddLeaveTypeModal(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" onClick={handleAddLeaveType} disabled={isManagingLeaveTypes}>
+              {isManagingLeaveTypes ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add Leave Type"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Policy Modal */}
+      <Dialog open={showPolicyModal} onOpenChange={() => setShowPolicyModal(false)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {policyModalType === "view"
+                ? "Policy Details"
+                : policyModalType === "edit"
+                  ? "Edit Policy"
+                  : "Delete Policy"}
+            </DialogTitle>
+            <DialogDescription>
+              {policyModalType === "view"
+                ? "View details of the selected policy"
+                : policyModalType === "edit"
+                  ? "Edit the selected policy"
+                  : "Delete the selected policy"}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedPolicy && policyModalType === "view" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right col-span-1">Name</Label>
+                <Input value={selectedPolicy.name} className="col-span-3" disabled />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right col-span-1">Days</Label>
+                <Input value={selectedPolicy.days} className="col-span-3" disabled />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right col-span-1">Description</Label>
+                <Textarea value={selectedPolicy.description} className="col-span-3" disabled />
+              </div>
+            </div>
+          )}
+          {selectedPolicy && policyModalType === "edit" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="editPolicyName" className="text-right col-span-1">
+                  Name
+                </Label>
                 <Input
                   id="editPolicyName"
-                  value={editPolicyData.name}
-                  onChange={(e) => setEditPolicyData({ ...editPolicyData, name: e.target.value })}
-                  placeholder="Enter policy name"
+                  value={editingPolicy.name}
+                  onChange={(e) => setEditingPolicy({ ...editingPolicy, name: e.target.value })}
+                  className="col-span-3"
                 />
               </div>
-              <div>
-                <Label htmlFor="editPolicyDays">Days Allocated</Label>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="editPolicyDays" className="text-right col-span-1">
+                  Days
+                </Label>
                 <Input
                   id="editPolicyDays"
                   type="number"
-                  value={editPolicyData.days}
-                  onChange={(e) => setEditPolicyData({ ...editPolicyData, days: Number.parseInt(e.target.value) || 0 })}
-                  placeholder="0"
+                  value={editingPolicy.days}
+                  onChange={(e) => setEditingPolicy({ ...editingPolicy, days: Number.parseInt(e.target.value) })}
+                  className="col-span-3"
                 />
               </div>
-              <div>
-                <Label htmlFor="editPolicyDescription">Description</Label>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="editPolicyDescription" className="text-right col-span-1">
+                  Description
+                </Label>
                 <Textarea
                   id="editPolicyDescription"
-                  value={editPolicyData.description}
-                  onChange={(e) => setEditPolicyData({ ...editPolicyData, description: e.target.value })}
-                  placeholder="Enter description"
-                  rows={3}
+                  value={editingPolicy.description}
+                  onChange={(e) => setEditingPolicy({ ...editingPolicy, description: e.target.value })}
+                  className="col-span-3"
                 />
               </div>
             </div>
-            <div className="flex justify-end space-x-2 mt-6">
-              <Button variant="outline" onClick={() => setShowEditPolicy(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleEditPolicy} disabled={isSavingPolicy}>
+          )}
+          {selectedPolicy && policyModalType === "delete" && (
+            <div className="py-4">
+              <p>Are you sure you want to delete the {selectedPolicy.name} policy?</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowPolicyModal(false)}>
+              Cancel
+            </Button>
+            {policyModalType === "edit" && (
+              <Button type="submit" onClick={handleSavePolicyChanges} disabled={isSavingPolicy}>
                 {isSavingPolicy ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Saving...
                   </>
                 ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Changes
-                  </>
+                  "Save Changes"
                 )}
               </Button>
-            </div>
-          </div>
-        </div>
-      )}
+            )}
+            {policyModalType === "delete" && (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setCurrentPolicies((prev) => prev.filter((policy) => policy.name !== selectedPolicy.name))
+                  setShowPolicyModal(false)
+                  toast({
+                    title: "Policy Deleted",
+                    description: `${selectedPolicy.name} policy has been successfully deleted.`,
+                  })
+                }}
+              >
+                Delete
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Delete Policy Modal */}
-      {showDeletePolicy && selectedPolicy && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Delete Policy</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowDeletePolicy(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete the "{selectedPolicy.name}" policy? This action cannot be undone.
-            </p>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowDeletePolicy(false)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" onClick={handleDeletePolicy}>
-                Delete Policy
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Document Modal */}
-      {showAddDocument && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Add HR Policy Document</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowAddDocument(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="documentName">Document Name</Label>
+      {/* Document Modal */}
+      <Dialog open={showDocumentModal} onOpenChange={() => setShowDocumentModal(false)}>
+        <DialogContent className={documentModalType === "view" ? "sm:max-w-[700px]" : "sm:max-w-[425px]"}>
+          <DialogHeader>
+            <DialogTitle>
+              {documentModalType === "add"
+                ? "Add HR Policy Document"
+                : documentModalType === "view"
+                  ? "Document Details"
+                  : documentModalType === "edit"
+                    ? "Edit Document"
+                    : "Delete Document"}
+            </DialogTitle>
+            <DialogDescription>
+              {documentModalType === "add"
+                ? "Upload a new HR policy document"
+                : documentModalType === "view"
+                  ? "View details of the selected document"
+                  : documentModalType === "edit"
+                    ? "Edit the selected document"
+                    : "Delete the selected document"}
+            </DialogDescription>
+          </DialogHeader>
+          {documentModalType === "add" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="documentName" className="text-right">
+                  Name
+                </Label>
                 <Input
                   id="documentName"
-                  value={newDocumentData.name}
-                  onChange={(e) => setNewDocumentData({ ...newDocumentData, name: e.target.value })}
-                  placeholder="Enter document name"
+                  value={documentName}
+                  onChange={(e) => setDocumentName(e.target.value)}
+                  className="col-span-3"
                 />
               </div>
-              <div>
-                <Label htmlFor="documentFile">File</Label>
-                <div className="mt-1">
-                  <input
-                    type="file"
-                    id="documentFile"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      setNewDocumentData({ ...newDocumentData, file })
-                    }}
-                    className="hidden"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() => document.getElementById("documentFile")?.click()}
-                    className="w-full justify-start hover:bg-gray-50 cursor-pointer"
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="documentFile" className="text-right">
+                  File
+                </Label>
+                <div className="col-span-3">
+                  <input type="file" id="documentFile" onChange={handleFileUpload} className="hidden" />
+                  <label
+                    htmlFor="documentFile"
+                    className="flex items-center justify-center w-full h-10 px-3 py-2 text-sm border border-input bg-background hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-md transition-colors"
                   >
                     <Upload className="w-4 h-4 mr-2" />
-                    {newDocumentData.file ? newDocumentData.file.name : "Choose File No file chosen"}
-                  </Button>
+                    Choose File No file chosen
+                  </label>
                 </div>
               </div>
             </div>
-            <div className="flex justify-end space-x-2 mt-6">
-              <Button variant="outline" onClick={() => setShowAddDocument(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddDocument}>Add Document</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Document Details Modal */}
-      {showDocumentDetails && selectedDocument && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Document Details</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowDocumentDetails(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-4">
-              <div>
-                <Label className="font-medium">Name</Label>
-                <p className="text-gray-600">{selectedDocument.name}</p>
+          )}
+          {selectedDocument && documentModalType === "view" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right col-span-1">Name</Label>
+                <Input value={selectedDocument.name} className="col-span-3" disabled />
               </div>
-              <div>
-                <Label className="font-medium">Type</Label>
-                <p className="text-gray-600">{selectedDocument.type.toUpperCase()}</p>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right col-span-1">Type</Label>
+                <Input value={selectedDocument.type} className="col-span-3" disabled />
               </div>
-              <div>
-                <Label className="font-medium">Size</Label>
-                <p className="text-gray-600">{selectedDocument.size}</p>
-              </div>
-            </div>
-
-            <div className="border-t pt-4">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-medium">Document Preview</h4>
-                <Button variant="outline" size="sm" onClick={() => setShowDocumentPreview(!showDocumentPreview)}>
-                  <Eye className="w-4 h-4 mr-2" />
-                  {showDocumentPreview ? "Hide Preview" : "Show Preview"}
-                </Button>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right col-span-1">Size</Label>
+                <Input value={selectedDocument.size} className="col-span-3" disabled />
               </div>
 
-              {showDocumentPreview && (
-                <div className="bg-gray-50 border rounded-lg p-4 max-h-96 overflow-y-auto">
-                  <div className="font-mono text-sm space-y-2">
-                    <div className="text-blue-600 font-semibold">
-                      Document: {selectedDocument.name} - {selectedDocument.type.toUpperCase()}
+              <div className="col-span-4 mt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-sm font-medium">Document Preview</Label>
+                  <Button variant="outline" size="sm" onClick={() => setShowDocumentPreview(!showDocumentPreview)}>
+                    {showDocumentPreview ? (
+                      <>
+                        <EyeOff className="w-4 h-4 mr-2" />
+                        Hide Preview
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="w-4 h-4 mr-2" />
+                        Show Preview
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {showDocumentPreview && (
+                  <div className="border rounded-lg bg-white shadow-sm">
+                    <div className="border-b px-4 py-2 bg-gray-50 rounded-t-lg">
+                      <h4 className="text-sm font-medium text-gray-700">Document Content</h4>
                     </div>
-                    <div className="text-gray-700">{getDocumentPreviewContent(selectedDocument)}</div>
+                    <div className="p-4 max-h-96 overflow-y-auto">
+                      <div className="prose prose-sm max-w-none">
+                        <pre className="text-sm whitespace-pre-wrap text-gray-800 font-mono leading-relaxed">
+                          {documentPreviewContent || "Loading document preview..."}
+                        </pre>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end mt-6">
-              <Button onClick={() => setShowDocumentDetails(false)}>Cancel</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Document Modal */}
-      {showEditDocument && selectedDocument && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Edit Document</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowEditDocument(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="editDocumentName">Name</Label>
-                <Input
-                  id="editDocumentName"
-                  value={editDocumentData.name}
-                  onChange={(e) => setEditDocumentData({ ...editDocumentData, name: e.target.value })}
-                  placeholder="Enter document name"
-                />
+                )}
               </div>
-              <div>
-                <Label htmlFor="editDocumentFile">File</Label>
-                <div className="mt-1">
-                  <input
-                    type="file"
-                    id="editDocumentFile"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      setEditDocumentData({ ...editDocumentData, file })
-                    }}
-                    className="hidden"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() => document.getElementById("editDocumentFile")?.click()}
-                    className="w-full justify-start hover:bg-gray-50 cursor-pointer"
+            </div>
+          )}
+          {selectedDocument && documentModalType === "edit" && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="editDocumentName" className="text-right">
+                  Name
+                </Label>
+                <Input id="editDocumentName" defaultValue={selectedDocument.name} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="editDocumentFile" className="text-right">
+                  File
+                </Label>
+                <div className="col-span-3">
+                  <input type="file" id="editDocumentFile" onChange={handleFileUpload} className="hidden" />
+                  <label
+                    htmlFor="editDocumentFile"
+                    className="flex items-center justify-center w-full h-10 px-3 py-2 text-sm border border-input bg-background hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-md transition-colors"
                   >
                     <Upload className="w-4 h-4 mr-2" />
-                    {editDocumentData.file ? editDocumentData.file.name : "Choose File No file chosen"}
-                  </Button>
+                    Choose File No file chosen
+                  </label>
                 </div>
               </div>
             </div>
-            <div className="flex justify-end space-x-2 mt-6">
-              <Button variant="outline" onClick={() => setShowEditDocument(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleEditDocument}>Save Changes</Button>
+          )}
+          {selectedDocument && documentModalType === "delete" && (
+            <div className="py-4">
+              <p>Are you sure you want to delete the {selectedDocument.name} document?</p>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Document Modal */}
-      {showDeleteDocument && selectedDocument && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Delete Document</h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowDeleteDocument(false)}>
-                <X className="w-4 h-4" />
+          )}
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowDocumentModal(false)}>
+              Cancel
+            </Button>
+            {documentModalType === "add" && (
+              <Button type="submit" onClick={handleSaveDocument} disabled={isSavingDocument}>
+                {isSavingDocument ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Add Document"
+                )}
               </Button>
-            </div>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete "{selectedDocument.name}"? This action cannot be undone.
-            </p>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowDeleteDocument(false)}>
-                Cancel
+            )}
+            {documentModalType === "edit" && (
+              <Button
+                type="submit"
+                onClick={() => {
+                  setShowDocumentModal(false)
+                  toast({
+                    title: "Document Updated",
+                    description: "Document has been successfully updated.",
+                  })
+                }}
+              >
+                Save Changes
               </Button>
-              <Button variant="destructive" onClick={handleDeleteDocument}>
-                Delete Document
+            )}
+            {documentModalType === "delete" && (
+              <Button variant="destructive" onClick={() => handleDeleteDocument(selectedDocument.id)}>
+                Delete
               </Button>
-            </div>
-          </div>
-        </div>
-      )}
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
