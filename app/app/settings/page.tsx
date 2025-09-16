@@ -35,7 +35,6 @@ import {
   TrendingUp,
   Trash2,
   FileText,
-  EyeOff,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -3656,389 +3655,152 @@ Remember: When in doubt, prioritize safety over productivity.`,
 
       {/* Add Leave Type Modal */}
       <Dialog open={showAddLeaveTypeModal} onOpenChange={() => setShowAddLeaveTypeModal(false)}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Add New Leave Type</DialogTitle>
-            <DialogDescription>Create a new leave type for your organization</DialogDescription>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="text-xl font-semibold">Add New Leave Type</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Create a new leave type for your organization with detailed configuration options
+            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="leaveTypeName" className="text-right">
-                Name
-              </Label>
-              <Input
-                id="leaveTypeName"
-                value={newLeaveType.name}
-                onChange={(e) => {
-                  setNewLeaveType({ ...newLeaveType, name: e.target.value })
-                  setLeaveTypeAIInsights(
-                    generateLeaveTypeInsights(e.target.value, newLeaveType.days, newLeaveType.description),
-                  )
-                }}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="leaveTypeDays" className="text-right">
-                Days
-              </Label>
-              <Input
-                id="leaveTypeDays"
-                type="number"
-                value={newLeaveType.days}
-                onChange={(e) => {
-                  const days = Number.parseInt(e.target.value)
-                  setNewLeaveType({ ...newLeaveType, days })
-                  setLeaveTypeAIInsights(generateLeaveTypeInsights(newLeaveType.name, days, newLeaveType.description))
-                }}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="leaveTypeDescription" className="text-right">
-                Description
-              </Label>
-              <Textarea
-                id="leaveTypeDescription"
-                value={newLeaveType.description}
-                onChange={(e) => {
-                  setNewLeaveType({ ...newLeaveType, description: e.target.value })
-                  setLeaveTypeAIInsights(
-                    generateLeaveTypeInsights(newLeaveType.name, newLeaveType.days, e.target.value),
-                  )
-                }}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="leaveTypeCarryOver" className="text-right">
-                Carry Over
-              </Label>
-              <Switch
-                id="leaveTypeCarryOver"
-                checked={newLeaveType.carryOver}
-                onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, carryOver: checked })}
-                className="col-span-3"
-              />
+
+          <div className="space-y-6 py-6">
+            {/* Basic Information Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-foreground border-b pb-2">Basic Information</h3>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="leaveTypeName" className="text-sm font-medium">
+                    Leave Type Name *
+                  </Label>
+                  <Input
+                    id="leaveTypeName"
+                    placeholder="e.g., Personal Leave, Study Leave, Compassionate Leave"
+                    value={newLeaveType.name}
+                    onChange={(e) => {
+                      setNewLeaveType({ ...newLeaveType, name: e.target.value })
+                      setLeaveTypeAIInsights(
+                        generateLeaveTypeInsights(e.target.value, newLeaveType.days, newLeaveType.description),
+                      )
+                    }}
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="leaveTypeDays" className="text-sm font-medium">
+                      Days Allocated *
+                    </Label>
+                    <Input
+                      id="leaveTypeDays"
+                      type="number"
+                      min="0"
+                      max="365"
+                      placeholder="0"
+                      value={newLeaveType.days}
+                      onChange={(e) => {
+                        const days = Number.parseInt(e.target.value) || 0
+                        setNewLeaveType({ ...newLeaveType, days })
+                        setLeaveTypeAIInsights(
+                          generateLeaveTypeInsights(newLeaveType.name, days, newLeaveType.description),
+                        )
+                      }}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-muted-foreground">Maximum days per year</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Carry Over Policy</Label>
+                    <div className="flex items-center space-x-3 pt-2">
+                      <Switch
+                        id="leaveTypeCarryOver"
+                        checked={newLeaveType.carryOver}
+                        onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, carryOver: checked })}
+                      />
+                      <Label htmlFor="leaveTypeCarryOver" className="text-sm text-muted-foreground">
+                        Allow unused days to carry over to next year
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
+            {/* Description Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-foreground border-b pb-2">Description & Guidelines</h3>
+
+              <div className="space-y-2">
+                <Label htmlFor="leaveTypeDescription" className="text-sm font-medium">
+                  Policy Description
+                </Label>
+                <Textarea
+                  id="leaveTypeDescription"
+                  placeholder="Describe the purpose, eligibility criteria, and any special conditions for this leave type..."
+                  value={newLeaveType.description}
+                  onChange={(e) => {
+                    setNewLeaveType({ ...newLeaveType, description: e.target.value })
+                    setLeaveTypeAIInsights(
+                      generateLeaveTypeInsights(newLeaveType.name, newLeaveType.days, e.target.value),
+                    )
+                  }}
+                  className="w-full min-h-[100px] resize-none"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Provide clear guidelines to help employees understand when and how to use this leave type
+                </p>
+              </div>
+            </div>
+
+            {/* AI Insights Section */}
             {leaveTypeAIInsights.length > 0 && (
-              <div className="col-span-4 mt-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm font-medium text-blue-900">AI Insights</span>
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-foreground border-b pb-2">AI Recommendations</h3>
+
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-1 bg-blue-100 rounded-full">
+                      <Sparkles className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <span className="text-sm font-medium text-blue-900">Smart Insights</span>
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {leaveTypeAIInsights.map((insight, index) => (
-                      <p key={index} className="text-xs text-blue-800">
-                        {insight}
-                      </p>
+                      <div key={index} className="flex items-start gap-2">
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
+                        <p className="text-sm text-blue-800 leading-relaxed">{insight}</p>
+                      </div>
                     ))}
                   </div>
                 </div>
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => setShowAddLeaveTypeModal(false)}>
+
+          <DialogFooter className="flex gap-3 pt-6 border-t">
+            <Button variant="outline" onClick={() => setShowAddLeaveTypeModal(false)} className="flex-1 sm:flex-none">
               Cancel
             </Button>
-            <Button type="submit" onClick={handleAddLeaveType} disabled={isManagingLeaveTypes}>
+            <Button
+              type="submit"
+              onClick={handleAddLeaveType}
+              disabled={isManagingLeaveTypes || !newLeaveType.name.trim() || newLeaveType.days <= 0}
+              className="flex-1 sm:flex-none"
+            >
               {isManagingLeaveTypes ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Adding...
+                  Creating Leave Type...
                 </>
               ) : (
-                "Add Leave Type"
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Leave Type
+                </>
               )}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Policy Modal */}
-      <Dialog open={showPolicyModal} onOpenChange={() => setShowPolicyModal(false)}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>
-              {policyModalType === "view"
-                ? "Policy Details"
-                : policyModalType === "edit"
-                  ? "Edit Policy"
-                  : "Delete Policy"}
-            </DialogTitle>
-            <DialogDescription>
-              {policyModalType === "view"
-                ? "View details of the selected policy"
-                : policyModalType === "edit"
-                  ? "Edit the selected policy"
-                  : "Delete the selected policy"}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedPolicy && policyModalType === "view" && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right col-span-1">Name</Label>
-                <Input value={selectedPolicy.name} className="col-span-3" disabled />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right col-span-1">Days</Label>
-                <Input value={selectedPolicy.days} className="col-span-3" disabled />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right col-span-1">Description</Label>
-                <Textarea value={selectedPolicy.description} className="col-span-3" disabled />
-              </div>
-            </div>
-          )}
-          {selectedPolicy && policyModalType === "edit" && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="editPolicyName" className="text-right col-span-1">
-                  Name
-                </Label>
-                <Input
-                  id="editPolicyName"
-                  value={editingPolicy.name}
-                  onChange={(e) => setEditingPolicy({ ...editingPolicy, name: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="editPolicyDays" className="text-right col-span-1">
-                  Days
-                </Label>
-                <Input
-                  id="editPolicyDays"
-                  type="number"
-                  value={editingPolicy.days}
-                  onChange={(e) => setEditingPolicy({ ...editingPolicy, days: Number.parseInt(e.target.value) })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="editPolicyDescription" className="text-right col-span-1">
-                  Description
-                </Label>
-                <Textarea
-                  id="editPolicyDescription"
-                  value={editingPolicy.description}
-                  onChange={(e) => setEditingPolicy({ ...editingPolicy, description: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-            </div>
-          )}
-          {selectedPolicy && policyModalType === "delete" && (
-            <div className="py-4">
-              <p>Are you sure you want to delete the {selectedPolicy.name} policy?</p>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => setShowPolicyModal(false)}>
-              Cancel
-            </Button>
-            {policyModalType === "edit" && (
-              <Button type="submit" onClick={handleSavePolicyChanges} disabled={isSavingPolicy}>
-                {isSavingPolicy ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Save Changes"
-                )}
-              </Button>
-            )}
-            {policyModalType === "delete" && (
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  setCurrentPolicies((prev) => prev.filter((policy) => policy.name !== selectedPolicy.name))
-                  setShowPolicyModal(false)
-                  toast({
-                    title: "Policy Deleted",
-                    description: `${selectedPolicy.name} policy has been successfully deleted.`,
-                  })
-                }}
-              >
-                Delete
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Document Modal */}
-      <Dialog open={showDocumentModal} onOpenChange={() => setShowDocumentModal(false)}>
-        <DialogContent className={documentModalType === "view" ? "sm:max-w-[700px]" : "sm:max-w-[425px]"}>
-          <DialogHeader>
-            <DialogTitle>
-              {documentModalType === "add"
-                ? "Add HR Policy Document"
-                : documentModalType === "view"
-                  ? "Document Details"
-                  : documentModalType === "edit"
-                    ? "Edit Document"
-                    : "Delete Document"}
-            </DialogTitle>
-            <DialogDescription>
-              {documentModalType === "add"
-                ? "Upload a new HR policy document"
-                : documentModalType === "view"
-                  ? "View details of the selected document"
-                  : documentModalType === "edit"
-                    ? "Edit the selected document"
-                    : "Delete the selected document"}
-            </DialogDescription>
-          </DialogHeader>
-          {documentModalType === "add" && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="documentName" className="text-right">
-                  Name
-                </Label>
-                <Input
-                  id="documentName"
-                  value={documentName}
-                  onChange={(e) => setDocumentName(e.target.value)}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="documentFile" className="text-right">
-                  File
-                </Label>
-                <div className="col-span-3">
-                  <input type="file" id="documentFile" onChange={handleFileUpload} className="hidden" />
-                  <label
-                    htmlFor="documentFile"
-                    className="flex items-center justify-center w-full h-10 px-3 py-2 text-sm border border-input bg-background hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-md transition-colors"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File No file chosen
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
-          {selectedDocument && documentModalType === "view" && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right col-span-1">Name</Label>
-                <Input value={selectedDocument.name} className="col-span-3" disabled />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right col-span-1">Type</Label>
-                <Input value={selectedDocument.type} className="col-span-3" disabled />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right col-span-1">Size</Label>
-                <Input value={selectedDocument.size} className="col-span-3" disabled />
-              </div>
-
-              <div className="col-span-4 mt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <Label className="text-sm font-medium">Document Preview</Label>
-                  <Button variant="outline" size="sm" onClick={() => setShowDocumentPreview(!showDocumentPreview)}>
-                    {showDocumentPreview ? (
-                      <>
-                        <EyeOff className="w-4 h-4 mr-2" />
-                        Hide Preview
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="w-4 h-4 mr-2" />
-                        Show Preview
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {showDocumentPreview && (
-                  <div className="border rounded-lg bg-white shadow-sm">
-                    <div className="border-b px-4 py-2 bg-gray-50 rounded-t-lg">
-                      <h4 className="text-sm font-medium text-gray-700">Document Content</h4>
-                    </div>
-                    <div className="p-4 max-h-96 overflow-y-auto">
-                      <div className="prose prose-sm max-w-none">
-                        <pre className="text-sm whitespace-pre-wrap text-gray-800 font-mono leading-relaxed">
-                          {documentPreviewContent || "Loading document preview..."}
-                        </pre>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          {selectedDocument && documentModalType === "edit" && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="editDocumentName" className="text-right">
-                  Name
-                </Label>
-                <Input id="editDocumentName" defaultValue={selectedDocument.name} className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="editDocumentFile" className="text-right">
-                  File
-                </Label>
-                <div className="col-span-3">
-                  <input type="file" id="editDocumentFile" onChange={handleFileUpload} className="hidden" />
-                  <label
-                    htmlFor="editDocumentFile"
-                    className="flex items-center justify-center w-full h-10 px-3 py-2 text-sm border border-input bg-background hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-md transition-colors"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File No file chosen
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
-          {selectedDocument && documentModalType === "delete" && (
-            <div className="py-4">
-              <p>Are you sure you want to delete the {selectedDocument.name} document?</p>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => setShowDocumentModal(false)}>
-              Cancel
-            </Button>
-            {documentModalType === "add" && (
-              <Button type="submit" onClick={handleSaveDocument} disabled={isSavingDocument}>
-                {isSavingDocument ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Add Document"
-                )}
-              </Button>
-            )}
-            {documentModalType === "edit" && (
-              <Button
-                type="submit"
-                onClick={() => {
-                  setShowDocumentModal(false)
-                  toast({
-                    title: "Document Updated",
-                    description: "Document has been successfully updated.",
-                  })
-                }}
-              >
-                Save Changes
-              </Button>
-            )}
-            {documentModalType === "delete" && (
-              <Button variant="destructive" onClick={() => handleDeleteDocument(selectedDocument.id)}>
-                Delete
-              </Button>
-            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
