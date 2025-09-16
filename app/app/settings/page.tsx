@@ -35,6 +35,10 @@ import {
   TrendingUp,
   Trash2,
   FileText,
+  ZoomIn,
+  ZoomOut,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -2859,8 +2863,7 @@ Remember: When in doubt, prioritize safety over productivity.`,
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <div className="flex items-center space-x-2">
-                          <Label htmlFor={`visible-${doc.id}`} className="text-sm">
+                        <Label htmlFor={`visible-${doc.id}`} className="text-sm">
                             Visible to all employees
                           </Label>
                           <Switch
@@ -3096,9 +3099,121 @@ Remember: When in doubt, prioritize safety over productivity.`,
                       </div>
 
                       {showDocumentPreview && (
-                        <div className="border rounded-lg p-4 bg-gray-50 max-h-96 overflow-y-auto">
-                          <div className="prose prose-sm max-w-none">
-                            <div dangerouslySetInnerHTML={{ __html: documentPreviewContent }} />
+                        <div className="border rounded-lg bg-white shadow-sm">
+                          {/* Document Viewer Header */}
+                          <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50">
+                            <div className="flex items-center space-x-2">
+                              <FileText className="w-4 h-4 text-gray-600" />
+                              <span className="text-sm font-medium text-gray-700">
+                                {selectedDocument.name}.{selectedDocument.type.toLowerCase()}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button variant="ghost" size="sm" className="h-7 px-2">
+                                <ZoomIn className="w-3 h-3" />
+                              </Button>
+                              <Button variant="ghost" size="sm" className="h-7 px-2">
+                                <ZoomOut className="w-3 h-3" />
+                              </Button>
+                              <Button variant="ghost" size="sm" className="h-7 px-2">
+                                <Download className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Document Content Area */}
+                          <div className="p-6 max-h-[500px] overflow-y-auto bg-gray-50">
+                            {/* Document Page Container */}
+                            <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-sm border">
+                              {/* Document Page */}
+                              <div className="p-8 min-h-[600px]">
+                                {/* Document Header */}
+                                <div className="text-center mb-8 pb-4 border-b-2 border-gray-200">
+                                  <div className="w-12 h-12 bg-blue-600 rounded-lg mx-auto mb-3 flex items-center justify-center">
+                                    <FileText className="w-6 h-6 text-white" />
+                                  </div>
+                                  <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                                    {selectedDocument.name}
+                                  </h1>
+                                  <p className="text-sm text-gray-500">
+                                    Company Policy Document • {selectedDocument.type} • {selectedDocument.size}
+                                  </p>
+                                </div>
+
+                                {/* Document Content */}
+                                <div className="prose prose-lg max-w-none">
+                                  {documentPreviewContent.split('\n\n').map((paragraph, index) => {
+                                    // Handle different content types
+                                    if (paragraph.startsWith('Document:')) {
+                                      return null; // Skip as we handle this in header
+                                    } else if (paragraph.match(/^\d+\.\s+[A-Z\s]+$/)) {
+                                      // Main section headers (e.g., "1. PROFESSIONAL CONDUCT")
+                                      return (
+                                        <h2 key={index} className="text-xl font-bold text-gray-900 mt-8 mb-4 pb-2 border-b border-gray-200">
+                                          {paragraph}
+                                        </h2>
+                                      );
+                                    } else if (paragraph.match(/^[A-Z\s]+$/)) {
+                                      // All caps headers
+                                      return (
+                                        <h3 key={index} className="text-lg font-semibold text-gray-800 mt-6 mb-3">
+                                          {paragraph}
+                                        </h3>
+                                      );
+                                    } else if (paragraph.includes('•')) {
+                                      // Bullet points
+                                      const items = paragraph.split('•').filter(item => item.trim());
+                                      return (
+                                        <ul key={index} className="list-disc list-inside space-y-2 mb-4">
+                                          {items.map((item, itemIndex) => (
+                                            <li key={itemIndex} className="text-gray-700 leading-relaxed">
+                                              {item.trim()}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      );
+                                    } else if (paragraph.trim()) {
+                                      // Regular paragraphs
+                                      return (
+                                        <p key={index} className="text-gray-700 leading-relaxed mb-4 text-justify">
+                                          {paragraph}
+                                        </p>
+                                      );
+                                    }
+                                    return null;
+                                  })}
+                                </div>
+
+                                {/* Document Footer */}
+                                <div className="mt-12 pt-6 border-t border-gray-200">
+                                  <div className="flex justify-between items-center text-sm text-gray-500">
+                                    <div>
+                                      <p>Document Version: 1.0</p>
+                                      <p>Last Updated: {new Date().toLocaleDateString()}</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p>Page 1 of 1</p>
+                                      <p>© {new Date().getFullYear()} Company Name</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Page Navigation */}
+                            <div className="flex items-center justify-center mt-6 space-x-4">
+                              <Button variant="outline" size="sm" disabled>
+                                <ChevronLeft className="w-4 h-4 mr-1" />
+                                Previous
+                              </Button>
+                              <span className="text-sm text-gray-600 px-4">
+                                Page 1 of 1
+                              </span>
+                              <Button variant="outline" size="sm" disabled>
+                                Next
+                                <ChevronRight className="w-4 h-4 ml-1" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -3489,650 +3604,629 @@ Remember: When in doubt, prioritize safety over productivity.`,
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* Add Subsidiary Modal */}
-      <Dialog open={showAddSubsidiary} onOpenChange={setShowAddSubsidiary}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Add New Subsidiary</DialogTitle>
-            <DialogDescription>Create a new subsidiary company</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Name
-              </Label>
-              <Input id="name" defaultValue="" className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="tax_id" className="text-right">
-                Tax ID
-              </Label>
-              <Input id="tax_id" defaultValue="" className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="ssnit_number" className="text-right">
-                SSNIT Number
-              </Label>
-              <Input id="ssnit_number" defaultValue="" className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="industry" className="text-right">
-                Industry
-              </Label>
-              <Input id="industry" defaultValue="" className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="email_address" className="text-right">
-                Email
-              </Label>
-              <Input id="email_address" defaultValue="" className="col-span-3" type="email" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="phone_number" className="text-right">
-                Phone
-              </Label>
-              <Input id="phone_number" defaultValue="" className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="address" className="text-right">
-                Address
-              </Label>
-              <Textarea id="address" defaultValue="" className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">Logo</Label>
-              <div className="col-span-3">
-                {subsidiaryLogoPreview ? (
-                  <div className="relative">
-                    <img
-                      src={subsidiaryLogoPreview || "/placeholder.svg"}
-                      alt="Subsidiary Logo"
-                      className="w-20 h-20 object-cover rounded-lg border"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
-                      onClick={() => setSubsidiaryLogoPreview("")}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                    <ImageIcon className="w-8 h-8 text-gray-400" />
-                  </div>
-                )}
-                <div className="space-y-2 mt-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        handleLogoUpload(file, "subsidiary")
-                      }
-                    }}
-                    className="hidden"
-                    id="subsidiary-logo-upload"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() => document.getElementById("subsidiary-logo-upload")?.click()}
-                    disabled={isUploadingLogo}
-                    className="flex items-center space-x-2"
-                  >
-                    {isUploadingLogo ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Uploading...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4" />
-                        <span>Upload Logo</span>
-                      </>
-                    )}
-                  </Button>
-                  <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="submit"
-              onClick={async () => {
-                const name = (document.getElementById("name") as HTMLInputElement).value
-                const tax_id = (document.getElementById("tax_id") as HTMLInputElement).value
-                const ssnit_number = (document.getElementById("ssnit_number") as HTMLInputElement).value
-                const industry = (document.getElementById("industry") as HTMLInputElement).value
-                const email_address = (document.getElementById("email_address") as HTMLInputElement).value
-                const phone_number = (document.getElementById("phone_number") as HTMLInputElement).value
-                const address = (document.getElementById("address") as HTMLTextAreaElement).value
-
-                setIsSavingSubsidiary(true)
-                await addNewSubsidiary({ name, tax_id, ssnit_number, industry, email_address, phone_number, address })
-                setShowAddSubsidiary(false)
-                setIsSavingSubsidiary(false)
-              }}
-              disabled={isSavingSubsidiary}
-            >
-              {isSavingSubsidiary ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Create Subsidiary"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Subsidiary Modal */}
-      <Dialog open={showEditSubsidiary} onOpenChange={setShowEditSubsidiary}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Edit Subsidiary</DialogTitle>
-            <DialogDescription>Edit details of the selected subsidiary</DialogDescription>
-          </DialogHeader>
-          {selectedSubsidiary && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit_name" className="text-right">
-                  Name
-                </Label>
-                <Input
-                  id="edit_name"
-                  defaultValue={selectedSubsidiary.name}
-                  className="col-span-3"
-                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, name: e.target.value })}
+  ;<Dialog open={showAddSubsidiary} onOpenChange={setShowAddSubsidiary}>
+    \
+    <DialogContent className="sm:max-w-[425px]">
+      <DialogHeader>
+        <DialogTitle>Add New Subsidiary</DialogTitle>
+        <DialogDescription>Create a new subsidiary company</DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-4 py-4">
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="name" className="text-right">
+            Name
+          </Label>
+          <Input id="name" defaultValue="" className="col-span-3" />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="tax_id" className="text-right">
+            Tax ID
+          </Label>
+          <Input id="tax_id" defaultValue="" className="col-span-3" />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="ssnit_number" className="text-right">
+            SSNIT Number
+          </Label>
+          <Input id="ssnit_number" defaultValue="" className="col-span-3" />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="industry" className="text-right">
+            Industry
+          </Label>
+          <Input id="industry" defaultValue="" className="col-span-3" />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="email_address" className="text-right">
+            Email
+          </Label>
+          <Input id="email_address" defaultValue="" className="col-span-3" type="email" />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="phone_number" className="text-right">
+            Phone
+          </Label>
+          <Input id="phone_number" defaultValue="" className="col-span-3" />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="address" className="text-right">
+            Address
+          </Label>
+          <Textarea id="address" defaultValue="" className="col-span-3" />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label className="text-right">Logo</Label>
+          <div className="col-span-3">
+            {subsidiaryLogoPreview ? (
+              <div className="relative">
+                <img
+                  src={subsidiaryLogoPreview || "/placeholder.svg"}
+                  alt="Subsidiary Logo"
+                  className="w-20 h-20 object-cover rounded-lg border"
                 />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                  onClick={() => setSubsidiaryLogoPreview("")}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit_tax_id" className="text-right">
-                  Tax ID
-                </Label>
-                <Input
-                  id="edit_tax_id"
-                  defaultValue={selectedSubsidiary.tax_id}
-                  className="col-span-3"
-                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, tax_id: e.target.value })}
-                />
+            ) : (
+              <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                <ImageIcon className="w-8 h-8 text-gray-400" />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit_ssnit_number" className="text-right">
-                  SSNIT Number
-                </Label>
-                <Input
-                  id="edit_ssnit_number"
-                  defaultValue={selectedSubsidiary.ssnit_number}
-                  className="col-span-3"
-                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, ssnit_number: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit_industry" className="text-right">
-                  Industry
-                </Label>
-                <Input
-                  id="edit_industry"
-                  defaultValue={selectedSubsidiary.industry}
-                  className="col-span-3"
-                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, industry: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit_email_address" className="text-right">
-                  Email
-                </Label>
-                <Input
-                  id="edit_email_address"
-                  defaultValue={selectedSubsidiary.email_address}
-                  className="col-span-3"
-                  type="email"
-                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, email_address: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit_phone_number" className="text-right">
-                  Phone
-                </Label>
-                <Input
-                  id="edit_phone_number"
-                  defaultValue={selectedSubsidiary.phone_number}
-                  className="col-span-3"
-                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, phone_number: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit_address" className="text-right">
-                  Address
-                </Label>
-                <Textarea
-                  id="edit_address"
-                  defaultValue={selectedSubsidiary.address}
-                  className="col-span-3"
-                  onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, address: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right">Logo</Label>
-                <div className="col-span-3">
-                  {subsidiaryLogoPreview || selectedSubsidiary.logo_url ? (
-                    <div className="relative">
-                      <img
-                        src={subsidiaryLogoPreview || selectedSubsidiary.logo_url}
-                        alt="Subsidiary Logo"
-                        className="w-20 h-20 object-cover rounded-lg border"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
-                        onClick={() => {
-                          setSubsidiaryLogoPreview("")
-                          setSelectedSubsidiary({ ...selectedSubsidiary, logo_url: "" })
-                        }}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                      <ImageIcon className="w-8 h-8 text-gray-400" />
-                    </div>
-                  )}
-                  <div className="space-y-2 mt-2">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) {
-                          handleLogoUpload(file, "subsidiary")
-                        }
-                      }}
-                      className="hidden"
-                      id="edit-subsidiary-logo-upload"
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={() => document.getElementById("edit-subsidiary-logo-upload")?.click()}
-                      disabled={isUploadingLogo}
-                      className="flex items-center space-x-2"
-                    >
-                      {isUploadingLogo ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Uploading...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-4 h-4" />
-                          <span>Upload Logo</span>
-                        </>
-                      )}
-                    </Button>
-                    <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              type="submit"
-              onClick={async () => {
-                if (!selectedSubsidiary) return
-
-                setIsSavingSubsidiary(true)
-                await updateSubsidiary(selectedSubsidiary.id, selectedSubsidiary)
-                setShowEditSubsidiary(false)
-                setIsSavingSubsidiary(false)
-              }}
-              disabled={isSavingSubsidiary}
-            >
-              {isSavingSubsidiary ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Subsidiary Details Modal */}
-      <Dialog open={showSubsidiaryDetails} onOpenChange={setShowSubsidiaryDetails}>
-        <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Subsidiary Details</DialogTitle>
-            <DialogDescription>View detailed information about the selected subsidiary</DialogDescription>
-          </DialogHeader>
-          {selectedSubsidiary && (
-            <div className="space-y-4 py-4">
-              <div className="flex items-center space-x-4">
-                <div className="w-20 h-20 rounded-lg flex items-center justify-center overflow-hidden">
-                  {selectedSubsidiary.logo_url ? (
-                    <img
-                      src={selectedSubsidiary.logo_url || "/placeholder.svg"}
-                      alt={`${selectedSubsidiary.name} logo`}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                      {selectedSubsidiary.name.charAt(0)}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">{selectedSubsidiary.name}</h3>
-                  <p className="text-sm text-gray-600">{selectedSubsidiary.industry}</p>
-                  <Badge variant={selectedSubsidiary.status === "active" ? "default" : "secondary"} className="mt-1">
-                    {selectedSubsidiary.status}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-medium">Contact Information</h4>
-                  <p className="text-sm text-gray-600">Email: {selectedSubsidiary.email_address}</p>
-                  <p className="text-sm text-gray-600">Phone: {selectedSubsidiary.phone_number}</p>
-                  <p className="text-sm text-gray-600">Address: {selectedSubsidiary.address}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Registration Details</h4>
-                  <p className="text-sm text-gray-600">Tax ID: {selectedSubsidiary.tax_id}</p>
-                  <p className="text-sm text-gray-600">SSNIT: {selectedSubsidiary.ssnit_number}</p>
-                  <p className="text-sm text-gray-600">
-                    Created: {new Date(selectedSubsidiary.created_at || "").toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-medium">Organizational Structure</h4>
-                <p className="text-sm text-gray-600">Divisions: {selectedSubsidiary.divisions?.join(", ") || "N/A"}</p>
-                <p className="text-sm text-gray-600">
-                  Departments: {selectedSubsidiary.departments?.join(", ") || "N/A"}
-                </p>
-                <p className="text-sm text-gray-600">Locations: {selectedSubsidiary.locations?.join(", ") || "N/A"}</p>
-              </div>
-
-              <div>
-                <h4 className="font-medium">Employee Count</h4>
-                <p className="text-sm text-gray-600">Total Employees: {selectedSubsidiary.employee_count || 0}</p>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button onClick={() => setShowSubsidiaryDetails(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Confirm Deactivate Subsidiary Modal */}
-      <Dialog open={showDeactivateConfirm} onOpenChange={setShowDeactivateConfirm}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Deactivate Subsidiary</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to deactivate this subsidiary? This action will prevent further access.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => setShowDeactivateConfirm(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={confirmToggleStatus}>
-              Deactivate
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Confirm Reactivate Subsidiary Modal */}
-      <Dialog open={showReactivateConfirm} onOpenChange={setShowReactivateConfirm}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Reactivate Subsidiary</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to reactivate this subsidiary? This action will restore access.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => setShowReactivateConfirm(false)}>
-              Cancel
-            </Button>
-            <Button onClick={confirmToggleStatus}>Reactivate</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* View Employees Modal */}
-      <Dialog
-        open={viewEmployeesModal.isOpen}
-        onOpenChange={() => setViewEmployeesModal({ ...viewEmployeesModal, isOpen: false })}
-      >
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>
-              Employees of {subsidiaries.find((s) => s.id === viewEmployeesModal.subsidiaryId)?.name}
-            </DialogTitle>
-            <DialogDescription>View a list of employees associated with this subsidiary</DialogDescription>
-          </DialogHeader>
-          <div className="divide-y divide-gray-200">
-            {viewEmployeesModal.employees?.map((employee) => (
-              <div key={employee.id} className="py-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{employee.name}</p>
-                    <p className="text-sm text-gray-600">
-                      {employee.position} - {employee.department}
-                    </p>
-                  </div>
-                  <p className="text-sm text-gray-500">{employee.email}</p>
-                </div>
-              </div>
-            ))}
-            {viewEmployeesModal.employees?.length === 0 && (
-              <div className="py-4 text-center text-gray-500">No employees found for this subsidiary.</div>
             )}
+            <div className="space-y-2 mt-2">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    handleLogoUpload(file, "subsidiary")
+                  }
+                }}
+                className="hidden"
+                id="subsidiary-logo-upload"
+              />
+              <Button
+                variant="outline"
+                onClick={() => document.getElementById("subsidiary-logo-upload")?.click()}
+                disabled={isUploadingLogo}
+                className="flex items-center space-x-2"
+              >
+                {isUploadingLogo ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Uploading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    <span>Upload Logo</span>
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+            </div>
           </div>
-          <DialogFooter>
-            <Button onClick={() => setViewEmployeesModal({ ...viewEmployeesModal, isOpen: false })}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button
+          type="submit"
+          onClick={async () => {
+            const name = (document.getElementById("name") as HTMLInputElement).value
+            const tax_id = (document.getElementById("tax_id") as HTMLInputElement).value
+            const ssnit_number = (document.getElementById("ssnit_number") as HTMLInputElement).value
+            const industry = (document.getElementById("industry") as HTMLInputElement).value
+            const email_address = (document.getElementById("email_address") as HTMLInputElement).value
+            const phone_number = (document.getElementById("phone_number") as HTMLInputElement).value
+            const address = (document.getElementById("address") as HTMLTextAreaElement).value
 
-      {/* Import Settings Modal */}
-      <Dialog open={importModal} onOpenChange={() => setImportModal(false)}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Import Settings</DialogTitle>
-            <DialogDescription>Import settings from a CSV file</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) {
-                  handleImportSettings(file)
-                  setImportModal(false)
-                }
-              }}
+            setIsSavingSubsidiary(true)
+            await addNewSubsidiary({ name, tax_id, ssnit_number, industry, email_address, phone_number, address })
+            setShowAddSubsidiary(false)
+            setIsSavingSubsidiary(false)
+          }}
+          disabled={isSavingSubsidiary}
+        >
+          {isSavingSubsidiary ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            "Create Subsidiary"
+          )}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+  ;<Dialog open={showEditSubsidiary} onOpenChange={setShowEditSubsidiary}>
+    <DialogContent className="sm:max-w-[425px]">
+      <DialogHeader>
+        <DialogTitle>Edit Subsidiary</DialogTitle>
+        <DialogDescription>Edit details of the selected subsidiary</DialogDescription>
+      </DialogHeader>
+      {selectedSubsidiary && (
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="edit_name" className="text-right">
+              Name
+            </Label>
+            <Input
+              id="edit_name"
+              defaultValue={selectedSubsidiary.name}
+              className="col-span-3"
+              onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, name: e.target.value })}
             />
           </div>
-          <DialogFooter>
-            <Button type="button" onClick={() => setImportModal(false)}>
-              Cancel
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Leave Type Modal */}
-      <Dialog open={showAddLeaveTypeModal} onOpenChange={() => setShowAddLeaveTypeModal(false)}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="space-y-3">
-            <DialogTitle className="text-xl font-semibold">Add New Leave Type</DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">
-              Create a new leave type for your organization with detailed configuration options
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6 py-6">
-            {/* Basic Information Section */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium text-foreground border-b pb-2">Basic Information</h3>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="leaveTypeName" className="text-sm font-medium">
-                    Leave Type Name *
-                  </Label>
-                  <Input
-                    id="leaveTypeName"
-                    placeholder="e.g., Personal Leave, Study Leave, Compassionate Leave"
-                    value={newLeaveType.name}
-                    onChange={(e) => {
-                      setNewLeaveType({ ...newLeaveType, name: e.target.value })
-                      setLeaveTypeAIInsights(
-                        generateLeaveTypeInsights(e.target.value, newLeaveType.days, newLeaveType.description),
-                      )
-                    }}
-                    className="w-full"
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="edit_tax_id" className="text-right">
+              Tax ID
+            </Label>
+            <Input
+              id="edit_tax_id"
+              defaultValue={selectedSubsidiary.tax_id}
+              className="col-span-3"
+              onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, tax_id: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="edit_ssnit_number" className="text-right">
+              SSNIT Number
+            </Label>
+            <Input
+              id="edit_ssnit_number"
+              defaultValue={selectedSubsidiary.ssnit_number}
+              className="col-span-3"
+              onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, ssnit_number: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="edit_industry" className="text-right">
+              Industry
+            </Label>
+            <Input
+              id="edit_industry"
+              defaultValue={selectedSubsidiary.industry}
+              className="col-span-3"
+              onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, industry: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="edit_email_address" className="text-right">
+              Email
+            </Label>
+            <Input
+              id="edit_email_address"
+              defaultValue={selectedSubsidiary.email_address}
+              className="col-span-3"
+              type="email"
+              onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, email_address: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="edit_phone_number" className="text-right">
+              Phone
+            </Label>
+            <Input
+              id="edit_phone_number"
+              defaultValue={selectedSubsidiary.phone_number}
+              className="col-span-3"
+              onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, phone_number: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="edit_address" className="text-right">
+              Address
+            </Label>
+            <Textarea
+              id="edit_address"
+              defaultValue={selectedSubsidiary.address}
+              className="col-span-3"
+              onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, address: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right">Logo</Label>
+            <div className="col-span-3">
+              {subsidiaryLogoPreview || selectedSubsidiary.logo_url ? (
+                <div className="relative">
+                  <img
+                    src={subsidiaryLogoPreview || selectedSubsidiary.logo_url}
+                    alt="Subsidiary Logo"
+                    className="w-20 h-20 object-cover rounded-lg border"
                   />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                    onClick={() => {
+                      setSubsidiaryLogoPreview("")
+                      setSelectedSubsidiary({ ...selectedSubsidiary, logo_url: "" })
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="leaveTypeDays" className="text-sm font-medium">
-                      Days Allocated *
-                    </Label>
-                    <Input
-                      id="leaveTypeDays"
-                      type="number"
-                      min="0"
-                      max="365"
-                      placeholder="0"
-                      value={newLeaveType.days}
-                      onChange={(e) => {
-                        const days = Number.parseInt(e.target.value) || 0
-                        setNewLeaveType({ ...newLeaveType, days })
-                        setLeaveTypeAIInsights(
-                          generateLeaveTypeInsights(newLeaveType.name, days, newLeaveType.description),
-                        )
-                      }}
-                      className="w-full"
-                    />
-                    <p className="text-xs text-muted-foreground">Maximum days per year</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Carry Over Policy</Label>
-                    <div className="flex items-center space-x-3 pt-2">
-                      <Switch
-                        id="leaveTypeCarryOver"
-                        checked={newLeaveType.carryOver}
-                        onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, carryOver: checked })}
-                      />
-                      <Label htmlFor="leaveTypeCarryOver" className="text-sm text-muted-foreground">
-                        Allow unused days to carry over to next year
-                      </Label>
-                    </div>
-                  </div>
+              ) : (
+                <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                  <ImageIcon className="w-8 h-8 text-gray-400" />
                 </div>
-              </div>
-            </div>
-
-            {/* Description Section */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium text-foreground border-b pb-2">Description & Guidelines</h3>
-
-              <div className="space-y-2">
-                <Label htmlFor="leaveTypeDescription" className="text-sm font-medium">
-                  Policy Description
-                </Label>
-                <Textarea
-                  id="leaveTypeDescription"
-                  placeholder="Describe the purpose, eligibility criteria, and any special conditions for this leave type..."
-                  value={newLeaveType.description}
+              )}
+              <div className="space-y-2 mt-2">
+                <input
+                  type="file"
+                  accept="image/*"
                   onChange={(e) => {
-                    setNewLeaveType({ ...newLeaveType, description: e.target.value })
-                    setLeaveTypeAIInsights(
-                      generateLeaveTypeInsights(newLeaveType.name, newLeaveType.days, e.target.value),
-                    )
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      handleLogoUpload(file, "subsidiary")
+                    }
                   }}
-                  className="w-full min-h-[100px] resize-none"
+                  className="hidden"
+                  id="edit-subsidiary-logo-upload"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Provide clear guidelines to help employees understand when and how to use this leave type
-                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => document.getElementById("edit-subsidiary-logo-upload")?.click()}
+                  disabled={isUploadingLogo}
+                  className="flex items-center space-x-2"
+                >
+                  {isUploadingLogo ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Uploading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      <span>Upload Logo</span>
+                    </>
+                  )}
+                </Button>
+                <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      <DialogFooter>
+        <Button
+          type="submit"
+          onClick={async () => {
+            if (!selectedSubsidiary) return
 
-            {/* AI Insights Section */}
-            {leaveTypeAIInsights.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-foreground border-b pb-2">AI Recommendations</h3>
-
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1 bg-blue-100 rounded-full">
-                      <Sparkles className="w-4 h-4 text-blue-600" />
-                    </div>
-                    <span className="text-sm font-medium text-blue-900">Smart Insights</span>
-                  </div>
-                  <div className="space-y-2">
-                    {leaveTypeAIInsights.map((insight, index) => (
-                      <div key={index} className="flex items-start gap-2">
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
-                        <p className="text-sm text-blue-800 leading-relaxed">{insight}</p>
-                      </div>
-                    ))}
-                  </div>
+            setIsSavingSubsidiary(true)
+            await updateSubsidiary(selectedSubsidiary.id, selectedSubsidiary)
+            setShowEditSubsidiary(false)
+            setIsSavingSubsidiary(false)
+          }}
+          disabled={isSavingSubsidiary}
+        >
+          {isSavingSubsidiary ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            "Save Changes"
+          )}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+  ;<Dialog open={showSubsidiaryDetails} onOpenChange={setShowSubsidiaryDetails}>
+    <DialogContent className="sm:max-w-[550px]">
+      <DialogHeader>
+        <DialogTitle>Subsidiary Details</DialogTitle>
+        <DialogDescription>View detailed information about the selected subsidiary</DialogDescription>
+      </DialogHeader>
+      {selectedSubsidiary && (
+        <div className="space-y-4 py-4">
+          <div className="flex items-center space-x-4">
+            <div className="w-20 h-20 rounded-lg flex items-center justify-center overflow-hidden">
+              {selectedSubsidiary.logo_url ? (
+                <img
+                  src={selectedSubsidiary.logo_url || "/placeholder.svg"}
+                  alt={`${selectedSubsidiary.name} logo`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                  {selectedSubsidiary.name.charAt(0)}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">{selectedSubsidiary.name}</h3>
+              <p className="text-sm text-gray-600">{selectedSubsidiary.industry}</p>
+              <Badge variant={selectedSubsidiary.status === "active" ? "default" : "secondary"} className="mt-1">
+                {selectedSubsidiary.status}
+              </Badge>
+            </div>
           </div>
 
-          <DialogFooter className="flex gap-3 pt-6 border-t">
-            <Button variant="outline" onClick={() => setShowAddLeaveTypeModal(false)} className="flex-1 sm:flex-none">
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              onClick={handleAddLeaveType}
-              disabled={isManagingLeaveTypes || !newLeaveType.name.trim() || newLeaveType.days <= 0}
-              className="flex-1 sm:flex-none"
-            >
-              {isManagingLeaveTypes ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating Leave Type...
-                </>
-              ) : (
-                <>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Leave Type
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h4 className="font-medium">Contact Information</h4>
+              <p className="text-sm text-gray-600">Email: {selectedSubsidiary.email_address}</p>
+              <p className="text-sm text-gray-600">Phone: {selectedSubsidiary.phone_number}</p>
+              <p className="text-sm text-gray-600">Address: {selectedSubsidiary.address}</p>
+            </div>
+            <div>
+              <h4 className="font-medium">Registration Details</h4>
+              <p className="text-sm text-gray-600">Tax ID: {selectedSubsidiary.tax_id}</p>
+              <p className="text-sm text-gray-600">SSNIT: {selectedSubsidiary.ssnit_number}</p>
+              <p className="text-sm text-gray-600">
+                Created: {new Date(selectedSubsidiary.created_at || "").toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-medium">Organizational Structure</h4>
+            <p className="text-sm text-gray-600">Divisions: {selectedSubsidiary.divisions?.join(", ") || "N/A"}</p>
+            <p className="text-sm text-gray-600">Departments: {selectedSubsidiary.departments?.join(", ") || "N/A"}</p>
+            <p className="text-sm text-gray-600">Locations: {selectedSubsidiary.locations?.join(", ") || "N/A"}</p>
+          </div>
+
+          <div>
+            <h4 className="font-medium">Employee Count</h4>
+            <p className="text-sm text-gray-600">Total Employees: {selectedSubsidiary.employee_count || 0}</p>
+          </div>
+        </div>
+      )}
+      <DialogFooter>
+        <Button onClick={() => setShowSubsidiaryDetails(false)}>Close</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+  ;<Dialog open={showDeactivateConfirm} onOpenChange={setShowDeactivateConfirm}>
+    <DialogContent className="sm:max-w-[425px]">
+      <DialogHeader>
+        <DialogTitle>Deactivate Subsidiary</DialogTitle>
+        <DialogDescription>
+          Are you sure you want to deactivate this subsidiary? This action will prevent further access.
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button variant="secondary" onClick={() => setShowDeactivateConfirm(false)}>
+          Cancel
+        </Button>
+        <Button variant="destructive" onClick={confirmToggleStatus}>
+          Deactivate
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+  ;<Dialog open={showReactivateConfirm} onOpenChange={setShowReactivateConfirm}>
+    <DialogContent className="sm:max-w-[425px]">
+      <DialogHeader>
+        <DialogTitle>Reactivate Subsidiary</DialogTitle>
+        <DialogDescription>
+          Are you sure you want to reactivate this subsidiary? This action will restore access.
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button variant="secondary" onClick={() => setShowReactivateConfirm(false)}>
+          Cancel
+        </Button>
+        <Button onClick={confirmToggleStatus}>Reactivate</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+  ;<Dialog
+    open={viewEmployeesModal.isOpen}
+    onOpenChange={() => setViewEmployeesModal({ ...viewEmployeesModal, isOpen: false })}
+  >
+    <DialogContent className="sm:max-w-[600px]">
+      <DialogHeader>
+        <DialogTitle>
+          Employees of {subsidiaries.find((s) => s.id === viewEmployeesModal.subsidiaryId)?.name}
+        </DialogTitle>
+        <DialogDescription>View a list of employees associated with this subsidiary</DialogDescription>
+      </DialogHeader>
+      <div className="divide-y divide-gray-200">
+        {viewEmployeesModal.employees?.map((employee) => (
+          <div key={employee.id} className="py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">{employee.name}</p>
+                <p className="text-sm text-gray-600">
+                  {employee.position} - {employee.department}
+                </p>
+              </div>
+              <p className="text-sm text-gray-500">{employee.email}</p>
+            </div>
+          </div>
+        ))}
+        {viewEmployeesModal.employees?.length === 0 && (
+          <div className="py-4 text-center text-gray-500">No employees found for this subsidiary.</div>
+        )}
+      </div>
+      <DialogFooter>
+        <Button onClick={() => setViewEmployeesModal({ ...viewEmployeesModal, isOpen: false })}>Close</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+  ;<Dialog open={importModal} onOpenChange={() => setImportModal(false)}>
+    <DialogContent className="sm:max-w-[425px]">
+      <DialogHeader>
+        <DialogTitle>Import Settings</DialogTitle>
+        <DialogDescription>Import settings from a CSV file</DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-4 py-4">
+        <input
+          type="file"
+          accept=".csv"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) {
+              handleImportSettings(file)
+              setImportModal(false)
+            }
+          }}
+        />
+      </div>
+      <DialogFooter>
+        <Button type="button" onClick={() => setImportModal(false)}>
+          Cancel
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+  ;<Dialog open={showAddLeaveTypeModal} onOpenChange={() => setShowAddLeaveTypeModal(false)}>
+    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogHeader className="space-y-3">
+        <DialogTitle className="text-xl font-semibold">Add New Leave Type</DialogTitle>
+        <DialogDescription className="text-sm text-muted-foreground">
+          Create a new leave type for your organization with detailed configuration options
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-6 py-6">
+        {/* Basic Information Section */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-foreground border-b pb-2">Basic Information</h3>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="leaveTypeName" className="text-sm font-medium">
+                Leave Type Name *
+              </Label>
+              <Input
+                id="leaveTypeName"
+                placeholder="e.g., Personal Leave, Study Leave, Compassionate Leave"
+                value={newLeaveType.name}
+                onChange={(e) => {
+                  setNewLeaveType({ ...newLeaveType, name: e.target.value })
+                  setLeaveTypeAIInsights(
+                    generateLeaveTypeInsights(e.target.value, newLeaveType.days, newLeaveType.description),
+                  )
+                }}
+                className="w-full"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="leaveTypeDays" className="text-sm font-medium">
+                  Days Allocated *
+                </Label>
+                <Input
+                  id="leaveTypeDays"
+                  type="number"
+                  min="0"
+                  max="365"
+                  placeholder="0"
+                  value={newLeaveType.days}
+                  onChange={(e) => {
+                    const days = Number.parseInt(e.target.value) || 0
+                    setNewLeaveType({ ...newLeaveType, days })
+                    setLeaveTypeAIInsights(generateLeaveTypeInsights(newLeaveType.name, days, newLeaveType.description))
+                  }}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">Maximum days per year</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Carry Over Policy</Label>
+                <div className="flex items-center space-x-3 pt-2">
+                  <Switch
+                    id="leaveTypeCarryOver"
+                    checked={newLeaveType.carryOver}
+                    onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, carryOver: checked })}
+                  />
+                  <Label htmlFor="leaveTypeCarryOver" className="text-sm text-muted-foreground">
+                    Allow unused days to carry over to next year
+                  </Label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Description Section */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-foreground border-b pb-2">Description & Guidelines</h3>
+
+          <div className="space-y-2">
+            <Label htmlFor="leaveTypeDescription" className="text-sm font-medium">
+              Policy Description
+            </Label>
+            <Textarea
+              id="leaveTypeDescription"
+              placeholder="Describe the purpose, eligibility criteria, and any special conditions for this leave type..."
+              value={newLeaveType.description}
+              onChange={(e) => {
+                setNewLeaveType({ ...newLeaveType, description: e.target.value })
+                setLeaveTypeAIInsights(generateLeaveTypeInsights(newLeaveType.name, newLeaveType.days, e.target.value))
+              }}
+              className="w-full min-h-[100px] resize-none"
+            />
+            <p className="text-xs text-muted-foreground">
+              Provide clear guidelines to help employees understand when and how to use this leave type
+            </p>
+          </div>
+        </div>
+
+        {/* AI Insights Section */}
+        {leaveTypeAIInsights.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-foreground border-b pb-2">AI Recommendations</h3>
+
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="p-1 bg-blue-100 rounded-full">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                </div>
+                <span className="text-sm font-medium text-blue-900">Smart Insights</span>
+              </div>
+              <div className="space-y-2">
+                {leaveTypeAIInsights.map((insight, index) => (
+                  <div key={index} className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
+                    <p className="text-sm text-blue-800 leading-relaxed">{insight}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <DialogFooter className="flex gap-3 pt-6 border-t">
+        <Button variant="outline" onClick={() => setShowAddLeaveTypeModal(false)} className="flex-1 sm:flex-none">
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          onClick={handleAddLeaveType}
+          disabled={isManagingLeaveTypes || !newLeaveType.name.trim() || newLeaveType.days <= 0}
+          className="flex-1 sm:flex-none"
+        >
+          {isManagingLeaveTypes ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Creating Leave Type...
+            </>
+          ) : (
+            <>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Leave Type
+            </>
+          )}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+  </div>
   )
 }
 
