@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { text } = await generateText({
-      model: groq("llama-3.1-70b-versatile"),
+      model: groq("llama-3.1-70b-instruct"),
       prompt: prompt,
       maxTokens: 1500,
       temperature: 0.7,
