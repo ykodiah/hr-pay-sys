@@ -7,7 +7,10 @@ import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import {
   Building2,
+  Shield,
   Users,
+  DollarSign,
+  Bell,
   X,
   Eye,
   Edit,
@@ -30,6 +33,10 @@ import {
   Sparkles,
   TrendingUp,
   Trash2,
+  FileText,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -42,6 +49,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 
@@ -885,8 +900,6 @@ export default function SettingsPage() {
             name: subsidiaryData.name,
             tax_id: subsidiaryData.tax_id,
             ssnit_number: subsidiaryData.ssnit_number,
-            address: subsidiaryData.address,
-            phone_number: subsidiaryData.phone_number,\`\`\`typescript\
             address: subsidiaryData.address,
             phone_number: subsidiaryData.phone_number,
             email_address: subsidiaryData.email_address,
@@ -1985,7 +1998,6 @@ Next Review Date: January 15, 2025`,
     } finally {
       setIsSaving(false)
     }
-
   }
 
   const confirmDeactivateSubsidiary = (subsidiaryId: string) => {
@@ -2065,7 +2077,6 @@ Next Review Date: January 15, 2025`,
       toast({
         title: "Backup Failed",
         description: "Failed to complete system backup.",
-        variant: "destructive",
       })
     } finally {
       setIsBackingUp(false)
@@ -2896,7 +2907,6 @@ Next Review Date: January 15, 2025`,
                                         ? "default"
                                         : "secondary"
                                   }
-                                  className="text-xs"
                                 >
                                   {policy.usage}
                                 </Badge>
@@ -3000,4 +3010,586 @@ Next Review Date: January 15, 2025`,
             </Card>
 
             <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <FileText className="w-5 h-5" />
+                  <span>HR Policy Documents</span>
+                </CardTitle>
+                <CardDescription>Manage HR policy documents and employee access</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Update HR documents rendering with 3-dot menus */}
+                <div className="space-y-3">
+                  {hrDocuments.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between p-3 border rounded hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <FileText className="w-5 h-5 text-gray-500" />
+                        <div>
+                          <p className="font-medium">{doc.name}</p>
+                          <p className="text-sm text-gray-500">
+                            {doc.type} • {doc.size}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2">
+                          <Label htmlFor={`visible-${doc.id}`} className="text-sm">
+                            Visible to all employees
+                          </Label>
+                          <Switch
+                            id={`visible-${doc.id}`}
+                            checked={doc.visibleToAll}
+                            onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
+                          />
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDocumentView(doc)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDocumentAction("edit", doc.id)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleDocumentAction("delete", doc.id)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" onClick={handleAddDocument} className="w-full bg-transparent">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add HR Policy Document
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Document Modal */}
+              <Dialog open={showDocumentModal} onOpenChange={setShowDocumentModal}>
+                <DialogContent
+                  className={`${isFullscreen ? "max-w-[99vw] max-h-[99vh] w-[99vw] h-[99vh]" : "max-w-[95vw] max-h-[95vh] w-[95vw] h-[95vh]"} overflow-hidden p-0`}
+                >
+                  <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
+                    <DialogTitle>Document Details</DialogTitle>
+                    <DialogDescription>View details of the selected document</DialogDescription>
+                  </DialogHeader>
+
+                  {documentModalType === "view" && selectedDocument && (
+                    <div className="flex flex-col h-full">
+                      <div className="px-6 py-3 bg-gray-50 border-b flex-shrink-0">
+                        <div className="grid grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <span className="font-medium text-gray-700">Name</span>
+                            <p className="text-gray-900">{selectedDocument.name}</p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">Type</span>
+                            <p className="text-gray-900">{selectedDocument.type}</p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">Size</span>
+                            <p className="text-gray-900">{selectedDocument.size}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 flex flex-col overflow-hidden">
+                        <div className="flex items-center justify-between px-6 py-2 bg-white border-b flex-shrink-0">
+                          <h3 className="text-lg font-semibold">Document Preview</h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowDocumentPreview(!showDocumentPreview)}
+                            className="text-gray-600 hover:text-gray-900"
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            {showDocumentPreview ? "Hide Preview" : "Show Preview"}
+                          </Button>
+                        </div>
+
+                        {showDocumentPreview && (
+                          <div className="flex-1 flex flex-col overflow-hidden">
+                            <div className="border-0 bg-white shadow-sm flex-1 flex flex-col">
+                              {/* Document Viewer Header */}
+                              <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50 flex-shrink-0">
+                                <div className="flex items-center space-x-3">
+                                  <div className="flex items-center space-x-2">
+                                    <FileText className="w-5 h-5 text-blue-600" />
+                                    <span className="font-medium text-gray-900">{selectedDocument.name}</span>
+                                    <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">
+                                      {selectedDocument.type}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleZoomIn}
+                                  disabled={documentZoom >= 200}
+                                  title="Zoom In"
+                                  className="hover:bg-gray-200"
+                                >
+                                  <ZoomIn className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleZoomOut}
+                                  disabled={documentZoom <= 50}
+                                  title="Zoom Out"
+                                  className="hover:bg-gray-200"
+                                >
+                                  <ZoomOut className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleDownload}
+                                  title="Download Document"
+                                  className="hover:bg-gray-200"
+                                >
+                                  <Download className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleFullscreen}
+                                  title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                                  className="hover:bg-gray-200"
+                                >
+                                  <Maximize2 className="w-4 h-4" />
+                                </Button>
+                                <div className="text-xs text-gray-500 px-2 border-l font-medium">{documentZoom}%</div>
+                              </div>
+                            </div>
+
+                              <div className="flex-1 bg-gray-100 p-4 overflow-auto">
+                                <div className="max-w-6xl mx-auto h-full">
+                                  {/* Document Page Container */}
+                                  <div
+                                    className="bg-white shadow-lg border border-gray-300 p-12 font-serif text-gray-900 leading-relaxed mx-auto"
+                                    style={{
+                                      transform: `scale(${documentZoom / 100})`,
+                                      transformOrigin: "top center",
+                                      marginBottom: `${(documentZoom - 100) * 8}px`,
+                                      width: "210mm", // A4 width
+                                      minHeight: "297mm", // A4 height
+                                    }}
+                                  >
+                                  {/* Document Header */}
+                                  <div className="text-center mb-12 pb-6 border-b-2 border-gray-300">
+                                    <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                                      <FileText className="w-10 h-10 text-white" />
+                                    </div>
+                                    <h1 className="text-3xl font-bold text-gray-900 mb-4">{selectedDocument.name}</h1>
+                                    <div className="flex justify-center space-x-8 text-sm text-gray-600">
+                                      <div>
+                                        <span className="font-medium">Document Type:</span> {selectedDocument.type}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Size:</span> {selectedDocument.size}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Last Modified:</span> 9/17/2025
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Document Content */}
+                                  <div className="prose prose-xl max-w-none">
+                                    <pre className="whitespace-pre-wrap font-serif text-lg leading-relaxed text-gray-900">
+                                      {documentPreviewContent}
+                                    </pre>
+                                  </div>
+
+                                  {/* Document Footer */}
+                                  <div className="mt-16 pt-6 border-t border-gray-300 text-center text-sm text-gray-500">
+                                    <p>
+                                      This document is confidential and proprietary. Unauthorized distribution is
+                                      prohibited.
+                                    </p>
+                                    <p className="mt-2">© 2024 Company Name. All rights reserved.</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="px-6 py-4 border-t bg-gray-50 flex justify-end flex-shrink-0">
+                        <Button variant="outline" onClick={() => setShowDocumentModal(false)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {documentModalType === "edit" && selectedDocument && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="edit-document-name">Document Name</Label>
+                        <Input
+                          id="edit-document-name"
+                          value={documentName}
+                          onChange={(e) => setDocumentName(e.target.value)}
+                          placeholder="Enter document name"
+                        />
+                      </div>
+                      <div>\
+                        <Label htmlFor="edit-document-file">File (optional)</Label>
+                        <div className="mt-1">
+                          <Input
+                            id="edit-document-file"
+                            type="file"
+                            onChange={handleFileUpload}
+                            accept=".pdf,.doc,.docx"
+                            className="cursor-pointer hover:bg-gray-50"
+                          />
+                        </div>
+                        <p className="text-sm text-gray-500 mt-1">Leave empty to keep the current file</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {documentModalType === "delete" && selectedDocument && (
+                    <div className="space-y-4">
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-center space-x-2">
+                          <AlertTriangle className="w-5 h-5 text-red-600" />
+                          <p className="text-sm text-red-800">
+                            This action cannot be undone. This will permanently delete "{selectedDocument.name}".
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowDocumentModal(false)}>
+                      Cancel
+                    </Button>
+                    {documentModalType === "add" && (
+                      <Button onClick={handleSaveDocument} disabled={isSavingDocument}>
+                        {isSavingDocument ? "Uploading..." : "Add Document"}
+                      </Button>
+                    )}
+                    {documentModalType === "edit" && (
+                      <Button onClick={handleEditDocument} disabled={isSavingDocument}>
+                        {isSavingDocument ? "Saving..." : "Save Changes"}
+                      </Button>
+                    )}
+                    {documentModalType === "delete" && (
+                      <Button
+                        variant="destructive"
+                        onClick={() => handleDeleteDocument(selectedDocument.id)}
+                        disabled={isSavingDocument}
+                      >
+                        {isSavingDocument ? "Deleting..." : "Delete Document"}
+                      </Button>
+                    )}
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="payroll">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <DollarSign className="w-5 h-5" />
+                <span>Payroll Settings</span>
+              </CardTitle>
+              <CardDescription>Configure payroll calculations, allowances, and deductions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Allowances</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Transport Allowance</span>
+                    <span className="text-sm text-gray-600">₵200.00</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Housing Allowance</span>
+                    <span className="text-sm text-gray-600">15%</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Meal Allowance</span>
+                    <span className="text-sm text-gray-600">₵150.00</span>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleManageAllowances}>
+                  Manage Allowances
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Deductions</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>SSNIT (Employee)</span>
+                    <span className="text-sm text-gray-600">5.5%</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Income Tax</span>
+                    <span className="text-sm text-gray-600">Variable</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Staff Loan</span>
+                    <span className="text-sm text-gray-600">₵500.00</span>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleManageDeductions}>
+                  Manage Deductions
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Bell className="w-5 h-5" />
+                <span>Notification Settings</span>
+              </CardTitle>
+              <CardDescription>Configure email templates and notification preferences</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Email Templates</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <div>
+                      <span className="font-medium">Welcome Email</span>
+                      <p className="text-sm text-gray-600">Welcome to Akwaaba Technologies</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Welcome Email")}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Template
+                    </Button>
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <div>
+                      <span className="font-medium">Leave Request</span>
+                      <p className="text-sm text-gray-600">Notification for leave requests</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Leave Request")}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Template
+                    </Button>
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <div>
+                      <span className="font-medium">Password Reset</span>
+                      <p className="text-sm text-gray-600">Instructions for resetting password</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => handleEditEmailTemplate("Password Reset")}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Template
+                    </Button>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleAddEmailTemplate}>
+                  Add Email Template
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Notification Preferences</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Leave Request Notifications</span>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Task Assignment Notifications</span>
+                    <Switch />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Meeting Reminders</span>
+                    <Switch defaultChecked />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="roles">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Shield className="w-5 h-5" />
+                <span>Roles & Permissions</span>
+              </CardTitle>
+              <CardDescription>Manage user roles and access permissions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Current Roles</h3>
+                <div className="space-y-2">
+                  {roles.map((role) => (
+                    <div key={role.id} className="flex justify-between items-center p-3 border rounded">
+                      <div>
+                        <span className="font-medium">{role.name}</span>
+                        <p className="text-sm text-gray-600">{role.description}</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-500">{role.user_count} Users</span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditRole(role.name)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Role
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-red-600">
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Role
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" size="sm" onClick={handleAddRole}>
+                  Add Role
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="access">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Users className="w-5 h-5" />
+                <span>Access Management</span>
+              </CardTitle>
+              <CardDescription>Manage user access and authentication settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Authentication Methods</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Password Authentication</span>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Two-Factor Authentication</span>
+                    <Switch />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Social Login (Google, Facebook)</span>
+                    <Switch />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="security">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Shield className="w-5 h-5" />
+                <span>Security Settings</span>
+              </CardTitle>
+              <CardDescription>Configure security settings and data backup options</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Data Backup</h3>
+                <div className="flex justify-between items-center p-3 border rounded">
+                  <div>
+                    <span className="font-medium">Last Backup</span>
+                    <p className="text-sm text-gray-600">
+                      {lastBackupTime ? new Date(lastBackupTime).toLocaleString() : "No backup yet"}
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleBackupNow} disabled={isBackingUp}>
+                    {isBackingUp ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Backing Up...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Backup Now
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Security Policies</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Password Expiry (90 days)</span>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>IP Address Whitelisting</span>
+                    <Switch />
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Data Encryption</span>
+                    <Switch defaultChecked />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Add Subsidiary Modal */}
+      <Dialog open={showAddSubsidiary} onOpenChange={setShowAddSubsidiary}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add New Subsidiary</DialogTitle>
+            <DialogDescription>Create a new subsidiary company</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input id="name" defaultValue="" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
 \
