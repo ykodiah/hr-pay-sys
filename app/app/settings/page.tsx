@@ -29,7 +29,6 @@ import {
   Calendar,
   Sparkles,
   TrendingUp,
-  Trash2,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -1549,6 +1548,147 @@ export default function SettingsPage() {
     return insights
   }
 
+  const getDocumentContent = (document: any) => {
+    if (!document) return ""
+
+    const documentTemplates: Record<string, { content: string }> = {
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+WELCOME TO OUR COMPANY
+
+This handbook serves as a guide to our company policies, procedures, and benefits. Please read it carefully and keep it for future reference.
+
+TABLE OF CONTENTS
+
+1. EMPLOYMENT POLICIES
+   - Equal Employment Opportunity
+   - Anti-Discrimination Policy
+   - Harassment Prevention
+   - Code of Conduct
+
+2. WORK SCHEDULES AND ATTENDANCE
+   - Standard Work Hours
+   - Flexible Work Arrangements
+   - Attendance Policy
+   - Time Off Requests
+
+3. COMPENSATION AND BENEFITS
+   - Salary Administration
+   - Performance Reviews
+   - Health Insurance
+   - Retirement Plans
+   - Paid Time Off
+
+4. WORKPLACE POLICIES
+   - Dress Code
+   - Technology Use
+   - Confidentiality
+   - Safety Procedures
+
+5. EMPLOYEE DEVELOPMENT
+   - Training Programs
+   - Career Advancement
+   - Performance Management
+   - Professional Development
+
+For questions about this handbook, please contact Human Resources.`,
+      },
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+INTRODUCTION
+
+Our Code of Conduct outlines the ethical standards and behavioral expectations for all employees, contractors, and business partners.
+
+CORE VALUES
+
+1. INTEGRITY
+   - Act honestly and transparently
+   - Keep commitments and promises
+   - Report violations without fear of retaliation
+
+2. RESPECT
+   - Treat all individuals with dignity
+   - Value diversity and inclusion
+   - Maintain professional relationships
+
+3. ACCOUNTABILITY
+   - Take responsibility for actions
+   - Meet performance expectations
+   - Support team objectives
+
+ETHICAL GUIDELINES
+
+• Conflict of Interest
+• Confidential Information
+• Fair Dealing
+• Compliance with Laws
+• Reporting Concerns
+
+ENFORCEMENT
+
+Violations of this Code may result in disciplinary action, up to and including termination of employment.
+
+For questions or to report concerns, contact the Ethics Hotline at ethics@company.com`,
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.0
+APPROVED BY: Safety Committee
+
+SAFETY FIRST
+
+The safety and well-being of our employees is our top priority. This manual provides guidelines for maintaining a safe work environment.
+
+GENERAL SAFETY RULES
+
+1. Report all accidents and injuries immediately
+2. Use personal protective equipment when required
+3. Follow all safety procedures and protocols
+4. Keep work areas clean and organized
+5. Report unsafe conditions or practices
+
+EMERGENCY PROCEDURES
+
+• Fire Emergency
+• Medical Emergency
+• Evacuation Procedures
+• Emergency Contacts
+
+WORKPLACE HAZARDS
+
+• Chemical Safety
+• Electrical Safety
+• Ergonomic Guidelines
+• Equipment Operation
+
+TRAINING REQUIREMENTS
+
+All employees must complete safety training within 30 days of employment and annually thereafter.
+
+For safety concerns, contact the Safety Officer at safety@company.com`,
+      },
+    }
+
+    return (
+      documentTemplates[document.name]?.content ||
+      `Document: ${document.name}
+
+This document contains important information about ${document.name.toLowerCase()}. The content would be displayed here in a real implementation.`
+    )
+  }
+
   const parseDocumentContent = (document: any) => {
     const documentTemplates = {
       "Code of Conduct": {
@@ -2813,7 +2953,7 @@ Next Review Date: January 15, 2025`,
                         <Sparkles className="w-4 h-4 text-purple-500" />
                         <span>AI Recommendations</span>
                       </Label>
-                      <p className="text-sm text-muted-foreground">Get AI-powered insights for HR decisions</p>
+                      <p className="text-sm text-muted-foreground">Enable AI-driven insights for HR processes</p>
                     </div>
                     <Switch
                       checked={hrConfig.aiRecommendations}
@@ -2824,10 +2964,10 @@ Next Review Date: January 15, 2025`,
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label className="flex items-center space-x-2">
-                        <Brain className="w-4 h-4 text-blue-500" />
+                        <TrendingUp className="w-4 h-4 text-blue-500" />
                         <span>Smart Scheduling</span>
                       </Label>
-                      <p className="text-sm text-muted-foreground">AI-optimized shift and leave scheduling</p>
+                      <p className="text-sm text-muted-foreground">Optimize schedules based on employee availability</p>
                     </div>
                     <Switch
                       checked={hrConfig.smartScheduling}
@@ -2838,10 +2978,10 @@ Next Review Date: January 15, 2025`,
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label className="flex items-center space-x-2">
-                        <TrendingUp className="w-4 h-4 text-green-500" />
+                        <Calendar className="w-4 h-4 text-green-500" />
                         <span>Performance Tracking</span>
                       </Label>
-                      <p className="text-sm text-muted-foreground">AI-enhanced performance analytics</p>
+                      <p className="text-sm text-muted-foreground">Track employee performance metrics and goals</p>
                     </div>
                     <Switch
                       checked={hrConfig.performanceTracking}
@@ -2852,138 +2992,1237 @@ Next Review Date: January 15, 2025`,
               </CardContent>
             </Card>
 
+            {/* Leave Policies Management */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Calendar className="w-5 h-5" />
-                  <span>Leave Policies</span>
-                </CardTitle>
-                <CardDescription>Manage leave types and policies with AI insights</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <h3 className="font-semibold flex items-center space-x-2">
-                      <span>Current Policies</span>
-                      {hrConfig.aiRecommendations && (
-                        <Badge variant="secondary" className="text-xs">
-                          <Sparkles className="w-3 h-3 mr-1" />
-                          AI Enhanced
-                        </Badge>
-                      )}
-                    </h3>
-                    {/* Update the current policies rendering to use state */}
-                    <div className="space-y-2">
-                      {currentPolicies.map((policy) => (
-                        <div
-                          key={policy.name}
-                          className="flex justify-between items-center p-3 border rounded hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2">
-                              <span className="font-medium">{policy.name}</span>
-                              {hrConfig.aiRecommendations && (
-                                <Badge
-                                  variant={
-                                    policy.trend === "up"
-                                      ? "destructive"
-                                      : policy.trend === "down"
-                                        ? "default"
-                                        : "secondary"
-                                  }
-                                >
-                                  {policy.usage}
-                                </Badge>
-                              )}
-                            </div>
-                            <span className="text-sm text-gray-600">{policy.days} days</span>
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handlePolicyAction("view", policy.name)}>
-                                <Eye className="w-4 h-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handlePolicyAction("edit", policy.name)}>
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit Policy
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => handlePolicyAction("delete", policy.name)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete Policy
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      ))}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleManageLeaveTypes}
-                      disabled={isManagingLeaveTypes}
-                      className="w-full bg-transparent"
-                    >
-                      {isManagingLeaveTypes ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Loading...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add Leave Types
-                        </>
-                      )}
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center space-x-2">
+                    <Calendar className="w-5 h-5" />
+                    <span>Leave Policies</span>
+                  </CardTitle>
+                  <div className="flex items-center space-x-2">
+                    <Button variant="outline" onClick={handleManageLeaveTypes}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Leave Type
+                    </Button>
+                    <Button variant="outline" onClick={() => setIsManagingLeaveTypes(true)}>
+                      <Brain className="w-4 h-4 mr-2" />
+                      Generate AI Insights
                     </Button>
                   </div>
+                </div>
+                <CardDescription>Manage leave policies and generate AI insights</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {currentPolicies.map((policy) => (
+                    <Card key={policy.name} className="border-l-4 border-l-blue-500">
+                      <CardHeader>
+                        <CardTitle className="text-lg font-semibold">{policy.name}</CardTitle>
+                        <CardDescription>{policy.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <p className="text-sm">
+                          <span className="font-medium">Days:</span> {policy.days}
+                        </p>
+                        <p className="text-sm">
+                          <span className="font-medium">Usage:</span> {policy.usage}
+                        </p>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-medium">Trend:</span>
+                          {policy.trend === "up" && <TrendingUp className="w-4 h-4 text-green-500" />}
+                          {policy.trend === "down" && <TrendingUp className="w-4 h-4 text-red-500 rotate-180" />}
+                          {policy.trend === "stable" && "-"}
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => handlePolicyAction("view", policy.name)}>
+                            View
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handlePolicyAction("edit", policy.name)}>
+                            Edit
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handlePolicyAction("delete", policy.name)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
-                  <div className="space-y-4">
-                    <h3 className="font-semibold flex items-center space-x-2">
-                      <Sparkles className="w-4 h-4 text-purple-500" />
-                      <span>AI Insights</span>
-                    </h3>
-                    {hrConfig.aiRecommendations ? (
-                      <div className="space-y-3">
-                        <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                          <div className="flex items-start space-x-2">
-                            <TrendingUp className="w-4 h-4 text-blue-600 mt-0.5" />
-                            <div>
-                              <p className="text-sm font-medium text-blue-800">High Annual Leave Usage</p>
-                              <p className="text-xs text-blue-600">Consider reviewing leave allocation policies</p>
-                            </div>
+            {/* HR Documents Management */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center space-x-2">
+                    <ImageIcon className="w-5 h-5" />
+                    <span>HR Documents</span>
+                  </CardTitle>
+                  <Button variant="outline" onClick={handleAddDocument}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Document
+                  </Button>
+                </div>
+                <CardDescription>Manage HR documents and visibility settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
+                  {hrDocuments.map((doc) => (
+                    <Card key={doc.id} className="border-l-4 border-l-green-500">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-base font-semibold">{doc.name}</h3>
+                            <p className="text-xs text-gray-600">
+                              {doc.type} - {doc.size}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-4">
+                            <Switch
+                              checked={doc.visibleToAll}
+                              onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
+                            />
+                            <Button variant="outline" size="sm" onClick={() => handleDocumentView(doc)}>
+                              View
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => handleDocumentAction("edit", doc.id)}>
+                              Edit
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDocumentAction("delete", doc.id)}
+                            >
+                              Delete
+                            </Button>
                           </div>
                         </div>
-
-                        <div className="p-3 bg-green-50 border border-green-200 rounded">
-                          <div className="flex items-start space-x-2">
-                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
-                            <div>
-                              <p className="text-sm font-medium text-green-800">Low Sick Leave Usage</p>
-                              <p className="text-xs text-green-600">Employees are maintaining good health</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-500">Enable AI recommendations to see insights</p>
-                    )}
-                  </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
+
+        <TabsContent value="payroll">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Settings className="w-5 h-5" />
+                <span>Payroll Configuration</span>
+              </CardTitle>
+              <CardDescription>Configure payroll settings and policies</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="payFrequency">Pay Frequency</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select frequency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="biweekly">Bi-Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="currency">Currency</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="usd">USD</SelectItem>
+                      <SelectItem value="eur">EUR</SelectItem>
+                      <SelectItem value="ghs">GHS</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Button variant="outline" onClick={handleManageAllowancesInner}>
+                  Manage Allowances
+                </Button>
+                <Button variant="outline" onClick={handleManageDeductionsInner}>
+                  Manage Deductions
+                </Button>
+                <Button variant="outline" onClick={handleManageSalaryGradesInner}>
+                  Manage Salary Grades
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Settings className="w-5 h-5" />
+                <span>Notifications</span>
+              </CardTitle>
+              <CardDescription>Configure email and system notifications</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <Button variant="outline" onClick={handleAddEmailTemplateInner}>
+                  Add Email Template
+                </Button>
+                <Button variant="outline" onClick={() => handleEditEmailTemplateInner("Welcome Email")}>
+                  Edit Welcome Email
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="roles">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="w-5 h-5" />
+                  <span>Roles & Permissions</span>
+                </CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" onClick={handleAddRoleInner}>
+                    Add Role
+                  </Button>
+                </div>
+              </div>
+              <CardDescription>Manage user roles and permissions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                {roles.map((role) => (
+                  <Card key={role.id} className="border-l-4 border-l-indigo-500">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-base font-semibold">{role.name}</h3>
+                          <p className="text-xs text-gray-600">{role.description}</p>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <span className="text-sm text-gray-500">{role.user_count} Users</span>
+                          <Button variant="outline" size="sm" onClick={() => handleEditRoleInner(role.name)}>
+                            Edit
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="access">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Settings className="w-5 h-5" />
+                <span>Access Control</span>
+              </CardTitle>
+              <CardDescription>Manage user access and authentication settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <Label>Two-Factor Authentication</Label>
+                <Switch />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="security">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Settings className="w-5 h-5" />
+                  <span>Security</span>
+                </CardTitle>
+                <Button variant="outline" onClick={handleBackupNowInner} disabled={isBackingUp}>
+                  {isBackingUp ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Backing Up...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" />
+                      Backup Now
+                    </>
+                  )}
+                </Button>
+              </div>
+              <CardDescription>Manage security settings and backups</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <Label>Last Backup</Label>
+                <p>{lastBackupTime ? new Date(lastBackupTime).toLocaleString() : "No backup yet"}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Add Subsidiary Modal */}
+      {showAddSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Add New Subsidiary</CardTitle>
+                <CardDescription>Enter the details for the new subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    <div className="flex items-center space-x-4">
+                      {subsidiaryLogoPreview ? (
+                        <div className="relative">
+                          <img
+                            src={subsidiaryLogoPreview || "/placeholder.svg"}
+                            alt="Subsidiary Logo"
+                            className="w-20 h-20 object-cover rounded-lg border"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                            onClick={() => setSubsidiaryLogoPreview("")}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                          <ImageIcon className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              handleLogoUpload(file, "subsidiary")
+                            }
+                          }}
+                          className="hidden"
+                          id="subsidiary-logo-upload"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById("subsidiary-logo-upload")?.click()}
+                          disabled={isUploadingLogo}
+                          className="flex items-center space-x-2"
+                        >
+                          {isUploadingLogo ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              <span>Upload Logo</span>
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="subsidiaryName">Subsidiary Name</Label>
+                      <Input id="subsidiaryName" placeholder="Enter subsidiary name" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryIndustry">Industry</Label>
+                      <Input id="subsidiaryIndustry" placeholder="Enter industry" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryTaxId">Tax ID</Label>
+                      <Input id="subsidiaryTaxId" placeholder="Enter tax ID" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiarySsnit">SSNIT Number</Label>
+                      <Input id="subsidiarySsnit" placeholder="Enter SSNIT number" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryEmail">Email Address</Label>
+                      <Input id="subsidiaryEmail" type="email" placeholder="Enter email address" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryPhone">Phone Number</Label>
+                      <Input id="subsidiaryPhone" placeholder="Enter phone number" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="subsidiaryAddress">Address</Label>
+                    <Textarea id="subsidiaryAddress" placeholder="Enter address" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter division" />
+                      <Button variant="outline" size="sm">
+                        Add Division
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter department" />
+                      <Button variant="outline" size="sm">
+                        Add Department
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter location" />
+                      <Button variant="outline" size="sm">
+                        Add Location
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setShowAddSubsidiary(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => setShowAddSubsidiary(false)}>Add Subsidiary</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Subsidiary Modal */}
+      {showEditSubsidiary && selectedSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Edit Subsidiary</CardTitle>
+                <CardDescription>Edit the details for the selected subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    <div className="flex items-center space-x-4">
+                      {subsidiaryLogoPreview || selectedSubsidiary.logo_url ? (
+                        <div className="relative">
+                          <img
+                            src={subsidiaryLogoPreview || selectedSubsidiary.logo_url}
+                            alt="Subsidiary Logo"
+                            className="w-20 h-20 object-cover rounded-lg border"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                            onClick={() => setSubsidiaryLogoPreview("")}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                          <ImageIcon className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              handleLogoUpload(file, "subsidiary")
+                            }
+                          }}
+                          className="hidden"
+                          id="subsidiary-logo-upload-edit"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById("subsidiary-logo-upload-edit")?.click()}
+                          disabled={isUploadingLogo}
+                          className="flex items-center space-x-2"
+                        >
+                          {isUploadingLogo ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              <span>Upload Logo</span>
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="editSubsidiaryName">Subsidiary Name</Label>
+                      <Input
+                        id="editSubsidiaryName"
+                        placeholder="Enter subsidiary name"
+                        value={selectedSubsidiary.name}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryIndustry">Industry</Label>
+                      <Input
+                        id="editSubsidiaryIndustry"
+                        placeholder="Enter industry"
+                        value={selectedSubsidiary.industry}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, industry: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryTaxId">Tax ID</Label>
+                      <Input
+                        id="editSubsidiaryTaxId"
+                        placeholder="Enter tax ID"
+                        value={selectedSubsidiary.tax_id}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, tax_id: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiarySsnit">SSNIT Number</Label>
+                      <Input
+                        id="editSubsidiarySsnit"
+                        placeholder="Enter SSNIT number"
+                        value={selectedSubsidiary.ssnit_number}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, ssnit_number: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryEmail">Email Address</Label>
+                      <Input
+                        id="editSubsidiaryEmail"
+                        type="email"
+                        placeholder="Enter email address"
+                        value={selectedSubsidiary.email_address}
+                        onChange={(e) =>
+                          setSelectedSubsidiary({ ...selectedSubsidiary, email_address: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryPhone">Phone Number</Label>
+                      <Input
+                        id="editSubsidiaryPhone"
+                        placeholder="Enter phone number"
+                        value={selectedSubsidiary.phone_number}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, phone_number: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="editSubsidiaryAddress">Address</Label>
+                    <Textarea
+                      id="editSubsidiaryAddress"
+                      placeholder="Enter address"
+                      value={selectedSubsidiary.address}
+                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, address: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.divisions) ? (
+                        selectedSubsidiary.divisions.map((division, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={division}
+                              onChange={(e) => {
+                                const newDivisions = [...selectedSubsidiary.divisions]
+                                newDivisions[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newDivisions = selectedSubsidiary.divisions.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <Input placeholder="No divisions defined" disabled />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newDivisions = selectedSubsidiary.divisions
+                            ? [...selectedSubsidiary.divisions, "New Division"]
+                            : ["New Division"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                        }}
+                      >
+                        Add Division
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.departments) ? (
+                        selectedSubsidiary.departments.map((department, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={department}
+                              onChange={(e) => {
+                                const newDepartments = [...selectedSubsidiary.departments]
+                                newDepartments[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newDepartments = selectedSubsidiary.departments.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <Input placeholder="No departments defined" disabled />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newDepartments = selectedSubsidiary.departments
+                            ? [...selectedSubsidiary.departments, "New Department"]
+                            : ["New Department"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                        }}
+                      >
+                        Add Department
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.locations) ? (
+                        selectedSubsidiary.locations.map((location, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={location}
+                              onChange={(e) => {
+                                const newLocations = [...selectedSubsidiary.locations]
+                                newLocations[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newLocations = selectedSubsidiary.locations.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <Input placeholder="No locations defined" disabled />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newLocations = selectedSubsidiary.locations
+                            ? [...selectedSubsidiary.locations, "New Location"]
+                            : ["New Location"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                        }}
+                      >
+                        Add Location
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setShowEditSubsidiary(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => setShowEditSubsidiary(false)}>Save Changes</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Subsidiary Details Modal */}
+      {showSubsidiaryDetails && selectedSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Subsidiary Details</CardTitle>
+                <CardDescription>View the details for the selected subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    {selectedSubsidiary.logo_url ? (
+                      <img
+                        src={selectedSubsidiary.logo_url || "/placeholder.svg"}
+                        alt="Subsidiary Logo"
+                        className="w-20 h-20 object-cover rounded-lg border"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                        <ImageIcon className="w-8 h-8 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label>Subsidiary Name</Label>
+                      <Input value={selectedSubsidiary.name} disabled />
+                    </div>
+                    <div>
+                      <Label>Industry</Label>
+                      <Input value={selectedSubsidiary.industry} disabled />
+                    </div>
+                    <div>
+                      <Label>Tax ID</Label>
+                      <Input value={selectedSubsidiary.tax_id} disabled />
+                    </div>
+                    <div>
+                      <Label>SSNIT Number</Label>
+                      <Input value={selectedSubsidiary.ssnit_number} disabled />
+                    </div>
+                    <div>
+                      <Label>Email Address</Label>
+                      <Input value={selectedSubsidiary.email_address} disabled />
+                    </div>
+                    <div>
+                      <Label>Phone Number</Label>
+                      <Input value={selectedSubsidiary.phone_number} disabled />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Address</Label>
+                    <Textarea value={selectedSubsidiary.address} disabled />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    {Array.isArray(selectedSubsidiary.divisions) ? (
+                      selectedSubsidiary.divisions.map((division, index) => (
+                        <Input key={index} value={division} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No divisions defined" disabled />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    {Array.isArray(selectedSubsidiary.departments) ? (
+                      selectedSubsidiary.departments.map((department, index) => (
+                        <Input key={index} value={department} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No departments defined" disabled />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    {Array.isArray(selectedSubsidiary.locations) ? (
+                      selectedSubsidiary.locations.map((location, index) => (
+                        <Input key={index} value={location} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No locations defined" disabled />
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="ghost" onClick={() => setShowSubsidiaryDetails(false)}>
+                    Close
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate Confirmation Modal */}
+      {showDeactivateConfirm && subsidiaryToToggle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="max-w-md p-6">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Deactivate Subsidiary</CardTitle>
+              <CardDescription>Are you sure you want to deactivate {subsidiaryToToggle.name}?</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p>Deactivating will prevent further actions on this subsidiary.</p>
+              <div className="flex justify-end space-x-2">
+                <Button variant="ghost" onClick={() => setShowDeactivateConfirm(false)}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={confirmToggleStatus}>
+                  Deactivate
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Reactivate Confirmation Modal */}
+      {showReactivateConfirm && subsidiaryToToggle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="max-w-md p-6">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Reactivate Subsidiary</CardTitle>
+              <CardDescription>Are you sure you want to reactivate {subsidiaryToToggle.name}?</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p>Reactivating will allow full access and actions on this subsidiary.</p>
+              <div className="flex justify-end space-x-2">
+                <Button variant="ghost" onClick={() => setShowReactivateConfirm(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={confirmToggleStatus}>Reactivate</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* View Employees Modal */}
+      {viewEmployeesModal.isOpen && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Employees of Subsidiary</CardTitle>
+                <CardDescription>View the employees for the selected subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {viewEmployeesModal.employees && viewEmployeesModal.employees.length > 0 ? (
+                  <div className="space-y-3">
+                    {viewEmployeesModal.employees.map((employee) => (
+                      <Card key={employee.id} className="border-l-4 border-l-indigo-500">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-base font-semibold">{employee.name}</h3>
+                              <p className="text-xs text-gray-600">{employee.position}</p>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              <span className="text-sm text-gray-500">{employee.email}</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <p>No employees found for this subsidiary.</p>
+                )}
+                <div className="flex justify-end">
+                  <Button variant="ghost" onClick={() => setViewEmployeesModal({ isOpen: false, subsidiaryId: "" })}>
+                    Close
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Import Settings Modal */}
+      {importModal && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-lg mx-auto">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">Import Settings</CardTitle>
+                <CardDescription>Import settings from a CSV file</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Label htmlFor="importFile">Choose CSV File</Label>
+                <Input
+                  type="file"
+                  id="importFile"
+                  accept=".csv"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      handleImportSettings(file)
+                      setImportModal(false)
+                    }
+                  }}
+                />
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setImportModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => setImportModal(false)}>Import</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Add Leave Type Modal */}
+      {showAddLeaveTypeModal && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-lg mx-auto">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">Add New Leave Type</CardTitle>
+                <CardDescription>Define a new leave type for your organization</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Label htmlFor="leaveTypeName">Leave Type Name</Label>
+                <Input
+                  id="leaveTypeName"
+                  placeholder="Enter leave type name"
+                  value={newLeaveType.name}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
+                />
+
+                <Label htmlFor="leaveTypeDays">Days</Label>
+                <Input
+                  id="leaveTypeDays"
+                  type="number"
+                  placeholder="Enter number of days"
+                  value={newLeaveType.days}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, days: e.target.value })}
+                />
+
+                <Label htmlFor="leaveTypeDescription">Description</Label>
+                <Textarea
+                  id="leaveTypeDescription"
+                  placeholder="Enter description"
+                  value={newLeaveType.description}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, description: e.target.value })}
+                />
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={newLeaveType.carryOver}
+                    onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, carryOver: checked })}
+                  />
+                  <Label htmlFor="leaveTypeCarryOver">Allow Carry Over</Label>
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setShowAddLeaveTypeModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddLeaveType} disabled={isManagingLeaveTypes}>
+                    {isManagingLeaveTypes ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Adding...
+                      </>
+                    ) : (
+                      "Add Leave Type"
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Policy Modal */}
+      {showPolicyModal && selectedPolicy && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-lg mx-auto">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">
+                  {policyModalType === "view"
+                    ? "View Policy"
+                    : policyModalType === "edit"
+                      ? "Edit Policy"
+                      : "Delete Policy"}
+                </CardTitle>
+                <CardDescription>
+                  {policyModalType === "view"
+                    ? "View the details of the selected policy"
+                    : policyModalType === "edit"
+                      ? "Edit the details of the selected policy"
+                      : "Confirm deletion of the selected policy"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {policyModalType === "view" && (
+                  <>
+                    <Label>Policy Name</Label>
+                    <Input value={selectedPolicy.name} disabled />
+
+                    <Label>Days</Label>
+                    <Input value={selectedPolicy.days} disabled />
+
+                    <Label>Description</Label>
+                    <Textarea value={selectedPolicy.description} disabled />
+                  </>
+                )}
+
+                {policyModalType === "edit" && (
+                  <>
+                    <Label htmlFor="editPolicyName">Policy Name</Label>
+                    <Input
+                      id="editPolicyName"
+                      placeholder="Enter policy name"
+                      value={editingPolicy.name}
+                      onChange={(e) => setEditingPolicy({ ...editingPolicy, name: e.target.value })}
+                    />
+
+                    <Label htmlFor="editPolicyDays">Days</Label>
+                    <Input
+                      id="editPolicyDays"
+                      type="number"
+                      placeholder="Enter number of days"
+                      value={editingPolicy.days}
+                      onChange={(e) => setEditingPolicy({ ...editingPolicy, days: Number.parseInt(e.target.value) })}
+                    />
+
+                    <Label htmlFor="editPolicyDescription">Description</Label>
+                    <Textarea
+                      id="editPolicyDescription"
+                      placeholder="Enter description"
+                      value={editingPolicy.description}
+                      onChange={(e) => setEditingPolicy({ ...editingPolicy, description: e.target.value })}
+                    />
+                  </>
+                )}
+
+                {policyModalType === "delete" && (
+                  <p>Are you sure you want to delete the {selectedPolicy.name} policy?</p>
+                )}
+
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setShowPolicyModal(false)}>
+                    Cancel
+                  </Button>
+                  {policyModalType === "edit" && (
+                    <Button onClick={handleSavePolicyChanges} disabled={isSavingPolicy}>
+                      {isSavingPolicy ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Changes"
+                      )}
+                    </Button>
+                  )}
+                  {policyModalType === "delete" && (
+                    <Button variant="destructive" onClick={() => handleDeletePolicy(selectedPolicy.name)}>
+                      Delete
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Document Modal */}
+      {showDocumentModal && selectedDocument && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">
+                  {documentModalType === "view"
+                    ? "View Document"
+                    : documentModalType === "edit"
+                      ? "Edit Document"
+                      : documentModalType === "add"
+                        ? "Add Document"
+                        : "Delete Document"}
+                </CardTitle>
+                <CardDescription>
+                  {documentModalType === "view"
+                    ? "View the content of the selected document"
+                    : documentModalType === "edit"
+                      ? "Edit the details of the selected document"
+                      : documentModalType === "add"
+                        ? "Upload a new document"
+                        : "Confirm deletion of the selected document"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {documentModalType === "view" && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <Label>Document Name</Label>
+                      <div className="flex items-center space-x-2">
+                        <Button variant="outline" size="sm" onClick={handleZoomIn}>
+                          Zoom In
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={handleZoomOut}>
+                          Zoom Out
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={handleDownload}>
+                          Download
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={handleFullscreen}>
+                          {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`relative overflow-auto border rounded-md ${
+                        isFullscreen ? "fixed inset-0 z-50 bg-white" : "h-[500px]"
+                      }`}
+                    >
+                      <div style={{ zoom: `${documentZoom}%` }} className="p-4 whitespace-pre-line">
+                        {documentPreviewContent}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {documentModalType === "edit" && (
+                  <>
+                    <Label htmlFor="editDocumentName">Document Name</Label>
+                    <Input
+                      id="editDocumentName"
+                      placeholder="Enter document name"
+                      value={documentName}
+                      onChange={(e) => setDocumentName(e.target.value)}
+                    />
+                  </>
+                )}
+
+                {documentModalType === "add" && (
+                  <>
+                    <Label htmlFor="addDocumentName">Document Name</Label>
+                    <Input
+                      id="addDocumentName"
+                      placeholder="Enter document name"
+                      value={documentName}
+                      onChange={(e) => setDocumentName(e.target.value)}
+                    />
+
+                    <Label htmlFor="uploadDocument">Upload Document</Label>
+                    <Input type="file" id="uploadDocument" onChange={handleFileUpload} />
+                  </>
+                )}
+
+                {documentModalType === "delete" && (
+                  <p>Are you sure you want to delete the {selectedDocument.name} document?</p>
+                )}
+
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setShowDocumentModal(false)}>
+                    Cancel
+                  </Button>
+                  {documentModalType === "edit" && (
+                    <Button onClick={handleEditDocument} disabled={isSavingDocument}>
+                      {isSavingDocument ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Changes"
+                      )}
+                    </Button>
+                  )}
+                  {documentModalType === "add" && (
+                    <Button onClick={handleSaveDocument} disabled={isSavingDocument}>
+                      {isSavingDocument ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        "Upload Document"
+                      )}
+                    </Button>
+                  )}
+                  {documentModalType === "delete" && (
+                    <Button variant="destructive" onClick={() => handleDeleteDocument(selectedDocument.id)}>
+                      Delete
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
