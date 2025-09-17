@@ -35,10 +35,11 @@ import {
   TrendingUp,
   Trash2,
   FileText,
-  ChevronLeft,
-  ChevronRight,
   ZoomIn,
   ZoomOut,
+  Maximize2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -246,15 +247,6 @@ const SettingsPage: FunctionComponent = () => {
   })
 
   const [leaveTypeAIInsights, setLeaveTypeAIInsights] = useState<string[]>([])
-
-  const [documentViewerState, setDocumentViewerState] = useState({
-    currentPage: 1,
-    totalPages: 1,
-    zoomLevel: 100,
-    searchTerm: '',
-    isFullscreen: false,
-    viewMode: 'fit-width' // fit-width, fit-page, actual-size
-  })
 
   // Logo upload function
   const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
@@ -1340,7 +1332,7 @@ const SettingsPage: FunctionComponent = () => {
         variant: "destructive",
       })
     } finally {
-      setIsSavingDocument(false)
+      setIsSavingPolicy(false)
     }
   }
 
@@ -1354,47 +1346,11 @@ const SettingsPage: FunctionComponent = () => {
     })
   }
 
-  const handleDocumentAction = (action: string, docId?: number) => {
-    if (action === "add") {
-      setDocumentName("")
-      setUploadedFile(null)
-    } else if (action === "edit" && docId) {
-      const doc = hrDocuments.find(d => d.id === docId)
-      if (doc) {
-        setSelectedDocument(doc)
-        setDocumentName(doc.name)
-      }
-    } else if (action === "delete" && docId) {
-      const doc = hrDocuments.find(d => d.id === docId)
-      if (doc) {
-        setSelectedDocument(doc)
-      }
-    }
-    setDocumentModalType(action)
-    setShowDocumentModal(true)
-  }
-
-  const handleAddDocument = () => {
-    setDocumentName("")
-    setUploadedFile(null)
-    handleDocumentAction("add")
-  }
-
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0]
-    if (file) {
-      setUploadedFile(file)
-      if (!documentName) {
-        setDocumentName(file.name.replace(/\.[^/.]+$/, ""))
-      }
-    }
-  }
-
-  const handleSaveDocument = async () => {
-    if (!documentName || !uploadedFile) {
+  const handleEditDocument = async () => {
+    if (!documentName) {
       toast({
         title: "Error",
-        description: "Please provide a document name and upload a file.",
+        description: "Please provide a document name.",
         variant: "destructive",
       })
       return
@@ -1402,51 +1358,25 @@ const SettingsPage: FunctionComponent = () => {
 
     setIsSavingDocument(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      const newDoc = {
-        id: Date.now(),
-        name: documentName,
-        type: uploadedFile.type.includes("pdf") ? "PDF" : "DOC",
-        size: `${(uploadedFile.size / (1024 * 1024)).toFixed(1)} MB`,
-        visibleToAll: false,
-      }
+      setHrDocuments((prev) =>
+        prev.map((doc) => (doc.id === selectedDocument.id ? { ...doc, name: documentName } : doc)),
+      )
 
-      setHrDocuments((prev) => [...prev, newDoc])
       setShowDocumentModal(false)
-      setDocumentName("")
-      setUploadedFile(null)
-
       toast({
-        title: "Document Added",
-        description: `${documentName} has been successfully uploaded.`,
+        title: "Document Updated",
+        description: `${documentName} has been successfully updated.`,
       })
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to upload document. Please try again.",
+        description: "Failed to update document. Please try again.",
         variant: "destructive",
       })
     } finally {
       setIsSavingDocument(false)
-    }
-  }
-
-  const handleDeleteDocument = async (docId) => {
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId))
-      setShowDocumentModal(false)
-      toast({
-        title: "Document Deleted",
-        description: "Document has been successfully removed.",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete document. Please try again.",
-        variant: "destructive",
-      })
     }
   }
 
@@ -1581,262 +1511,255 @@ const SettingsPage: FunctionComponent = () => {
   }
 
   const parseDocumentContent = (document: any) => {
+    // Simulate different document types with realistic content
     const documentTemplates = {
       "Code of Conduct": {
-        content: `
-          <div class="document-page">
-            <div class="document-header">
-              <h1 class="document-title">CODE OF CONDUCT</h1>
-              <div class="document-meta">
-                <span class="company-name">AKWAABA HR SOLUTIONS</span>
-                <span class="document-date">Effective Date: January 2024</span>
-              </div>
-            </div>
-            
-            <div class="document-body">
-              <div class="section">
-                <h2 class="section-title">1. INTRODUCTION</h2>
-                <p class="section-content">
-                  This Code of Conduct outlines the ethical standards and behavioral expectations 
-                  for all employees, contractors, and stakeholders of our organization. It serves 
-                  as a guide for making ethical decisions and maintaining professional integrity.
-                </p>
-              </div>
+        content: `Document: Code of Conduct
 
-              <div class="section">
-                <h2 class="section-title">2. PROFESSIONAL CONDUCT</h2>
-                <p class="section-content">
-                  All employees are expected to maintain the highest standards of professional 
-                  conduct in their interactions with colleagues, clients, and stakeholders.
-                </p>
-                <ul class="section-list">
-                  <li>Treat all individuals with respect and dignity</li>
-                  <li>Maintain professional appearance and demeanor</li>
-                  <li>Communicate effectively and courteously</li>
-                  <li>Demonstrate reliability and accountability</li>
-                </ul>
-              </div>
+This is a comprehensive Code of Conduct document outlining the ethical standards and behavioral expectations for all employees.
 
-              <div class="section">
-                <h2 class="section-title">3. CONFIDENTIALITY</h2>
-                <p class="section-content">
-                  Employees must protect confidential information and proprietary data belonging 
-                  to the company and its clients. This includes:
-                </p>
-                <ul class="section-list">
-                  <li>Customer data and business information</li>
-                  <li>Financial records and strategic plans</li>
-                  <li>Personnel information and HR records</li>
-                  <li>Intellectual property and trade secrets</li>
-                </ul>
-              </div>
+Key sections include:
+• Company policies and procedures
+• Employee rights and responsibilities
+• Code of conduct guidelines
+• Compliance requirements
+• Disciplinary procedures
+• Reporting mechanisms
 
-              <div class="section">
-                <h2 class="section-title">4. CONFLICT OF INTEREST</h2>
-                <p class="section-content">
-                  Employees must avoid situations that create or appear to create conflicts 
-                  between personal interests and company interests. Any potential conflicts 
-                  must be disclosed to management immediately.
-                </p>
-              </div>
+1. PROFESSIONAL CONDUCT
+All employees are expected to maintain the highest standards of professional conduct in their interactions with colleagues, clients, and stakeholders.
 
-              <div class="section">
-                <h2 class="section-title">5. COMPLIANCE WITH LAWS</h2>
-                <p class="section-content">
-                  All employees must comply with applicable laws, regulations, and company 
-                  policies. This includes but is not limited to:
-                </p>
-                <ul class="section-list">
-                  <li>Employment and labor laws</li>
-                  <li>Anti-discrimination and harassment policies</li>
-                  <li>Health and safety regulations</li>
-                  <li>Data protection and privacy laws</li>
-                </ul>
-              </div>
+2. CONFIDENTIALITY
+Employees must protect confidential information and proprietary data belonging to the company and its clients.
 
-              <div class="section">
-                <h2 class="section-title">6. REPORTING VIOLATIONS</h2>
-                <p class="section-content">
-                  Employees are encouraged to report any violations of this code through 
-                  appropriate channels. Reports can be made to direct supervisors, HR 
-                  department, or through our anonymous reporting system.
-                </p>
-              </div>
-            </div>
+3. CONFLICT OF INTEREST
+Employees must avoid situations that create or appear to create conflicts between personal interests and company interests.
 
-            <div class="document-footer">
-              <div class="footer-content">
-                <span class="page-number">Page 1 of 2</span>
-                <span class="document-version">Version 2.1 | Confidential</span>
-              </div>
-            </div>
-          </div>
-        `,
-        totalPages: 2
+4. COMPLIANCE WITH LAWS
+All employees must comply with applicable laws, regulations, and company policies.
+
+5. REPORTING VIOLATIONS
+Employees are encouraged to report any violations of this code through appropriate channels.
+
+This document serves as a guide for ethical decision-making and professional behavior within our organization.`,
       },
       "Employee Handbook": {
-        content: `
-          <div class="document-page">
-            <div class="document-header">
-              <h1 class="document-title">EMPLOYEE HANDBOOK</h1>
-              <div class="document-meta">
-                <span class="company-name">AKWAABA HR SOLUTIONS</span>
-                <span class="document-date">2024 Edition</span>
-              </div>
-            </div>
-            
-            <div class="document-body">
-              <div class="section">
-                <h2 class="section-title">WELCOME MESSAGE</h2>
-                <p class="section-content">
-                  Welcome to AKWAABA HR Solutions! We are pleased to have you join our team. 
-                  This handbook provides essential information about our company policies, 
-                  procedures, and benefits to help you succeed in your role.
-                </p>
-              </div>
+        content: `Document: Employee Handbook
 
-              <div class="section">
-                <h2 class="section-title">TABLE OF CONTENTS</h2>
-                <ul class="toc-list">
-                  <li><span class="toc-item">1. Company Overview</span><span class="toc-page">3</span></li>
-                  <li><span class="toc-item">2. Employment Policies</span><span class="toc-page">5</span></li>
-                  <li><span class="toc-item">3. Benefits and Compensation</span><span class="toc-page">8</span></li>
-                  <li><span class="toc-item">4. Leave Policies</span><span class="toc-page">12</span></li>
-                  <li><span class="toc-item">5. Performance Management</span><span class="toc-page">15</span></li>
-                  <li><span class="toc-item">6. Safety and Security</span><span class="toc-page">18</span></li>
-                </ul>
-              </div>
+Welcome to our organization! This handbook provides essential information about company policies, procedures, and benefits.
 
-              <div class="section">
-                <h2 class="section-title">COMPANY OVERVIEW</h2>
-                <p class="section-content">
-                  Our mission is to provide exceptional HR solutions while maintaining the 
-                  highest standards of integrity and professionalism. We are committed to 
-                  creating an inclusive workplace where every employee can thrive.
-                </p>
-                
-                <h3 class="subsection-title">Our Values</h3>
-                <ul class="section-list">
-                  <li><strong>Integrity:</strong> We act with honesty and transparency</li>
-                  <li><strong>Excellence:</strong> We strive for the highest quality in everything we do</li>
-                  <li><strong>Innovation:</strong> We embrace change and continuous improvement</li>
-                  <li><strong>Collaboration:</strong> We work together to achieve common goals</li>
-                </ul>
-              </div>
-            </div>
+Table of Contents:
+• Welcome Message
+• Company Overview
+• Employment Policies
+• Benefits and Compensation
+• Leave Policies
+• Performance Management
+• Safety and Security
+• Technology Usage
 
-            <div class="document-footer">
-              <div class="footer-content">
-                <span class="page-number">Page 1 of 25</span>
-                <span class="document-version">Version 3.2 | Internal Use Only</span>
-              </div>
-            </div>
-          </div>
-        `,
-        totalPages: 25
-      }
+WELCOME MESSAGE
+We are pleased to welcome you to our team. This handbook will help you understand our company culture and expectations.
+
+COMPANY OVERVIEW
+Our mission is to provide exceptional service while maintaining the highest standards of integrity and professionalism.
+
+EMPLOYMENT POLICIES
+- Equal Opportunity Employment
+- Anti-Discrimination Policy
+- Harassment Prevention
+- Work Schedule and Attendance
+
+BENEFITS AND COMPENSATION
+- Health Insurance
+- Retirement Plans
+- Paid Time Off
+- Professional Development
+
+LEAVE POLICIES
+- Annual Leave: 21 days per year
+- Sick Leave: 10 days per year
+- Maternity/Paternity Leave: As per local regulations
+
+This handbook is updated regularly to reflect current policies and procedures.`,
+      },
+      "Safety Manual": {
+        content: `Document: Safety Manual
+
+This safety manual outlines procedures and guidelines to ensure a safe working environment for all employees.
+
+SAFETY PRINCIPLES
+1. Safety is everyone's responsibility
+2. All accidents are preventable
+3. Safety training is mandatory
+4. Report all hazards immediately
+
+EMERGENCY PROCEDURES
+- Fire Emergency: Exit procedures and assembly points
+- Medical Emergency: First aid and emergency contacts
+- Security Emergency: Lockdown procedures
+
+WORKPLACE SAFETY
+- Personal Protective Equipment (PPE)
+- Equipment Operation Guidelines
+- Hazard Identification and Reporting
+- Incident Investigation Procedures
+
+HEALTH AND WELLNESS
+- Ergonomic Guidelines
+- Mental Health Resources
+- Wellness Programs
+- Health Screenings
+
+Remember: When in doubt, prioritize safety over productivity.`,
+      },
     }
 
-    const template = documentTemplates[document.name] || {
-      content: `
-        <div class="document-page">
-          <div class="document-header">
-            <h1 class="document-title">${document.name.toUpperCase()}</h1>
-            <div class="document-meta">
-              <span class="company-name">AKWAABA HR SOLUTIONS</span>
-              <span class="document-date">Document Date: ${new Date().toLocaleDateString()}</span>
-            </div>
-          </div>
-          
-          <div class="document-body">
-            <div class="section">
-              <p class="section-content">
-                This ${document.type} document contains important company information and policies. 
-                The content would be extracted and displayed from the actual uploaded file in a 
-                production environment.
-              </p>
-            </div>
-            
-            <div class="section">
-              <h2 class="section-title">Document Information</h2>
-              <ul class="section-list">
-                <li><strong>File Name:</strong> ${document.name}</li>
-                <li><strong>File Type:</strong> ${document.type}</li>
-                <li><strong>File Size:</strong> ${document.size}</li>
-                <li><strong>Last Modified:</strong> ${new Date().toLocaleDateString()}</li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="document-footer">
-            <div class="footer-content">
-              <span class="page-number">Page 1 of 1</span>
-              <span class="document-version">Preview Mode</span>
-            </div>
-          </div>
-        </div>
-      `,
-      totalPages: 1
+    // Return specific content based on document name, or generate generic content
+    if (documentTemplates[document.name]) {
+      return documentTemplates[document.name].content
     }
 
-    return template
+    // Generate content based on document type
+    const fileExtension = document.type.toLowerCase()
+    let content = `Document: ${document.name}\n\n`
+
+    if (fileExtension === "pdf") {
+      content += `This is a PDF document containing important company information.\n\n`
+      content += `Key sections may include:\n`
+      content += `• Policy guidelines and procedures\n`
+      content += `• Regulatory compliance information\n`
+      content += `• Employee responsibilities\n`
+      content += `• Contact information and resources\n\n`
+      content += `[PDF content would be extracted and displayed here in a production environment]\n\n`
+      content += `Document size: ${document.size}\n`
+      content += `Last modified: ${new Date().toLocaleDateString()}`
+    } else if (fileExtension === "doc" || fileExtension === "docx") {
+      content += `This is a Word document containing structured company information.\n\n`
+      content += `Document structure:\n`
+      content += `• Header with company branding\n`
+      content += `• Table of contents\n`
+      content += `• Main content sections\n`
+      content += `• Appendices and references\n\n`
+      content += `[Word document content would be parsed and displayed here]\n\n`
+      content += `Document properties:\n`
+      content += `- File size: ${document.size}\n`
+      content += `- Format: Microsoft Word Document\n`
+      content += `- Created: ${new Date().toLocaleDateString()}`
+    } else {
+      content += `This document contains important company information and policies.\n\n`
+      content += `Content overview:\n`
+      content += `• Company policies and procedures\n`
+      content += `• Employee guidelines and expectations\n`
+      content += `• Compliance and regulatory information\n`
+      content += `• Contact information and resources\n\n`
+      content += `[Document content would be processed and displayed based on file type]\n\n`
+      content += `File information:\n`
+      content += `- Size: ${document.size}\n`
+      content += `- Type: ${document.type}\n`
+      content += `- Status: Available for viewing`
+    }
+
+    return content
   }
 
   const handleDocumentView = (document: any) => {
     setSelectedDocument(document)
     setDocumentModalType("view")
     setShowDocumentModal(true)
-    setShowDocumentPreview(false)
-    
-    // Reset viewer state
-    setDocumentViewerState({
-      currentPage: 1,
-      totalPages: 1,
-      zoomLevel: 100,
-      searchTerm: '',
-      isFullscreen: false,
-      viewMode: 'fit-width'
-    })
+    setShowDocumentPreview(false) // Reset preview state
 
     setTimeout(() => {
-      const parsedDocument = parseDocumentContent(document)
-      setDocumentPreviewContent(parsedDocument.content)
-      setDocumentViewerState(prev => ({
-        ...prev,
-        totalPages: parsedDocument.totalPages
-      }))
+      const parsedContent = parseDocumentContent(document)
+      setDocumentPreviewContent(parsedContent)
     }, 500)
   }
 
-  const handleZoomIn = () => {
-    setDocumentViewerState(prev => ({
-      ...prev,
-      zoomLevel: Math.min(prev.zoomLevel + 25, 200)
-    }))
+  const handleDocumentAction = (action, docId = null) => {
+    if (docId) {
+      const doc = hrDocuments.find((d) => d.id === docId)
+      setSelectedDocument(doc)
+    }
+    setDocumentModalType(action)
+    setShowDocumentModal(true)
   }
 
-  const handleZoomOut = () => {
-    setDocumentViewerState(prev => ({
-      ...prev,
-      zoomLevel: Math.max(prev.zoomLevel - 25, 50)
-    }))
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0]
+    if (file) {
+      setUploadedFile(file)
+      if (!documentName) {
+        setDocumentName(file.name.replace(/\.[^/.]+$/, ""))
+      }
+    }
   }
 
-  const handlePageNavigation = (direction: 'prev' | 'next') => {
-    setDocumentViewerState(prev => ({
-      ...prev,
-      currentPage: direction === 'next' 
-        ? Math.min(prev.currentPage + 1, prev.totalPages)
-        : Math.max(prev.currentPage - 1, 1)
-    }))
+  const handleAddDocument = () => {
+    setDocumentName("")
+    setUploadedFile(null)
+    handleDocumentAction("add")
   }
 
-  const handleViewModeChange = (mode: string) => {
-    setDocumentViewerState(prev => ({
-      ...prev,
-      viewMode: mode,
-      zoomLevel: mode === 'actual-size' ? 100 : prev.zoomLevel
-    }))
+  const handleSaveDocument = async () => {
+    if (!documentName || !uploadedFile) {
+      toast({
+        title: "Error",
+        description: "Please provide a document name and upload a file.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSavingDocument(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      const newDoc = {
+        id: Date.now(),
+        name: documentName,
+        type: uploadedFile.type.includes("pdf") ? "PDF" : "DOC",
+        size: `${(uploadedFile.size / (1024 * 1024)).toFixed(1)} MB`,
+        visibleToAll: false,
+      }
+
+      setHrDocuments((prev) => [...prev, newDoc])
+      setShowDocumentModal(false)
+      setDocumentName("")
+      setUploadedFile(null)
+
+      toast({
+        title: "Document Added",
+        description: `${documentName} has been successfully uploaded.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to upload document. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingDocument(false)
+    }
+  }
+
+  const handleDeleteDocument = async (docId) => {
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId))
+      setShowDocumentModal(false)
+      toast({
+        title: "Document Deleted",
+        description: "Document has been successfully removed.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete document. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingDocument(false)
+    }
   }
 
   const handleSaveSubsidiaries = async () => {
@@ -1967,6 +1890,27 @@ const SettingsPage: FunctionComponent = () => {
       title: "Edit Role",
       description: `Editing ${roleName} role...`,
     })
+  }
+
+  const handleBackupNow = async () => {
+    setIsBackingUp(true)
+    try {
+      // Simulate backup process
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      setLastBackupTime(new Date().toISOString())
+      toast({
+        title: "Backup Completed",
+        description: "System backup completed successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Backup Failed",
+        description: "Failed to complete system backup.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsBackingUp(false)
+    }
   }
 
   return (
@@ -3159,204 +3103,144 @@ const SettingsPage: FunctionComponent = () => {
                       </div>
 
                       {showDocumentPreview && (
-                        <div className="border rounded-lg bg-white shadow-lg">
-                          <div className="flex items-center justify-between p-3 border-b bg-gray-50">
-                            <div className="flex items-center space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handlePageNavigation('prev')}
-                                disabled={documentViewerState.currentPage === 1}
-                              >
-                                <ChevronLeft className="w-4 h-4" />
-                              </Button>
-                              <span className="text-sm font-medium">
-                                {documentViewerState.currentPage} / {documentViewerState.totalPages}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handlePageNavigation('next')}
-                                disabled={documentViewerState.currentPage === documentViewerState.totalPages}
-                              >
-                                <ChevronRight className="w-4 h-4" />
-                              </Button>
+                        <div className="border rounded-lg bg-white shadow-sm">
+                          {/* Document Viewer Header */}
+                          <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
+                            <div className="flex items-center space-x-3">
+                              <div className="flex items-center space-x-2">
+                                <FileText className="w-5 h-5 text-blue-600" />
+                                <span className="font-medium text-gray-900">{selectedDocument.name}</span>
+                                <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">
+                                  {selectedDocument.type}
+                                </span>
+                              </div>
                             </div>
-
                             <div className="flex items-center space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleZoomOut}
-                                disabled={documentViewerState.zoomLevel <= 50}
-                              >
-                                <ZoomOut className="w-4 h-4" />
-                              </Button>
-                              <span className="text-sm font-medium min-w-[60px] text-center">
-                                {documentViewerState.zoomLevel}%
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleZoomIn}
-                                disabled={documentViewerState.zoomLevel >= 200}
-                              >
+                              <Button variant="ghost" size="sm">
                                 <ZoomIn className="w-4 h-4" />
                               </Button>
-                            </div>
-
-                            <div className="flex items-center space-x-2">
-                              <select
-                                value={documentViewerState.viewMode}
-                                onChange={(e) => handleViewModeChange(e.target.value)}
-                                className="text-sm border rounded px-2 py-1"
-                              >
-                                <option value="fit-width">Fit Width</option>
-                                <option value="fit-page">Fit Page</option>
-                                <option value="actual-size">Actual Size</option>
-                              </select>
+                              <Button variant="ghost" size="sm">
+                                <ZoomOut className="w-4 h-4" />
+                              </Button>
                               <Button variant="ghost" size="sm">
                                 <Download className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm">
+                                <Maximize2 className="w-4 h-4" />
                               </Button>
                             </div>
                           </div>
 
-                          <div className="document-viewer-container bg-gray-100 p-4 max-h-[600px] overflow-auto">
-                            <div 
-                              className="document-viewer-content mx-auto bg-white shadow-lg"
-                              style={{
-                                transform: `scale(${documentViewerState.zoomLevel / 100})`,
-                                transformOrigin: 'top center',
-                                width: documentViewerState.viewMode === 'fit-width' ? '100%' : 
-                                       documentViewerState.viewMode === 'fit-page' ? 'fit-content' : '210mm',
-                                maxWidth: documentViewerState.viewMode === 'actual-size' ? '210mm' : '100%',
-                                minHeight: '297mm',
-                                padding: '20mm',
-                                fontFamily: 'system-ui, -apple-system, sans-serif',
-                                fontSize: '12pt',
-                                lineHeight: '1.6',
-                                color: '#333'
-                              }}
-                            >
-                              <style jsx>{`
-                                .document-page {
-                                  width: 100%;
-                                  min-height: 100%;
-                                  display: flex;
-                                  flex-direction: column;
-                                }
-                                
-                                .document-header {
-                                  text-align: center;
-                                  margin-bottom: 30px;
-                                  padding-bottom: 20px;
-                                  border-bottom: 2px solid #e5e7eb;
-                                }
-                                
-                                .document-title {
-                                  font-size: 24pt;
-                                  font-weight: bold;
-                                  color: #1f2937;
-                                  margin-bottom: 10px;
-                                  letter-spacing: 1px;
-                                }
-                                
-                                .document-meta {
-                                  display: flex;
-                                  justify-content: space-between;
-                                  font-size: 10pt;
-                                  color: #6b7280;
-                                }
-                                
-                                .company-name {
-                                  font-weight: 600;
-                                  color: #3b82f6;
-                                }
-                                
-                                .document-body {
-                                  flex: 1;
-                                }
-                                
-                                .section {
-                                  margin-bottom: 25px;
-                                }
-                                
-                                .section-title {
-                                  font-size: 16pt;
-                                  font-weight: bold;
-                                  color: #1f2937;
-                                  margin-bottom: 12px;
-                                  padding-bottom: 5px;
-                                  border-bottom: 1px solid #e5e7eb;
-                                }
-                                
-                                .subsection-title {
-                                  font-size: 14pt;
-                                  font-weight: 600;
-                                  color: #374151;
-                                  margin: 15px 0 8px 0;
-                                }
-                                
-                                .section-content {
-                                  margin-bottom: 12px;
-                                  text-align: justify;
-                                  line-height: 1.7;
-                                }
-                                
-                                .section-list {
-                                  margin: 12px 0;
-                                  padding-left: 20px;
-                                }
-                                
-                                .section-list li {
-                                  margin-bottom: 6px;
-                                  line-height: 1.6;
-                                }
-                                
-                                .toc-list {
-                                  list-style: none;
-                                  padding: 0;
-                                }
-                                
-                                .toc-list li {
-                                  display: flex;
-                                  justify-content: space-between;
-                                  padding: 8px 0;
-                                  border-bottom: 1px dotted #d1d5db;
-                                }
-                                
-                                .toc-item {
-                                  font-weight: 500;
-                                }
-                                
-                                .toc-page {
-                                  font-weight: bold;
-                                  color: #3b82f6;
-                                }
-                                
-                                .document-footer {
-                                  margin-top: auto;
-                                  padding-top: 20px;
-                                  border-top: 1px solid #e5e7eb;
-                                }
-                                
-                                .footer-content {
-                                  display: flex;
-                                  justify-content: space-between;
-                                  font-size: 9pt;
-                                  color: #6b7280;
-                                }
-                                
-                                .page-number {
-                                  font-weight: 500;
-                                }
-                                
-                                .document-version {
-                                  font-style: italic;
-                                }
-                              `}</style>
-                              
-                              <div dangerouslySetInnerHTML={{ __html: documentPreviewContent }} />
+                          {/* Document Content Area */}
+                          <div className="relative">
+                            {/* Document Pages Container */}
+                            <div className="max-h-[600px] overflow-y-auto bg-gray-100 p-6">
+                              <div className="max-w-4xl mx-auto">
+                                {/* Document Page */}
+                                <div className="bg-white shadow-lg rounded-lg p-8 mb-6 min-h-[700px]">
+                                  {/* Document Header */}
+                                  <div className="border-b pb-4 mb-6">
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                                          {selectedDocument.name}
+                                        </h1>
+                                        <div className="flex items-center space-x-4 text-sm text-gray-600">
+                                          <span>Document Type: {selectedDocument.type}</span>
+                                          <span>•</span>
+                                          <span>Size: {selectedDocument.size}</span>
+                                          <span>•</span>
+                                          <span>Last Modified: {new Date().toLocaleDateString()}</span>
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center">
+                                          <FileText className="w-8 h-8 text-blue-600" />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Document Content */}
+                                  <div className="prose prose-lg max-w-none">
+                                    {documentPreviewContent.split("\n\n").map((paragraph, index) => {
+                                      if (paragraph.startsWith("Document:")) {
+                                        return (
+                                          <div key={index} className="mb-6">
+                                            <h2 className="text-xl font-semibold text-gray-900 mb-3">
+                                              {paragraph.replace("Document: ", "")}
+                                            </h2>
+                                          </div>
+                                        )
+                                      } else if (paragraph.includes("•")) {
+                                        const lines = paragraph.split("\n")
+                                        const title = lines[0]
+                                        const bullets = lines.slice(1).filter((line) => line.includes("•"))
+                                        return (
+                                          <div key={index} className="mb-6">
+                                            {title && !title.includes("•") && (
+                                              <h3 className="text-lg font-medium text-gray-900 mb-3">{title}</h3>
+                                            )}
+                                            <ul className="list-none space-y-2">
+                                              {bullets.map((bullet, bulletIndex) => (
+                                                <li key={bulletIndex} className="flex items-start space-x-2">
+                                                  <span className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></span>
+                                                  <span className="text-gray-700">{bullet.replace("• ", "")}</span>
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )
+                                      } else if (paragraph.match(/^\d+\./)) {
+                                        const lines = paragraph.split("\n")
+                                        const heading = lines[0]
+                                        const content = lines.slice(1).join(" ")
+                                        return (
+                                          <div key={index} className="mb-6">
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-2">{heading}</h3>
+                                            <p className="text-gray-700 leading-relaxed">{content}</p>
+                                          </div>
+                                        )
+                                      } else if (paragraph.toUpperCase() === paragraph && paragraph.length > 5) {
+                                        return (
+                                          <div key={index} className="mb-4">
+                                            <h3 className="text-lg font-semibold text-gray-900 uppercase tracking-wide">
+                                              {paragraph}
+                                            </h3>
+                                          </div>
+                                        )
+                                      } else {
+                                        return (
+                                          <div key={index} className="mb-4">
+                                            <p className="text-gray-700 leading-relaxed">{paragraph}</p>
+                                          </div>
+                                        )
+                                      }
+                                    })}
+                                  </div>
+
+                                  {/* Document Footer */}
+                                  <div className="border-t pt-6 mt-8">
+                                    <div className="flex items-center justify-between text-sm text-gray-500">
+                                      <span>© 2024 Company Name. All rights reserved.</span>
+                                      <span>Page 1 of 1</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Document Navigation */}
+                            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
+                              <div className="flex items-center space-x-2 bg-white shadow-lg rounded-full px-4 py-2 border">
+                                <Button variant="ghost" size="sm" disabled>
+                                  <ChevronLeft className="w-4 h-4" />
+                                </Button>
+                                <span className="text-sm font-medium px-2">1 / 1</span>
+                                <Button variant="ghost" size="sm" disabled>
+                                  <ChevronRight className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -3431,8 +3315,6 @@ const SettingsPage: FunctionComponent = () => {
                 </DialogContent>
               </Dialog>
             )}
-
-            {/* Employee Analytics card removed as requested */}
           </div>
         </TabsContent>
 
@@ -3711,7 +3593,7 @@ const SettingsPage: FunctionComponent = () => {
                       {lastBackupTime ? new Date(lastBackupTime).toLocaleString() : "No backup yet"}
                     </p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={handleBackupNowInner} disabled={isBackingUp}>
+                  <Button variant="outline" size="sm" onClick={handleBackupNow} disabled={isBackingUp}>
                     {isBackingUp ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -4030,13 +3912,14 @@ const SettingsPage: FunctionComponent = () => {
                           <span>Uploading...</span>
                         </>
                       ) : (
-                      <>
-                        <Upload className="w-4 h-4" />
-                        <span>Upload Logo</span>
-                      </>
-                    )}
-                  </Button>
-                  <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                        <>
+                          <Upload className="w-4 h-4" />
+                          <span>Upload Logo</span>
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4393,5 +4276,5 @@ const SettingsPage: FunctionComponent = () => {
     </div>
   )
 }
-\
+
 export default SettingsPage
