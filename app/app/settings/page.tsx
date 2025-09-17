@@ -37,6 +37,7 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  Minimize2,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -2084,6 +2085,15 @@ Next Review Date: January 15, 2025`,
     }
   }
 
+  const [zoomLevel, setZoomLevel] = useState(1)
+
+  const handleZoom = (direction: "in" | "out") => {
+    setZoomLevel((prevZoom) => {
+      const newZoom = direction === "in" ? prevZoom + 0.25 : prevZoom - 0.25
+      return Math.max(0.5, Math.min(2, newZoom)) // Limit zoom level between 50% and 200%
+    })
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -3087,15 +3097,15 @@ Next Review Date: January 15, 2025`,
             {showDocumentModal && (
               <Dialog open={showDocumentModal} onOpenChange={setShowDocumentModal}>
                 <DialogContent
-                  className={`${isFullscreen ? "max-w-[98vw] max-h-[98vh]" : "max-w-[90vw] max-h-[90vh]"} overflow-hidden`}
+                  className={`${isFullscreen ? "max-w-[95vw] max-h-[95vh] w-[95vw] h-[95vh]" : "max-w-[85vw] max-h-[85vh] w-[85vw] h-[85vh]"} overflow-hidden`}
                 >
-                  <DialogHeader>
+                  <DialogHeader className="flex-shrink-0">
                     <DialogTitle>Document Details</DialogTitle>
                     <DialogDescription>View details of the selected document</DialogDescription>
                   </DialogHeader>
 
                   {documentModalType === "view" && selectedDocument && (
-                    <div className="space-y-4 h-full flex flex-col min-h-[75vh]">
+                    <div className="space-y-4 h-full flex flex-col min-h-[80vh]">
                       <div className="grid grid-cols-3 gap-4 flex-shrink-0">
                         <div>
                           <Label className="text-sm font-medium">Name</Label>
@@ -3118,127 +3128,231 @@ Next Review Date: January 15, 2025`,
                           size="sm"
                           onClick={() => setShowDocumentPreview(!showDocumentPreview)}
                         >
-                          <Eye className="w-4 h-4 mr-2" />
+                          <Eye className="mr-2 h-4 w-4" />
                           {showDocumentPreview ? "Hide Preview" : "Show Preview"}
                         </Button>
                       </div>
 
                       {showDocumentPreview && (
-                        <div className="flex-1 flex flex-col min-h-[65vh]">
-                          <div className="border rounded-lg bg-white shadow-sm flex-1 flex flex-col">
-                            {/* Document Viewer Header */}
-                            <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50 flex-shrink-0">
-                              <div className="flex items-center space-x-3">
-                                <div className="flex items-center space-x-2">
-                                  <FileText className="w-5 h-5 text-blue-600" />
-                                  <span className="font-medium text-gray-900">{selectedDocument.name}</span>
-                                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">
-                                    {selectedDocument.type}
-                                  </span>
+                        <div className="flex-1 border rounded-lg overflow-hidden bg-white min-h-[65vh]">
+                          {/* Document Viewer Header */}
+                          <div className="bg-gray-50 border-b px-4 py-3 flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <FileText className="h-5 w-5 text-blue-600" />
+                              <span className="font-medium text-gray-900">{selectedDocument.name}</span>
+                              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
+                                {selectedDocument.type}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleZoom("in")}
+                                className="h-8 w-8 p-0"
+                              >
+                                <ZoomIn className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleZoom("out")}
+                                className="h-8 w-8 p-0"
+                              >
+                                <ZoomOut className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDownload(selectedDocument)}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setIsFullscreen(!isFullscreen)}
+                                className="h-8 w-8 p-0"
+                              >
+                                {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                              </Button>
+                              <div className="text-sm text-gray-600 px-2">{Math.round(zoomLevel * 100)}%</div>
+                            </div>
+                          </div>
+
+                          {/* Document Content */}
+                          <div
+                            className="overflow-auto bg-gray-100 p-6 h-full"
+                            style={{ minHeight: isFullscreen ? "80vh" : "60vh" }}
+                          >
+                            <div
+                              className="bg-white shadow-lg mx-auto p-8 rounded-lg"
+                              style={{
+                                transform: `scale(${zoomLevel})`,
+                                transformOrigin: "top center",
+                                width: "210mm", // A4 width
+                                minHeight: "297mm", // A4 height
+                                maxWidth: "none",
+                              }}
+                            >
+                              {/* Document Header */}
+                              <div className="text-center mb-8 border-b pb-6">
+                                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                  <FileText className="h-8 w-8 text-blue-600" />
+                                </div>
+                                <h1 className="text-3xl font-bold text-gray-900 mb-2">{selectedDocument.name}</h1>
+                                <div className="flex justify-center space-x-8 text-sm text-gray-600">
+                                  <div>
+                                    <span className="font-medium">Document Type:</span> {selectedDocument.type}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Size:</span> {selectedDocument.size}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Last Modified:</span>{" "}
+                                    {new Date().toLocaleDateString()}
+                                  </div>
                                 </div>
                               </div>
-                              <div className="flex items-center space-x-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={handleZoomIn}
-                                  disabled={documentZoom >= 200}
-                                  title="Zoom In"
-                                  className="hover:bg-gray-200"
-                                >
-                                  <ZoomIn className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={handleZoomOut}
-                                  disabled={documentZoom <= 50}
-                                  title="Zoom Out"
-                                  className="hover:bg-gray-200"
-                                >
-                                  <ZoomOut className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={handleDownload}
-                                  title="Download Document"
-                                  className="hover:bg-gray-200"
-                                >
-                                  <Download className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={handleFullscreen}
-                                  title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-                                  className="hover:bg-gray-200"
-                                >
-                                  <Maximize2 className="w-4 h-4" />
-                                </Button>
-                                <div className="text-xs text-gray-500 px-2 border-l font-medium">{documentZoom}%</div>
-                              </div>
-                            </div>
 
-                            <div className="flex-1 bg-gray-100 p-6 overflow-auto" style={{ minHeight: "60vh" }}>
-                              <div className="max-w-5xl mx-auto">
-                                {/* Document Page Container */}
-                                <div
-                                  className="bg-white shadow-lg border border-gray-300 min-h-[900px] p-16 font-serif text-gray-900 leading-relaxed"
-                                  style={{
-                                    transform: `scale(${documentZoom / 100})`,
-                                    transformOrigin: "top center",
-                                    marginBottom: `${(documentZoom - 100) * 8}px`,
-                                    width: "210mm", // A4 width
-                                    minHeight: "297mm", // A4 height
-                                  }}
-                                >
-                                  {/* Document Header */}
-                                  <div className="text-center mb-12 pb-6 border-b-2 border-gray-300">
-                                    <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                                      <FileText className="w-10 h-10 text-white" />
-                                    </div>
-                                    <h1 className="text-3xl font-bold text-gray-900 mb-4">{selectedDocument.name}</h1>
-                                    <div className="flex justify-center space-x-8 text-sm text-gray-600">
-                                      <div>
-                                        <span className="font-medium">Document Type:</span> {selectedDocument.type}
-                                      </div>
-                                      <div>
-                                        <span className="font-medium">Size:</span> {selectedDocument.size}
-                                      </div>
-                                      <div>
-                                        <span className="font-medium">Last Modified:</span> 9/17/2025
-                                      </div>
-                                    </div>
+                              {/* Document Body */}
+                              <div className="space-y-6 text-gray-800 leading-relaxed">
+                                <div className="text-center">
+                                  <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                                    {selectedDocument.name.toUpperCase()}
+                                  </h2>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-4 text-sm border-b pb-4">
+                                  <div>
+                                    <span className="font-semibold">EFFECTIVE DATE:</span> January 1, 2024
                                   </div>
-
-                                  {/* Document Content */}
-                                  <div className="prose prose-xl max-w-none">
-                                    <pre className="whitespace-pre-wrap font-serif text-lg leading-relaxed text-gray-900">
-                                      {documentPreviewContent}
-                                    </pre>
+                                  <div>
+                                    <span className="font-semibold">VERSION:</span> 2.1
                                   </div>
+                                  <div>
+                                    <span className="font-semibold">APPROVED BY:</span> Board of Directors
+                                  </div>
+                                </div>
 
-                                  {/* Document Footer */}
-                                  <div className="mt-16 pt-6 border-t border-gray-300 text-center text-sm text-gray-500">
-                                    <p>
-                                      This document is confidential and proprietary. Unauthorized distribution is
-                                      prohibited.
+                                {/* Document Content */}
+                                <div className="space-y-6">
+                                  <section>
+                                    <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                                      1. PROFESSIONAL CONDUCT
+                                    </h3>
+                                    <p className="mb-4">
+                                      All employees are expected to maintain the highest standards of professional
+                                      conduct in their interactions with colleagues, clients, and stakeholders.
                                     </p>
-                                    <p className="mt-2">© 2024 Company Name. All rights reserved.</p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
+                                    <ul className="list-disc list-inside space-y-2 ml-4">
+                                      <li>Treat all individuals with respect and dignity</li>
+                                      <li>Maintain confidentiality of sensitive information</li>
+                                      <li>Act with integrity in all business dealings</li>
+                                      <li>Comply with all applicable laws and regulations</li>
+                                    </ul>
+                                  </section>
 
-                            {/* Document Navigation Footer */}
-                            <div className="flex items-center justify-between px-4 py-2 border-t bg-gray-50 text-sm text-gray-600 flex-shrink-0">
-                              <div className="flex items-center space-x-2">
-                                <span>Page 1 of 1</span>
-                              </div>
-                              <div className="flex items-center space-x-4">
-                                <span>Document loaded successfully</span>
-                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                  <section>
+                                    <h3 className="text-xl font-semibold text-gray-900 mb-3">2. CONFIDENTIALITY</h3>
+                                    <p className="mb-4">
+                                      Employees must protect confidential information and proprietary data belonging to
+                                      the company and its clients.
+                                    </p>
+                                    <ul className="list-disc list-inside space-y-2 ml-4">
+                                      <li>Do not disclose confidential information to unauthorized parties</li>
+                                      <li>Use confidential information only for legitimate business purposes</li>
+                                      <li>Secure all confidential documents and data</li>
+                                      <li>Report any suspected breaches of confidentiality</li>
+                                    </ul>
+                                  </section>
+
+                                  <section>
+                                    <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                                      3. CONFLICT OF INTEREST
+                                    </h3>
+                                    <p className="mb-4">
+                                      Employees must avoid situations that create or appear to create conflicts of
+                                      interest.
+                                    </p>
+                                    <ul className="list-disc list-inside space-y-2 ml-4">
+                                      <li>Disclose any potential conflicts of interest to management</li>
+                                      <li>Do not use company resources for personal gain</li>
+                                      <li>Avoid business relationships that could compromise judgment</li>
+                                      <li>Seek guidance when uncertain about potential conflicts</li>
+                                    </ul>
+                                  </section>
+
+                                  <section>
+                                    <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                                      4. HARASSMENT PREVENTION
+                                    </h3>
+                                    <p className="mb-4">
+                                      The company is committed to providing a workplace free from harassment and
+                                      discrimination.
+                                    </p>
+                                    <ul className="list-disc list-inside space-y-2 ml-4">
+                                      <li>Zero tolerance for harassment or discrimination</li>
+                                      <li>Report any incidents immediately to HR or management</li>
+                                      <li>Participate in required training programs</li>
+                                      <li>Support a respectful and inclusive work environment</li>
+                                    </ul>
+                                  </section>
+
+                                  <section>
+                                    <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                                      5. COMPLIANCE REQUIREMENTS
+                                    </h3>
+                                    <p className="mb-4">
+                                      All employees must comply with applicable laws, regulations, and company policies.
+                                    </p>
+                                    <ul className="list-disc list-inside space-y-2 ml-4">
+                                      <li>Stay informed about relevant laws and regulations</li>
+                                      <li>Complete required compliance training</li>
+                                      <li>Report violations or suspected violations</li>
+                                      <li>Cooperate with internal and external audits</li>
+                                    </ul>
+                                  </section>
+
+                                  <section>
+                                    <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                                      6. DISCIPLINARY PROCEDURES
+                                    </h3>
+                                    <p className="mb-4">
+                                      Violations of this code may result in disciplinary action, up to and including
+                                      termination.
+                                    </p>
+                                    <ul className="list-disc list-inside space-y-2 ml-4">
+                                      <li>Progressive discipline policy applies</li>
+                                      <li>Serious violations may result in immediate termination</li>
+                                      <li>Right to appeal disciplinary decisions</li>
+                                      <li>Documentation of all disciplinary actions</li>
+                                    </ul>
+                                  </section>
+
+                                  <section>
+                                    <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                                      7. REPORTING MECHANISMS
+                                    </h3>
+                                    <p className="mb-4">
+                                      Multiple channels are available for reporting violations or concerns.
+                                    </p>
+                                    <ul className="list-disc list-inside space-y-2 ml-4">
+                                      <li>Direct supervisor or manager</li>
+                                      <li>Human Resources department</li>
+                                      <li>Anonymous hotline: 1-800-ETHICS</li>
+                                      <li>Online reporting portal</li>
+                                    </ul>
+                                  </section>
+                                </div>
+
+                                <div className="border-t pt-6 mt-8 text-center text-sm text-gray-600">
+                                  <p>This handbook is updated regularly to reflect current policies and procedures.</p>
+                                  <p className="mt-2">
+                                    For questions or clarifications, please contact the Human Resources department.
+                                  </p>
+                                </div>
                               </div>
                             </div>
                           </div>
