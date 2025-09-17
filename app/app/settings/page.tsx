@@ -232,6 +232,10 @@ export default function SettingsPage() {
 
   const [leaveTypeAIInsights, setLeaveTypeAIInsights] = useState<string[]>([])
 
+  const [showAIInsightsModal, setShowAIInsightsModal] = useState(false)
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false)
+  const [aiInsights, setAiInsights] = useState<string>("")
+
   const handleZoomIn = () => {
     setDocumentZoom((prev) => Math.min(prev + 25, 200))
   }
@@ -2212,6 +2216,72 @@ Next Review Date: January 15, 2025`,
     }
   }
 
+  const handleGenerateAIInsights = async () => {
+    setIsGeneratingInsights(true)
+    setShowAIInsightsModal(true)
+
+    try {
+      // Prepare leave policies data for AI analysis
+      const policiesData = currentPolicies.map((policy) => ({
+        name: policy.name,
+        days: policy.days,
+        usage: policy.usage,
+        trend: policy.trend,
+        description: policy.description,
+      }))
+
+      const prompt = `Analyze the following leave policies and provide professional HR insights:
+
+${policiesData
+  .map(
+    (policy) =>
+      `- ${policy.name}: ${policy.days} days allocated, ${policy.usage} usage rate, trend: ${policy.trend}
+    Description: ${policy.description}`,
+  )
+  .join("\n")}
+
+Please provide:
+1. Usage pattern analysis
+2. Policy optimization recommendations  
+3. Compliance considerations
+4. Industry benchmarking insights
+5. Cost impact analysis
+6. Employee satisfaction implications
+
+Format the response in a professional, actionable manner for HR decision-makers.`
+
+      const response = await fetch("/api/ai-insights", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prompt }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to generate insights")
+      }
+
+      const data = await response.json()
+      setAiInsights(data.insights)
+
+      toast({
+        title: "AI Insights Generated",
+        description: "Professional leave policy analysis completed successfully.",
+      })
+    } catch (error) {
+      console.error("Error generating AI insights:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate AI insights. Please try again.",
+        variant: "destructive",
+      })
+      setShowAIInsightsModal(false)
+    } finally {
+      setIsGeneratingInsights(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -3010,7 +3080,8 @@ Next Review Date: January 15, 2025`,
                       <Plus className="w-4 h-4 mr-2" />
                       Add Leave Type
                     </Button>
-                    <Button variant="outline" onClick={() => setIsManagingLeaveTypes(true)}>
+                    {/* Update the Generate AI Insights button to use the new handler */}
+                    <Button variant="outline" onClick={handleGenerateAIInsights}>
                       <Brain className="w-4 h-4 mr-2" />
                       Generate AI Insights
                     </Button>
@@ -3034,7 +3105,7 @@ Next Review Date: January 15, 2025`,
                           <span className="font-medium">Usage:</span> {policy.usage}
                         </p>
                         <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium">Trend:</span>
+                          <span className="font-medium">Trend:</span>
                           {policy.trend === "up" && <TrendingUp className="w-4 h-4 text-green-500" />}
                           {policy.trend === "down" && <TrendingUp className="w-4 h-4 text-red-500 rotate-180" />}
                           {policy.trend === "stable" && "-"}
@@ -4225,6 +4296,71 @@ Next Review Date: January 15, 2025`,
                 </div>
               </CardContent>
             </Card>
+          </div>
+        </div>
+      )}
+
+      {showAIInsightsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b">
+              <div className="flex items-center space-x-2">
+                <Brain className="w-6 h-6 text-blue-600" />
+                <h2 className="text-xl font-semibold">AI Leave Policy Insights</h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAIInsightsModal(false)}
+                disabled={isGeneratingInsights}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              {isGeneratingInsights ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                  <p className="text-gray-600">Analyzing your leave policies...</p>
+                  <p className="text-sm text-gray-500">This may take a few moments</p>
+                </div>
+              ) : aiInsights ? (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Sparkles className="w-5 h-5 text-blue-600" />
+                      <h3 className="font-semibold text-blue-900">Professional Analysis</h3>
+                    </div>
+                    <div className="prose prose-sm max-w-none">
+                      <pre className="whitespace-pre-wrap font-sans text-gray-700 leading-relaxed">{aiInsights}</pre>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(aiInsights)
+                        toast({
+                          title: "Copied to Clipboard",
+                          description: "AI insights have been copied to your clipboard.",
+                        })
+                      }}
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy Insights
+                    </Button>
+                    <Button onClick={() => setShowAIInsightsModal(false)}>Close</Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+                  <p className="text-gray-600">No insights available. Please try again.</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
