@@ -1,9 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
-
 :root {
+  /* Updated design tokens to match HR system design brief */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -37,8 +36,6 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --font-open-sans: "Open Sans", sans-serif;
-  --font-work-sans: "Work Sans", serif;
 }
 
 .dark {
@@ -77,6 +74,7 @@
 }
 
 @theme inline {
+  /* optional: --font-sans, --font-serif, --font-mono if they are applied in the layout.tsx */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -113,8 +111,6 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --font-sans: var(--font-open-sans);
-  --font-serif: var(--font-work-sans);
 }
 
 @layer base {
@@ -123,5 +119,32 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Added theme-aware utility classes */
+  .theme-bg-primary-50 {
+    background-color: var(--theme-primary-50);
+  }
+  .theme-bg-primary-600 {
+    background-color: var(--theme-primary-600);
+  }
+  .theme-bg-primary-700 {
+    background-color: var(--theme-primary-700);
+  }
+  .theme-text-primary-600 {
+    color: var(--theme-primary-600);
+  }
+  .theme-text-primary-700 {
+    color: var(--theme-primary-700);
+  }
+  .theme-border-primary-500 {
+    border-color: var(--theme-primary-500);
+  }
+
+  /* Form input styling */
+  .form-input {
+    @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20;
   }
 }
