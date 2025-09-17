@@ -258,17 +258,37 @@ export default function SettingsPage() {
 
   const handleDownload = () => {
     if (selectedDocument) {
-      // Create a blob URL for download
+      // Create document content based on type
+      const content = parseDocumentContent(selectedDocument)
+      let blob
+      let filename
+
+      if (selectedDocument.type === "PDF") {
+        // For PDF, we'll create a simple text file (in real app, would use PDF library)
+        blob = new Blob([content], { type: "application/pdf" })
+        filename = `${selectedDocument.name}.pdf`
+      } else if (selectedDocument.type === "DOC" || selectedDocument.type === "DOCX") {
+        // For Word docs, create as RTF format
+        const rtfContent = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}} \\f0\\fs24 ${content.replace(/\n/g, "\\par ")}}`
+        blob = new Blob([rtfContent], { type: "application/rtf" })
+        filename = `${selectedDocument.name}.rtf`
+      } else {
+        blob = new Blob([content], { type: "text/plain" })
+        filename = `${selectedDocument.name}.txt`
+      }
+
+      const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
-      link.href = "#" // In real implementation, this would be the actual file URL
-      link.download = selectedDocument.name
+      link.href = url
+      link.download = filename
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+      URL.revokeObjectURL(url)
 
       toast({
         title: "Download Started",
-        description: `Downloading ${selectedDocument.name}...`,
+        description: `Downloading ${filename}...`,
       })
     }
   }
@@ -1546,156 +1566,272 @@ export default function SettingsPage() {
   }
 
   const parseDocumentContent = (document: any) => {
-    // Simulate different document types with realistic content
     const documentTemplates = {
       "Code of Conduct": {
-        content: `Document: Code of Conduct
+        content: `COMPANY CODE OF CONDUCT
 
-This is a comprehensive Code of Conduct document outlining the ethical standards and behavioral expectations for all employees.
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
 
-Key sections include:
-• Company policies and procedures
-• Employee rights and responsibilities
-• Code of conduct guidelines
-• Compliance requirements
-• Disciplinary procedures
-• Reporting mechanisms
+═══════════════════════════════════════════════════════════════
 
-1. PROFESSIONAL CONDUCT
-All employees are expected to maintain the highest standards of professional conduct in their interactions with colleagues, clients, and stakeholders.
+TABLE OF CONTENTS
 
-2. CONFIDENTIALITY
-Employees must protect confidential information and proprietary data belonging to the company and its clients.
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
 
-3. CONFLICT OF INTEREST
-Employees must avoid situations that create or appear to create conflicts between personal interests and company interests.
+═══════════════════════════════════════════════════════════════
 
-4. COMPLIANCE WITH LAWS
-All employees must comply with applicable laws, regulations, and company policies.
+1. INTRODUCTION AND PURPOSE
 
-5. REPORTING VIOLATIONS
-Employees are encouraged to report any violations of this code through appropriate channels.
+Welcome to our organization. This Code of Conduct serves as a comprehensive guide for ethical decision-making and professional behavior within our company. All employees, contractors, and business partners are expected to adhere to these standards.
 
-This document serves as a guide for ethical decision-making and professional behavior within our organization.`,
+Our mission is to provide exceptional service while maintaining the highest standards of integrity and professionalism in all business dealings.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 General Principles
+All employees must:
+• Treat colleagues, clients, and stakeholders with respect and dignity
+• Maintain professional demeanor in all business interactions
+• Uphold company values and reputation
+• Act with honesty and transparency
+
+2.2 Workplace Behavior
+• Harassment, discrimination, or bullying will not be tolerated
+• Maintain a safe and inclusive work environment
+• Respect diversity and promote equal opportunities
+• Follow all safety protocols and procedures
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 Confidential Information
+Employees must protect:
+• Client data and personal information
+• Proprietary business information
+• Trade secrets and intellectual property
+• Financial and strategic information
+
+3.2 Data Protection
+• Use strong passwords and secure authentication
+• Report security incidents immediately
+• Follow data retention and disposal policies
+• Comply with privacy regulations (GDPR, CCPA, etc.)
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 Definition
+A conflict of interest occurs when personal interests interfere with company interests or decision-making processes.
+
+4.2 Common Examples
+• Financial interests in competitors or suppliers
+• Personal relationships affecting business decisions
+• Outside employment that competes with company business
+• Accepting gifts or favors from business partners
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must:
+• Comply with applicable local, state, and federal laws
+• Follow industry-specific regulations
+• Adhere to international trade and export controls
+• Report legal violations or concerns
+
+6. REPORTING VIOLATIONS
+
+6.1 Reporting Channels
+• Direct supervisor or manager
+• Human Resources department
+• Ethics hotline: 1-800-ETHICS-1
+• Anonymous online reporting portal
+• Legal department for serious violations
+
+6.2 Whistleblower Protection
+The company prohibits retaliation against employees who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations may result in:
+• Verbal or written warnings
+• Mandatory training or counseling
+• Suspension or probation
+• Termination of employment
+• Legal action where appropriate
+
+This document is reviewed annually and updated as needed to reflect current laws and best practices.
+
+═══════════════════════════════════════════════════════════════
+
+For questions about this Code of Conduct, contact:
+Ethics and Compliance Office
+ethics@company.com | (555) 123-4567
+
+Document ID: COC-2024-001
+Last Updated: January 15, 2024
+Next Review Date: January 15, 2025`,
       },
       "Employee Handbook": {
-        content: `Document: Employee Handbook
+        content: `EMPLOYEE HANDBOOK
 
-Welcome to our organization! This handbook provides essential information about company policies, procedures, and benefits.
+WELCOME TO OUR ORGANIZATION
 
-Table of Contents:
-• Welcome Message
-• Company Overview
-• Employment Policies
-• Benefits and Compensation
-• Leave Policies
-• Performance Management
-• Safety and Security
-• Technology Usage
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.2
+HUMAN RESOURCES DEPARTMENT
 
-WELCOME MESSAGE
-We are pleased to welcome you to our team. This handbook will help you understand our company culture and expectations.
+═══════════════════════════════════════════════════════════════
 
-COMPANY OVERVIEW
+TABLE OF CONTENTS
+
+SECTION I: WELCOME AND INTRODUCTION
+1. Welcome Message .......................................... 4
+2. Company Overview ......................................... 5
+3. Mission, Vision, and Values ............................. 6
+
+SECTION II: EMPLOYMENT POLICIES
+4. Equal Opportunity Employment ............................. 8
+5. Anti-Discrimination Policy ............................... 9
+6. Harassment Prevention Policy ............................. 10
+7. Work Schedule and Attendance ............................. 12
+
+SECTION III: BENEFITS AND COMPENSATION
+8. Health Insurance ......................................... 14
+9. Retirement Plans ......................................... 16
+10. Paid Time Off ........................................... 18
+11. Professional Development ................................ 20
+
+SECTION IV: PERFORMANCE MANAGEMENT
+12. Performance Reviews ..................................... 22
+13. Career Development ...................................... 24
+14. Training and Education .................................. 26
+
+SECTION V: SAFETY AND SECURITY
+15. Workplace Safety ........................................ 28
+16. Technology Usage ........................................ 30
+17. Security Protocols ...................................... 32
+
+═══════════════════════════════════════════════════════════════
+
+SECTION I: WELCOME AND INTRODUCTION
+
+1. WELCOME MESSAGE
+
+Dear Team Member,
+
+Welcome to our organization! We are pleased to have you join our team. This handbook will help you understand our company culture, policies, and expectations.
+
+Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment where everyone can thrive and contribute to our shared goals.
+
+This handbook is your guide to understanding our policies and procedures. Please read it carefully and keep it as a reference throughout your employment.
+
+We look forward to working with you and supporting your professional growth.
+
+Sincerely,
+The Management Team
+
+2. COMPANY OVERVIEW
+
 Our mission is to provide exceptional service while maintaining the highest standards of integrity and professionalism.
 
-EMPLOYMENT POLICIES
-- Equal Opportunity Employment
-- Anti-Discrimination Policy
-- Harassment Prevention
-- Work Schedule and Attendance
+Founded in 1995, we have grown from a small startup to a leading organization in our industry. We serve clients across multiple sectors and pride ourselves on innovation, quality, and customer satisfaction.
 
-BENEFITS AND COMPENSATION
-- Health Insurance
-- Retirement Plans
-- Paid Time Off
-- Professional Development
+Key Facts:
+• Founded: 1995
+• Employees: 500+
+• Locations: 12 offices worldwide
+• Industries Served: Technology, Healthcare, Finance, Education
+
+3. MISSION, VISION, AND VALUES
+
+MISSION STATEMENT
+To deliver innovative solutions that exceed client expectations while fostering a culture of excellence, integrity, and continuous improvement.
+
+VISION STATEMENT
+To be the leading provider of professional services, recognized for our expertise, innovation, and commitment to client success.
+
+CORE VALUES
+• INTEGRITY: We act with honesty and transparency in all our dealings
+• EXCELLENCE: We strive for the highest quality in everything we do
+• INNOVATION: We embrace new ideas and creative solutions
+• COLLABORATION: We work together to achieve common goals
+• RESPECT: We treat everyone with dignity and consideration
+
+SECTION II: EMPLOYMENT POLICIES
+
+4. EQUAL OPPORTUNITY EMPLOYMENT
+
+We are an equal opportunity employer committed to providing employment opportunities regardless of:
+• Race, color, or national origin
+• Religion or creed
+• Gender or gender identity
+• Sexual orientation
+• Age (40 and over)
+• Disability status
+• Veteran status
+• Genetic information
+
+5. BENEFITS AND COMPENSATION
+
+HEALTH INSURANCE
+• Comprehensive medical coverage
+• Dental and vision plans
+• Health Savings Account (HSA) options
+• Employee assistance programs
+
+RETIREMENT PLANS
+• 401(k) plan with company matching
+• Vesting schedule: 100% after 3 years
+• Financial planning resources
+• Retirement counseling services
+
+PAID TIME OFF
+• Annual Leave: 21 days per year
+• Sick Leave: 10 days per year
+• Maternity/Paternity Leave: As per local regulations
+• Personal Days: 5 days per year
 
 LEAVE POLICIES
-- Annual Leave: 21 days per year
-- Sick Leave: 10 days per year
-- Maternity/Paternity Leave: As per local regulations
 
-This handbook is updated regularly to reflect current policies and procedures.`,
-      },
-      "Safety Manual": {
-        content: `Document: Safety Manual
+Annual Leave: 21 days per year
+• Accrual begins on first day of employment
+• Maximum carryover: 5 days to following year
+• Advance approval required for extended leave
 
-This safety manual outlines procedures and guidelines to ensure a safe working environment for all employees.
+Sick Leave: 10 days per year
+• Available for personal illness or family care
+• Medical certification required for absences over 3 days
+• Unused sick days do not carry over
 
-SAFETY PRINCIPLES
-1. Safety is everyone's responsibility
-2. All accidents are preventable
-3. Safety training is mandatory
-4. Report all hazards immediately
+Maternity/Paternity Leave: As per local regulations
+• Up to 12 weeks for eligible employees
+• Combination of paid and unpaid leave
+• Job protection guaranteed upon return
 
-EMERGENCY PROCEDURES
-- Fire Emergency: Exit procedures and assembly points
-- Medical Emergency: First aid and emergency contacts
-- Security Emergency: Lockdown procedures
+This handbook is updated regularly to reflect current policies and procedures. For the most current version, please check the company intranet or contact Human Resources.
 
-WORKPLACE SAFETY
-- Personal Protective Equipment (PPE)
-- Equipment Operation Guidelines
-- Hazard Identification and Reporting
-- Incident Investigation Procedures
+═══════════════════════════════════════════════════════════════
 
-HEALTH AND WELLNESS
-- Ergonomic Guidelines
-- Mental Health Resources
-- Wellness Programs
-- Health Screenings
+For questions about policies in this handbook, contact:
+Human Resources Department
+hr@company.com | (555) 123-4567
 
-Remember: When in doubt, prioritize safety over productivity.`,
+Document ID: EH-2024-001
+Last Updated: January 15, 2024
+Next Review Date: January 15, 2025`,
       },
     }
 
-    // Return specific content based on document name, or generate generic content
-    if (documentTemplates[document.name]) {
-      return documentTemplates[document.name].content
-    }
-
-    // Generate content based on document type
-    const fileExtension = document.type.toLowerCase()
-    let content = `Document: ${document.name}\n\n`
-
-    if (fileExtension === "pdf") {
-      content += `This is a PDF document containing important company information.\n\n`
-      content += `Key sections may include:\n`
-      content += `• Policy guidelines and procedures\n`
-      content += `• Regulatory compliance information\n`
-      content += `• Employee responsibilities\n`
-      content += `• Contact information and resources\n\n`
-      content += `[PDF content would be extracted and displayed here in a production environment]\n\n`
-      content += `Document size: ${document.size}\n`
-      content += `Last modified: ${new Date().toLocaleDateString()}`
-    } else if (fileExtension === "doc" || fileExtension === "docx") {
-      content += `This is a Word document containing structured company information.\n\n`
-      content += `Document structure:\n`
-      content += `• Header with company branding\n`
-      content += `• Table of contents\n`
-      content += `• Main content sections\n`
-      content += `• Appendices and references\n\n`
-      content += `[Word document content would be parsed and displayed here]\n\n`
-      content += `Document properties:\n`
-      content += `- File size: ${document.size}\n`
-      content += `- Format: Microsoft Word Document\n`
-      content += `- Created: ${new Date().toLocaleDateString()}`
-    } else {
-      content += `This document contains important company information and policies.\n\n`
-      content += `Content overview:\n`
-      content += `• Company policies and procedures\n`
-      content += `• Employee guidelines and expectations\n`
-      content += `• Compliance and regulatory information\n`
-      content += `• Contact information and resources\n\n`
-      content += `[Document content would be processed and displayed based on file type]\n\n`
-      content += `File information:\n`
-      content += `- Size: ${document.size}\n`
-      content += `- Type: ${document.type}\n`
-      content += `- Status: Available for viewing`
-    }
-
-    return content
+    return (
+      documentTemplates[document.name]?.content ||
+      `Document: ${document.name}\n\nThis document contains important information about ${document.name.toLowerCase()}. The content would be displayed here in a real implementation.`
+    )
   }
 
   const handleDocumentView = (document: any) => {
@@ -2950,7 +3086,9 @@ Remember: When in doubt, prioritize safety over productivity.`,
             {/* Document Modal */}
             {showDocumentModal && (
               <Dialog open={showDocumentModal} onOpenChange={setShowDocumentModal}>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogContent
+                  className={`${isFullscreen ? "max-w-[95vw] max-h-[95vh]" : "max-w-6xl max-h-[85vh]"} overflow-hidden`}
+                >
                   <DialogHeader>
                     <DialogTitle>
                       {documentModalType === "add" && "Add HR Policy Document"}
@@ -2998,8 +3136,8 @@ Remember: When in doubt, prioritize safety over productivity.`,
                   )}
 
                   {documentModalType === "view" && selectedDocument && (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-4 h-full flex flex-col">
+                      <div className="grid grid-cols-3 gap-4 flex-shrink-0">
                         <div>
                           <Label className="text-sm font-medium">Name</Label>
                           <p className="text-sm text-gray-600 mt-1">{selectedDocument.name}</p>
@@ -3014,7 +3152,7 @@ Remember: When in doubt, prioritize safety over productivity.`,
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-shrink-0">
                         <Label className="text-sm font-medium">Document Preview</Label>
                         <Button
                           variant="outline"
@@ -3027,80 +3165,120 @@ Remember: When in doubt, prioritize safety over productivity.`,
                       </div>
 
                       {showDocumentPreview && (
-                        <div className="border rounded-lg bg-white shadow-sm">
-                          {/* Document Viewer Header */}
-                          <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
-                            <div className="flex items-center space-x-3">
-                              <div className="flex items-center space-x-2">
-                                <FileText className="w-5 h-5 text-blue-600" />
-                                <span className="font-medium text-gray-900">{selectedDocument.name}</span>
-                                <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">
-                                  {selectedDocument.type}
-                                </span>
+                        <div className="flex-1 flex flex-col min-h-0">
+                          <div className="border rounded-lg bg-white shadow-sm flex-1 flex flex-col">
+                            {/* Document Viewer Header */}
+                            <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50 flex-shrink-0">
+                              <div className="flex items-center space-x-3">
+                                <div className="flex items-center space-x-2">
+                                  <FileText className="w-5 h-5 text-blue-600" />
+                                  <span className="font-medium text-gray-900">{selectedDocument.name}</span>
+                                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">
+                                    {selectedDocument.type}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleZoomIn}
-                                disabled={documentZoom >= 200}
-                                title="Zoom In"
-                              >
-                                <ZoomIn className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleZoomOut}
-                                disabled={documentZoom <= 50}
-                                title="Zoom Out"
-                              >
-                                <ZoomOut className="w-4 h-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={handleDownload} title="Download Document">
-                                <Download className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleFullscreen}
-                                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-                              >
-                                <Maximize2 className="w-4 h-4" />
-                              </Button>
-                              <div className="text-xs text-gray-500 px-2 border-l">{documentZoom}%</div>
-                            </div>
-                          </div>
-
-                          {/* Document Content Area */}
-                          <div className={`relative ${isFullscreen ? "fixed inset-0 z-50 bg-white" : ""}`}>
-                            {isFullscreen && (
-                              <div className="absolute top-4 right-4 z-10">
+                              <div className="flex items-center space-x-2">
                                 <Button
-                                  variant="outline"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleZoomIn}
+                                  disabled={documentZoom >= 200}
+                                  title="Zoom In"
+                                  className="hover:bg-gray-200"
+                                >
+                                  <ZoomIn className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleZoomOut}
+                                  disabled={documentZoom <= 50}
+                                  title="Zoom Out"
+                                  className="hover:bg-gray-200"
+                                >
+                                  <ZoomOut className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleDownload}
+                                  title="Download Document"
+                                  className="hover:bg-gray-200"
+                                >
+                                  <Download className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
                                   size="sm"
                                   onClick={handleFullscreen}
-                                  className="bg-white shadow-lg"
+                                  title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                                  className="hover:bg-gray-200"
                                 >
-                                  <X className="w-4 h-4 mr-2" />
-                                  Exit Fullscreen
+                                  <Maximize2 className="w-4 h-4" />
                                 </Button>
+                                <div className="text-xs text-gray-500 px-2 border-l font-medium">{documentZoom}%</div>
                               </div>
-                            )}
+                            </div>
 
-                            <div
-                              className={`bg-white shadow-sm border rounded-lg overflow-auto ${
-                                isFullscreen ? "h-full p-8" : "max-h-96"
-                              }`}
-                              style={{
-                                transform: `scale(${documentZoom / 100})`,
-                                transformOrigin: "top left",
-                                width: `${10000 / documentZoom}%`,
-                              }}
-                            >
-                              {/* Document content goes here */}
-                              {documentPreviewContent}
+                            <div className="flex-1 bg-gray-100 p-4 overflow-auto">
+                              <div className="max-w-4xl mx-auto">
+                                {/* Document Page Container */}
+                                <div
+                                  className="bg-white shadow-lg border border-gray-300 min-h-[800px] p-12 font-serif text-gray-900 leading-relaxed"
+                                  style={{
+                                    transform: `scale(${documentZoom / 100})`,
+                                    transformOrigin: "top center",
+                                    marginBottom: `${(documentZoom - 100) * 8}px`,
+                                  }}
+                                >
+                                  {/* Document Header */}
+                                  <div className="text-center mb-8 pb-4 border-b-2 border-gray-300">
+                                    <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                      <FileText className="w-8 h-8 text-white" />
+                                    </div>
+                                    <h1 className="text-2xl font-bold text-gray-900 mb-2">{selectedDocument.name}</h1>
+                                    <div className="flex justify-center space-x-6 text-sm text-gray-600">
+                                      <div>
+                                        <span className="font-medium">Document Type:</span> {selectedDocument.type}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Size:</span> {selectedDocument.size}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Last Modified:</span> 9/17/2025
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Document Content */}
+                                  <div className="prose prose-lg max-w-none">
+                                    <pre className="whitespace-pre-wrap font-serif text-base leading-relaxed text-gray-900">
+                                      {documentPreviewContent}
+                                    </pre>
+                                  </div>
+
+                                  {/* Document Footer */}
+                                  <div className="mt-12 pt-4 border-t border-gray-300 text-center text-sm text-gray-500">
+                                    <p>
+                                      This document is confidential and proprietary. Unauthorized distribution is
+                                      prohibited.
+                                    </p>
+                                    <p className="mt-2">© 2024 Company Name. All rights reserved.</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Document Navigation Footer */}
+                            <div className="flex items-center justify-between px-4 py-2 border-t bg-gray-50 text-sm text-gray-600 flex-shrink-0">
+                              <div className="flex items-center space-x-2">
+                                <span>Page 1 of 1</span>
+                              </div>
+                              <div className="flex items-center space-x-4">
+                                <span>Document loaded successfully</span>
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -3831,7 +4009,7 @@ Remember: When in doubt, prioritize safety over productivity.`,
         </DialogContent>
       </Dialog>
 
-      {/* Confirm Deactivate Subsidiary Modal */}
+      {/* Deactivate Confirmation Modal */}
       <Dialog open={showDeactivateConfirm} onOpenChange={setShowDeactivateConfirm}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -3851,7 +4029,7 @@ Remember: When in doubt, prioritize safety over productivity.`,
         </DialogContent>
       </Dialog>
 
-      {/* Confirm Reactivate Subsidiary Modal */}
+      {/* Reactivate Confirmation Modal */}
       <Dialog open={showReactivateConfirm} onOpenChange={setShowReactivateConfirm}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
