@@ -1,5 +1,4 @@
 "use client"
-import type { FunctionComponent } from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -38,8 +37,6 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -139,7 +136,7 @@ const isDemoMode = () => {
   return false
 }
 
-const SettingsPage: FunctionComponent = () => {
+export default function SettingsPage() {
   console.log("[v0] SettingsPage component initializing...")
 
   const { toast } = useToast()
@@ -180,6 +177,9 @@ const SettingsPage: FunctionComponent = () => {
   const [isSavingDocument, setIsSavingDocument] = useState(false)
   const [showDocumentPreview, setShowDocumentPreview] = useState(false)
   const [documentPreviewContent, setDocumentPreviewContent] = useState("")
+
+  const [documentZoom, setDocumentZoom] = useState(100)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   const [showDocumentModal, setShowDocumentModal] = useState(false)
   const [documentModalType, setDocumentModalType] = useState("add") // add, view, edit, delete
@@ -247,6 +247,41 @@ const SettingsPage: FunctionComponent = () => {
   })
 
   const [leaveTypeAIInsights, setLeaveTypeAIInsights] = useState<string[]>([])
+
+  const handleZoomIn = () => {
+    setDocumentZoom((prev) => Math.min(prev + 25, 200))
+  }
+
+  const handleZoomOut = () => {
+    setDocumentZoom((prev) => Math.max(prev - 25, 50))
+  }
+
+  const handleDownload = () => {
+    if (selectedDocument) {
+      // Create a blob URL for download
+      const link = document.createElement("a")
+      link.href = "#" // In real implementation, this would be the actual file URL
+      link.download = selectedDocument.name
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      toast({
+        title: "Download Started",
+        description: `Downloading ${selectedDocument.name}...`,
+      })
+    }
+  }
+
+  const handleFullscreen = () => {
+    setIsFullscreen(!isFullscreen)
+    if (!isFullscreen) {
+      toast({
+        title: "Fullscreen Mode",
+        description: "Press ESC to exit fullscreen",
+      })
+    }
+  }
 
   // Logo upload function
   const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
@@ -2912,117 +2947,6 @@ Remember: When in doubt, prioritize safety over productivity.`,
               </CardContent>
             </Card>
 
-            {/* Policy Modal */}
-            {showPolicyModal && selectedPolicy && (
-              <Dialog open={showPolicyModal} onOpenChange={setShowPolicyModal}>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>
-                      {policyModalType === "view" && "Policy Details"}
-                      {policyModalType === "edit" && "Edit Policy"}
-                      {policyModalType === "delete" && "Delete Policy"}
-                    </DialogTitle>
-                    <DialogDescription>
-                      {policyModalType === "view" && "View details of the selected policy"}
-                      {policyModalType === "edit" && "Edit the selected policy"}
-                      {policyModalType === "delete" && "Are you sure you want to delete this policy?"}
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  {policyModalType === "view" && (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-sm font-medium">Policy Name</Label>
-                          <p className="text-sm text-gray-600 mt-1">{selectedPolicy.name}</p>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium">Days Allocated</Label>
-                          <p className="text-sm text-gray-600 mt-1">{selectedPolicy.days} days</p>
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium">Description</Label>
-                        <p className="text-sm text-gray-600 mt-1">{selectedPolicy.description}</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium">Current Usage</Label>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {selectedPolicy.usage} of employees have used this leave type
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {policyModalType === "edit" && (
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="policy-name">Policy Name</Label>
-                        <Input
-                          id="policy-name"
-                          value={editingPolicy.name}
-                          onChange={(e) => setEditingPolicy({ ...editingPolicy, name: e.target.value })}
-                          placeholder="Enter policy name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="policy-days">Days Allocated</Label>
-                        <Input
-                          id="policy-days"
-                          type="number"
-                          value={editingPolicy.days}
-                          onChange={(e) =>
-                            setEditingPolicy({ ...editingPolicy, days: Number.parseInt(e.target.value) || 0 })
-                          }
-                          placeholder="Enter number of days"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="policy-description">Description</Label>
-                        <Textarea
-                          id="policy-description"
-                          value={editingPolicy.description}
-                          onChange={(e) => setEditingPolicy({ ...editingPolicy, description: e.target.value })}
-                          placeholder="Enter policy description"
-                          rows={3}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {policyModalType === "delete" && (
-                    <div className="space-y-4">
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <div className="flex items-center space-x-2">
-                          <AlertTriangle className="w-5 h-5 text-red-600" />
-                          <p className="text-sm text-red-800">
-                            This action cannot be undone. This will permanently delete the "{selectedPolicy.name}"
-                            policy.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setShowPolicyModal(false)}>
-                      Cancel
-                    </Button>
-                    {policyModalType === "edit" && (
-                      <Button onClick={handleSavePolicyChanges} disabled={isSavingPolicy}>
-                        {isSavingPolicy ? "Saving..." : "Save Changes"}
-                      </Button>
-                    )}
-                    {policyModalType === "delete" && (
-                      <Button variant="destructive" onClick={() => handleDeletePolicy(selectedPolicy.name)}>
-                        Delete Policy
-                      </Button>
-                    )}
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            )}
-
             {/* Document Modal */}
             {showDocumentModal && (
               <Dialog open={showDocumentModal} onOpenChange={setShowDocumentModal}>
@@ -3116,131 +3040,67 @@ Remember: When in doubt, prioritize safety over productivity.`,
                               </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <Button variant="ghost" size="sm">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleZoomIn}
+                                disabled={documentZoom >= 200}
+                                title="Zoom In"
+                              >
                                 <ZoomIn className="w-4 h-4" />
                               </Button>
-                              <Button variant="ghost" size="sm">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleZoomOut}
+                                disabled={documentZoom <= 50}
+                                title="Zoom Out"
+                              >
                                 <ZoomOut className="w-4 h-4" />
                               </Button>
-                              <Button variant="ghost" size="sm">
+                              <Button variant="ghost" size="sm" onClick={handleDownload} title="Download Document">
                                 <Download className="w-4 h-4" />
                               </Button>
-                              <Button variant="ghost" size="sm">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleFullscreen}
+                                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                              >
                                 <Maximize2 className="w-4 h-4" />
                               </Button>
+                              <div className="text-xs text-gray-500 px-2 border-l">{documentZoom}%</div>
                             </div>
                           </div>
 
                           {/* Document Content Area */}
-                          <div className="relative">
-                            {/* Document Pages Container */}
-                            <div className="max-h-[600px] overflow-y-auto bg-gray-100 p-6">
-                              <div className="max-w-4xl mx-auto">
-                                {/* Document Page */}
-                                <div className="bg-white shadow-lg rounded-lg p-8 mb-6 min-h-[700px]">
-                                  {/* Document Header */}
-                                  <div className="border-b pb-4 mb-6">
-                                    <div className="flex items-center justify-between">
-                                      <div>
-                                        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                                          {selectedDocument.name}
-                                        </h1>
-                                        <div className="flex items-center space-x-4 text-sm text-gray-600">
-                                          <span>Document Type: {selectedDocument.type}</span>
-                                          <span>•</span>
-                                          <span>Size: {selectedDocument.size}</span>
-                                          <span>•</span>
-                                          <span>Last Modified: {new Date().toLocaleDateString()}</span>
-                                        </div>
-                                      </div>
-                                      <div className="text-right">
-                                        <div className="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center">
-                                          <FileText className="w-8 h-8 text-blue-600" />
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Document Content */}
-                                  <div className="prose prose-lg max-w-none">
-                                    {documentPreviewContent.split("\n\n").map((paragraph, index) => {
-                                      if (paragraph.startsWith("Document:")) {
-                                        return (
-                                          <div key={index} className="mb-6">
-                                            <h2 className="text-xl font-semibold text-gray-900 mb-3">
-                                              {paragraph.replace("Document: ", "")}
-                                            </h2>
-                                          </div>
-                                        )
-                                      } else if (paragraph.includes("•")) {
-                                        const lines = paragraph.split("\n")
-                                        const title = lines[0]
-                                        const bullets = lines.slice(1).filter((line) => line.includes("•"))
-                                        return (
-                                          <div key={index} className="mb-6">
-                                            {title && !title.includes("•") && (
-                                              <h3 className="text-lg font-medium text-gray-900 mb-3">{title}</h3>
-                                            )}
-                                            <ul className="list-none space-y-2">
-                                              {bullets.map((bullet, bulletIndex) => (
-                                                <li key={bulletIndex} className="flex items-start space-x-2">
-                                                  <span className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></span>
-                                                  <span className="text-gray-700">{bullet.replace("• ", "")}</span>
-                                                </li>
-                                              ))}
-                                            </ul>
-                                          </div>
-                                        )
-                                      } else if (paragraph.match(/^\d+\./)) {
-                                        const lines = paragraph.split("\n")
-                                        const heading = lines[0]
-                                        const content = lines.slice(1).join(" ")
-                                        return (
-                                          <div key={index} className="mb-6">
-                                            <h3 className="text-lg font-semibold text-gray-900 mb-2">{heading}</h3>
-                                            <p className="text-gray-700 leading-relaxed">{content}</p>
-                                          </div>
-                                        )
-                                      } else if (paragraph.toUpperCase() === paragraph && paragraph.length > 5) {
-                                        return (
-                                          <div key={index} className="mb-4">
-                                            <h3 className="text-lg font-semibold text-gray-900 uppercase tracking-wide">
-                                              {paragraph}
-                                            </h3>
-                                          </div>
-                                        )
-                                      } else {
-                                        return (
-                                          <div key={index} className="mb-4">
-                                            <p className="text-gray-700 leading-relaxed">{paragraph}</p>
-                                          </div>
-                                        )
-                                      }
-                                    })}
-                                  </div>
-
-                                  {/* Document Footer */}
-                                  <div className="border-t pt-6 mt-8">
-                                    <div className="flex items-center justify-between text-sm text-gray-500">
-                                      <span>© 2024 Company Name. All rights reserved.</span>
-                                      <span>Page 1 of 1</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Document Navigation */}
-                            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
-                              <div className="flex items-center space-x-2 bg-white shadow-lg rounded-full px-4 py-2 border">
-                                <Button variant="ghost" size="sm" disabled>
-                                  <ChevronLeft className="w-4 h-4" />
-                                </Button>
-                                <span className="text-sm font-medium px-2">1 / 1</span>
-                                <Button variant="ghost" size="sm" disabled>
-                                  <ChevronRight className="w-4 h-4" />
+                          <div className={`relative ${isFullscreen ? "fixed inset-0 z-50 bg-white" : ""}`}>
+                            {isFullscreen && (
+                              <div className="absolute top-4 right-4 z-10">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleFullscreen}
+                                  className="bg-white shadow-lg"
+                                >
+                                  <X className="w-4 h-4 mr-2" />
+                                  Exit Fullscreen
                                 </Button>
                               </div>
+                            )}
+
+                            <div
+                              className={`bg-white shadow-sm border rounded-lg overflow-auto ${
+                                isFullscreen ? "h-full p-8" : "max-h-96"
+                              }`}
+                              style={{
+                                transform: `scale(${documentZoom / 100})`,
+                                transformOrigin: "top left",
+                                width: `${10000 / documentZoom}%`,
+                              }}
+                            >
+                              {/* Document content goes here */}
+                              {documentPreviewContent}
                             </div>
                           </div>
                         </div>
@@ -3328,94 +3188,45 @@ Remember: When in doubt, prioritize safety over productivity.`,
               <CardDescription>Configure payroll calculations, allowances, and deductions</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Allowances</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center p-3 border rounded">
-                      <span>Transport Allowance</span>
-                      <span className="text-sm text-gray-600">₵200.00</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 border rounded">
-                      <span>Housing Allowance</span>
-                      <span className="text-sm text-gray-600">15%</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 border rounded">
-                      <span>Meal Allowance</span>
-                      <span className="text-sm text-gray-600">₵150.00</span>
-                    </div>
+              <div className="space-y-4">
+                <h3 className="font-semibold">Allowances</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Transport Allowance</span>
+                    <span className="text-sm text-gray-600">₵200.00</span>
                   </div>
-                  <Button variant="outline" size="sm" onClick={handleManageAllowances}>
-                    Manage Allowances
-                  </Button>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Deductions</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center p-3 border rounded">
-                      <span>SSNIT (Employee)</span>
-                      <span className="text-sm text-gray-600">5.5%</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 border rounded">
-                      <span>Income Tax</span>
-                      <span className="text-sm text-gray-600">Variable</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 border rounded">
-                      <span>Staff Loan</span>
-                      <span className="text-sm text-gray-600">₵500.00</span>
-                    </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Housing Allowance</span>
+                    <span className="text-sm text-gray-600">15%</span>
                   </div>
-                  <Button variant="outline" size="sm" onClick={handleManageDeductions}>
-                    Manage Deductions
-                  </Button>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Meal Allowance</span>
+                    <span className="text-sm text-gray-600">₵150.00</span>
+                  </div>
                 </div>
+                <Button variant="outline" size="sm" onClick={handleManageAllowances}>
+                  Manage Allowances
+                </Button>
               </div>
 
               <div className="space-y-4">
-                <h3 className="font-semibold">Salary Grades</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-300">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-300 p-2 text-left">Grade</th>
-                        <th className="border border-gray-300 p-2 text-left">Step 1</th>
-                        <th className="border border-gray-300 p-2 text-left">Step 2</th>
-                        <th className="border border-gray-300 p-2 text-left">Step 3</th>
-                        <th className="border border-gray-300 p-2 text-left">Step 4</th>
-                        <th className="border border-gray-300 p-2 text-left">Step 5</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="border border-gray-300 p-2">Junior Level</td>
-                        <td className="border border-gray-300 p-2">₵2,500</td>
-                        <td className="border border-gray-300 p-2">₵2,750</td>
-                        <td className="border border-gray-300 p-2">₵3,000</td>
-                        <td className="border border-gray-300 p-2">₵3,250</td>
-                        <td className="border border-gray-300 p-2">₵3,500</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 p-2">Mid Level</td>
-                        <td className="border border-gray-300 p-2">₵4,000</td>
-                        <td className="border border-gray-300 p-2">₵4,500</td>
-                        <td className="border border-gray-300 p-2">₵5,000</td>
-                        <td className="border border-gray-300 p-2">₵5,500</td>
-                        <td className="border border-gray-300 p-2">₵6,000</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 p-2">Senior Level</td>
-                        <td className="border border-gray-300 p-2">₵7,000</td>
-                        <td className="border border-gray-300 p-2">₵8,000</td>
-                        <td className="border border-gray-300 p-2">₵9,000</td>
-                        <td className="border border-gray-300 p-2">₵10,000</td>
-                        <td className="border border-gray-300 p-2">₵11,000</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <h3 className="font-semibold">Deductions</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>SSNIT (Employee)</span>
+                    <span className="text-sm text-gray-600">5.5%</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Income Tax</span>
+                    <span className="text-sm text-gray-600">Variable</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 border rounded">
+                    <span>Staff Loan</span>
+                    <span className="text-sm text-gray-600">₵500.00</span>
+                  </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleManageSalaryGrades}>
-                  Manage Salary Grades
+                <Button variant="outline" size="sm" onClick={handleManageDeductions}>
+                  Manage Deductions
                 </Button>
               </div>
             </CardContent>
@@ -4276,5 +4087,3 @@ Remember: When in doubt, prioritize safety over productivity.`,
     </div>
   )
 }
-
-export default SettingsPage
