@@ -2963,6 +2963,27 @@ Next Review Date: January 15, 2025`,
                             </div>
                           </div>
                         </div>
+
                         <div className="p-3 bg-green-50 border border-green-200 rounded">
                           <div className="flex items-start space-x-2">
-\
+                            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-medium text-green-800">Low Sick Leave Usage</p>
+                              <p className="text-xs text-green-600">Employees are maintaining good health</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">Enable AI recommendations to see insights</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
