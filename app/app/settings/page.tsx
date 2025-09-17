@@ -3087,56 +3087,15 @@ Next Review Date: January 15, 2025`,
             {showDocumentModal && (
               <Dialog open={showDocumentModal} onOpenChange={setShowDocumentModal}>
                 <DialogContent
-                  className={`${isFullscreen ? "max-w-[95vw] max-h-[95vh]" : "max-w-6xl max-h-[85vh]"} overflow-hidden`}
+                  className={`${isFullscreen ? "max-w-[98vw] max-h-[98vh]" : "max-w-[90vw] max-h-[90vh]"} overflow-hidden`}
                 >
                   <DialogHeader>
-                    <DialogTitle>
-                      {documentModalType === "add" && "Add HR Policy Document"}
-                      {documentModalType === "view" && "Document Details"}
-                      {documentModalType === "edit" && "Edit Document"}
-                      {documentModalType === "delete" && "Delete Document"}
-                    </DialogTitle>
-                    <DialogDescription>
-                      {documentModalType === "add" && "Upload a new HR policy document"}
-                      {documentModalType === "view" && "View details of the selected document"}
-                      {documentModalType === "edit" && "Edit the selected document"}
-                      {documentModalType === "delete" && "Are you sure you want to delete this document?"}
-                    </DialogDescription>
+                    <DialogTitle>Document Details</DialogTitle>
+                    <DialogDescription>View details of the selected document</DialogDescription>
                   </DialogHeader>
 
-                  {documentModalType === "add" && (
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="document-name">Document Name</Label>
-                        <Input
-                          id="document-name"
-                          value={documentName}
-                          onChange={(e) => setDocumentName(e.target.value)}
-                          placeholder="Enter document name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="document-file">File</Label>
-                        <div className="mt-1">
-                          <Input
-                            id="document-file"
-                            type="file"
-                            onChange={handleFileUpload}
-                            accept=".pdf,.doc,.docx"
-                            className="cursor-pointer hover:bg-gray-50"
-                          />
-                        </div>
-                        {uploadedFile && (
-                          <p className="text-sm text-gray-600 mt-2">
-                            Selected: {uploadedFile.name} ({(uploadedFile.size / (1024 * 1024)).toFixed(1)} MB)
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
                   {documentModalType === "view" && selectedDocument && (
-                    <div className="space-y-4 h-full flex flex-col">
+                    <div className="space-y-4 h-full flex flex-col min-h-[75vh]">
                       <div className="grid grid-cols-3 gap-4 flex-shrink-0">
                         <div>
                           <Label className="text-sm font-medium">Name</Label>
@@ -3165,7 +3124,7 @@ Next Review Date: January 15, 2025`,
                       </div>
 
                       {showDocumentPreview && (
-                        <div className="flex-1 flex flex-col min-h-0">
+                        <div className="flex-1 flex flex-col min-h-[65vh]">
                           <div className="border rounded-lg bg-white shadow-sm flex-1 flex flex-col">
                             {/* Document Viewer Header */}
                             <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50 flex-shrink-0">
@@ -3221,24 +3180,26 @@ Next Review Date: January 15, 2025`,
                               </div>
                             </div>
 
-                            <div className="flex-1 bg-gray-100 p-4 overflow-auto">
-                              <div className="max-w-4xl mx-auto">
+                            <div className="flex-1 bg-gray-100 p-6 overflow-auto" style={{ minHeight: "60vh" }}>
+                              <div className="max-w-5xl mx-auto">
                                 {/* Document Page Container */}
                                 <div
-                                  className="bg-white shadow-lg border border-gray-300 min-h-[800px] p-12 font-serif text-gray-900 leading-relaxed"
+                                  className="bg-white shadow-lg border border-gray-300 min-h-[900px] p-16 font-serif text-gray-900 leading-relaxed"
                                   style={{
                                     transform: `scale(${documentZoom / 100})`,
                                     transformOrigin: "top center",
                                     marginBottom: `${(documentZoom - 100) * 8}px`,
+                                    width: "210mm", // A4 width
+                                    minHeight: "297mm", // A4 height
                                   }}
                                 >
                                   {/* Document Header */}
-                                  <div className="text-center mb-8 pb-4 border-b-2 border-gray-300">
-                                    <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                                      <FileText className="w-8 h-8 text-white" />
+                                  <div className="text-center mb-12 pb-6 border-b-2 border-gray-300">
+                                    <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                                      <FileText className="w-10 h-10 text-white" />
                                     </div>
-                                    <h1 className="text-2xl font-bold text-gray-900 mb-2">{selectedDocument.name}</h1>
-                                    <div className="flex justify-center space-x-6 text-sm text-gray-600">
+                                    <h1 className="text-3xl font-bold text-gray-900 mb-4">{selectedDocument.name}</h1>
+                                    <div className="flex justify-center space-x-8 text-sm text-gray-600">
                                       <div>
                                         <span className="font-medium">Document Type:</span> {selectedDocument.type}
                                       </div>
@@ -3252,14 +3213,14 @@ Next Review Date: January 15, 2025`,
                                   </div>
 
                                   {/* Document Content */}
-                                  <div className="prose prose-lg max-w-none">
-                                    <pre className="whitespace-pre-wrap font-serif text-base leading-relaxed text-gray-900">
+                                  <div className="prose prose-xl max-w-none">
+                                    <pre className="whitespace-pre-wrap font-serif text-lg leading-relaxed text-gray-900">
                                       {documentPreviewContent}
                                     </pre>
                                   </div>
 
                                   {/* Document Footer */}
-                                  <div className="mt-12 pt-4 border-t border-gray-300 text-center text-sm text-gray-500">
+                                  <div className="mt-16 pt-6 border-t border-gray-300 text-center text-sm text-gray-500">
                                     <p>
                                       This document is confidential and proprietary. Unauthorized distribution is
                                       prohibited.
