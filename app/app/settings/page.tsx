@@ -242,15 +242,20 @@ export default function SettingsPage() {
 
   const handleDownload = () => {
     if (selectedDocument) {
-      // Create document content based on type
       const content = parseDocumentContent(selectedDocument)
       let blob
       let filename
 
       if (selectedDocument.type === "PDF") {
-        // For PDF, we'll create a simple text file (in real app, would use PDF library)
-        blob = new Blob([content], { type: "application/pdf" })
-        filename = `${selectedDocument.name}.pdf`
+        // For demo purposes, download as text file since we don't have actual PDF binary data
+        // In production, this would fetch the actual PDF file from storage
+        blob = new Blob([content], { type: "text/plain" })
+        filename = `${selectedDocument.name}.txt`
+
+        toast({
+          title: "Download Note",
+          description: "PDF downloaded as text file for demo purposes",
+        })
       } else if (selectedDocument.type === "DOC" || selectedDocument.type === "DOCX") {
         // For Word docs, create as RTF format
         const rtfContent = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}} \\f0\\fs24 ${content.replace(/\n/g, "\\par ")}}`
