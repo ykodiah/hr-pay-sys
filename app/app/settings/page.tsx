@@ -29,6 +29,10 @@ import {
   Calendar,
   Sparkles,
   TrendingUp,
+  DollarSign,
+  Minus,
+  CreditCard,
+  Calculator,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -238,6 +242,23 @@ export default function SettingsPage() {
 
   const [policyInsights, setPolicyInsights] = useState<Record<string, string>>({})
   const [loadingInsights, setLoadingInsights] = useState<Record<string, boolean>>({})
+
+  const [allowances, setAllowances] = useState([
+    { code: 'TRANS', description: 'Transport Allowance', taxable: true, recurring: true, amount: 0, percentage: 0, type: 'FIXED' },
+    { code: 'HOUSE', description: 'Housing Allowance', taxable: true, recurring: true, amount: 0, percentage: 0, type: 'FIXED' },
+    { code: 'MED', description: 'Medical Allowance', taxable: false, recurring: true, amount: 0, percentage: 0, type: 'FIXED' }
+  ])
+
+  const [deductions, setDeductions] = useState([
+    { code: 'TAX', description: 'Tax Deduction', recurring: true, amount: 0, percentage: 0, type: 'VARIABLE' },
+    { code: 'SSNIT', description: 'SSNIT Deduction', recurring: true, amount: 0, percentage: 5.5, type: 'VARIABLE' },
+    { code: 'LOAN', description: 'Loan Deduction', recurring: true, amount: 0, percentage: 0, type: 'FIXED' }
+  ])
+
+  const [loanSettings, setLoanSettings] = useState([
+    { code: 'PERSON', description: 'Personal Loan', maxAmount: 50000, interestRate: 10, rateMethod: 'Reducing Balance', adminCharges: 500, loanTenure: 12 },
+    { code: 'EMERGE', description: 'Emergency Loan', maxAmount: 10000, interestRate: 5, rateMethod: 'Straight Line Met', adminCharges: 200, loanTenure: 6 }
+  ])
 
   const handleZoomIn = () => {
     setDocumentZoom((prev) => Math.min(prev + 25, 200))
@@ -3243,58 +3264,390 @@ Format the response in a professional, actionable manner for HR decision-makers.
         </TabsContent>
 
         <TabsContent value="payroll">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Settings className="w-5 h-5" />
-                <span>Payroll Configuration</span>
-              </CardTitle>
-              <CardDescription>Configure payroll settings and policies</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="payFrequency">Pay Frequency</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select frequency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="biweekly">Bi-Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                    </SelectContent>
-                  </Select>
+          <div className="space-y-6">
+            
+            {/* Payroll Configuration Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Settings className="w-5 h-5" />
+                  <span>Payroll Configuration</span>
+                </CardTitle>
+                <CardDescription>Configure basic payroll settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div>
+                    <Label htmlFor="payFrequency">Pay Frequency</Label>
+                    <Select defaultValue="monthly">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="biweekly">Bi-Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="currency">Currency</Label>
+                    <Select defaultValue="ghs">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ghs">Ghana Cedis (GHS)</SelectItem>
+                        <SelectItem value="usd">USD</SelectItem>
+                        <SelectItem value="eur">EUR</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="minimumWage">Minimum Wage (USD)</Label>
+                    <Input type="number" defaultValue="18.15" />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="weekdayOvertimeRate">Weekday Overtime Rate Multiplier</Label>
+                    <Input type="number" step="0.1" defaultValue="1.5" />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="weekendOvertimeRate">Weekend Overtime Rate Multiplier</Label>
+                    <Input type="number" step="0.1" defaultValue="2" />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="payrollCutoffDay">Payroll Cutoff Day</Label>
+                    <Input type="number" min="1" max="31" defaultValue="25" />
+                  </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="currency">Currency</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select currency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="usd">USD</SelectItem>
-                      <SelectItem value="eur">EUR</SelectItem>
-                      <SelectItem value="ghs">GHS</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch id="autoCalculatePAYE" defaultChecked />
+                    <Label htmlFor="autoCalculatePAYE">Auto-calculate PAYE</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="autoCalculateSSNIT" defaultChecked />
+                    <Label htmlFor="autoCalculateSSNIT">Auto-calculate SSNIT</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="autoCalculateProvidentFund" defaultChecked />
+                    <Label htmlFor="autoCalculateProvidentFund">Auto-calculate Provident Fund (Tier 3)</Label>
+                  </div>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              <div className="space-y-4">
-                <Button variant="outline" onClick={handleManageAllowancesInner}>
-                  Manage Allowances
-                </Button>
-                <Button variant="outline" onClick={handleManageDeductionsInner}>
-                  Manage Deductions
-                </Button>
-                <Button variant="outline" onClick={handleManageSalaryGradesInner}>
-                  Manage Salary Grades
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Tax Configuration Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Calculator className="w-5 h-5" />
+                  <span>Tax Configuration</span>
+                </CardTitle>
+                <CardDescription>Configure tax bands and SSNIT rates</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium">PAYE Tax Bands</h4>
+                    <Button size="sm" variant="outline">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Band
+                    </Button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse border border-gray-200">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="border border-gray-200 px-4 py-2 text-left">Band</th>
+                          <th className="border border-gray-200 px-4 py-2 text-left">Rate (%)</th>
+                          <th className="border border-gray-200 px-4 py-2 text-left">From (USD)</th>
+                          <th className="border border-gray-200 px-4 py-2 text-left">To (USD)</th>
+                          <th className="border border-gray-200 px-4 py-2 text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="border border-gray-200 px-4 py-2">0</td>
+                          <td className="border border-gray-200 px-4 py-2">% on first USD</td>
+                          <td className="border border-gray-200 px-4 py-2">4350</td>
+                          <td className="border border-gray-200 px-4 py-2">-</td>
+                          <td className="border border-gray-200 px-4 py-2 text-center">
+                            <Button size="sm" variant="ghost">Edit</Button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-200 px-4 py-2">5</td>
+                          <td className="border border-gray-200 px-4 py-2">% on next USD</td>
+                          <td className="border border-gray-200 px-4 py-2">1000</td>
+                          <td className="border border-gray-200 px-4 py-2">-</td>
+                          <td className="border border-gray-200 px-4 py-2 text-center">
+                            <Button size="sm" variant="ghost">Edit</Button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-200 px-4 py-2">10</td>
+                          <td className="border border-gray-200 px-4 py-2">% on next USD</td>
+                          <td className="border border-gray-200 px-4 py-2">2000</td>
+                          <td className="border border-gray-200 px-4 py-2">-</td>
+                          <td className="border border-gray-200 px-4 py-2 text-center">
+                            <Button size="sm" variant="ghost">Edit</Button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-200 px-4 py-2">17.5</td>
+                          <td className="border border-gray-200 px-4 py-2">% on next USD</td>
+                          <td className="border border-gray-200 px-4 py-2">20000</td>
+                          <td className="border border-gray-200 px-4 py-2">-</td>
+                          <td className="border border-gray-200 px-4 py-2 text-center">
+                            <Button size="sm" variant="ghost">Edit</Button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-200 px-4 py-2">25</td>
+                          <td className="border border-gray-200 px-4 py-2">% on next USD</td>
+                          <td className="border border-gray-200 px-4 py-2">25000</td>
+                          <td className="border border-gray-200 px-4 py-2">-</td>
+                          <td className="border border-gray-200 px-4 py-2 text-center">
+                            <Button size="sm" variant="ghost">Edit</Button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-200 px-4 py-2">30</td>
+                          <td className="border border-gray-200 px-4 py-2">% on remaining amount</td>
+                          <td className="border border-gray-200 px-4 py-2">-</td>
+                          <td className="border border-gray-200 px-4 py-2">-</td>
+                          <td className="border border-gray-200 px-4 py-2 text-center">
+                            <Button size="sm" variant="ghost">Edit</Button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-medium mb-3">SSNIT Rates</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span>Employee:</span>
+                        <span className="font-medium">5.5%</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Employer:</span>
+                        <span className="font-medium">13%</span>
+                      </div>
+                      <div className="flex justify-between items-center font-medium border-t pt-2">
+                        <span>Total:</span>
+                        <span>18.5%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-3">Tier 2 Rates</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span>Employee:</span>
+                        <span className="font-medium">5.5%</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Employer:</span>
+                        <span className="font-medium">5.5%</span>
+                      </div>
+                      <div className="flex justify-between items-center font-medium border-t pt-2">
+                        <span>Total:</span>
+                        <span>11.0%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-3">Tier 3 Rates</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span>Employee:</span>
+                        <span className="font-medium">5%</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Employer:</span>
+                        <span className="font-medium">5%</span>
+                      </div>
+                      <div className="flex justify-between items-center font-medium border-t pt-2">
+                        <span>Total:</span>
+                        <span>10.0%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Allowances Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-5 h-5" />
+                    <span>Allowances</span>
+                  </div>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-200">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-200 px-4 py-2 text-left">Code</th>
+                        <th className="border border-gray-200 px-4 py-2 text-left">Description</th>
+                        <th className="border border-gray-200 px-4 py-2 text-center">Taxable</th>
+                        <th className="border border-gray-200 px-4 py-2 text-center">Recurring</th>
+                        <th className="border border-gray-200 px-4 py-2 text-right">AMOUNT</th>
+                        <th className="border border-gray-200 px-4 py-2 text-right">%</th>
+                        <th className="border border-gray-200 px-4 py-2 text-center">FIXED/VARIABLE</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allowances.map((allowance, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 px-4 py-2 font-medium">{allowance.code}</td>
+                          <td className="border border-gray-200 px-4 py-2">{allowance.description}</td>
+                          <td className="border border-gray-200 px-4 py-2 text-center">
+                            <Switch checked={allowance.taxable} />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-2 text-center">
+                            <Switch checked={allowance.recurring} />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-2 text-right">{allowance.amount}</td>
+                          <td className="border border-gray-200 px-4 py-2 text-right">{allowance.percentage}</td>
+                          <td className="border border-gray-200 px-4 py-2 text-center">
+                            <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">
+                              {allowance.type}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Deductions Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Minus className="w-5 h-5" />
+                    <span>Deductions</span>
+                  </div>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-200">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-200 px-4 py-2 text-left">Code</th>
+                        <th className="border border-gray-200 px-4 py-2 text-left">Description</th>
+                        <th className="border border-gray-200 px-4 py-2 text-center">Recurring</th>
+                        <th className="border border-gray-200 px-4 py-2 text-right">AMOUNT</th>
+                        <th className="border border-gray-200 px-4 py-2 text-right">%</th>
+                        <th className="border border-gray-200 px-4 py-2 text-center">FIXED/VARIABLE</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deductions.map((deduction, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 px-4 py-2 font-medium">{deduction.code}</td>
+                          <td className="border border-gray-200 px-4 py-2">{deduction.description}</td>
+                          <td className="border border-gray-200 px-4 py-2 text-center">
+                            <Switch checked={deduction.recurring} />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-2 text-right">{deduction.amount}</td>
+                          <td className="border border-gray-200 px-4 py-2 text-right">{deduction.percentage}</td>
+                          <td className="border border-gray-200 px-4 py-2 text-center">
+                            <span className="px-2 py-1 text-xs rounded bg-orange-100 text-orange-800">
+                              {deduction.type}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Loan Settings Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <CreditCard className="w-5 h-5" />
+                    <span>Loan Settings</span>
+                  </div>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-200">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-200 px-4 py-2 text-left">Code</th>
+                        <th className="border border-gray-200 px-4 py-2 text-left">Description</th>
+                        <th className="border border-gray-200 px-4 py-2 text-right">Maximum Amount</th>
+                        <th className="border border-gray-200 px-4 py-2 text-right">Interest Rate (%)</th>
+                        <th className="border border-gray-200 px-4 py-2 text-center">Rate Method</th>
+                        <th className="border border-gray-200 px-4 py-2 text-right">Admin Charges</th>
+                        <th className="border border-gray-200 px-4 py-2 text-right">Loan Tenure (months)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loanSettings.map((loan, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 px-4 py-2 font-medium">{loan.code}</td>
+                          <td className="border border-gray-200 px-4 py-2">{loan.description}</td>
+                          <td className="border border-gray-200 px-4 py-2 text-right">{loan.maxAmount.toLocaleString()}</td>
+                          <td className="border border-gray-200 px-4 py-2 text-right">{loan.interestRate}</td>
+                          <td className="border border-gray-200 px-4 py-2 text-center">{loan.rateMethod}</td>
+                          <td className="border border-gray-200 px-4 py-2 text-right">{loan.adminCharges}</td>
+                          <td className="border border-gray-200 px-4 py-2 text-right">{loan.loanTenure}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Save Button */}
+            <div className="flex justify-end">
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Save className="w-4 h-4 mr-2" />
+                Save Payroll Settings
+              </Button>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="notifications">
@@ -4261,163 +4614,5 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         </Button>
                         <Button variant="outline" size="sm" onClick={handleZoomOut}>
                           Zoom Out
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={handleDownload}>
-                          Download
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={handleFullscreen}>
-                          {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div
-                      className={`relative overflow-auto border rounded-md ${
-                        isFullscreen ? "fixed inset-0 z-50 bg-white" : "h-[500px]"
-                      }`}
-                    >
-                      <div style={{ zoom: `${documentZoom}%` }} className="p-4 whitespace-pre-line">
-                        {documentPreviewContent}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {documentModalType === "edit" && (
-                  <>
-                    <Label htmlFor="editDocumentName">Document Name</Label>
-                    <Input
-                      id="editDocumentName"
-                      placeholder="Enter document name"
-                      value={documentName}
-                      onChange={(e) => setDocumentName(e.target.value)}
-                    />
-                  </>
-                )}
-
-                {documentModalType === "add" && (
-                  <>
-                    <Label htmlFor="addDocumentName">Document Name</Label>
-                    <Input
-                      id="addDocumentName"
-                      placeholder="Enter document name"
-                      value={documentName}
-                      onChange={(e) => setDocumentName(e.target.value)}
-                    />
-
-                    <Label htmlFor="uploadDocument">Upload Document</Label>
-                    <Input type="file" id="uploadDocument" onChange={handleFileUpload} />
-                  </>
-                )}
-
-                {documentModalType === "delete" && (
-                  <p>Are you sure you want to delete the {selectedDocument.name} document?</p>
-                )}
-
-                <div className="flex justify-end space-x-2">
-                  <Button variant="ghost" onClick={() => setShowDocumentModal(false)}>
-                    Cancel
-                  </Button>
-                  {documentModalType === "edit" && (
-                    <Button onClick={handleEditDocument} disabled={isSavingDocument}>
-                      {isSavingDocument ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        "Save Changes"
-                      )}
-                    </Button>
-                  )}
-                  {documentModalType === "add" && (
-                    <Button onClick={handleSaveDocument} disabled={isSavingDocument}>
-                      {isSavingDocument ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Uploading...
-                        </>
-                      ) : (
-                        "Upload Document"
-                      )}
-                    </Button>
-                  )}
-                  {documentModalType === "delete" && (
-                    <Button variant="destructive" onClick={() => handleDeleteDocument(selectedDocument.id)}>
-                      Delete
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {showAIInsightsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b">
-              <div className="flex items-center space-x-2">
-                <Brain className="w-6 h-6 text-blue-600" />
-                <h2 className="text-xl font-semibold">AI Leave Policy Insights</h2>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAIInsightsModal(false)}
-                disabled={isGeneratingInsights}
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-              {isGeneratingInsights ? (
-                <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                  <p className="text-gray-600">Analyzing your leave policies...</p>
-                  <p className="text-sm text-gray-500">This may take a few moments</p>
-                </div>
-              ) : aiInsights ? (
-                <div className="space-y-4">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Sparkles className="w-5 h-5 text-blue-600" />
-                      <h3 className="font-semibold text-blue-900">Professional Analysis</h3>
-                    </div>
-                    <div className="prose prose-sm max-w-none">
-                      <pre className="whitespace-pre-wrap font-sans text-gray-700 leading-relaxed">{aiInsights}</pre>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end space-x-2 pt-4 border-t">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        navigator.clipboard.writeText(aiInsights)
-                        toast({
-                          title: "Copied to Clipboard",
-                          description: "AI insights have been copied to your clipboard.",
-                        })
-                      }}
-                    >
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy Insights
-                    </Button>
-                    <Button onClick={() => setShowAIInsightsModal(false)}>Close</Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-                  <p className="text-gray-600">No insights available. Please try again.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+                        </Button>\
+                        <
