@@ -2335,6 +2335,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
   }
 
+  const [showAIInsights, setShowAIInsights] = useState(false)
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false)
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -4609,10 +4612,4 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     <div className="flex items-center justify-between">
                       <Label>Document Name</Label>
                       <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm" onClick={handleZoomIn}>
-                          Zoom In
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={handleZoomOut}>
-                          Zoom Out
-                        </Button>\
-                        <
+                        <Button variant="outline" size="sm" onClick={handleZoomIn}>\
