@@ -1,52 +1,43 @@
 "use client"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import {
   Building2,
-  Users,
   X,
+  Loader2,
+  Upload,
+  Building,
+  Users,
+  Calculator,
+  Bell,
+  Shield,
+  Key,
+  Lock,
+  Database,
+  FileText,
+  TrendingUp,
+  Calendar,
+  Mail,
+  Brain,
+  CheckCircle,
+  Settings,
+  Save,
+  Plus,
+  MoreHorizontal,
   Eye,
   Edit,
-  MoreVertical,
-  Loader2,
-  Brain,
-  Plus,
-  RefreshCw,
-  MapPin,
-  Briefcase,
-  Copy,
+  Pause,
+  Play,
+  Trash2,
   Download,
-  Upload,
-  ImageIcon,
-  AlertTriangle,
-  CheckCircle,
-  Save,
-  Settings,
-  Calendar,
-  Sparkles,
-  TrendingUp,
   DollarSign,
   Minus,
-  CreditCard,
-  Calculator,
+  Receipt,
 } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 interface Company {
   id: string
@@ -63,6 +54,8 @@ interface Company {
   departments?: string[]
   locations?: string[]
   status?: string
+  size?: string
+  country?: string
 }
 
 interface Employee {
@@ -142,6 +135,8 @@ export default function SettingsPage() {
     divisions: [],
     departments: [],
     locations: [],
+    size: "",
+    country: "",
   })
 
   const [hrConfig, setHrConfig] = useState({
@@ -154,6 +149,19 @@ export default function SettingsPage() {
     aiRecommendations: true,
     smartScheduling: false,
     performanceTracking: true,
+  })
+
+  const [payrollConfig, setPayrollConfig] = useState({
+    payFrequency: "Monthly",
+    currency: "USD",
+    minimumWage: 18.15,
+    weekdayOvertimeMultiplier: 1.5,
+    weekendOvertimeMultiplier: 2.0,
+    payrollCutoffDay: 25,
+    processingDay: 28,
+    autoCalculatePAYE: true,
+    autoCalculateSSNIT: true,
+    autoCalculateProvidentFund: true,
   })
 
   const [editingPolicy, setEditingPolicy] = useState({
@@ -243,23 +251,6 @@ export default function SettingsPage() {
   const [policyInsights, setPolicyInsights] = useState<Record<string, string>>({})
   const [loadingInsights, setLoadingInsights] = useState<Record<string, boolean>>({})
 
-  const [allowances, setAllowances] = useState([
-    { code: 'TRANS', description: 'Transport Allowance', taxable: true, recurring: true, amount: 0, percentage: 0, type: 'FIXED' },
-    { code: 'HOUSE', description: 'Housing Allowance', taxable: true, recurring: true, amount: 0, percentage: 0, type: 'FIXED' },
-    { code: 'MED', description: 'Medical Allowance', taxable: false, recurring: true, amount: 0, percentage: 0, type: 'FIXED' }
-  ])
-
-  const [deductions, setDeductions] = useState([
-    { code: 'TAX', description: 'Tax Deduction', recurring: true, amount: 0, percentage: 0, type: 'VARIABLE' },
-    { code: 'SSNIT', description: 'SSNIT Deduction', recurring: true, amount: 0, percentage: 5.5, type: 'VARIABLE' },
-    { code: 'LOAN', description: 'Loan Deduction', recurring: true, amount: 0, percentage: 0, type: 'FIXED' }
-  ])
-
-  const [loanSettings, setLoanSettings] = useState([
-    { code: 'PERSON', description: 'Personal Loan', maxAmount: 50000, interestRate: 10, rateMethod: 'Reducing Balance', adminCharges: 500, loanTenure: 12 },
-    { code: 'EMERGE', description: 'Emergency Loan', maxAmount: 10000, interestRate: 5, rateMethod: 'Straight Line Met', adminCharges: 200, loanTenure: 6 }
-  ])
-
   const [selectedCurrency, setSelectedCurrency] = useState('ghs')
   const [payeTaxBands, setPayeTaxBands] = useState([
     { band: 0, rate: 0, from: 4350, to: null, description: '% on first' },
@@ -337,6 +328,7 @@ export default function SettingsPage() {
   const handleCurrencyChange = (currency: string) => {
     setSelectedCurrency(currency)
     setPayeTaxBands(currencyConfig[currency as keyof typeof currencyConfig].taxBands)
+    setPayrollConfig({ ...payrollConfig, currency: currency })
   }
 
   const updateSsnitRates = (field: 'employee' | 'employer', value: number) => {
@@ -516,6 +508,8 @@ export default function SettingsPage() {
           divisions: data.divisions || [],
           departments: data.departments || [],
           locations: data.locations || [],
+          size: data.size || "",
+          country: data.country || "",
         })
 
         setDivisions(data.divisions || [])
@@ -1921,7 +1915,7 @@ Violations may result in:
 
 This document is reviewed annually and updated as needed to reflect current laws and best practices.
 
-═══════════════════════════════════════════════════════════════
+════════════════════════════════════════════════
 
 For questions about this Code of Conduct, contact:
 Ethics and Compliance Office
@@ -2353,346 +2347,481 @@ Next Review Date: January 15, 2025`,
 
       const prompt = `Analyze the following leave policies and provide professional HR insights:
 
-${policiesData
-  .map(
-    (policy) =>
-      `- ${policy.name}: ${policy.days} days allocated, ${policy.usage} usage rate, trend: ${policy.trend}
-    Description: ${policy.description}`,
-  )
-  .join("\n")}
+${policiesData.map(policy => `- ${policy.name}: ${policy.days} days, ${policy.usage}% usage, ${policy.description}`).join('\n')}
 
 Please provide:
-1. Usage pattern analysis
-2. Policy optimization recommendations  
-3. Compliance considerations
-4. Industry benchmarking insights
-5. Cost impact analysis
-6. Employee satisfaction implications
+1. Overall policy utilization analysis
+2. Recommendations for policy optimization
+3. Potential cost savings opportunities
+4. Employee satisfaction insights`
 
-Format the response in a professional, actionable manner for HR decision-makers.`
-
-      const response = await fetch("/api/ai-insights", {
-        method: "POST",
+      const response = await fetch('/api/ai-insights', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({
+          prompt,
+          type: 'leave_policies'
+        }),
       })
 
       if (!response.ok) {
-        throw new Error("Failed to generate insights")
+        throw new Error('Failed to generate insights')
       }
 
       const data = await response.json()
       setAiInsights(data.insights)
-
-      toast({
-        title: "AI Insights Generated",
-        description: "Professional leave policy analysis completed successfully.",
-      })
     } catch (error) {
-      console.error("Error generating AI insights:", error)
+      console.error('[v0] Error generating AI insights:', error)
+      setAiInsights('Unable to generate insights at this time. Please try again later.')
       toast({
         title: "Error",
         description: "Failed to generate AI insights. Please try again.",
         variant: "destructive",
       })
-      setShowAIInsightsModal(false)
     } finally {
       setIsGeneratingInsights(false)
     }
   }
 
-  const handleGeneratePolicyInsight = async (policyName: string) => {
-    const policy = currentPolicies.find((p) => p.name === policyName)
+  const handleGenerateIndividualInsight = async (policyId: string) => {
+    const policy = currentPolicies.find(p => p.id === policyId)
     if (!policy) return
 
-    setLoadingInsights((prev) => ({ ...prev, [policyName]: true }))
+    setLoadingInsights(prev => ({ ...prev, [policyId]: true }))
 
     try {
-      const response = await fetch("/api/policy-insights", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ policy }),
+      const response = await fetch('/api/policy-insights', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          policy: {
+            name: policy.name,
+            days: policy.days,
+            usage: policy.usage,
+            description: policy.description
+          }
+        }),
       })
 
-      if (!response.ok) throw new Error("Failed to generate insight")
+      if (!response.ok) {
+        throw new Error('Failed to generate insight')
+      }
 
       const data = await response.json()
-      setPolicyInsights((prev) => ({ ...prev, [policyName]: data.insight }))
+      setPolicyInsights(prev => ({ ...prev, [policyId]: data.insight }))
     } catch (error) {
-      console.error("Error generating insight:", error)
-      toast({
-        title: "Error",
-        description: "Failed to generate AI insight. Please try again.",
-        variant: "destructive",
-      })
+      console.error('[v0] Error generating policy insight:', error)
+      setPolicyInsights(prev => ({ ...prev, [policyId]: 'Unable to generate insight at this time.' }))
     } finally {
-      setLoadingInsights((prev) => ({ ...prev, [policyName]: false }))
+      setLoadingInsights(prev => ({ ...prev, [policyId]: false }))
     }
   }
 
-  const [showAIInsights, setShowAIInsights] = useState(false)
-  const [aiInsightsLoading, setAiInsightsLoading] = useState(false)
+  const handleSavePayrollConfig = async () => {
+    setIsSavingPayroll(true)
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      toast({
+        title: "Success",
+        description: "Payroll configuration saved successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save payroll configuration.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingPayroll(false)
+    }
+  }
+
+  const handleSaveHRConfig = async () => {
+    setIsSaving(true)
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      toast({
+        title: "Success",
+        description: "HR configuration saved successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save HR configuration.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const calculateSSNITTotal = () => {
+    return ssnitRates.employee + ssnitRates.employer
+  }
+
+  const calculateTier2Total = () => {
+    return tier2Rates.employee + tier2Rates.employer
+  }
+
+  const calculateTier3Total = () => {
+    return tier3Rates.employee + tier3Rates.employer
+  }
+
+  const handleSSNITChange = (field: 'employee' | 'employer', value: number) => {
+    setSsnitRates(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleTier2Change = (field: 'employee' | 'employer', value: number) => {
+    setTier2Rates(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleTier3Change = (field: 'employee' | 'employer', value: number) => {
+    setTier3Rates(prev => ({ ...prev, [field]: value }))
+  }
+
+  const [selectedAllowance, setSelectedAllowance] = useState(null)
+  const [selectedDeduction, setSelectedDeduction] = useState(null)
+  const [showAllowanceModal, setShowAllowanceModal] = useState(false)
+  const [showDeductionModal, setShowDeductionModal] = useState(false)
+  const [showAddAllowanceModal, setShowAddAllowanceModal] = useState(false)
+  const [showAddDeductionModal, setShowAddDeductionModal] = useState(false)
+  const [isSavingPayroll, setIsSavingPayrollHR] = useState(false)
+  const [isSavingHR, setIsSavingHR] = useState(false)
+  const [salaryGrades, setSalaryGrades] = useState([
+    { id: 1, grade: 'A1', level: 'Entry Level', minSalary: 5000, maxSalary: 8000, steps: 5 },
+    { id: 2, grade: 'B2', level: 'Mid Level', minSalary: 8000, maxSalary: 12000, steps: 7 },
+    { id: 3, grade: 'C3', level: 'Senior Level', minSalary: 12000, maxSalary: 20000, steps: 10 }
+  ])
+  const [showAddSalaryGradeModal, setShowAddSalaryGradeModal] = useState(false)
+  const [policyDocuments, setPolicyDocuments] = useState([
+    { id: 1, name: 'Employee Handbook', category: 'HR Policy', version: '1.0', status: 'active', lastUpdated: '2024-01-01' },
+    { id: 2, name: 'Code of Conduct', category: 'HR Policy', version: '1.1', status: 'active', lastUpdated: '2024-01-01' },
+    { id: 3, name: 'Safety Guidelines', category: 'HR Policy', version: '1.2', status: 'draft', lastUpdated: '2024-01-01' }
+  ])
+  const [showEditTaxBandModal, setShowEditTaxBandModal] = useState(false)
+  const [showAddTaxBandModal, setShowAddTaxBandModal] = useState(false)
+  const [emailTemplates, setEmailTemplates] = useState([
+    { id: 1, name: 'Welcome Email', description: 'Welcome email for new employees', status: 'active' },
+    { id: 2, name: 'Leave Request', description: 'Leave request notification', status: 'active' },
+    { id: 3, name: 'Performance Review', description: 'Performance review notification', status: 'active' }
+  ])
+
+  const handleViewSalaryGrade = (id) => {
+    toast({
+      title: "View Salary Grade",
+      description: `Viewing salary grade ${id}...`,
+    })
+  }
+
+  const handleEditSalaryGrade = (id) => {
+    toast({
+      title: "Edit Salary Grade",
+      description: `Editing salary grade ${id}...`,
+    })
+  }
+
+  const handleDeleteSalaryGrade = (id) => {
+    toast({
+      title: "Delete Salary Grade",
+      description: `Deleting salary grade ${id}...`,
+    })
+  }
+
+  const handleViewDocument = (id) => {
+    toast({
+      title: "View Document",
+      description: `Viewing document ${id}...`,
+    })
+  }
+
+  const handleEditDocument = (id) => {
+    toast({
+      title: "Edit Document",
+      description: `Editing document ${id}...`,
+    })
+  }
+
+  const handleDownloadDocument = (id) => {
+    toast({
+      title: "Download Document",
+      description: `Downloading document ${id}...`,
+    })
+  }
+
+  const handleDeleteDocument = (id) => {
+    toast({
+      title: "Delete Document",
+      description: `Deleting document ${id}...`,
+    })
+  }
+
+  const handleEditTaxBand = (index) => {
+    toast({
+      title: "Edit Tax Band",
+      description: `Editing tax band ${index}...`,
+    })
+  }
+
+  const [activeTab, setActiveTab] = useState("company");
+  const getCurrencySymbol = (currencyCode) => {
+    switch (currencyCode) {
+      case "USD":
+        return "$";
+      case "EUR":
+        return "€";
+      case "GBP":
+        return "£";
+      case "NGN":
+        return "₦";
+      case "GHS":
+        return "₵";
+      default:
+        return "$";
+    }
+  };
+
+  const currencySymbol = getCurrencySymbol(payrollConfig.currency)
+
+  const formatCurrency = (amount, currencyCode) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currencyCode,
+    }).format(amount);
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-600">Manage your organization settings and configurations</p>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+          <p className="text-gray-600 mt-2">Manage your organization settings and configurations</p>
         </div>
-      </div>
 
-      <Tabs defaultValue="company" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-8">
-          <TabsTrigger value="company">Company</TabsTrigger>
-          <TabsTrigger value="subsidiaries">Multi-Company</TabsTrigger>
-          <TabsTrigger value="hr">HR</TabsTrigger>
-          <TabsTrigger value="payroll">Payroll</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="roles">Roles</TabsTrigger>
-          <TabsTrigger value="access">Access</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-        </TabsList>
+        {/* Navigation Tabs */}
+        <div className="mb-8">
+          <div className="flex space-x-1 bg-white rounded-lg p-1 shadow-sm">
+            {[
+              { id: 'company', label: 'Company', icon: Building2 },
+              { id: 'multi-company', label: 'Multi-Company', icon: Building },
+              { id: 'hr', label: 'HR', icon: Users },
+              { id: 'payroll', label: 'Payroll', icon: Calculator },
+              { id: 'notifications', label: 'Notifications', icon: Bell },
+              { id: 'roles', label: 'Roles', icon: Shield },
+              { id: 'access', label: 'Access', icon: Key },
+              { id: 'security', label: 'Security', icon: Lock },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <tab.icon className="w-4 h-4" />
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
-        {/* Company Settings */}
-        <TabsContent value="company">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Building2 className="w-5 h-5" />
-                <span>Company Settings</span>
-              </CardTitle>
-              <CardDescription>Manage your company information and organizational structure</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <Label>Company Logo</Label>
-                <div className="flex items-center space-x-4">
-                  {companyLogoPreview || companyData.logo_url ? (
-                    <div className="relative">
-                      <img
-                        src={companyLogoPreview || companyData.logo_url}
-                        alt="Company Logo"
-                        className="w-20 h-20 object-cover rounded-lg border"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
-                        onClick={() => {
-                          setCompanyLogoPreview("")
-                          setCompanyData({ ...companyData, logo_url: "" })
-                        }}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                      <ImageIcon className="w-8 h-8 text-gray-400" />
-                    </div>
-                  )}
-                  <div className="space-y-2">
+        {/* Tab Content */}
+        {activeTab === 'company' && (
+          <div className="space-y-6">
+            {/* Company Information */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center space-x-3">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                  <h2 className="text-xl font-semibold text-gray-900">Company Information</h2>
+                </div>
+                <p className="text-gray-600 mt-1">Basic company details and settings</p>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Company Name
+                    </label>
                     <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) {
-                          handleLogoUpload(file, "company")
-                        }
-                      }}
-                      className="hidden"
-                      id="company-logo-upload"
+                      type="text"
+                      value={companyData.name}
+                      onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <Button
-                      variant="outline"
-                      onClick={() => document.getElementById("company-logo-upload")?.click()}
-                      disabled={isUploadingLogo}
-                      className="flex items-center space-x-2"
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Industry
+                    </label>
+                    <select
+                      value={companyData.industry}
+                      onChange={(e) => setCompanyData({ ...companyData, industry: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      {isUploadingLogo ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Uploading...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-4 h-4" />
-                          <span>Upload Logo</span>
-                        </>
-                      )}
-                    </Button>
-                    <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                      <option value="Technology">Technology</option>
+                      <option value="Healthcare">Healthcare</option>
+                      <option value="Finance">Finance</option>
+                      <option value="Education">Education</option>
+                      <option value="Manufacturing">Manufacturing</option>
+                      <option value="Retail">Retail</option>
+                      <option value="Other">Other</option>
+                    </select>
                   </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="companyName">Company Name</Label>
-                  <Input
-                    id="companyName"
-                    value={companyData.name}
-                    onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="industry">Industry</Label>
-                  <Input
-                    id="industry"
-                    value={companyData.industry}
-                    onChange={(e) => setCompanyData({ ...companyData, industry: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="taxId">Tax ID</Label>
-                  <Input
-                    id="taxId"
-                    value={companyData.tax_id}
-                    onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="ssnitNumber">SSNIT Number</Label>
-                  <Input
-                    id="ssnitNumber"
-                    value={companyData.ssnit_number}
-                    onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={companyData.email_address}
-                    onChange={(e) => setCompanyData({ ...companyData, email_address: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    value={companyData.phone_number}
-                    onChange={(e) => setCompanyData({ ...companyData, phone_number: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="address">Address</Label>
-                <Textarea
-                  id="address"
-                  value={companyData.address}
-                  onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <Label>Departments</Label>
-                  <div className="space-y-2">
-                    {departments.map((dept, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <Input
-                          value={dept}
-                          onChange={(e) => {
-                            const newDepts = [...departments]
-                            newDepts[index] = e.target.value
-                            setDepartments(newDepts)
-                          }}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDepartments(departments.filter((_, i) => i !== index))}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDepartments([...departments, "New Department"])}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Employee Count
+                    </label>
+                    <select
+                      value={companyData.size}
+                      onChange={(e) => setCompanyData({ ...companyData, size: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      Add Department
-                    </Button>
+                      <option value="1-10">1-10 employees</option>
+                      <option value="11-50">11-50 employees</option>
+                      <option value="51-200">51-200 employees</option>
+                      <option value="201-500">201-500 employees</option>
+                      <option value="500+">500+ employees</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Country
+                    </label>
+                    <select
+                      value={companyData.country}
+                      onChange={(e) => setCompanyData({ ...companyData, country: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="Ghana">Ghana</option>
+                      <option value="Nigeria">Nigeria</option>
+                      <option value="Kenya">Kenya</option>
+                      <option value="South Africa">South Africa</option>
+                      <option value="United States">United States</option>
+                      <option value="United Kingdom">United Kingdom</option>
+                    </select>
                   </div>
                 </div>
+                <div className="mt-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Company Address
+                  </label>
+                  <textarea
+                    value={companyData.address}
+                    onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter company address..."
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
-                <div>
-                  <Label>Locations</Label>
-                  <div className="space-y-2">
-                    {locations.map((location, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <Input
-                          value={location}
-                          onChange={(e) => {
-                            const newLocations = [...locations]
-                            newLocations[index] = e.target.value
-                            setLocations(newLocations)
-                          }}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setLocations(locations.filter((_, i) => i !== index))}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button variant="outline" size="sm" onClick={() => setLocations([...locations, "New Location"])}>
-                      Add Location
-                    </Button>
+        {activeTab === 'multi-company' && (
+          <div className="space-y-6">
+            {/* Multi-Company Management */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Building className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">Subsidiaries</h2>
+                      <p className="text-gray-600 mt-1">Manage subsidiary companies and branches</p>
+                    </div>
                   </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                  onClick={handleSaveSettings}
-                  disabled={isSavingSettings}
-                >
-                  {isSavingSettings ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Company Settings
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Multi-Company Management */}
-        <TabsContent value="subsidiaries">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Building2 className="w-5 h-5" />
-                  <span>Multi-Company Management</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button onClick={() => setShowAddSubsidiary(true)}>
+                  <Button onClick={() => setShowAddSubsidiaryModal(true)} className="bg-blue-600 hover:bg-blue-700">
                     <Plus className="w-4 h-4 mr-2" />
                     Add Subsidiary
                   </Button>
-                  <Button variant="outline" onClick={handleSaveSubsidiaryChanges} disabled={isSavingSubsidiary}>
-                    {isSavingSubsidiary ? (
+                </div>
+              </div>
+              <div className="p-6">
+                <div className="space-y-4">
+                  {subsidiaries.map((subsidiary) => (
+                    <div key={subsidiary.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <Building className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-gray-900">{subsidiary.name}</h3>
+                          <p className="text-sm text-gray-600">{subsidiary.location}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          subsidiary.status === 'active' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {subsidiary.status}
+                        </span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewSubsidiary(subsidiary.id)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditSubsidiary(subsidiary.id)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            {subsidiary.status === 'active' ? (
+                              <DropdownMenuItem onClick={() => confirmDeactivateSubsidiary(subsidiary.id)}>
+                                <Pause className="w-4 h-4 mr-2" />
+                                Deactivate
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem onClick={() => confirmReactivateSubsidiary(subsidiary.id)}>
+                                <Play className="w-4 h-4 mr-2" />
+                                Reactivate
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'hr' && (
+          <div className="space-y-6">
+            {/* HR Configuration */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Settings className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">HR Configuration</h2>
+                      <p className="text-gray-600 mt-1">Configure core HR settings and policies</p>
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={handleSaveHRConfig}
+                    disabled={isSavingHR}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isSavingHR ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         Saving...
@@ -2700,463 +2829,74 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     ) : (
                       <>
                         <Save className="w-4 h-4 mr-2" />
-                        Save
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardTitle>
-              <CardDescription>
-                Manage subsidiary companies, their organizational structure, and synchronize settings across entities
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {/* Company Overview Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-2">
-                        <Building2 className="w-5 h-5 text-blue-600" />
-                        <div>
-                          <p className="text-sm font-medium">Total Subsidiaries</p>
-                          <p className="text-2xl font-bold">{subsidiaries.length}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-2">
-                        <Users className="w-5 h-5 text-green-600" />
-                        <div>
-                          <p className="text-sm font-medium">Active Companies</p>
-                          <p className="text-2xl font-bold">
-                            {subsidiaries.filter((s) => s.status === "active").length}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-2">
-                        <MapPin className="w-5 h-5 text-purple-600" />
-                        <div>
-                          <p className="text-sm font-medium">Total Locations</p>
-                          <p className="text-2xl font-bold">
-                            {subsidiaries.reduce((acc, s) => acc + (s.locations?.length || 0), 0)}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-2">
-                        <Briefcase className="w-5 h-5 text-orange-600" />
-                        <div>
-                          <p className="text-sm font-medium">Total Departments</p>
-                          <p className="text-2xl font-bold">
-                            {subsidiaries.reduce((acc, s) => acc + (s.departments?.length || 0), 0)}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Subsidiaries List */}
-                <div className="space-y-3">
-                  {subsidiaries.map((subsidiary) => (
-                    // Updated subsidiary card to show logo and removed Edit button
-                    <Card key={subsidiary.id} className="border-l-4 border-l-blue-500">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-2">
-                              <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
-                                {subsidiary.logo_url ? (
-                                  <img
-                                    src={subsidiary.logo_url || "/placeholder.svg"}
-                                    alt={`${subsidiary.name} logo`}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                                    {subsidiary.name.charAt(0)}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <h3 className="text-base font-semibold">{subsidiary.name}</h3>
-                                    <p className="text-xs text-gray-600">{subsidiary.industry}</p>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <Badge
-                                      variant={subsidiary.status === "active" ? "default" : "secondary"}
-                                      className="text-xs"
-                                    >
-                                      {subsidiary.status}
-                                    </Badge>
-                                    <span className="text-xs text-gray-500">Tax ID: {subsidiary.tax_id}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                              <div>
-                                <p className="text-xs font-medium text-gray-700 mb-1">Contact Information</p>
-                                <div className="space-y-0.5">
-                                  <p className="text-xs text-gray-600">{subsidiary.email_address}</p>
-                                  <p className="text-xs text-gray-600">{subsidiary.phone_number}</p>
-                                  <p className="text-xs text-gray-600 truncate">{subsidiary.address}</p>
-                                </div>
-                              </div>
-                              <div>
-                                <p className="text-xs font-medium text-gray-700 mb-1">Organizational Structure</p>
-                                <div className="flex items-center space-x-3 text-xs text-gray-600">
-                                  <span>
-                                    {subsidiary.divisions_count || subsidiary.divisions?.length || 0} Divisions
-                                  </span>
-                                  <span>
-                                    {subsidiary.departments_count || subsidiary.departments?.length || 0} Departments
-                                  </span>
-                                  <span>
-                                    {subsidiary.locations_count || subsidiary.locations?.length || 0} Locations
-                                  </span>
-                                </div>
-                              </div>
-                              <div>
-                                <p className="text-xs font-medium text-gray-700 mb-1">Registration Details</p>
-                                <div className="space-y-0.5">
-                                  <p className="text-xs text-gray-600">SSNIT: {subsidiary.ssnit_number}</p>
-                                  <p className="text-xs text-gray-600">
-                                    Created:{" "}
-                                    {subsidiary.created_at
-                                      ? new Date(subsidiary.created_at).toLocaleDateString()
-                                      : "N/A"}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-1.5">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-2 text-xs bg-transparent"
-                                onClick={() => {
-                                  setSelectedSubsidiary(subsidiary)
-                                  setShowSubsidiaryDetails(true)
-                                }}
-                              >
-                                <Eye className="w-3 h-3 mr-1" />
-                                View Details
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-2 text-xs bg-transparent"
-                                onClick={() => {
-                                  setSelectedSubsidiary(subsidiary)
-                                  setShowEditSubsidiary(true)
-                                }}
-                              >
-                                <Edit className="w-3 h-3 mr-1" />
-                                Edit
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-2 text-xs bg-transparent"
-                                onClick={() => syncSubsidiarySettings(subsidiary.id)}
-                              >
-                                <RefreshCw className="w-3 h-3 mr-1" />
-                                Sync Settings
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-2 text-xs bg-transparent"
-                                onClick={() => viewSubsidiaryEmployees(subsidiary.id)}
-                              >
-                                <Users className="w-3 h-3 mr-1" />
-                                View Employees ({subsidiary.employee_count || 0})
-                              </Button>
-                            </div>
-                          </div>
-
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                                <MoreVertical className="h-3 w-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedSubsidiary(subsidiary)
-                                  setShowSubsidiaryDetails(true)
-                                }}
-                              >
-                                <Eye className="w-4 h-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedSubsidiary(subsidiary)
-                                  setShowEditSubsidiary(true)
-                                }}
-                              >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit Subsidiary
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => syncSubsidiarySettings(subsidiary.id)}>
-                                <RefreshCw className="w-4 h-4 mr-2" />
-                                Sync Settings
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => duplicateSubsidiary(subsidiary)}>
-                                <Copy className="w-4 h-4 mr-2" />
-                                Duplicate
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              {subsidiary.status === "active" ? (
-                                <DropdownMenuItem
-                                  onClick={() => confirmDeactivateSubsidiary(subsidiary.id)}
-                                  className="text-orange-600"
-                                >
-                                  <AlertTriangle className="w-4 h-4 mr-2" />
-                                  Deactivate
-                                </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem
-                                  onClick={() => confirmReactivateSubsidiary(subsidiary.id)}
-                                  className="text-green-600"
-                                >
-                                  <CheckCircle className="w-4 h-4 mr-2" />
-                                  Reactivate
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-
-                  {subsidiaries.length === 0 && (
-                    <Card>
-                      <CardContent className="p-8 text-center">
-                        <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Subsidiaries Found</h3>
-                        <p className="text-gray-600 mb-4">
-                          Get started by adding your first subsidiary company to manage multiple entities.
-                        </p>
-                        <Button onClick={() => setShowAddSubsidiary(true)}>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add First Subsidiary
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                {/* Settings Synchronization Panel */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <RefreshCw className="w-5 h-5" />
-                      <span>Settings Synchronization</span>
-                    </CardTitle>
-                    <CardDescription>Synchronize settings across all subsidiary companies</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="font-medium mb-2">Sync Options</h4>
-                        <div className="space-y-2">
-                          <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" defaultChecked />
-                            <span className="text-sm">HR Policies</span>
-                          </label>
-                          <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" defaultChecked />
-                            <span className="text-sm">Payroll Configuration</span>
-                          </label>
-                          <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" />
-                            <span className="text-sm">Leave Types</span>
-                          </label>
-                          <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" />
-                            <span className="text-sm">Roles & Permissions</span>
-                          </label>
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="font-medium mb-2">Sync Actions</h4>
-
-                        <div className="space-y-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full justify-start bg-transparent"
-                            onClick={handleSaveSettings}
-                            disabled={isSavingSettings}
-                          >
-                            {isSavingSettings ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Saving...
-                              </>
-                            ) : (
-                              <>
-                                <Save className="w-4 h-4 mr-2" />
-                                Save Settings
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full justify-start bg-transparent"
-                            onClick={handleExportSettingsTemplate}
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Export Settings Template
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full justify-start bg-transparent"
-                            onClick={() => setImportModal(true)}
-                          >
-                            <Upload className="w-4 h-4 mr-2" />
-                            Import Settings
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="hr">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Settings className="w-5 h-5" />
-                      <span>HR Configuration</span>
-                    </CardTitle>
-                    <CardDescription>Configure core HR settings and policies</CardDescription>
-                  </div>
-                  <Button
-                    onClick={handleSaveHRConfig}
-                    disabled={isSaving}
-                    className="bg-black text-white hover:bg-gray-800"
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
                         Save HR Configuration
                       </>
                     )}
                   </Button>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
+              </div>
+              <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="leaveYearStart">Leave Year Start</Label>
-                      <Select
-                        value={hrConfig.leaveYearStart}
-                        onValueChange={(value) => setHrConfig({ ...hrConfig, leaveYearStart: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="January">January</SelectItem>
-                          <SelectItem value="February">February</SelectItem>
-                          <SelectItem value="March">March</SelectItem>
-                          <SelectItem value="April">April</SelectItem>
-                          <SelectItem value="May">May</SelectItem>
-                          <SelectItem value="June">June</SelectItem>
-                          <SelectItem value="July">July</SelectItem>
-                          <SelectItem value="August">August</SelectItem>
-                          <SelectItem value="September">September</SelectItem>
-                          <SelectItem value="October">October</SelectItem>
-                          <SelectItem value="November">November</SelectItem>
-                          <SelectItem value="December">December</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="workingHours">Working Hours/Day</Label>
-                      <Input
-                        id="workingHours"
-                        type="number"
-                        value={hrConfig.workingHoursPerDay}
-                        onChange={(e) =>
-                          setHrConfig({ ...hrConfig, workingHoursPerDay: Number.parseInt(e.target.value) })
-                        }
-                        min="1"
-                        max="24"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Leave Year Start
+                    </label>
+                    <select
+                      value={hrConfig.leaveYearStart}
+                      onChange={(e) => setHrConfig({ ...hrConfig, leaveYearStart: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="January">January</option>
+                      <option value="April">April</option>
+                      <option value="July">July</option>
+                      <option value="October">October</option>
+                    </select>
                   </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="probationPeriod">Probation Period (months)</Label>
-                      <Input
-                        id="probationPeriod"
-                        type="number"
-                        value={hrConfig.probationPeriod}
-                        onChange={(e) => setHrConfig({ ...hrConfig, probationPeriod: Number.parseInt(e.target.value) })}
-                        min="0"
-                        max="12"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="workingDays">Working Days/Week</Label>
-                      <Input
-                        id="workingDays"
-                        type="number"
-                        value={hrConfig.workingDaysPerWeek}
-                        onChange={(e) =>
-                          setHrConfig({ ...hrConfig, workingDaysPerWeek: Number.parseInt(e.target.value) })
-                        }
-                        min="1"
-                        max="7"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Probation Period (months)
+                    </label>
+                    <input
+                      type="number"
+                      value={hrConfig.probationPeriod}
+                      onChange={(e) => setHrConfig({ ...hrConfig, probationPeriod: Number.parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Working Hours/Day
+                    </label>
+                    <input
+                      type="number"
+                      value={hrConfig.workingHoursPerDay}
+                      onChange={(e) => setHrConfig({ ...hrConfig, workingHoursPerDay: Number.parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Working Days/Week
+                    </label>
+                    <input
+                      type="number"
+                      value={hrConfig.workingDaysPerWeek}
+                      onChange={(e) => setHrConfig({ ...hrConfig, workingDaysPerWeek: Number.parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Auto-approve leave requests</Label>
-                      <p className="text-sm text-muted-foreground">Automatically approve requests within policy</p>
+                <div className="mt-8 space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900">Automation Settings</h3>
+                  
+                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <CheckCircle className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <h4 className="font-medium text-gray-900">Auto-approve leave requests</h4>
+                        <p className="text-sm text-gray-600">Automatically approve requests within policy</p>
+                      </div>
                     </div>
                     <Switch
                       checked={hrConfig.autoApproveLeave}
@@ -3164,10 +2904,13 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Email notifications</Label>
-                      <p className="text-sm text-muted-foreground">Send email updates for HR activities</p>
+                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Mail className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <h4 className="font-medium text-gray-900">Email notifications</h4>
+                        <p className="text-sm text-gray-600">Send email updates for HR activities</p>
+                      </div>
                     </div>
                     <Switch
                       checked={hrConfig.emailNotifications}
@@ -3175,13 +2918,13 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="flex items-center space-x-2">
-                        <Sparkles className="w-4 h-4 text-purple-500" />
-                        <span>AI Recommendations</span>
-                      </Label>
-                      <p className="text-sm text-muted-foreground">Enable AI-driven insights for HR processes</p>
+                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Brain className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <h4 className="font-medium text-gray-900">AI Recommendations</h4>
+                        <p className="text-sm text-gray-600">Enable AI-driven insights for HR processes</p>
+                      </div>
                     </div>
                     <Switch
                       checked={hrConfig.aiRecommendations}
@@ -3189,13 +2932,13 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="flex items-center space-x-2">
-                        <TrendingUp className="w-4 h-4 text-blue-500" />
-                        <span>Smart Scheduling</span>
-                      </Label>
-                      <p className="text-sm text-muted-foreground">Optimize schedules based on employee availability</p>
+                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Calendar className="w-5 h-5 text-green-600" />
+                      <div>
+                        <h4 className="font-medium text-gray-900">Smart Scheduling</h4>
+                        <p className="text-sm text-gray-600">Optimize schedules based on employee availability</p>
+                      </div>
                     </div>
                     <Switch
                       checked={hrConfig.smartScheduling}
@@ -3203,13 +2946,13 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="flex items-center space-x-2">
-                        <Calendar className="w-4 h-4 text-green-500" />
-                        <span>Performance Tracking</span>
-                      </Label>
-                      <p className="text-sm text-muted-foreground">Track employee performance metrics and goals</p>
+                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <TrendingUp className="w-5 h-5 text-green-600" />
+                      <div>
+                        <h4 className="font-medium text-gray-900">Performance Tracking</h4>
+                        <p className="text-sm text-gray-600">Track employee performance metrics and goals</p>
+                      </div>
                     </div>
                     <Switch
                       checked={hrConfig.performanceTracking}
@@ -3217,285 +2960,447 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            {/* Leave Policies Management */}
-            <Card>
-              <CardHeader>
+            {/* Leave Policies */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center space-x-2">
-                    <Calendar className="w-5 h-5" />
-                    <span>Leave Policies</span>
-                  </CardTitle>
-                  <div className="flex items-center space-x-2">
-                    <Button variant="outline" onClick={handleManageLeaveTypes}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Leave Type
-                    </Button>
+                  <div className="flex items-center space-x-3">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">Leave Policies</h2>
+                      <p className="text-gray-600 mt-1">Manage leave policies and generate AI insights</p>
+                    </div>
                   </div>
+                  <Button onClick={() => setShowAddLeaveTypeModal(true)} className="bg-blue-600 hover:bg-blue-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Leave Type
+                  </Button>
                 </div>
-                <CardDescription>Manage leave policies and generate AI insights</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
+              </div>
+              <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {currentPolicies.map((policy) => (
-                    <Card key={policy.name} className="border-l-4 border-l-blue-500">
-                      <CardHeader>
-                        <CardTitle className="text-lg font-semibold">{policy.name}</CardTitle>
-                        <CardDescription>{policy.description}</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                          <p className="text-sm">
-                            <span className="font-medium">Days:</span> {policy.days}
-                          </p>
-                          <p className="text-sm">
-                            <span className="font-medium">Usage:</span> {policy.usage}
-                          </p>
-                        </div>
-
-                        <div className="border-t pt-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-muted-foreground">AI Insight</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleGeneratePolicyInsight(policy.name)}
-                              disabled={loadingInsights[policy.name]}
-                              className="h-6 px-2 text-xs"
-                            >
-                              {loadingInsights[policy.name] ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <Brain className="w-3 h-3" />
-                              )}
-                              <span className="ml-1">Generate</span>
+                    <div key={policy.id} className="border border-gray-200 rounded-lg p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900">{policy.name}</h3>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="w-4 h-4" />
                             </Button>
-                          </div>
-
-                          {policyInsights[policy.name] ? (
-                            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                              <p className="text-xs text-blue-800 leading-relaxed">{policyInsights[policy.name]}</p>
-                            </div>
-                          ) : (
-                            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 text-center">
-                              <p className="text-xs text-gray-500">Click Generate to get AI insights for this policy</p>
-                            </div>
-                          )}
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewPolicy(policy.id)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditPolicy(policy.id)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeletePolicy(policy.id)} className="text-red-600">
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <p className="text-gray-600 text-sm mb-4">{policy.description}</p>
+                      <div className="space-y-2 mb-4">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Days:</span>
+                          <span className="font-medium">{policy.days}</span>
                         </div>
-
-                        <div className="flex justify-end space-x-2 pt-2">
-                          <Button variant="outline" size="sm" onClick={() => handlePolicyAction("view", policy.name)}>
-                            View
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => handlePolicyAction("edit", policy.name)}>
-                            Edit
-                          </Button>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Usage:</span>
+                          <span className="font-medium">{policy.usage}%</span>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-700">AI Insights</span>
                           <Button
-                            variant="destructive"
                             size="sm"
-                            onClick={() => handlePolicyAction("delete", policy.name)}
+                            variant="outline"
+                            onClick={() => handleGenerateIndividualInsight(policy.id)}
+                            disabled={loadingInsights[policy.id]}
+                            className="text-xs"
                           >
-                            Delete
+                            {loadingInsights[policy.id] ? (
+                              <>
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              <>
+                                <Brain className="w-3 h-3 mr-1" />
+                                Generate
+                              </>
+                            )}
                           </Button>
                         </div>
-                      </CardContent>
-                    </Card>
+                        {policyInsights[policy.id] && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                            <p className="text-sm text-blue-800">{policyInsights[policy.id]}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            {/* HR Documents Management */}
-            <Card>
-              <CardHeader>
+            {/* Salary Grades & Notches */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center space-x-2">
-                    <ImageIcon className="w-5 h-5" />
-                    <span>HR Documents</span>
-                  </CardTitle>
-                  <Button variant="outline" onClick={handleAddDocument}>
+                  <div className="flex items-center space-x-3">
+                    <TrendingUp className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">Salary Grades & Notches</h2>
+                      <p className="text-gray-600 mt-1">Manage salary structures and promotion guidelines</p>
+                    </div>
+                  </div>
+                  <Button onClick={() => setShowAddSalaryGradeModal(true)} className="bg-blue-600 hover:bg-blue-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Grade
+                  </Button>
+                </div>
+              </div>
+              <div className="p-6">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Grade</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Level</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Min Salary</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Max Salary</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Steps</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {salaryGrades.map((grade) => (
+                        <tr key={grade.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-4 font-medium text-gray-900">{grade.grade}</td>
+                          <td className="py-3 px-4 text-gray-600">{grade.level}</td>
+                          <td className="py-3 px-4 text-gray-600">{currencySymbol}{grade.minSalary.toLocaleString()}</td>
+                          <td className="py-3 px-4 text-gray-600">{currencySymbol}{grade.maxSalary.toLocaleString()}</td>
+                          <td className="py-3 px-4 text-gray-600">{grade.steps}</td>
+                          <td className="py-3 px-4">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleViewSalaryGrade(grade.id)}>
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEditSalaryGrade(grade.id)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteSalaryGrade(grade.id)} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* HR Policy Documents */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <FileText className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">HR Policy Documents</h2>
+                      <p className="text-gray-600 mt-1">Manage company policies and employee handbooks</p>
+                    </div>
+                  </div>
+                  <Button onClick={() => setShowAddDocumentModal(true)} className="bg-blue-600 hover:bg-blue-700">
                     <Plus className="w-4 h-4 mr-2" />
                     Add Document
                   </Button>
                 </div>
-                <CardDescription>Manage HR documents and visibility settings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  {hrDocuments.map((doc) => (
-                    <Card key={doc.id} className="border-l-4 border-l-green-500">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="text-base font-semibold">{doc.name}</h3>
-                            <p className="text-xs text-gray-600">
-                              {doc.type} - {doc.size}
-                            </p>
-                          </div>
-                          <div className="flex items-center space-x-4">
-                            <Switch
-                              checked={doc.visibleToAll}
-                              onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
-                            />
-                            <Button variant="outline" size="sm" onClick={() => handleDocumentView(doc)}>
-                              View
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleDocumentAction("edit", doc.id)}>
-                              Edit
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleDocumentAction("delete", doc.id)}
-                            >
-                              Delete
-                            </Button>
-                          </div>
+              </div>
+              <div className="p-6">
+                <div className="space-y-4">
+                  {policyDocuments.map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <FileText className="w-5 h-5 text-blue-600" />
                         </div>
-                      </CardContent>
-                    </Card>
+                        <div>
+                          <h3 className="font-medium text-gray-900">{doc.name}</h3>
+                          <p className="text-sm text-gray-600">Version {doc.version} • Updated {doc.lastUpdated}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          doc.status === 'active' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {doc.status}
+                        </span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewDocument(doc.id)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditDocument(doc.id)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownloadDocument(doc.id)}>
+                              <Download className="w-4 h-4 mr-2" />
+                              Download
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeleteDocument(doc.id)} className="text-red-600">
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
-        </TabsContent>
+        )}
 
-        <TabsContent value="payroll">
+        {activeTab === 'payroll' && (
           <div className="space-y-6">
-            
-            {/* Payroll Configuration Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Settings className="w-5 h-5" />
-                  <span>Payroll Configuration</span>
-                </CardTitle>
-                <CardDescription>Configure basic payroll settings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div>
-                    <Label htmlFor="payFrequency">Pay Frequency</Label>
-                    <Select defaultValue="monthly">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="biweekly">Bi-Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
+            {/* Payroll Configuration */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Settings className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">Payroll Configuration</h2>
+                      <p className="text-gray-600 mt-1">Configure basic payroll settings</p>
+                    </div>
                   </div>
-
-                  <div>
-                    <Label htmlFor="currency">Currency</Label>
-                    <Select value={selectedCurrency} onValueChange={handleCurrencyChange}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ghs">Ghana Cedis (GHS)</SelectItem>
-                        <SelectItem value="usd">US Dollar (USD)</SelectItem>
-                        <SelectItem value="eur">Euro (EUR)</SelectItem>
-                        <SelectItem value="ngn">Nigerian Naira (NGN)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="minimumWage">Minimum Wage ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})</Label>
-                    <Input type="number" defaultValue="18.15" />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="weekdayOvertimeRate">Weekday Overtime Rate Multiplier</Label>
-                    <Input type="number" step="0.1" defaultValue="1.5" />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="weekendOvertimeRate">Weekend Overtime Rate Multiplier</Label>
-                    <Input type="number" step="0.1" defaultValue="2" />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="payrollCutoffDay">Payroll Cutoff Day</Label>
-                    <Input type="number" min="1" max="31" defaultValue="25" />
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch id="autoCalculatePAYE" defaultChecked />
-                    <Label htmlFor="autoCalculatePAYE">Auto-calculate PAYE</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="autoCalculateSSNIT" defaultChecked />
-                    <Label htmlFor="autoCalculateSSNIT">Auto-calculate SSNIT</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="autoCalculateProvidentFund" defaultChecked />
-                    <Label htmlFor="autoCalculateProvidentFund">Auto-calculate Provident Fund (Tier 3)</Label>
-                  </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button onClick={() => {
-                    // Save payroll configuration
-                    console.log('[v0] Saving payroll configuration...')
-                  }}>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Payroll Configuration
+                  <Button 
+                    onClick={handleSavePayrollConfig}
+                    disabled={isSavingPayroll}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isSavingPayroll ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Payroll Settings
+                      </>
+                    )}
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Pay Frequency
+                    </label>
+                    <select
+                      value={payrollConfig.payFrequency}
+                      onChange={(e) => setPayrollConfig({ ...payrollConfig, payFrequency: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="Monthly">Monthly</option>
+                      <option value="Bi-weekly">Bi-weekly</option>
+                      <option value="Weekly">Weekly</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Currency
+                    </label>
+                    <select
+                      value={payrollConfig.currency}
+                      onChange={(e) => handleCurrencyChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="USD">US Dollar (USD)</option>
+                      <option value="GHS">Ghana Cedi (GHS)</option>
+                      <option value="NGN">Nigerian Naira (NGN)</option>
+                      <option value="EUR">Euro (EUR)</option>
+                      <option value="GBP">British Pound (GBP)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Minimum Wage ({currencySymbol})
+                    </label>
+                    <input
+                      type="number"
+                      value={payrollConfig.minimumWage}
+                      onChange={(e) => setPayrollConfig({ ...payrollConfig, minimumWage: Number.parseFloat(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Weekday Overtime Rate Multiplier
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={payrollConfig.weekdayOvertimeMultiplier}
+                      onChange={(e) => setPayrollConfig({ ...payrollConfig, weekdayOvertimeMultiplier: Number.parseFloat(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Weekend Overtime Rate Multiplier
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={payrollConfig.weekendOvertimeMultiplier}
+                      onChange={(e) => setPayrollConfig({ ...payrollConfig, weekendOvertimeMultiplier: Number.parseFloat(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Payroll Cutoff Day
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={payrollConfig.payrollCutoffDay}
+                      onChange={(e) => setPayrollConfig({ ...payrollConfig, payrollCutoffDay: Number.parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
 
-            {/* Tax Configuration Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Calculator className="w-5 h-5" />
-                  <span>Tax Configuration</span>
-                </CardTitle>
-                <CardDescription>Configure tax bands and SSNIT rates</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
+                <div className="mt-8 space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900">Auto-calculation Settings</h3>
+                  
+                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Calculator className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <h4 className="font-medium text-gray-900">Auto-calculate PAYE</h4>
+                        <p className="text-sm text-gray-600">Automatically calculate Pay As You Earn tax</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={payrollConfig.autoCalculatePAYE}
+                      onCheckedChange={(checked) => setPayrollConfig({ ...payrollConfig, autoCalculatePAYE: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Calculator className="w-5 h-5 text-green-600" />
+                      <div>
+                        <h4 className="font-medium text-gray-900">Auto-calculate SSNIT</h4>
+                        <p className="text-sm text-gray-600">Automatically calculate Social Security contributions</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={payrollConfig.autoCalculateSSNIT}
+                      onCheckedChange={(checked) => setPayrollConfig({ ...payrollConfig, autoCalculateSSNIT: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Calculator className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <h4 className="font-medium text-gray-900">Auto-calculate Provident Fund (Tier 3)</h4>
+                        <p className="text-sm text-gray-600">Automatically calculate Tier 3 pension contributions</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={payrollConfig.autoCalculateProvidentFund}
+                      onCheckedChange={(checked) => setPayrollConfig({ ...payrollConfig, autoCalculateProvidentFund: checked })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Tax Configuration */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center space-x-3">
+                  <Receipt className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">Tax Configuration</h2>
+                    <p className="text-gray-600 mt-1">Configure tax bands and SSNIT rates</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6">
+                {/* PAYE Tax Bands */}
+                <div className="mb-8">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-medium">PAYE Tax Bands</h4>
-                    <Button size="sm" variant="outline" onClick={() => {
-                      console.log('[v0] Adding new tax band...')
-                    }}>
+                    <h3 className="text-lg font-medium text-gray-900">PAYE Tax Bands</h3>
+                    <Button onClick={() => setShowAddTaxBandModal(true)} size="sm" className="bg-green-600 hover:bg-green-700">
                       <Plus className="w-4 h-4 mr-2" />
                       Add Band
                     </Button>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border border-gray-200">
+                    <table className="w-full border-collapse">
                       <thead>
-                        <tr className="bg-gray-50">
-                          <th className="border border-gray-200 px-4 py-2 text-left">Band</th>
-                          <th className="border border-gray-200 px-4 py-2 text-left">Rate (%)</th>
-                          <th className="border border-gray-200 px-4 py-2 text-left">From ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})</th>
-                          <th className="border border-gray-200 px-4 py-2 text-left">To ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})</th>
-                          <th className="border border-gray-200 px-4 py-2 text-center">Actions</th>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Band</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Rate (%)</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">From ({currencySymbol})</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">To ({currencySymbol})</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {payeTaxBands.map((band, index) => (
-                          <tr key={index}>
-                            <td className="border border-gray-200 px-4 py-2">{band.rate}</td>
-                            <td className="border border-gray-200 px-4 py-2">{band.description} {currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol}</td>
-                            <td className="border border-gray-200 px-4 py-2">{band.from ? band.from.toLocaleString() : '-'}</td>
-                            <td className="border border-gray-200 px-4 py-2">{band.to ? band.to.toLocaleString() : '-'}</td>
-                            <td className="border border-gray-200 px-4 py-2 text-center">
-                              <Button size="sm" variant="ghost" onClick={() => {
-                                console.log('[v0] Editing tax band:', band)
-                              }}>Edit</Button>
+                          <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="py-3 px-4 font-medium text-gray-900">{band.band}</td>
+                            <td className="py-3 px-4 text-gray-600">{band.rate}% on {band.description}</td>
+                            <td className="py-3 px-4 text-gray-600">{band.from ? `${currencySymbol}${band.from.toLocaleString()}` : '-'}</td>
+                            <td className="py-3 px-4 text-gray-600">{band.to ? `${currencySymbol}${band.to.toLocaleString()}` : '-'}</td>
+                            <td className="py-3 px-4">
+                              <Button variant="ghost" size="sm" onClick={() => handleEditTaxBand(index)}>
+                                <Edit className="w-4 h-4" />
+                              </Button>
                             </td>
                           </tr>
                         ))}
@@ -3504,1047 +3409,851 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* SSNIT Rates */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div>
-                    <h4 className="font-medium mb-3">SSNIT Rates</h4>
-                    <div className="space-y-2">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">SSNIT Rates</h3>
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <span>Employee:</span>
+                        <span className="text-sm text-gray-600">Employee:</span>
                         <div className="flex items-center space-x-2">
-                          <Input 
-                            type="number" 
-                            step="0.1" 
+                          <input
+                            type="number"
+                            step="0.1"
                             value={ssnitRates.employee}
-                            onChange={(e) => updateSsnitRates('employee', Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right"
+                            onChange={(e) => handleSSNITChange('employee', Number.parseFloat(e.target.value))}
+                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
-                          <span>%</span>
+                          <span className="text-sm text-gray-600">%</span>
                         </div>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span>Employer:</span>
+                        <span className="text-sm text-gray-600">Employer:</span>
                         <div className="flex items-center space-x-2">
-                          <Input 
-                            type="number" 
-                            step="0.1" 
+                          <input
+                            type="number"
+                            step="0.1"
                             value={ssnitRates.employer}
-                            onChange={(e) => updateSsnitRates('employer', Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right"
+                            onChange={(e) => handleSSNITChange('employer', Number.parseFloat(e.target.value))}
+                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
-                          <span>%</span>
+                          <span className="text-sm text-gray-600">%</span>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center font-medium border-t pt-2">
-                        <span>Total:</span>
-                        <span>{ssnitRates.total.toFixed(1)}%</span>
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                        <span className="text-sm font-medium text-gray-900">Total:</span>
+                        <span className="text-sm font-medium text-gray-900">{calculateSSNITTotal()}%</span>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <h4 className="font-medium mb-3">Tier 2 Rates</h4>
-                    <div className="space-y-2">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Tier 2 Rates</h3>
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <span>Employee:</span>
+                        <span className="text-sm text-gray-600">Employee:</span>
                         <div className="flex items-center space-x-2">
-                          <Input 
-                            type="number" 
-                            step="0.1" 
+                          <input
+                            type="number"
+                            step="0.1"
                             value={tier2Rates.employee}
-                            onChange={(e) => updateTier2Rates('employee', Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right"
+                            onChange={(e) => handleTier2Change('employee', Number.parseFloat(e.target.value))}
+                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
-                          <span>%</span>
+                          <span className="text-sm text-gray-600">%</span>
                         </div>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span>Employer:</span>
+                        <span className="text-sm text-gray-600">Employer:</span>
                         <div className="flex items-center space-x-2">
-                          <Input 
-                            type="number" 
-                            step="0.1" 
+                          <input
+                            type="number"
+                            step="0.1"
                             value={tier2Rates.employer}
-                            onChange={(e) => updateTier2Rates('employer', Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right"
+                            onChange={(e) => handleTier2Change('employer', Number.parseFloat(e.target.value))}
+                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
-                          <span>%</span>
+                          <span className="text-sm text-gray-600">%</span>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center font-medium border-t pt-2">
-                        <span>Total:</span>
-                        <span>{tier2Rates.total.toFixed(1)}%</span>
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                        <span className="text-sm font-medium text-gray-900">Total:</span>
+                        <span className="text-sm font-medium text-gray-900">{calculateTier2Total()}%</span>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <h4 className="font-medium mb-3">Tier 3 Rates</h4>
-                    <div className="space-y-2">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Tier 3 Rates</h3>
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <span>Employee:</span>
+                        <span className="text-sm text-gray-600">Employee:</span>
                         <div className="flex items-center space-x-2">
-                          <Input 
-                            type="number" 
-                            step="0.1" 
+                          <input
+                            type="number"
+                            step="0.1"
                             value={tier3Rates.employee}
-                            onChange={(e) => updateTier3Rates('employee', Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right"
+                            onChange={(e) => handleTier3Change('employee', Number.parseFloat(e.target.value))}
+                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
-                          <span>%</span>
+                          <span className="text-sm text-gray-600">%</span>
                         </div>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span>Employer:</span>
+                        <span className="text-sm text-gray-600">Employer:</span>
                         <div className="flex items-center space-x-2">
-                          <Input 
-                            type="number" 
-                            step="0.1" 
+                          <input
+                            type="number"
+                            step="0.1"
                             value={tier3Rates.employer}
-                            onChange={(e) => updateTier3Rates('employer', Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right"
+                            onChange={(e) => handleTier3Change('employer', Number.parseFloat(e.target.value))}
+                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
-                          <span>%</span>
+                          <span className="text-sm text-gray-600">%</span>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center font-medium border-t pt-2">
-                        <span>Total:</span>
-                        <span>{tier3Rates.total.toFixed(1)}%</span>
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                        <span className="text-sm font-medium text-gray-900">Total:</span>
+                        <span className="text-sm font-medium text-gray-900">{calculateTier3Total()}%</span>
                       </div>
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
 
-                <div className="flex justify-end">
-                  <Button onClick={() => {
-                    console.log('[v0] Saving tax configuration...')
-                  }}>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Tax Configuration
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Allowances Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <DollarSign className="w-5 h-5" />
-                    <span>Allowances</span>
+            {/* Allowances */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <DollarSign className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">Allowances</h2>
+                      <p className="text-gray-600 mt-1">Configure employee allowances and benefits</p>
+                    </div>
                   </div>
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                  <Button onClick={() => setShowAddAllowanceModal(true)} className="bg-green-600 hover:bg-green-700">
                     <Plus className="w-4 h-4 mr-2" />
                     Add
                   </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+                </div>
+              </div>
+              <div className="p-6">
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-200">
+                  <table className="w-full border-collapse">
                     <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-200 px-4 py-2 text-left">Code</th>
-                        <th className="border border-gray-200 px-4 py-2 text-left">Description</th>
-                        <th className="border border-gray-200 px-4 py-2 text-center">Taxable</th>
-                        <th className="border border-gray-200 px-4 py-2 text-center">Recurring</th>
-                        <th className="border border-gray-200 px-4 py-2 text-right">AMOUNT</th>
-                        <th className="border border-gray-200 px-4 py-2 text-right">%</th>
-                        <th className="border border-gray-200 px-4 py-2 text-center">FIXED/VARIABLE</th>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Code</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Description</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-900">Taxable</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-900">Recurring</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-900">AMOUNT</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-900">%</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-900">FIXED/VARIABLE</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-900">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {allowances.map((allowance, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="border border-gray-200 px-4 py-2 font-medium">{allowance.code}</td>
-                          <td className="border border-gray-200 px-4 py-2">{allowance.description}</td>
-                          <td className="border border-gray-200 px-4 py-2 text-center">
-                            <Switch checked={allowance.taxable} />
+                      {allowances.map((allowance) => (
+                        <tr key={allowance.code} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-4 font-medium text-gray-900">{allowance.code}</td>
+                          <td className="py-3 px-4 text-gray-600">{allowance.description}</td>
+                          <td className="py-3 px-4 text-center">
+                            <Switch
+                              checked={allowance.taxable}
+                              onCheckedChange={(checked) => {
+                                setAllowances(prev => prev.map(a => 
+                                  a.code === allowance.code ? { ...a, taxable: checked } : a
+                                ))
+                              }}
+                            />
                           </td>
-                          <td className="border border-gray-200 px-4 py-2 text-center">
-                            <Switch checked={allowance.recurring} />
+                          <td className="py-3 px-4 text-center">
+                            <Switch
+                              checked={allowance.recurring}
+                              onCheckedChange={(checked) => {
+                                setAllowances(prev => prev.map(a => 
+                                  a.code === allowance.code ? { ...a, recurring: checked } : a
+                                ))
+                              }}
+                            />
                           </td>
-                          <td className="border border-gray-200 px-4 py-2 text-right">{allowance.amount}</td>
-                          <td className="border border-gray-200 px-4 py-2 text-right">{allowance.percentage}</td>
-                          <td className="border border-gray-200 px-4 py-2 text-center">
-                            <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">
+                          <td className="py-3 px-4 text-center text-gray-600">{allowance.amount}</td>
+                          <td className="py-3 px-4 text-center text-gray-600">{allowance.percentage}</td>
+                          <td className="py-3 px-4 text-center">
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              allowance.type === 'FIXED' 
+                                ? 'bg-blue-100 text-blue-800' 
+                                : 'bg-orange-100 text-orange-800'
+                            }`}>
                               {allowance.type}
                             </span>
                           </td>
+                          <td className="py-3 px-4 text-center">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditAllowance(allowance.code)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteAllowance(allowance.code)} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            {/* Deductions Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Minus className="w-5 h-5" />
-                    <span>Deductions</span>
+            {/* Deductions */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Minus className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">Deductions</h2>
+                      <p className="text-gray-600 mt-1">Configure payroll deductions and taxes</p>
+                    </div>
                   </div>
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                  <Button onClick={() => setShowAddDeductionModal(true)} className="bg-green-600 hover:bg-green-700">
                     <Plus className="w-4 h-4 mr-2" />
                     Add
                   </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+                </div>
+              </div>
+              <div className="p-6">
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-200">
+                  <table className="w-full border-collapse">
                     <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-200 px-4 py-2 text-left">Code</th>
-                        <th className="border border-gray-200 px-4 py-2 text-left">Description</th>
-                        <th className="border border-gray-200 px-4 py-2 text-center">Recurring</th>
-                        <th className="border border-gray-200 px-4 py-2 text-right">AMOUNT</th>
-                        <th className="border border-gray-200 px-4 py-2 text-right">%</th>
-                        <th className="border border-gray-200 px-4 py-2 text-center">FIXED/VARIABLE</th>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Code</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Description</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-900">Recurring</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-900">AMOUNT</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-900">%</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-900">FIXED/VARIABLE</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-900">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {deductions.map((deduction, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="border border-gray-200 px-4 py-2 font-medium">{deduction.code}</td>
-                          <td className="border border-gray-200 px-4 py-2">{deduction.description}</td>
-                          <td className="border border-gray-200 px-4 py-2 text-center">
-                            <Switch checked={deduction.recurring} />
+                      {deductions.map((deduction) => (
+                        <tr key={deduction.code} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-4 font-medium text-gray-900">{deduction.code}</td>
+                          <td className="py-3 px-4 text-gray-600">{deduction.description}</td>
+                          <td className="py-3 px-4 text-center">
+                            <Switch
+                              checked={deduction.recurring}
+                              onCheckedChange={(checked) => {
+                                setDeductions(prev => prev.map(d => 
+                                  d.code === deduction.code ? { ...d, recurring: checked } : d
+                                ))
+                              }}
+                            />
                           </td>
-                          <td className="border border-gray-200 px-4 py-2 text-right">{deduction.amount}</td>
-                          <td className="border border-gray-200 px-4 py-2 text-right">{deduction.percentage}</td>
-                          <td className="border border-gray-200 px-4 py-2 text-center">
-                            <span className="px-2 py-1 text-xs rounded bg-orange-100 text-orange-800">
+                          <td className="py-3 px-4 text-center text-gray-600">{deduction.amount}</td>
+                          <td className="py-3 px-4 text-center text-gray-600">{deduction.percentage}</td>
+                          <td className="py-3 px-4 text-center">
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              deduction.type === 'FIXED' 
+                                ? 'bg-blue-100 text-blue-800' 
+                                : deduction.type === 'VARIABLE'
+                                ? 'bg-orange-100 text-orange-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
                               {deduction.type}
                             </span>
                           </td>
+                          <td className="py-3 px-4 text-center">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditDeduction(deduction.code)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteDeduction(deduction.code)} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Loan Settings Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <CreditCard className="w-5 h-5" />
-                    <span>Loan Settings</span>
-                  </div>
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-200">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-200 px-4 py-2 text-left">Code</th>
-                        <th className="border border-gray-200 px-4 py-2 text-left">Description</th>
-                        <th className="border border-gray-200 px-4 py-2 text-right">Maximum Amount</th>
-                        <th className="border border-gray-200 px-4 py-2 text-right">Interest Rate (%)</th>
-                        <th className="border border-gray-200 px-4 py-2 text-center">Rate Method</th>
-                        <th className="border border-gray-200 px-4 py-2 text-right">Admin Charges</th>
-                        <th className="border border-gray-200 px-4 py-2 text-right">Loan Tenure (months)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loanSettings.map((loan, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="border border-gray-200 px-4 py-2 font-medium">{loan.code}</td>
-                          <td className="border border-gray-200 px-4 py-2">{loan.description}</td>
-                          <td className="border border-gray-200 px-4 py-2 text-right">{loan.maxAmount.toLocaleString()}</td>
-                          <td className="border border-gray-200 px-4 py-2 text-right">{loan.interestRate}</td>
-                          <td className="border border-gray-200 px-4 py-2 text-center">{loan.rateMethod}</td>
-                          <td className="border border-gray-200 px-4 py-2 text-right">{loan.adminCharges}</td>
-                          <td className="border border-gray-200 px-4 py-2 text-right">{loan.loanTenure}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Save Button */}
-            <div className="flex justify-end">
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Save className="w-4 h-4 mr-2" />
-                Save Payroll Settings
-              </Button>
+              </div>
             </div>
           </div>
-        </TabsContent>
+        )}
 
-        <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Settings className="w-5 h-5" />
-                <span>Notifications</span>
-              </CardTitle>
-              <CardDescription>Configure email and system notifications</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <Button variant="outline" onClick={handleAddEmailTemplateInner}>
-                  Add Email Template
-                </Button>
-                <Button variant="outline" onClick={() => handleEditEmailTemplateInner("Welcome Email")}>
-                  Edit Welcome Email
-                </Button>
+        {activeTab === 'notifications' && (
+          <div className="space-y-6">
+            {/* Email Templates */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Mail className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">Email Templates</h2>
+                      <p className="text-gray-600 mt-1">Manage automated email notifications</p>
+                    </div>
+                  </div>
+                  <Button onClick={handleAddEmailTemplate} className="bg-blue-600 hover:bg-blue-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Template
+                  </Button>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <div className="p-6">
+                <div className="space-y-4">
+                  {emailTemplates.map((template) => (
+                    <div key={template.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <Mail className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-gray-900">{template.name}</h3>
+                          <p className="text-sm text-gray-600">{template.description}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          template.status === 'active' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {template.status}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditEmailTemplate(template.name)}
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
-        <TabsContent value="roles">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center space-x-2">
-                  <Users className="w-5 h-5" />
-                  <span>Roles & Permissions</span>
-                </CardTitle>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" onClick={handleAddRoleInner}>
+        {activeTab === 'roles' && (
+          <div className="space-y-6">
+            {/* Role Management */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Shield className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">Role Management</h2>
+                      <p className="text-gray-600 mt-1">Define user roles and permissions</p>
+                    </div>
+                  </div>
+                  <Button onClick={handleAddRole} className="bg-blue-600 hover:bg-blue-700">
+                    <Plus className="w-4 h-4 mr-2" />
                     Add Role
                   </Button>
                 </div>
               </div>
-              <CardDescription>Manage user roles and permissions</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-3">
-                {roles.map((role) => (
-                  <Card key={role.id} className="border-l-4 border-l-indigo-500">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
+              <div className="p-6">
+                <div className="space-y-4">
+                  {roles.map((role) => (
+                    <div key={role.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <Shield className="w-5 h-5 text-blue-600" />
+                        </div>
                         <div>
-                          <h3 className="text-base font-semibold">{role.name}</h3>
-                          <p className="text-xs text-gray-600">{role.description}</p>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <span className="text-sm text-gray-500">{role.user_count} Users</span>
-                          <Button variant="outline" size="sm" onClick={() => handleEditRoleInner(role.name)}>
-                            Edit
-                          </Button>
+                          <h3 className="font-medium text-gray-900">{role.name}</h3>
+                          <p className="text-sm text-gray-600">{role.description}</p>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="access">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Settings className="w-5 h-5" />
-                <span>Access Control</span>
-              </CardTitle>
-              <CardDescription>Manage user access and authentication settings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <Label>Two-Factor Authentication</Label>
-                <Switch />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="security">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center space-x-2">
-                  <Settings className="w-5 h-5" />
-                  <span>Security</span>
-                </CardTitle>
-                <Button variant="outline" onClick={handleBackupNowInner} disabled={isBackingUp}>
-                  {isBackingUp ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Backing Up...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="mr-2 h-4 w-4" />
-                      Backup Now
-                    </>
-                  )}
-                </Button>
-              </div>
-              <CardDescription>Manage security settings and backups</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <Label>Last Backup</Label>
-                <p>{lastBackupTime ? new Date(lastBackupTime).toLocaleString() : "No backup yet"}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Add Subsidiary Modal */}
-      {showAddSubsidiary && (
-        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
-          <div className="relative m-8 md:m-16 lg:m-24">
-            <Card className="max-w-3xl mx-auto">
-              <CardHeader>
-                <CardTitle className="text-xl">Add New Subsidiary</CardTitle>
-                <CardDescription>Enter the details for the new subsidiary company</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-4">
-                  <div className="space-y-4">
-                    <Label>Subsidiary Logo</Label>
-                    <div className="flex items-center space-x-4">
-                      {subsidiaryLogoPreview ? (
-                        <div className="relative">
-                          <img
-                            src={subsidiaryLogoPreview || "/placeholder.svg"}
-                            alt="Subsidiary Logo"
-                            className="w-20 h-20 object-cover rounded-lg border"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
-                            onClick={() => setSubsidiaryLogoPreview("")}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                          <ImageIcon className="w-8 h-8 text-gray-400" />
-                        </div>
-                      )}
-                      <div className="space-y-2">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              handleLogoUpload(file, "subsidiary")
-                            }
-                          }}
-                          className="hidden"
-                          id="subsidiary-logo-upload"
-                        />
+                      <div className="flex items-center space-x-3">
+                        <span className="text-sm text-gray-600">{role.userCount} users</span>
                         <Button
                           variant="outline"
-                          onClick={() => document.getElementById("subsidiary-logo-upload")?.click()}
-                          disabled={isUploadingLogo}
-                          className="flex items-center space-x-2"
+                          size="sm"
+                          onClick={() => handleEditRole(role.name)}
                         >
-                          {isUploadingLogo ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Uploading...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="w-4 h-4" />
-                              <span>Upload Logo</span>
-                            </>
-                          )}
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit
                         </Button>
-                        <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <Label htmlFor="subsidiaryName">Subsidiary Name</Label>
-                      <Input id="subsidiaryName" placeholder="Enter subsidiary name" />
-                    </div>
-                    <div>
-                      <Label htmlFor="subsidiaryIndustry">Industry</Label>
-                      <Input id="subsidiaryIndustry" placeholder="Enter industry" />
-                    </div>
-                    <div>
-                      <Label htmlFor="subsidiaryTaxId">Tax ID</Label>
-                      <Input id="subsidiaryTaxId" placeholder="Enter tax ID" />
-                    </div>
-                    <div>
-                      <Label htmlFor="subsidiarySsnit">SSNIT Number</Label>
-                      <Input id="subsidiarySsnit" placeholder="Enter SSNIT number" />
-                    </div>
-                    <div>
-                      <Label htmlFor="subsidiaryEmail">Email Address</Label>
-                      <Input id="subsidiaryEmail" type="email" placeholder="Enter email address" />
-                    </div>
-                    <div>
-                      <Label htmlFor="subsidiaryPhone">Phone Number</Label>
-                      <Input id="subsidiaryPhone" placeholder="Enter phone number" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="subsidiaryAddress">Address</Label>
-                    <Textarea id="subsidiaryAddress" placeholder="Enter address" />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Divisions</Label>
-                    <div className="space-y-2">
-                      <Input placeholder="Enter division" />
-                      <Button variant="outline" size="sm">
-                        Add Division
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Departments</Label>
-                    <div className="space-y-2">
-                      <Input placeholder="Enter department" />
-                      <Button variant="outline" size="sm">
-                        Add Department
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Locations</Label>
-                    <div className="space-y-2">
-                      <Input placeholder="Enter location" />
-                      <Button variant="outline" size="sm">
-                        Add Location
-                      </Button>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-                <div className="flex justify-end space-x-2">
-                  <Button variant="ghost" onClick={() => setShowAddSubsidiary(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={() => setShowAddSubsidiary(false)}>Add Subsidiary</Button>
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Edit Subsidiary Modal */}
-      {showEditSubsidiary && selectedSubsidiary && (
-        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
-          <div className="relative m-8 md:m-16 lg:m-24">
-            <Card className="max-w-3xl mx-auto">
-              <CardHeader>
-                <CardTitle className="text-xl">Edit Subsidiary</CardTitle>
-                <CardDescription>Edit the details for the selected subsidiary company</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-4">
-                  <div className="space-y-4">
-                    <Label>Subsidiary Logo</Label>
-                    <div className="flex items-center space-x-4">
-                      {subsidiaryLogoPreview || selectedSubsidiary.logo_url ? (
-                        <div className="relative">
-                          <img
-                            src={subsidiaryLogoPreview || selectedSubsidiary.logo_url}
-                            alt="Subsidiary Logo"
-                            className="w-20 h-20 object-cover rounded-lg border"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
-                            onClick={() => setSubsidiaryLogoPreview("")}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
+        {activeTab === 'access' && (
+          <div className="space-y-6">
+            {/* Access Control */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center space-x-3">
+                  <Key className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">Access Control</h2>
+                    <p className="text-gray-600 mt-1">Manage system access and permissions</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6">
+                <div className="text-center py-12">
+                  <Key className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Access Control Settings</h3>
+                  <p className="text-gray-600">Configure user access permissions and security settings.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'security' && (
+          <div className="space-y-6">
+            {/* Security Settings */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center space-x-3">
+                  <Lock className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">Security Settings</h2>
+                    <p className="text-gray-600 mt-1">Configure security and backup settings</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6">
+                <div className="space-y-6">
+                  {/* Backup Settings */}
+                  <div className="border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <Database className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900">Data Backup</h3>
+                          <p className="text-sm text-gray-600">Automated system backups</p>
                         </div>
-                      ) : (
-                        <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                          <ImageIcon className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <Button
+                        onClick={handleBackupNow}
+                        disabled={isBackingUp}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        {isBackingUp ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Backing up...
+                          </>
+                        ) : (
+                          <>
+                            <Database className="w-4 h-4 mr-2" />
+                            Backup Now
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      <p>Last backup: {lastBackupTime ? new Date(lastBackupTime).toLocaleString() : 'Never'}</p>
+                      <p>Next scheduled backup: Daily at 2:00 AM</p>
+                    </div>
+                  </div>
+
+                  {/* Import Settings */}
+                  <div className="border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <Upload className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900">Import Settings</h3>
+                          <p className="text-sm text-gray-600">Import configuration from file</p>
                         </div>
-                      )}
-                      <div className="space-y-2">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              handleLogoUpload(file, "subsidiary")
-                            }
-                          }}
-                          className="hidden"
-                          id="subsidiary-logo-upload-edit"
-                        />
-                        <Button
-                          variant="outline"
-                          onClick={() => document.getElementById("subsidiary-logo-upload-edit")?.click()}
-                          disabled={isUploadingLogo}
-                          className="flex items-center space-x-2"
-                        >
-                          {isUploadingLogo ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Uploading...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="w-4 h-4" />
-                              <span>Upload Logo</span>
-                            </>
-                          )}
-                        </Button>
-                        <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <Label htmlFor="editSubsidiaryName">Subsidiary Name</Label>
-                      <Input
-                        id="editSubsidiaryName"
-                        placeholder="Enter subsidiary name"
-                        value={selectedSubsidiary.name}
-                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, name: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="editSubsidiaryIndustry">Industry</Label>
-                      <Input
-                        id="editSubsidiaryIndustry"
-                        placeholder="Enter industry"
-                        value={selectedSubsidiary.industry}
-                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, industry: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="editSubsidiaryTaxId">Tax ID</Label>
-                      <Input
-                        id="editSubsidiaryTaxId"
-                        placeholder="Enter tax ID"
-                        value={selectedSubsidiary.tax_id}
-                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, tax_id: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="editSubsidiarySsnit">SSNIT Number</Label>
-                      <Input
-                        id="editSubsidiarySsnit"
-                        placeholder="Enter SSNIT number"
-                        value={selectedSubsidiary.ssnit_number}
-                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, ssnit_number: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="editSubsidiaryEmail">Email Address</Label>
-                      <Input
-                        id="editSubsidiaryEmail"
-                        type="email"
-                        placeholder="Enter email address"
-                        value={selectedSubsidiary.email_address}
-                        onChange={(e) =>
-                          setSelectedSubsidiary({ ...selectedSubsidiary, email_address: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="editSubsidiaryPhone">Phone Number</Label>
-                      <Input
-                        id="editSubsidiaryPhone"
-                        placeholder="Enter phone number"
-                        value={selectedSubsidiary.phone_number}
-                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, phone_number: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="editSubsidiaryAddress">Address</Label>
-                    <Textarea
-                      id="editSubsidiaryAddress"
-                      placeholder="Enter address"
-                      value={selectedSubsidiary.address}
-                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, address: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Divisions</Label>
-                    <div className="space-y-2">
-                      {Array.isArray(selectedSubsidiary.divisions) ? (
-                        selectedSubsidiary.divisions.map((division, index) => (
-                          <div key={index} className="flex items-center space-x-2">
-                            <Input
-                              value={division}
-                              onChange={(e) => {
-                                const newDivisions = [...selectedSubsidiary.divisions]
-                                newDivisions[index] = e.target.value
-                                setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
-                              }}
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const newDivisions = selectedSubsidiary.divisions.filter((_, i) => i !== index)
-                                setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
-                              }}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))
-                      ) : (
-                        <Input placeholder="No divisions defined" disabled />
-                      )}
                       <Button
+                        onClick={() => setShowImportModal(true)}
                         variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const newDivisions = selectedSubsidiary.divisions
-                            ? [...selectedSubsidiary.divisions, "New Division"]
-                            : ["New Division"]
-                          setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
-                        }}
                       >
-                        Add Division
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Departments</Label>
-                    <div className="space-y-2">
-                      {Array.isArray(selectedSubsidiary.departments) ? (
-                        selectedSubsidiary.departments.map((department, index) => (
-                          <div key={index} className="flex items-center space-x-2">
-                            <Input
-                              value={department}
-                              onChange={(e) => {
-                                const newDepartments = [...selectedSubsidiary.departments]
-                                newDepartments[index] = e.target.value
-                                setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
-                              }}
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const newDepartments = selectedSubsidiary.departments.filter((_, i) => i !== index)
-                                setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
-                              }}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))
-                      ) : (
-                        <Input placeholder="No departments defined" disabled />
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const newDepartments = selectedSubsidiary.departments
-                            ? [...selectedSubsidiary.departments, "New Department"]
-                            : ["New Department"]
-                          setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
-                        }}
-                      >
-                        Add Department
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Locations</Label>
-                    <div className="space-y-2">
-                      {Array.isArray(selectedSubsidiary.locations) ? (
-                        selectedSubsidiary.locations.map((location, index) => (
-                          <div key={index} className="flex items-center space-x-2">
-                            <Input
-                              value={location}
-                              onChange={(e) => {
-                                const newLocations = [...selectedSubsidiary.locations]
-                                newLocations[index] = e.target.value
-                                setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
-                              }}
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const newLocations = selectedSubsidiary.locations.filter((_, i) => i !== index)
-                                setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
-                              }}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))
-                      ) : (
-                        <Input placeholder="No locations defined" disabled />
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const newLocations = selectedSubsidiary.locations
-                            ? [...selectedSubsidiary.locations, "New Location"]
-                            : ["New Location"]
-                          setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
-                        }}
-                      >
-                        Add Location
+                        <Upload className="w-4 h-4 mr-2" />
+                        Import Settings
                       </Button>
                     </div>
                   </div>
                 </div>
-                <div className="flex justify-end space-x-2">
-                  <Button variant="ghost" onClick={() => setShowEditSubsidiary(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={() => setShowEditSubsidiary(false)}>Save Changes</Button>
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      {showAddSubsidiaryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Add New Subsidiary</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Subsidiary Name
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter subsidiary name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Location
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter location"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setShowAddSubsidiaryModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowAddSubsidiaryModal(false)
+                  toast({
+                    title: "Success",
+                    description: "Subsidiary added successfully.",
+                  })
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Add Subsidiary
+              </Button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Subsidiary Details Modal */}
-      {showSubsidiaryDetails && selectedSubsidiary && (
-        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
-          <div className="relative m-8 md:m-16 lg:m-24">
-            <Card className="max-w-3xl mx-auto">
-              <CardHeader>
-                <CardTitle className="text-xl">Subsidiary Details</CardTitle>
-                <CardDescription>View the details for the selected subsidiary company</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-4">
-                  <div className="space-y-4">
-                    <Label>Subsidiary Logo</Label>
-                    {selectedSubsidiary.logo_url ? (
-                      <img
-                        src={selectedSubsidiary.logo_url || "/placeholder.svg"}
-                        alt="Subsidiary Logo"
-                        className="w-20 h-20 object-cover rounded-lg border"
-                      />
-                    ) : (
-                      <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                        <ImageIcon className="w-8 h-8 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <Label>Subsidiary Name</Label>
-                      <Input value={selectedSubsidiary.name} disabled />
-                    </div>
-                    <div>
-                      <Label>Industry</Label>
-                      <Input value={selectedSubsidiary.industry} disabled />
-                    </div>
-                    <div>
-                      <Label>Tax ID</Label>
-                      <Input value={selectedSubsidiary.tax_id} disabled />
-                    </div>
-                    <div>
-                      <Label>SSNIT Number</Label>
-                      <Input value={selectedSubsidiary.ssnit_number} disabled />
-                    </div>
-                    <div>
-                      <Label>Email Address</Label>
-                      <Input value={selectedSubsidiary.email_address} disabled />
-                    </div>
-                    <div>
-                      <Label>Phone Number</Label>
-                      <Input value={selectedSubsidiary.phone_number} disabled />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>Address</Label>
-                    <Textarea value={selectedSubsidiary.address} disabled />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Divisions</Label>
-                    {Array.isArray(selectedSubsidiary.divisions) ? (
-                      selectedSubsidiary.divisions.map((division, index) => (
-                        <Input key={index} value={division} disabled />
-                      ))
-                    ) : (
-                      <Input placeholder="No divisions defined" disabled />
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Departments</Label>
-                    {Array.isArray(selectedSubsidiary.departments) ? (
-                      selectedSubsidiary.departments.map((department, index) => (
-                        <Input key={index} value={department} disabled />
-                      ))
-                    ) : (
-                      <Input placeholder="No departments defined" disabled />
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Locations</Label>
-                    {Array.isArray(selectedSubsidiary.locations) ? (
-                      selectedSubsidiary.locations.map((location, index) => (
-                        <Input key={index} value={location} disabled />
-                      ))
-                    ) : (
-                      <Input placeholder="No locations defined" disabled />
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <Button variant="ghost" onClick={() => setShowSubsidiaryDetails(false)}>
-                    Close
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {/* Deactivate Confirmation Modal */}
       {showDeactivateConfirm && subsidiaryToToggle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <Card className="max-w-md p-6">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">Deactivate Subsidiary</CardTitle>
-              <CardDescription>Are you sure you want to deactivate {subsidiaryToToggle.name}?</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p>Deactivating will prevent further actions on this subsidiary.</p>
-              <div className="flex justify-end space-x-2">
-                <Button variant="ghost" onClick={() => setShowDeactivateConfirm(false)}>
-                  Cancel
-                </Button>
-                <Button variant="destructive" onClick={confirmToggleStatus}>
-                  Deactivate
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Reactivate Confirmation Modal */}
-      {showReactivateConfirm && subsidiaryToToggle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <Card className="max-w-md p-6">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">Reactivate Subsidiary</CardTitle>
-              <CardDescription>Are you sure you want to reactivate {subsidiaryToToggle.name}?</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p>Reactivating will allow full access and actions on this subsidiary.</p>
-              <div className="flex justify-end space-x-2">
-                <Button variant="ghost" onClick={() => setShowReactivateConfirm(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={confirmToggleStatus}>Reactivate</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* View Employees Modal */}
-      {viewEmployeesModal.isOpen && (
-        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
-          <div className="relative m-8 md:m-16 lg:m-24">
-            <Card className="max-w-3xl mx-auto">
-              <CardHeader>
-                <CardTitle className="text-xl">Employees of Subsidiary</CardTitle>
-                <CardDescription>View the employees for the selected subsidiary company</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {viewEmployeesModal.employees && viewEmployeesModal.employees.length > 0 ? (
-                  <div className="space-y-3">
-                    {viewEmployeesModal.employees.map((employee) => (
-                      <Card key={employee.id} className="border-l-4 border-l-indigo-500">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="text-base font-semibold">{employee.name}</h3>
-                              <p className="text-xs text-gray-600">{employee.position}</p>
-                            </div>
-                            <div className="flex items-center space-x-4">
-                              <span className="text-sm text-gray-500">{employee.email}</span>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <p>No employees found for this subsidiary.</p>
-                )}
-                <div className="flex justify-end">
-                  <Button variant="ghost" onClick={() => setViewEmployeesModal({ isOpen: false, subsidiaryId: "" })}>
-                    Close
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Deactivate Subsidiary</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to deactivate "{subsidiaryToToggle.name}"? This action can be reversed later.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeactivateConfirm(false)
+                  setSubsidiaryToToggle(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  handleToggleSubsidiaryStatus(subsidiaryToToggle.id, 'inactive')
+                  setShowDeactivateConfirm(false)
+                  setSubsidiaryToToggle(null)
+                }}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Deactivate
+              </Button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Import Settings Modal */}
-      {importModal && (
-        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
-          <div className="relative m-8 md:m-16 lg:m-24">
-            <Card className="max-w-lg mx-auto">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">Import Settings</CardTitle>
-                <CardDescription>Import settings from a CSV file</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="importFile">Select CSV File</Label>
-                    <Input
-                      id="importFile"
-                      type="file"
-                      accept=".csv"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) {
-                          handleImportSettings(file)
-                        }
-                      }}
-                    />
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    Upload a CSV file with subsidiary settings. The file should include columns for name, tax_id, ssnit_number, industry, etc.
-                  </p>
+      {showReactivateConfirm && subsidiaryToToggle && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Reactivate Subsidiary</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to reactivate "{subsidiaryToToggle.name}"?
+            </p>
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowReactivateConfirm(false)
+                  setSubsidiaryToToggle(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  handleToggleSubsidiaryStatus(subsidiaryToToggle.id, 'active')
+                  setShowReactivateConfirm(false)
+                  setSubsidiaryToToggle(null)
+                }}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                Reactivate
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Import Settings</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Configuration File
+                </label>
+                <input
+                  type="file"
+                  accept=".json,.csv"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="text-sm text-gray-600">
+                <p>Supported formats: JSON, CSV</p>
+                <p>Maximum file size: 10MB</p>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setShowImportModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowImportModal(false)
+                  toast({
+                    title: "Success",
+                    description: "Settings imported successfully.",
+                  })
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Import
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Leave Type Modal */}
+      {showAddLeaveTypeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Add Leave Type</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Leave Type Name
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Personal Leave"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Brief description of the leave type"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Annual Days Allowed
+                </label>
+                <input
+                  type="number"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., 10"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setShowAddLeaveTypeModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowAddLeaveTypeModal(false)
+                  toast({
+                    title: "Success",
+                    description: "Leave type added successfully.",
+                  })
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Add Leave Type
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Policy Modal */}
+      {showPolicyModal && selectedPolicy && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">{policyModalType === 'view' ? 'View' : 'Edit'} Policy</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowPolicyModal(false)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Policy Name
+                </label>
+                <input
+                  type="text"
+                  value={selectedPolicy.name}
+                  disabled={policyModalType === 'view'}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={selectedPolicy.description}
+                  disabled={policyModalType === 'view'}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Annual Days
+                  </label>
+                  <input
+                    type="number"
+                    value={selectedPolicy.days}
+                    disabled={policyModalType === 'view'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                  />
                 </div>
-                <div className="flex justify-end space-x-2">\
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Current Usage (%)
+                  </label>
+                  <input
+                    type="number"
+                    value={selectedPolicy.usage}
+                    disabled={policyModalType === 'view'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setShowPolicyModal(false)}
+              >
+                {policyModalType === 'view' ? 'Close' : 'Cancel'}
+              </Button>
+              {policyModalType === 'edit' && (
+                <Button
+                  onClick={() => {
+                    setShowPolicyModal(false)
+                    toast({
+                      title: "Success",
+                      description: "Policy updated successfully.",
+                    })
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Save Changes
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Modal */}
+      {showDocumentModal && selectedDocument && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">
+                {documentModalType === 'view' ? 'View' : documentModalType === 'edit' ? 'Edit' : 'Add'} Document
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDocumentModal(false)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Document Name
+                </label>
+                <input
+                  type="text"
+                  value={selectedDocument.name}
+                  disabled={documentModalType === 'view'}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category
+                </label>
+                <select
+                  value={selected
