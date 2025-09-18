@@ -7,34 +7,23 @@ import {
   Building2,
   X,
   Loader2,
-  Upload,
   Building,
   Users,
   Calculator,
-  Bell,
-  Shield,
-  Key,
-  Lock,
-  Database,
   FileText,
   TrendingUp,
   Calendar,
   Mail,
   Brain,
-  CheckCircle,
-  Settings,
   Save,
   Plus,
   MoreHorizontal,
   Eye,
   Edit,
-  Pause,
-  Play,
   Trash2,
   Download,
   DollarSign,
   Minus,
-  Receipt,
 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -106,6 +95,25 @@ interface Role {
   description: string
   permissions: string[]
   user_count: number
+}
+
+interface Allowance {
+  code: string
+  description: string
+  taxable: boolean
+  recurring: boolean
+  amount: number
+  percentage: number
+  type: "FIXED" | "VARIABLE"
+}
+
+interface Deduction {
+  code: string
+  description: string
+  recurring: boolean
+  amount: number
+  percentage: number
+  type: "FIXED" | "VARIABLE" | "NONE"
 }
 
 const isDemoMode = () => {
@@ -228,6 +236,11 @@ export default function SettingsPage() {
 
   const [isSaving, setIsSaving] = useState(false)
 
+  const [showAddSubsidiaryModal, setShowAddSubsidiaryModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false)
+  const [isSavingPayrollHR, setIsSavingPayrollHR] = useState(false)
+
   const [hrDocuments, setHrDocuments] = useState([
     { id: 1, name: "Employee Handbook", type: "PDF", size: "2.4 MB", visibleToAll: true },
     { id: 2, name: "Code of Conduct", type: "PDF", size: "1.8 MB", visibleToAll: false },
@@ -251,78 +264,78 @@ export default function SettingsPage() {
   const [policyInsights, setPolicyInsights] = useState<Record<string, string>>({})
   const [loadingInsights, setLoadingInsights] = useState<Record<string, boolean>>({})
 
-  const [selectedCurrency, setSelectedCurrency] = useState('ghs')
+  const [selectedCurrency, setSelectedCurrency] = useState("ghs")
   const [payeTaxBands, setPayeTaxBands] = useState([
-    { band: 0, rate: 0, from: 4350, to: null, description: '% on first' },
-    { band: 5, rate: 5, from: 1000, to: null, description: '% on next' },
-    { band: 10, rate: 10, from: 2000, to: null, description: '% on next' },
-    { band: 17.5, rate: 17.5, from: 20000, to: null, description: '% on next' },
-    { band: 25, rate: 25, from: 25000, to: null, description: '% on next' },
-    { band: 30, rate: 30, from: null, to: null, description: '% on remaining amount' }
+    { band: 0, rate: 0, from: 4350, to: null, description: "% on first" },
+    { band: 5, rate: 5, from: 1000, to: null, description: "% on next" },
+    { band: 10, rate: 10, from: 2000, to: null, description: "% on next" },
+    { band: 17.5, rate: 17.5, from: 20000, to: null, description: "% on next" },
+    { band: 25, rate: 25, from: 25000, to: null, description: "% on next" },
+    { band: 30, rate: 30, from: null, to: null, description: "% on remaining amount" },
   ])
   const [ssnitRates, setSsnitRates] = useState({
     employee: 5.5,
     employer: 13,
-    total: 18.5
+    total: 18.5,
   })
   const [tier2Rates, setTier2Rates] = useState({
     employee: 5.5,
     employer: 5.5,
-    total: 11.0
+    total: 11.0,
   })
   const [tier3Rates, setTier3Rates] = useState({
     employee: 5,
     employer: 5,
-    total: 10.0
+    total: 10.0,
   })
 
   const currencyConfig = {
-    ghs: { 
-      symbol: '₵', 
-      name: 'Ghana Cedis (GHS)',
+    ghs: {
+      symbol: "₵",
+      name: "Ghana Cedis (GHS)",
       taxBands: [
-        { band: 0, rate: 0, from: 4350, to: null, description: '% on first' },
-        { band: 5, rate: 5, from: 1000, to: null, description: '% on next' },
-        { band: 10, rate: 10, from: 2000, to: null, description: '% on next' },
-        { band: 17.5, rate: 17.5, from: 20000, to: null, description: '% on next' },
-        { band: 25, rate: 25, from: 25000, to: null, description: '% on next' },
-        { band: 30, rate: 30, from: null, to: null, description: '% on remaining amount' }
-      ]
+        { band: 0, rate: 0, from: 4350, to: null, description: "% on first" },
+        { band: 5, rate: 5, from: 1000, to: null, description: "% on next" },
+        { band: 10, rate: 10, from: 2000, to: null, description: "% on next" },
+        { band: 17.5, rate: 17.5, from: 20000, to: null, description: "% on next" },
+        { band: 25, rate: 25, from: 25000, to: null, description: "% on next" },
+        { band: 30, rate: 30, from: null, to: null, description: "% on remaining amount" },
+      ],
     },
-    usd: { 
-      symbol: '$', 
-      name: 'US Dollar (USD)',
+    usd: {
+      symbol: "$",
+      name: "US Dollar (USD)",
       taxBands: [
-        { band: 10, rate: 10, from: 11000, to: 44725, description: '% on income' },
-        { band: 12, rate: 12, from: 44726, to: 95375, description: '% on income' },
-        { band: 22, rate: 22, from: 95376, to: 182050, description: '% on income' },
-        { band: 24, rate: 24, from: 182051, to: 231250, description: '% on income' },
-        { band: 32, rate: 32, from: 231251, to: 578125, description: '% on income' },
-        { band: 37, rate: 37, from: 578126, to: null, description: '% on remaining amount' }
-      ]
+        { band: 10, rate: 10, from: 11000, to: 44725, description: "% on income" },
+        { band: 12, rate: 12, from: 44726, to: 95375, description: "% on income" },
+        { band: 22, rate: 22, from: 95376, to: 182050, description: "% on income" },
+        { band: 24, rate: 24, from: 182051, to: 231250, description: "% on income" },
+        { band: 32, rate: 32, from: 231251, to: 578125, description: "% on income" },
+        { band: 37, rate: 37, from: 578126, to: null, description: "% on remaining amount" },
+      ],
     },
-    eur: { 
-      symbol: '€', 
-      name: 'Euro (EUR)',
+    eur: {
+      symbol: "€",
+      name: "Euro (EUR)",
       taxBands: [
-        { band: 0, rate: 0, from: 10908, to: null, description: '% on first' },
-        { band: 14, rate: 14, from: 10909, to: 61972, description: '% on income' },
-        { band: 42, rate: 42, from: 61973, to: 277826, description: '% on income' },
-        { band: 45, rate: 45, from: 277827, to: null, description: '% on remaining amount' }
-      ]
+        { band: 0, rate: 0, from: 10908, to: null, description: "% on first" },
+        { band: 14, rate: 14, from: 10909, to: 61972, description: "% on income" },
+        { band: 42, rate: 42, from: 61973, to: 277826, description: "% on income" },
+        { band: 45, rate: 45, from: 277827, to: null, description: "% on remaining amount" },
+      ],
     },
-    ngn: { 
-      symbol: '₦', 
-      name: 'Nigerian Naira (NGN)',
+    ngn: {
+      symbol: "₦",
+      name: "Nigerian Naira (NGN)",
       taxBands: [
-        { band: 7, rate: 7, from: 300000, to: null, description: '% on first' },
-        { band: 11, rate: 11, from: 300000, to: null, description: '% on next' },
-        { band: 15, rate: 15, from: 500000, to: null, description: '% on next' },
-        { band: 19, rate: 19, from: 500000, to: null, description: '% on next' },
-        { band: 21, rate: 21, from: 1600000, to: null, description: '% on next' },
-        { band: 24, rate: 24, from: null, to: null, description: '% on remaining amount' }
-      ]
-    }
+        { band: 7, rate: 7, from: 300000, to: null, description: "% on first" },
+        { band: 11, rate: 11, from: 300000, to: null, description: "% on next" },
+        { band: 15, rate: 15, from: 500000, to: null, description: "% on next" },
+        { band: 19, rate: 19, from: 500000, to: null, description: "% on next" },
+        { band: 21, rate: 21, from: 1600000, to: null, description: "% on next" },
+        { band: 24, rate: 24, from: null, to: null, description: "% on remaining amount" },
+      ],
+    },
   }
 
   const handleCurrencyChange = (currency: string) => {
@@ -331,19 +344,19 @@ export default function SettingsPage() {
     setPayrollConfig({ ...payrollConfig, currency: currency })
   }
 
-  const updateSsnitRates = (field: 'employee' | 'employer', value: number) => {
+  const updateSsnitRates = (field: "employee" | "employer", value: number) => {
     const newRates = { ...ssnitRates, [field]: value }
     newRates.total = newRates.employee + newRates.employer
     setSsnitRates(newRates)
   }
 
-  const updateTier2Rates = (field: 'employee' | 'employer', value: number) => {
+  const updateTier2Rates = (field: "employee" | "employer", value: number) => {
     const newRates = { ...tier2Rates, [field]: value }
     newRates.total = newRates.employee + newRates.employer
     setTier2Rates(newRates)
   }
 
-  const updateTier3Rates = (field: 'employee' | 'employer', value: number) => {
+  const updateTier3Rates = (field: "employee" | "employer", value: number) => {
     const newRates = { ...tier3Rates, [field]: value }
     newRates.total = newRates.employee + newRates.employer
     setTier3Rates(newRates)
@@ -2161,7 +2174,7 @@ Next Review Date: January 15, 2025`,
     }
   }
 
-  const handleDeleteDocument = async (docId) => {
+  const handleDeleteDocumentInner = async (docId) => {
     try {
       await new Promise((resolve) => setTimeout(resolve, 500))
       setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId))
@@ -2217,34 +2230,6 @@ Next Review Date: January 15, 2025`,
       })
     } finally {
       setIsSavingSubsidiaries(false)
-    }
-  }
-
-  const handleSaveHRConfig = async () => {
-    setIsSaving(true)
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      if (isDemoMode) {
-        toast({
-          title: "HR Configuration Saved",
-          description: "HR settings updated successfully (Demo Mode)",
-        })
-      } else {
-        // Real database update would go here
-        toast({
-          title: "HR Configuration Saved",
-          description: "HR settings updated successfully",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save HR configuration",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSaving(false)
     }
   }
 
@@ -2347,7 +2332,7 @@ Next Review Date: January 15, 2025`,
 
       const prompt = `Analyze the following leave policies and provide professional HR insights:
 
-${policiesData.map(policy => `- ${policy.name}: ${policy.days} days, ${policy.usage}% usage, ${policy.description}`).join('\n')}
+${policiesData.map((policy) => `- ${policy.name}: ${policy.days} days, ${policy.usage}% usage, ${policy.description}`).join("\n")}
 
 Please provide:
 1. Overall policy utilization analysis
@@ -2355,26 +2340,26 @@ Please provide:
 3. Potential cost savings opportunities
 4. Employee satisfaction insights`
 
-      const response = await fetch('/api/ai-insights', {
-        method: 'POST',
+      const response = await fetch("/api/ai-insights", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           prompt,
-          type: 'leave_policies'
+          type: "leave_policies",
         }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to generate insights')
+        throw new Error("Failed to generate insights")
       }
 
       const data = await response.json()
       setAiInsights(data.insights)
     } catch (error) {
-      console.error('[v0] Error generating AI insights:', error)
-      setAiInsights('Unable to generate insights at this time. Please try again later.')
+      console.error("[v0] Error generating AI insights:", error)
+      setAiInsights("Unable to generate insights at this time. Please try again later.")
       toast({
         title: "Error",
         description: "Failed to generate AI insights. Please try again.",
@@ -2386,46 +2371,46 @@ Please provide:
   }
 
   const handleGenerateIndividualInsight = async (policyId: string) => {
-    const policy = currentPolicies.find(p => p.id === policyId)
+    const policy = currentPolicies.find((p) => p.id === policyId)
     if (!policy) return
 
-    setLoadingInsights(prev => ({ ...prev, [policyId]: true }))
+    setLoadingInsights((prev) => ({ ...prev, [policyId]: true }))
 
     try {
-      const response = await fetch('/api/policy-insights', {
-        method: 'POST',
+      const response = await fetch("/api/policy-insights", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           policy: {
             name: policy.name,
             days: policy.days,
             usage: policy.usage,
-            description: policy.description
-          }
+            description: policy.description,
+          },
         }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to generate insight')
+        throw new Error("Failed to generate insight")
       }
 
       const data = await response.json()
-      setPolicyInsights(prev => ({ ...prev, [policyId]: data.insight }))
+      setPolicyInsights((prev) => ({ ...prev, [policyId]: data.insight }))
     } catch (error) {
-      console.error('[v0] Error generating policy insight:', error)
-      setPolicyInsights(prev => ({ ...prev, [policyId]: 'Unable to generate insight at this time.' }))
+      console.error("[v0] Error generating policy insight:", error)
+      setPolicyInsights((prev) => ({ ...prev, [policyId]: "Unable to generate insight at this time." }))
     } finally {
-      setLoadingInsights(prev => ({ ...prev, [policyId]: false }))
+      setLoadingInsights((prev) => ({ ...prev, [policyId]: false }))
     }
   }
 
   const handleSavePayrollConfig = async () => {
-    setIsSavingPayroll(true)
+    setIsSavingPayrollHR(true)
     try {
       // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      await new Promise((resolve) => setTimeout(resolve, 2000))
       toast({
         title: "Success",
         description: "Payroll configuration saved successfully.",
@@ -2437,27 +2422,7 @@ Please provide:
         variant: "destructive",
       })
     } finally {
-      setIsSavingPayroll(false)
-    }
-  }
-
-  const handleSaveHRConfig = async () => {
-    setIsSaving(true)
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      toast({
-        title: "Success",
-        description: "HR configuration saved successfully.",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save HR configuration.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSaving(false)
+      setIsSavingPayrollHR(false)
     }
   }
 
@@ -2473,16 +2438,16 @@ Please provide:
     return tier3Rates.employee + tier3Rates.employer
   }
 
-  const handleSSNITChange = (field: 'employee' | 'employer', value: number) => {
-    setSsnitRates(prev => ({ ...prev, [field]: value }))
+  const handleSSNITChange = (field: "employee" | "employer", value: number) => {
+    setSsnitRates((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleTier2Change = (field: 'employee' | 'employer', value: number) => {
-    setTier2Rates(prev => ({ ...prev, [field]: value }))
+  const handleTier2Change = (field: "employee" | "employer", value: number) => {
+    setTier2Rates((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleTier3Change = (field: 'employee' | 'employer', value: number) => {
-    setTier3Rates(prev => ({ ...prev, [field]: value }))
+  const handleTier3Change = (field: "employee" | "employer", value: number) => {
+    setTier3Rates((prev) => ({ ...prev, [field]: value }))
   }
 
   const [selectedAllowance, setSelectedAllowance] = useState(null)
@@ -2491,25 +2456,45 @@ Please provide:
   const [showDeductionModal, setShowDeductionModal] = useState(false)
   const [showAddAllowanceModal, setShowAddAllowanceModal] = useState(false)
   const [showAddDeductionModal, setShowAddDeductionModal] = useState(false)
-  const [isSavingPayroll, setIsSavingPayrollHR] = useState(false)
+  const [isSavingPayroll, setIsSavingPayroll] = useState(false)
   const [isSavingHR, setIsSavingHR] = useState(false)
   const [salaryGrades, setSalaryGrades] = useState([
-    { id: 1, grade: 'A1', level: 'Entry Level', minSalary: 5000, maxSalary: 8000, steps: 5 },
-    { id: 2, grade: 'B2', level: 'Mid Level', minSalary: 8000, maxSalary: 12000, steps: 7 },
-    { id: 3, grade: 'C3', level: 'Senior Level', minSalary: 12000, maxSalary: 20000, steps: 10 }
+    { id: 1, grade: "A1", level: "Entry Level", minSalary: 5000, maxSalary: 8000, steps: 5 },
+    { id: 2, grade: "B2", level: "Mid Level", minSalary: 8000, maxSalary: 12000, steps: 7 },
+    { id: 3, grade: "C3", level: "Senior Level", minSalary: 12000, maxSalary: 20000, steps: 10 },
   ])
   const [showAddSalaryGradeModal, setShowAddSalaryGradeModal] = useState(false)
   const [policyDocuments, setPolicyDocuments] = useState([
-    { id: 1, name: 'Employee Handbook', category: 'HR Policy', version: '1.0', status: 'active', lastUpdated: '2024-01-01' },
-    { id: 2, name: 'Code of Conduct', category: 'HR Policy', version: '1.1', status: 'active', lastUpdated: '2024-01-01' },
-    { id: 3, name: 'Safety Guidelines', category: 'HR Policy', version: '1.2', status: 'draft', lastUpdated: '2024-01-01' }
+    {
+      id: 1,
+      name: "Employee Handbook",
+      category: "HR Policy",
+      version: "1.0",
+      status: "active",
+      lastUpdated: "2024-01-01",
+    },
+    {
+      id: 2,
+      name: "Code of Conduct",
+      category: "HR Policy",
+      version: "1.1",
+      status: "active",
+      lastUpdated: "2024-01-01",
+    },
+    {
+      id: 3,
+      name: "Safety Guidelines",
+      category: "HR Policy",
+      version: "1.2",
+      status: "draft",
+      lastUpdated: "2024-01-01",
+    },
   ])
-  const [showEditTaxBandModal, setShowEditTaxBandModal] = useState(false)
-  const [showAddTaxBandModal, setShowAddTaxBandModal] = useState(false)
+  const [showEditTaxBandModal, setShowAddTaxBandModal] = useState(false)
   const [emailTemplates, setEmailTemplates] = useState([
-    { id: 1, name: 'Welcome Email', description: 'Welcome email for new employees', status: 'active' },
-    { id: 2, name: 'Leave Request', description: 'Leave request notification', status: 'active' },
-    { id: 3, name: 'Performance Review', description: 'Performance review notification', status: 'active' }
+    { id: 1, name: "Welcome Email", description: "Welcome email for new employees", status: "active" },
+    { id: 2, name: "Leave Request", description: "Leave request notification", status: "active" },
+    { id: 3, name: "Performance Review", description: "Performance review notification", status: "active" },
   ])
 
   const handleViewSalaryGrade = (id) => {
@@ -2526,1734 +2511,1787 @@ Please provide:
     })
   }
 
-  const handleDeleteSalaryGrade = (id) => {
-    toast({
-      title: "Delete Salary Grade",
-      description: `Deleting salary grade ${id}...`,
-    })
+  const handleAddSalaryGrade = () => {
+    setShowAddSalaryGradeModal(true)
   }
 
-  const handleViewDocument = (id) => {
-    toast({
-      title: "View Document",
-      description: `Viewing document ${id}...`,
-    })
-  }
-
-  const handleEditDocument = (id) => {
-    toast({
-      title: "Edit Document",
-      description: `Editing document ${id}...`,
-    })
-  }
-
-  const handleDownloadDocument = (id) => {
-    toast({
-      title: "Download Document",
-      description: `Downloading document ${id}...`,
-    })
-  }
-
-  const handleDeleteDocument = (id) => {
-    toast({
-      title: "Delete Document",
-      description: `Deleting document ${id}...`,
-    })
-  }
-
-  const handleEditTaxBand = (index) => {
-    toast({
-      title: "Edit Tax Band",
-      description: `Editing tax band ${index}...`,
-    })
-  }
-
-  const [activeTab, setActiveTab] = useState("company");
-  const getCurrencySymbol = (currencyCode) => {
-    switch (currencyCode) {
-      case "USD":
-        return "$";
-      case "EUR":
-        return "€";
-      case "GBP":
-        return "£";
-      case "NGN":
-        return "₦";
-      case "GHS":
-        return "₵";
-      default:
-        return "$";
+  const handleSaveSalaryGrade = async (newGrade) => {
+    setIsSavingPayroll(true)
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      setSalaryGrades([...salaryGrades, { ...newGrade, id: Date.now() }])
+      setShowAddSalaryGradeModal(false)
+      toast({
+        title: "Success",
+        description: "Salary grade saved successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save salary grade.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingPayroll(false)
     }
-  };
+  }
 
-  const currencySymbol = getCurrencySymbol(payrollConfig.currency)
+  const handleViewPolicyDocument = (id) => {
+    toast({
+      title: "View Policy Document",
+      description: `Viewing policy document ${id}...`,
+    })
+  }
 
-  const formatCurrency = (amount, currencyCode) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currencyCode,
-    }).format(amount);
-  };
+  const handleEditPolicyDocument = (id) => {
+    toast({
+      title: "Edit Policy Document",
+      description: `Editing policy document ${id}...`,
+    })
+  }
+
+  const handleAddPolicyDocument = () => {
+    toast({
+      title: "Add Policy Document",
+      description: "Adding policy document...",
+    })
+  }
+
+  const handleSavePolicyDocument = async (newDocument) => {
+    setIsSavingHR(true)
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      setPolicyDocuments([...policyDocuments, { ...newDocument, id: Date.now() }])
+      toast({
+        title: "Success",
+        description: "Policy document saved successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save policy document.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingHR(false)
+    }
+  }
+
+  const handleViewEmailTemplate = (id) => {
+    toast({
+      title: "View Email Template",
+      description: `Viewing email template ${id}...`,
+    })
+  }
+
+  const handleEditTaxBand = () => {
+    setShowAddTaxBandModal(true)
+  }
+
+  const handleSaveTaxBand = async (newTaxBand) => {
+    setIsSavingPayroll(true)
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      setPayeTaxBands([...payeTaxBands, { ...newTaxBand, id: Date.now() }])
+      setShowAddTaxBandModal(false)
+      toast({
+        title: "Success",
+        description: "Tax band saved successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save tax band.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingPayroll(false)
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-600 mt-2">Manage your organization settings and configurations</p>
+    <div className="flex flex-col h-full gap-4 p-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={handleRefreshSubsidiaries}>
+            Refresh
+          </Button>
+          <Button onClick={handleSaveSettings} disabled={isSavingSettings}>
+            {isSavingSettings ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Save Changes
+              </>
+            )}
+          </Button>
         </div>
+      </div>
 
-        {/* Navigation Tabs */}
-        <div className="mb-8">
-          <div className="flex space-x-1 bg-white rounded-lg p-1 shadow-sm">
-            {[
-              { id: 'company', label: 'Company', icon: Building2 },
-              { id: 'multi-company', label: 'Multi-Company', icon: Building },
-              { id: 'hr', label: 'HR', icon: Users },
-              { id: 'payroll', label: 'Payroll', icon: Calculator },
-              { id: 'notifications', label: 'Notifications', icon: Bell },
-              { id: 'roles', label: 'Roles', icon: Shield },
-              { id: 'access', label: 'Access', icon: Key },
-              { id: 'security', label: 'Security', icon: Lock },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
-              >
-                <tab.icon className="w-4 h-4" />
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tab Content */}
-        {activeTab === 'company' && (
-          <div className="space-y-6">
-            {/* Company Information */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center space-x-3">
-                  <Building2 className="w-5 h-5 text-blue-600" />
-                  <h2 className="text-xl font-semibold text-gray-900">Company Information</h2>
-                </div>
-                <p className="text-gray-600 mt-1">Basic company details and settings</p>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Company Name
-                    </label>
-                    <input
-                      type="text"
-                      value={companyData.name}
-                      onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Industry
-                    </label>
-                    <select
-                      value={companyData.industry}
-                      onChange={(e) => setCompanyData({ ...companyData, industry: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="Technology">Technology</option>
-                      <option value="Healthcare">Healthcare</option>
-                      <option value="Finance">Finance</option>
-                      <option value="Education">Education</option>
-                      <option value="Manufacturing">Manufacturing</option>
-                      <option value="Retail">Retail</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Employee Count
-                    </label>
-                    <select
-                      value={companyData.size}
-                      onChange={(e) => setCompanyData({ ...companyData, size: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="1-10">1-10 employees</option>
-                      <option value="11-50">11-50 employees</option>
-                      <option value="51-200">51-200 employees</option>
-                      <option value="201-500">201-500 employees</option>
-                      <option value="500+">500+ employees</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Country
-                    </label>
-                    <select
-                      value={companyData.country}
-                      onChange={(e) => setCompanyData({ ...companyData, country: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="Ghana">Ghana</option>
-                      <option value="Nigeria">Nigeria</option>
-                      <option value="Kenya">Kenya</option>
-                      <option value="South Africa">South Africa</option>
-                      <option value="United States">United States</option>
-                      <option value="United Kingdom">United Kingdom</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="mt-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Company Address
-                  </label>
-                  <textarea
-                    value={companyData.address}
-                    onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter company address..."
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Company Information */}
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h2 className="text-lg font-semibold mb-2 flex items-center space-x-2">
+            <Building2 className="h-5 w-5 text-gray-500" />
+            <span>Company Information</span>
+          </h2>
+          <div className="space-y-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Name</label>
+              <input
+                type="text"
+                value={companyData.name}
+                onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <input
+                type="email"
+                value={companyData.email_address}
+                onChange={(e) => setCompanyData({ ...companyData, email_address: e.target.value })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Tax ID</label>
+              <input
+                type="text"
+                value={companyData.tax_id}
+                onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">SSNIT Number</label>
+              <input
+                type="text"
+                value={companyData.ssnit_number}
+                onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Industry</label>
+              <input
+                type="text"
+                value={companyData.industry}
+                onChange={(e) => setCompanyData({ ...companyData, industry: e.target.value })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Address</label>
+              <input
+                type="text"
+                value={companyData.address}
+                onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+              <input
+                type="text"
+                value={companyData.phone_number}
+                onChange={(e) => setCompanyData({ ...companyData, phone_number: e.target.value })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Divisions</label>
+              <input
+                type="text"
+                value={companyData.divisions?.join(", ") || ""}
+                onChange={(e) =>
+                  setCompanyData({ ...companyData, divisions: e.target.value.split(",").map((s) => s.trim()) })
+                }
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Departments</label>
+              <input
+                type="text"
+                value={companyData.departments?.join(", ") || ""}
+                onChange={(e) =>
+                  setCompanyData({ ...companyData, departments: e.target.value.split(",").map((s) => s.trim()) })
+                }
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Locations</label>
+              <input
+                type="text"
+                value={companyData.locations?.join(", ") || ""}
+                onChange={(e) =>
+                  setCompanyData({ ...companyData, locations: e.target.value.split(",").map((s) => s.trim()) })
+                }
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Company Logo</label>
+              <div className="mt-1 flex items-center">
+                {companyLogoPreview ? (
+                  <img
+                    src={companyLogoPreview || "/placeholder.svg"}
+                    alt="Company Logo Preview"
+                    className="h-12 w-12 rounded-full mr-4"
                   />
-                </div>
+                ) : (
+                  <div className="h-12 w-12 rounded-full bg-gray-200 mr-4 flex items-center justify-center">
+                    <Building className="h-6 w-6 text-gray-500" />
+                  </div>
+                )}
+                <label
+                  htmlFor="company-logo-upload"
+                  className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
+                >
+                  <span>Upload a file</span>
+                  <input
+                    id="company-logo-upload"
+                    name="company-logo-upload"
+                    type="file"
+                    className="sr-only"
+                    onChange={(e) => e.target.files && handleLogoUpload(e.target.files[0], "company")}
+                  />
+                </label>
+                {isUploadingLogo && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
               </div>
             </div>
           </div>
-        )}
+        </div>
 
-        {activeTab === 'multi-company' && (
-          <div className="space-y-6">
-            {/* Multi-Company Management */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Building className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900">Subsidiaries</h2>
-                      <p className="text-gray-600 mt-1">Manage subsidiary companies and branches</p>
-                    </div>
-                  </div>
-                  <Button onClick={() => setShowAddSubsidiaryModal(true)} className="bg-blue-600 hover:bg-blue-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Subsidiary
-                  </Button>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  {subsidiaries.map((subsidiary) => (
-                    <div key={subsidiary.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                          <Building className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900">{subsidiary.name}</h3>
-                          <p className="text-sm text-gray-600">{subsidiary.location}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          subsidiary.status === 'active' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {subsidiary.status}
-                        </span>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewSubsidiary(subsidiary.id)}>
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditSubsidiary(subsidiary.id)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            {subsidiary.status === 'active' ? (
-                              <DropdownMenuItem onClick={() => confirmDeactivateSubsidiary(subsidiary.id)}>
-                                <Pause className="w-4 h-4 mr-2" />
-                                Deactivate
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem onClick={() => confirmReactivateSubsidiary(subsidiary.id)}>
-                                <Play className="w-4 h-4 mr-2" />
-                                Reactivate
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+        {/* HR Configuration */}
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h2 className="text-lg font-semibold mb-2 flex items-center space-x-2">
+            <Users className="h-5 w-5 text-gray-500" />
+            <span>HR Configuration</span>
+          </h2>
+          <div className="space-y-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Leave Year Start</label>
+              <select
+                value={hrConfig.leaveYearStart}
+                onChange={(e) => setHrConfig({ ...hrConfig, leaveYearStart: e.target.value })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              >
+                <option>January</option>
+                <option>February</option>
+                <option>March</option>
+                <option>April</option>
+                <option>May</option>
+                <option>June</option>
+                <option>July</option>
+                <option>August</option>
+                <option>September</option>
+                <option>October</option>
+                <option>November</option>
+                <option>December</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Probation Period (Months)</label>
+              <input
+                type="number"
+                value={hrConfig.probationPeriod}
+                onChange={(e) => setHrConfig({ ...hrConfig, probationPeriod: Number.parseInt(e.target.value) })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Working Hours Per Day</label>
+              <input
+                type="number"
+                value={hrConfig.workingHoursPerDay}
+                onChange={(e) => setHrConfig({ ...hrConfig, workingHoursPerDay: Number.parseInt(e.target.value) })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Working Days Per Week</label>
+              <input
+                type="number"
+                value={hrConfig.workingDaysPerWeek}
+                onChange={(e) => setHrConfig({ ...hrConfig, workingDaysPerWeek: Number.parseInt(e.target.value) })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">Auto Approve Leave</label>
+              <Switch
+                checked={hrConfig.autoApproveLeave}
+                onCheckedChange={(checked) => setHrConfig({ ...hrConfig, autoApproveLeave: checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">Email Notifications</label>
+              <Switch
+                checked={hrConfig.emailNotifications}
+                onCheckedChange={(checked) => setHrConfig({ ...hrConfig, emailNotifications: checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">AI Recommendations</label>
+              <Switch
+                checked={hrConfig.aiRecommendations}
+                onCheckedChange={(checked) => setHrConfig({ ...hrConfig, aiRecommendations: checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">Smart Scheduling</label>
+              <Switch
+                checked={hrConfig.smartScheduling}
+                onCheckedChange={(checked) => setHrConfig({ ...hrConfig, smartScheduling: checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">Performance Tracking</label>
+              <Switch
+                checked={hrConfig.performanceTracking}
+                onCheckedChange={(checked) => setHrConfig({ ...hrConfig, performanceTracking: checked })}
+              />
             </div>
           </div>
-        )}
+        </div>
 
-        {activeTab === 'hr' && (
-          <div className="space-y-6">
-            {/* HR Configuration */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Settings className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900">HR Configuration</h2>
-                      <p className="text-gray-600 mt-1">Configure core HR settings and policies</p>
-                    </div>
-                  </div>
-                  <Button 
-                    onClick={handleSaveHRConfig}
-                    disabled={isSavingHR}
-                    className="bg-blue-600 hover:bg-blue-700"
+        {/* Payroll Configuration */}
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h2 className="text-lg font-semibold mb-2 flex items-center space-x-2">
+            <Calculator className="h-5 w-5 text-gray-500" />
+            <span>Payroll Configuration</span>
+          </h2>
+          <div className="space-y-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Pay Frequency</label>
+              <select
+                value={payrollConfig.payFrequency}
+                onChange={(e) => setPayrollConfig({ ...payrollConfig, payFrequency: e.target.value })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              >
+                <option>Weekly</option>
+                <option>Bi-weekly</option>
+                <option>Monthly</option>
+                <option>Quarterly</option>
+                <option>Annually</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Currency</label>
+              <select
+                value={selectedCurrency}
+                onChange={(e) => handleCurrencyChange(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              >
+                <option value="ghs">Ghana Cedis (GHS)</option>
+                <option value="usd">US Dollar (USD)</option>
+                <option value="eur">Euro (EUR)</option>
+                <option value="ngn">Nigerian Naira (NGN)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Minimum Wage ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})
+              </label>
+              <input
+                type="number"
+                value={payrollConfig.minimumWage}
+                onChange={(e) => setPayrollConfig({ ...payrollConfig, minimumWage: Number.parseFloat(e.target.value) })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Weekday Overtime Multiplier</label>
+              <input
+                type="number"
+                value={payrollConfig.weekdayOvertimeMultiplier}
+                onChange={(e) =>
+                  setPayrollConfig({ ...payrollConfig, weekdayOvertimeMultiplier: Number.parseFloat(e.target.value) })
+                }
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Weekend Overtime Multiplier</label>
+              <input
+                type="number"
+                value={payrollConfig.weekendOvertimeMultiplier}
+                onChange={(e) =>
+                  setPayrollConfig({ ...payrollConfig, weekendOvertimeMultiplier: Number.parseFloat(e.target.value) })
+                }
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Payroll Cutoff Day</label>
+              <input
+                type="number"
+                value={payrollConfig.payrollCutoffDay}
+                onChange={(e) =>
+                  setPayrollConfig({ ...payrollConfig, payrollCutoffDay: Number.parseInt(e.target.value) })
+                }
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Processing Day</label>
+              <input
+                type="number"
+                value={payrollConfig.processingDay}
+                onChange={(e) => setPayrollConfig({ ...payrollConfig, processingDay: Number.parseInt(e.target.value) })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">Auto Calculate PAYE</label>
+              <Switch
+                checked={payrollConfig.autoCalculatePAYE}
+                onCheckedChange={(checked) => setPayrollConfig({ ...payrollConfig, autoCalculatePAYE: checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">Auto Calculate SSNIT</label>
+              <Switch
+                checked={payrollConfig.autoCalculateSSNIT}
+                onCheckedChange={(checked) => setPayrollConfig({ ...payrollConfig, autoCalculateSSNIT: checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">Auto Calculate Provident Fund</label>
+              <Switch
+                checked={payrollConfig.autoCalculateProvidentFund}
+                onCheckedChange={(checked) =>
+                  setPayrollConfig({ ...payrollConfig, autoCalculateProvidentFund: checked })
+                }
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Tax Bands Configuration */}
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h2 className="text-lg font-semibold mb-2 flex items-center space-x-2">
+            <DollarSign className="h-5 w-5 text-gray-500" />
+            <span>PAYE Tax Bands ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})</span>
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                   >
-                    {isSavingHR ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4 mr-2" />
-                        Save HR Configuration
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Leave Year Start
-                    </label>
-                    <select
-                      value={hrConfig.leaveYearStart}
-                      onChange={(e) => setHrConfig({ ...hrConfig, leaveYearStart: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="January">January</option>
-                      <option value="April">April</option>
-                      <option value="July">July</option>
-                      <option value="October">October</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Probation Period (months)
-                    </label>
-                    <input
-                      type="number"
-                      value={hrConfig.probationPeriod}
-                      onChange={(e) => setHrConfig({ ...hrConfig, probationPeriod: Number.parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Working Hours/Day
-                    </label>
-                    <input
-                      type="number"
-                      value={hrConfig.workingHoursPerDay}
-                      onChange={(e) => setHrConfig({ ...hrConfig, workingHoursPerDay: Number.parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Working Days/Week
-                    </label>
-                    <input
-                      type="number"
-                      value={hrConfig.workingDaysPerWeek}
-                      onChange={(e) => setHrConfig({ ...hrConfig, workingDaysPerWeek: Number.parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
+                    Band
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Rate (%)
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    From
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    To
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Description
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {payeTaxBands.map((taxBand, index) => (
+                  <tr key={index}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{index + 1}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{taxBand.rate}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{taxBand.from === null ? "N/A" : taxBand.from}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{taxBand.to === null ? "N/A" : taxBand.to}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{taxBand.description}</div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4">
+            <Button variant="outline" onClick={handleEditTaxBand}>
+              Edit Tax Bands
+            </Button>
+          </div>
+        </div>
 
-                <div className="mt-8 space-y-4">
-                  <h3 className="text-lg font-medium text-gray-900">Automation Settings</h3>
-                  
-                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-purple-600" />
-                      <div>
-                        <h4 className="font-medium text-gray-900">Auto-approve leave requests</h4>
-                        <p className="text-sm text-gray-600">Automatically approve requests within policy</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={hrConfig.autoApproveLeave}
-                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, autoApproveLeave: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Mail className="w-5 h-5 text-blue-600" />
-                      <div>
-                        <h4 className="font-medium text-gray-900">Email notifications</h4>
-                        <p className="text-sm text-gray-600">Send email updates for HR activities</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={hrConfig.emailNotifications}
-                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, emailNotifications: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Brain className="w-5 h-5 text-purple-600" />
-                      <div>
-                        <h4 className="font-medium text-gray-900">AI Recommendations</h4>
-                        <p className="text-sm text-gray-600">Enable AI-driven insights for HR processes</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={hrConfig.aiRecommendations}
-                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, aiRecommendations: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Calendar className="w-5 h-5 text-green-600" />
-                      <div>
-                        <h4 className="font-medium text-gray-900">Smart Scheduling</h4>
-                        <p className="text-sm text-gray-600">Optimize schedules based on employee availability</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={hrConfig.smartScheduling}
-                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, smartScheduling: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <TrendingUp className="w-5 h-5 text-green-600" />
-                      <div>
-                        <h4 className="font-medium text-gray-900">Performance Tracking</h4>
-                        <p className="text-sm text-gray-600">Track employee performance metrics and goals</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={hrConfig.performanceTracking}
-                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, performanceTracking: checked })}
-                    />
-                  </div>
-                </div>
-              </div>
+        {/* SSNIT Rates Configuration */}
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h2 className="text-lg font-semibold mb-2 flex items-center space-x-2">
+            <TrendingUp className="h-5 w-5 text-gray-500" />
+            <span>SSNIT Rates</span>
+          </h2>
+          <div className="space-y-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Employee Contribution (%)</label>
+              <input
+                type="number"
+                value={ssnitRates.employee}
+                onChange={(e) => updateSsnitRates("employee", Number.parseFloat(e.target.value))}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Employer Contribution (%)</label>
+              <input
+                type="number"
+                value={ssnitRates.employer}
+                onChange={(e) => updateSsnitRates("employer", Number.parseFloat(e.target.value))}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Total Contribution (%)</label>
+              <input
+                type="number"
+                value={calculateSSNITTotal()}
+                readOnly
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm cursor-not-allowed"
+              />
+            </div>
+          </div>
+        </div>
 
-            {/* Leave Policies */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Calendar className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900">Leave Policies</h2>
-                      <p className="text-gray-600 mt-1">Manage leave policies and generate AI insights</p>
-                    </div>
-                  </div>
-                  <Button onClick={() => setShowAddLeaveTypeModal(true)} className="bg-blue-600 hover:bg-blue-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Leave Type
-                  </Button>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {currentPolicies.map((policy) => (
-                    <div key={policy.id} className="border border-gray-200 rounded-lg p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900">{policy.name}</h3>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewPolicy(policy.id)}>
-                              <Eye className="w-4 h-4 mr-2" />
-                              View
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditPolicy(policy.id)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDeletePolicy(policy.id)} className="text-red-600">
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                      <p className="text-gray-600 text-sm mb-4">{policy.description}</p>
-                      <div className="space-y-2 mb-4">
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Days:</span>
-                          <span className="font-medium">{policy.days}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Usage:</span>
-                          <span className="font-medium">{policy.usage}%</span>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-gray-700">AI Insights</span>
+        {/* Tier 2 Rates Configuration */}
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h2 className="text-lg font-semibold mb-2 flex items-center space-x-2">
+            <TrendingUp className="h-5 w-5 text-gray-500" />
+            <span>Tier 2 Rates</span>
+          </h2>
+          <div className="space-y-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Employee Contribution (%)</label>
+              <input
+                type="number"
+                value={tier2Rates.employee}
+                onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value))}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Employer Contribution (%)</label>
+              <input
+                type="number"
+                value={tier2Rates.employer}
+                onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value))}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Total Contribution (%)</label>
+              <input
+                type="number"
+                value={calculateTier2Total()}
+                readOnly
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm cursor-not-allowed"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Tier 3 Rates Configuration */}
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h2 className="text-lg font-semibold mb-2 flex items-center space-x-2">
+            <TrendingUp className="h-5 w-5 text-gray-500" />
+            <span>Tier 3 Rates</span>
+          </h2>
+          <div className="space-y-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Employee Contribution (%)</label>
+              <input
+                type="number"
+                value={tier3Rates.employee}
+                onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value))}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Employer Contribution (%)</label>
+              <input
+                type="number"
+                value={tier3Rates.employer}
+                onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value))}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Total Contribution (%)</label>
+              <input
+                type="number"
+                value={calculateTier3Total()}
+                readOnly
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm cursor-not-allowed"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Leave Policies */}
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h2 className="text-lg font-semibold mb-2 flex items-center space-x-2">
+            <Calendar className="h-5 w-5 text-gray-500" />
+            <span>Leave Policies</span>
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Name
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Days
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Usage
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Trend
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {currentPolicies.map((policy) => (
+                  <tr key={policy.name}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{policy.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{policy.days}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{policy.usage}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{policy.trend}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
                           <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleGenerateIndividualInsight(policy.id)}
-                            disabled={loadingInsights[policy.id]}
-                            className="text-xs"
+                            variant="ghost"
+                            className="relative h-8 w-8 rounded-full p-0 data-[state=open]:bg-muted"
                           >
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Open menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handlePolicyAction("view", policy.name)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handlePolicyAction("edit", policy.name)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handlePolicyAction("delete", policy.name)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleGenerateIndividualInsight(policy.id)}>
                             {loadingInsights[policy.id] ? (
                               <>
-                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                Generating...
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Generating Insight...
                               </>
                             ) : (
                               <>
-                                <Brain className="w-3 h-3 mr-1" />
-                                Generate
+                                <Brain className="mr-2 h-4 w-4" />
+                                Generate AI Insight
                               </>
                             )}
-                          </Button>
-                        </div>
-                        {policyInsights[policy.id] && (
-                          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                            <p className="text-sm text-blue-800">{policyInsights[policy.id]}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Salary Grades & Notches */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <TrendingUp className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900">Salary Grades & Notches</h2>
-                      <p className="text-gray-600 mt-1">Manage salary structures and promotion guidelines</p>
-                    </div>
-                  </div>
-                  <Button onClick={() => setShowAddSalaryGradeModal(true)} className="bg-blue-600 hover:bg-blue-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Grade
-                  </Button>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">Grade</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">Level</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">Min Salary</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">Max Salary</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">Steps</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {salaryGrades.map((grade) => (
-                        <tr key={grade.id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-3 px-4 font-medium text-gray-900">{grade.grade}</td>
-                          <td className="py-3 px-4 text-gray-600">{grade.level}</td>
-                          <td className="py-3 px-4 text-gray-600">{currencySymbol}{grade.minSalary.toLocaleString()}</td>
-                          <td className="py-3 px-4 text-gray-600">{currencySymbol}{grade.maxSalary.toLocaleString()}</td>
-                          <td className="py-3 px-4 text-gray-600">{grade.steps}</td>
-                          <td className="py-3 px-4">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleViewSalaryGrade(grade.id)}>
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleEditSalaryGrade(grade.id)}>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteSalaryGrade(grade.id)} className="text-red-600">
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            {/* HR Policy Documents */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <FileText className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900">HR Policy Documents</h2>
-                      <p className="text-gray-600 mt-1">Manage company policies and employee handbooks</p>
-                    </div>
-                  </div>
-                  <Button onClick={() => setShowAddDocumentModal(true)} className="bg-blue-600 hover:bg-blue-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Document
-                  </Button>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  {policyDocuments.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                          <FileText className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900">{doc.name}</h3>
-                          <p className="text-sm text-gray-600">Version {doc.version} • Updated {doc.lastUpdated}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          doc.status === 'active' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {doc.status}
-                        </span>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewDocument(doc.id)}>
-                              <Eye className="w-4 h-4 mr-2" />
-                              View
+                          </DropdownMenuItem>
+                          {policyInsights[policy.id] && (
+                            <DropdownMenuItem disabled>
+                              <FileText className="mr-2 h-4 w-4" />
+                              {policyInsights[policy.id]}
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditDocument(doc.id)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownloadDocument(doc.id)}>
-                              <Download className="w-4 h-4 mr-2" />
-                              Download
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDeleteDocument(doc.id)} className="text-red-600">
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
+          <div className="mt-4">
+            <Button variant="outline" onClick={handleManageLeaveTypes}>
+              Add Leave Type
+            </Button>
+          </div>
+        </div>
 
-        {activeTab === 'payroll' && (
-          <div className="space-y-6">
-            {/* Payroll Configuration */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Settings className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900">Payroll Configuration</h2>
-                      <p className="text-gray-600 mt-1">Configure basic payroll settings</p>
-                    </div>
-                  </div>
-                  <Button 
-                    onClick={handleSavePayrollConfig}
-                    disabled={isSavingPayroll}
-                    className="bg-blue-600 hover:bg-blue-700"
+        {/* HR Documents */}
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h2 className="text-lg font-semibold mb-2 flex items-center space-x-2">
+            <FileText className="h-5 w-5 text-gray-500" />
+            <span>HR Documents</span>
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                   >
-                    {isSavingPayroll ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Payroll Settings
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Pay Frequency
-                    </label>
-                    <select
-                      value={payrollConfig.payFrequency}
-                      onChange={(e) => setPayrollConfig({ ...payrollConfig, payFrequency: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="Monthly">Monthly</option>
-                      <option value="Bi-weekly">Bi-weekly</option>
-                      <option value="Weekly">Weekly</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Currency
-                    </label>
-                    <select
-                      value={payrollConfig.currency}
-                      onChange={(e) => handleCurrencyChange(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="USD">US Dollar (USD)</option>
-                      <option value="GHS">Ghana Cedi (GHS)</option>
-                      <option value="NGN">Nigerian Naira (NGN)</option>
-                      <option value="EUR">Euro (EUR)</option>
-                      <option value="GBP">British Pound (GBP)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Minimum Wage ({currencySymbol})
-                    </label>
-                    <input
-                      type="number"
-                      value={payrollConfig.minimumWage}
-                      onChange={(e) => setPayrollConfig({ ...payrollConfig, minimumWage: Number.parseFloat(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Weekday Overtime Rate Multiplier
-                    </label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={payrollConfig.weekdayOvertimeMultiplier}
-                      onChange={(e) => setPayrollConfig({ ...payrollConfig, weekdayOvertimeMultiplier: Number.parseFloat(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Weekend Overtime Rate Multiplier
-                    </label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={payrollConfig.weekendOvertimeMultiplier}
-                      onChange={(e) => setPayrollConfig({ ...payrollConfig, weekendOvertimeMultiplier: Number.parseFloat(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Payroll Cutoff Day
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="31"
-                      value={payrollConfig.payrollCutoffDay}
-                      onChange={(e) => setPayrollConfig({ ...payrollConfig, payrollCutoffDay: Number.parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-8 space-y-4">
-                  <h3 className="text-lg font-medium text-gray-900">Auto-calculation Settings</h3>
-                  
-                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Calculator className="w-5 h-5 text-blue-600" />
-                      <div>
-                        <h4 className="font-medium text-gray-900">Auto-calculate PAYE</h4>
-                        <p className="text-sm text-gray-600">Automatically calculate Pay As You Earn tax</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={payrollConfig.autoCalculatePAYE}
-                      onCheckedChange={(checked) => setPayrollConfig({ ...payrollConfig, autoCalculatePAYE: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Calculator className="w-5 h-5 text-green-600" />
-                      <div>
-                        <h4 className="font-medium text-gray-900">Auto-calculate SSNIT</h4>
-                        <p className="text-sm text-gray-600">Automatically calculate Social Security contributions</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={payrollConfig.autoCalculateSSNIT}
-                      onCheckedChange={(checked) => setPayrollConfig({ ...payrollConfig, autoCalculateSSNIT: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Calculator className="w-5 h-5 text-purple-600" />
-                      <div>
-                        <h4 className="font-medium text-gray-900">Auto-calculate Provident Fund (Tier 3)</h4>
-                        <p className="text-sm text-gray-600">Automatically calculate Tier 3 pension contributions</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={payrollConfig.autoCalculateProvidentFund}
-                      onCheckedChange={(checked) => setPayrollConfig({ ...payrollConfig, autoCalculateProvidentFund: checked })}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Tax Configuration */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center space-x-3">
-                  <Receipt className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <h2 className="text-xl font-semibold text-gray-900">Tax Configuration</h2>
-                    <p className="text-gray-600 mt-1">Configure tax bands and SSNIT rates</p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-6">
-                {/* PAYE Tax Bands */}
-                <div className="mb-8">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">PAYE Tax Bands</h3>
-                    <Button onClick={() => setShowAddTaxBandModal(true)} size="sm" className="bg-green-600 hover:bg-green-700">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Band
-                    </Button>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="text-left py-3 px-4 font-medium text-gray-900">Band</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900">Rate (%)</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900">From ({currencySymbol})</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900">To ({currencySymbol})</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {payeTaxBands.map((band, index) => (
-                          <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="py-3 px-4 font-medium text-gray-900">{band.band}</td>
-                            <td className="py-3 px-4 text-gray-600">{band.rate}% on {band.description}</td>
-                            <td className="py-3 px-4 text-gray-600">{band.from ? `${currencySymbol}${band.from.toLocaleString()}` : '-'}</td>
-                            <td className="py-3 px-4 text-gray-600">{band.to ? `${currencySymbol}${band.to.toLocaleString()}` : '-'}</td>
-                            <td className="py-3 px-4">
-                              <Button variant="ghost" size="sm" onClick={() => handleEditTaxBand(index)}>
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* SSNIT Rates */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">SSNIT Rates</h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Employee:</span>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={ssnitRates.employee}
-                            onChange={(e) => handleSSNITChange('employee', Number.parseFloat(e.target.value))}
-                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-600">%</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Employer:</span>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={ssnitRates.employer}
-                            onChange={(e) => handleSSNITChange('employer', Number.parseFloat(e.target.value))}
-                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-600">%</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                        <span className="text-sm font-medium text-gray-900">Total:</span>
-                        <span className="text-sm font-medium text-gray-900">{calculateSSNITTotal()}%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Tier 2 Rates</h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Employee:</span>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={tier2Rates.employee}
-                            onChange={(e) => handleTier2Change('employee', Number.parseFloat(e.target.value))}
-                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-600">%</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Employer:</span>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={tier2Rates.employer}
-                            onChange={(e) => handleTier2Change('employer', Number.parseFloat(e.target.value))}
-                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-600">%</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                        <span className="text-sm font-medium text-gray-900">Total:</span>
-                        <span className="text-sm font-medium text-gray-900">{calculateTier2Total()}%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Tier 3 Rates</h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Employee:</span>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={tier3Rates.employee}
-                            onChange={(e) => handleTier3Change('employee', Number.parseFloat(e.target.value))}
-                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-600">%</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Employer:</span>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={tier3Rates.employer}
-                            onChange={(e) => handleTier3Change('employer', Number.parseFloat(e.target.value))}
-                            className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-600">%</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                        <span className="text-sm font-medium text-gray-900">Total:</span>
-                        <span className="text-sm font-medium text-gray-900">{calculateTier3Total()}%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Allowances */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <DollarSign className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900">Allowances</h2>
-                      <p className="text-gray-600 mt-1">Configure employee allowances and benefits</p>
-                    </div>
-                  </div>
-                  <Button onClick={() => setShowAddAllowanceModal(true)} className="bg-green-600 hover:bg-green-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add
-                  </Button>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">Code</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">Description</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-900">Taxable</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-900">Recurring</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-900">AMOUNT</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-900">%</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-900">FIXED/VARIABLE</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-900">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allowances.map((allowance) => (
-                        <tr key={allowance.code} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-3 px-4 font-medium text-gray-900">{allowance.code}</td>
-                          <td className="py-3 px-4 text-gray-600">{allowance.description}</td>
-                          <td className="py-3 px-4 text-center">
-                            <Switch
-                              checked={allowance.taxable}
-                              onCheckedChange={(checked) => {
-                                setAllowances(prev => prev.map(a => 
-                                  a.code === allowance.code ? { ...a, taxable: checked } : a
-                                ))
-                              }}
-                            />
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <Switch
-                              checked={allowance.recurring}
-                              onCheckedChange={(checked) => {
-                                setAllowances(prev => prev.map(a => 
-                                  a.code === allowance.code ? { ...a, recurring: checked } : a
-                                ))
-                              }}
-                            />
-                          </td>
-                          <td className="py-3 px-4 text-center text-gray-600">{allowance.amount}</td>
-                          <td className="py-3 px-4 text-center text-gray-600">{allowance.percentage}</td>
-                          <td className="py-3 px-4 text-center">
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              allowance.type === 'FIXED' 
-                                ? 'bg-blue-100 text-blue-800' 
-                                : 'bg-orange-100 text-orange-800'
-                            }`}>
-                              {allowance.type}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEditAllowance(allowance.code)}>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteAllowance(allowance.code)} className="text-red-600">
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            {/* Deductions */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Minus className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900">Deductions</h2>
-                      <p className="text-gray-600 mt-1">Configure payroll deductions and taxes</p>
-                    </div>
-                  </div>
-                  <Button onClick={() => setShowAddDeductionModal(true)} className="bg-green-600 hover:bg-green-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add
-                  </Button>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">Code</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">Description</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-900">Recurring</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-900">AMOUNT</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-900">%</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-900">FIXED/VARIABLE</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-900">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {deductions.map((deduction) => (
-                        <tr key={deduction.code} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-3 px-4 font-medium text-gray-900">{deduction.code}</td>
-                          <td className="py-3 px-4 text-gray-600">{deduction.description}</td>
-                          <td className="py-3 px-4 text-center">
-                            <Switch
-                              checked={deduction.recurring}
-                              onCheckedChange={(checked) => {
-                                setDeductions(prev => prev.map(d => 
-                                  d.code === deduction.code ? { ...d, recurring: checked } : d
-                                ))
-                              }}
-                            />
-                          </td>
-                          <td className="py-3 px-4 text-center text-gray-600">{deduction.amount}</td>
-                          <td className="py-3 px-4 text-center text-gray-600">{deduction.percentage}</td>
-                          <td className="py-3 px-4 text-center">
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              deduction.type === 'FIXED' 
-                                ? 'bg-blue-100 text-blue-800' 
-                                : deduction.type === 'VARIABLE'
-                                ? 'bg-orange-100 text-orange-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {deduction.type}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEditDeduction(deduction.code)}>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteDeduction(deduction.code)} className="text-red-600">
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+                    Name
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Type
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Size
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Visibility
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {hrDocuments.map((doc) => (
+                  <tr key={doc.id}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{doc.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{doc.type}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{doc.size}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <Switch
+                        checked={doc.visibleToAll}
+                        onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="relative h-8 w-8 rounded-full p-0 data-[state=open]:bg-muted"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Open menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleDocumentView(doc)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setDocumentName(doc.name)
+                              handleDocumentAction("edit", doc.id)
+                            }}
+                          >
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteDocumentInner(doc.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-
-        {activeTab === 'notifications' && (
-          <div className="space-y-6">
-            {/* Email Templates */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Mail className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900">Email Templates</h2>
-                      <p className="text-gray-600 mt-1">Manage automated email notifications</p>
-                    </div>
-                  </div>
-                  <Button onClick={handleAddEmailTemplate} className="bg-blue-600 hover:bg-blue-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Template
-                  </Button>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  {emailTemplates.map((template) => (
-                    <div key={template.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                          <Mail className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900">{template.name}</h3>
-                          <p className="text-sm text-gray-600">{template.description}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          template.status === 'active' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {template.status}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditEmailTemplate(template.name)}
-                        >
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+          <div className="mt-4">
+            <Button variant="outline" onClick={handleAddDocument}>
+              Add Document
+            </Button>
           </div>
-        )}
+        </div>
 
-        {activeTab === 'roles' && (
-          <div className="space-y-6">
-            {/* Role Management */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Shield className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900">Role Management</h2>
-                      <p className="text-gray-600 mt-1">Define user roles and permissions</p>
-                    </div>
-                  </div>
-                  <Button onClick={handleAddRole} className="bg-blue-600 hover:bg-blue-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Role
-                  </Button>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  {roles.map((role) => (
-                    <div key={role.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                          <Shield className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900">{role.name}</h3>
-                          <p className="text-sm text-gray-600">{role.description}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <span className="text-sm text-gray-600">{role.userCount} users</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditRole(role.name)}
-                        >
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+        {/* Email Templates */}
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h2 className="text-lg font-semibold mb-2 flex items-center space-x-2">
+            <Mail className="h-5 w-5 text-gray-500" />
+            <span>Email Templates</span>
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Name
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Description
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Status
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {emailTemplates.map((template) => (
+                  <tr key={template.id}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{template.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{template.description}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{template.status}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="relative h-8 w-8 rounded-full p-0 data-[state=open]:bg-muted"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Open menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewEmailTemplate(template.id)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditEmailTemplate(template.name)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {}}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-
-        {activeTab === 'access' && (
-          <div className="space-y-6">
-            {/* Access Control */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center space-x-3">
-                  <Key className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <h2 className="text-xl font-semibold text-gray-900">Access Control</h2>
-                    <p className="text-gray-600 mt-1">Manage system access and permissions</p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="text-center py-12">
-                  <Key className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Access Control Settings</h3>
-                  <p className="text-gray-600">Configure user access permissions and security settings.</p>
-                </div>
-              </div>
-            </div>
+          <div className="mt-4">
+            <Button variant="outline" onClick={handleAddEmailTemplate}>
+              Add Template
+            </Button>
           </div>
-        )}
+        </div>
 
-        {activeTab === 'security' && (
-          <div className="space-y-6">
-            {/* Security Settings */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center space-x-3">
-                  <Lock className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <h2 className="text-xl font-semibold text-gray-900">Security Settings</h2>
-                    <p className="text-gray-600 mt-1">Configure security and backup settings</p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="space-y-6">
-                  {/* Backup Settings */}
-                  <div className="border border-gray-200 rounded-lg p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <Database className="w-5 h-5 text-blue-600" />
-                        <div>
-                          <h3 className="text-lg font-medium text-gray-900">Data Backup</h3>
-                          <p className="text-sm text-gray-600">Automated system backups</p>
-                        </div>
-                      </div>
-                      <Button
-                        onClick={handleBackupNow}
-                        disabled={isBackingUp}
-                        className="bg-blue-600 hover:bg-blue-700"
-                      >
-                        {isBackingUp ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Backing up...
-                          </>
-                        ) : (
-                          <>
-                            <Database className="w-4 h-4 mr-2" />
-                            Backup Now
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      <p>Last backup: {lastBackupTime ? new Date(lastBackupTime).toLocaleString() : 'Never'}</p>
-                      <p>Next scheduled backup: Daily at 2:00 AM</p>
-                    </div>
-                  </div>
-
-                  {/* Import Settings */}
-                  <div className="border border-gray-200 rounded-lg p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <Upload className="w-5 h-5 text-blue-600" />
-                        <div>
-                          <h3 className="text-lg font-medium text-gray-900">Import Settings</h3>
-                          <p className="text-sm text-gray-600">Import configuration from file</p>
-                        </div>
-                      </div>
-                      <Button
-                        onClick={() => setShowImportModal(true)}
-                        variant="outline"
-                      >
-                        <Upload className="w-4 h-4 mr-2" />
-                        Import Settings
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+        {/* Salary Grades */}
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h2 className="text-lg font-semibold mb-2 flex items-center space-x-2">
+            <Calculator className="h-5 w-5 text-gray-500" />
+            <span>Salary Grades</span>
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Grade
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Level
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Min Salary
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Max Salary
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Steps
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {salaryGrades.map((grade) => (
+                  <tr key={grade.id}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{grade.grade}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{grade.level}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{grade.minSalary}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{grade.maxSalary}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{grade.steps}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="relative h-8 w-8 rounded-full p-0 data-[state=open]:bg-muted"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Open menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewSalaryGrade(grade.id)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditSalaryGrade(grade.id)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {}}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
+          <div className="mt-4">
+            <Button variant="outline" onClick={handleAddSalaryGrade}>
+              Add Grade
+            </Button>
+          </div>
+        </div>
+
+        {/* Policy Documents */}
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h2 className="text-lg font-semibold mb-2 flex items-center space-x-2">
+            <FileText className="h-5 w-5 text-gray-500" />
+            <span>Policy Documents</span>
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Name
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Category
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Version
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Status
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Last Updated
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {policyDocuments.map((document) => (
+                  <tr key={document.id}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{document.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{document.category}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{document.version}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{document.status}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{document.lastUpdated}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="relative h-8 w-8 rounded-full p-0 data-[state=open]:bg-muted"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Open menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewPolicyDocument(document.id)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditPolicyDocument(document.id)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {}}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4">
+            <Button variant="outline" onClick={handleAddPolicyDocument}>
+              Add Document
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Modals */}
-      {showAddSubsidiaryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Add New Subsidiary</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Subsidiary Name
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter subsidiary name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Location
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter location"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button
-                variant="outline"
-                onClick={() => setShowAddSubsidiaryModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowAddSubsidiaryModal(false)
-                  toast({
-                    title: "Success",
-                    description: "Subsidiary added successfully.",
-                  })
-                }}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                Add Subsidiary
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showDeactivateConfirm && subsidiaryToToggle && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Deactivate Subsidiary</h3>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to deactivate "{subsidiaryToToggle.name}"? This action can be reversed later.
-            </p>
-            <div className="flex justify-end space-x-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowDeactivateConfirm(false)
-                  setSubsidiaryToToggle(null)
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  handleToggleSubsidiaryStatus(subsidiaryToToggle.id, 'inactive')
-                  setShowDeactivateConfirm(false)
-                  setSubsidiaryToToggle(null)
-                }}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                Deactivate
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showReactivateConfirm && subsidiaryToToggle && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Reactivate Subsidiary</h3>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to reactivate "{subsidiaryToToggle.name}"?
-            </p>
-            <div className="flex justify-end space-x-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowReactivateConfirm(false)
-                  setSubsidiaryToToggle(null)
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  handleToggleSubsidiaryStatus(subsidiaryToToggle.id, 'active')
-                  setShowReactivateConfirm(false)
-                  setSubsidiaryToToggle(null)
-                }}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                Reactivate
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showImportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Import Settings</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Configuration File
-                </label>
-                <input
-                  type="file"
-                  accept=".json,.csv"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="text-sm text-gray-600">
-                <p>Supported formats: JSON, CSV</p>
-                <p>Maximum file size: 10MB</p>
-              </div>
-            </div>
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button
-                variant="outline"
-                onClick={() => setShowImportModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowImportModal(false)
-                  toast({
-                    title: "Success",
-                    description: "Settings imported successfully.",
-                  })
-                }}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                Import
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Add Leave Type Modal */}
       {showAddLeaveTypeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Add Leave Type</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Leave Type Name
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., Personal Leave"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
-                <textarea
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Brief description of the leave type"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Annual Days Allowed
-                </label>
-                <input
-                  type="number"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 10"
-                />
-              </div>
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 py-8">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
             </div>
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button
-                variant="outline"
-                onClick={() => setShowAddLeaveTypeModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowAddLeaveTypeModal(false)
-                  toast({
-                    title: "Success",
-                    description: "Leave type added successfully.",
-                  })
-                }}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                Add Leave Type
-              </Button>
+
+            <div className="relative bg-white rounded-lg px-4 pt-5 pb-4 sm:p-6 sm:pb-4 w-full max-w-md">
+              <div>
+                <h3 className="text-lg leading-6 font-medium text-gray-900">Add New Leave Type</h3>
+                <div className="mt-2">
+                  <label htmlFor="leaveTypeName" className="block text-sm font-medium text-gray-700">
+                    Leave Type Name
+                  </label>
+                  <input
+                    type="text"
+                    name="leaveTypeName"
+                    id="leaveTypeName"
+                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value={newLeaveType.name}
+                    onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
+                  />
+                </div>
+                <div className="mt-2">
+                  <label htmlFor="leaveTypeDays" className="block text-sm font-medium text-gray-700">
+                    Days
+                  </label>
+                  <input
+                    type="number"
+                    name="leaveTypeDays"
+                    id="leaveTypeDays"
+                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value={newLeaveType.days}
+                    onChange={(e) => setNewLeaveType({ ...newLeaveType, days: e.target.value })}
+                  />
+                </div>
+                <div className="mt-2">
+                  <label htmlFor="leaveTypeDescription" className="block text-sm font-medium text-gray-700">
+                    Description
+                  </label>
+                  <textarea
+                    name="leaveTypeDescription"
+                    id="leaveTypeDescription"
+                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value={newLeaveType.description}
+                    onChange={(e) => setNewLeaveType({ ...newLeaveType, description: e.target.value })}
+                  />
+                </div>
+                <div className="mt-2 flex items-center">
+                  <input
+                    id="leaveTypeCarryOver"
+                    name="leaveTypeCarryOver"
+                    type="checkbox"
+                    className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                    checked={newLeaveType.carryOver}
+                    onChange={(e) => setNewLeaveType({ ...newLeaveType, carryOver: e.target.checked })}
+                  />
+                  <label htmlFor="leaveTypeCarryOver" className="ml-2 block text-sm text-gray-900">
+                    Allow Carry Over
+                  </label>
+                </div>
+              </div>
+              <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                <Button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm"
+                  onClick={handleAddLeaveType}
+                  disabled={isManagingLeaveTypes}
+                >
+                  {isManagingLeaveTypes ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Adding...
+                    </>
+                  ) : (
+                    "Add Leave Type"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                  onClick={() => setShowAddLeaveTypeModal(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* Policy Modal */}
-      {showPolicyModal && selectedPolicy && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">{policyModalType === 'view' ? 'View' : 'Edit'} Policy</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowPolicyModal(false)}
-              >
-                <X className="w-4 h-4" />
-              </Button>
+      {showPolicyModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 py-8">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
             </div>
-            
-            <div className="space-y-4">
+
+            <div className="relative bg-white rounded-lg px-4 pt-5 pb-4 sm:p-6 sm:pb-4 w-full max-w-md">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Policy Name
-                </label>
-                <input
-                  type="text"
-                  value={selectedPolicy.name}
-                  disabled={policyModalType === 'view'}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-                />
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  {policyModalType === "view"
+                    ? "View Policy"
+                    : policyModalType === "edit"
+                      ? "Edit Policy"
+                      : "Delete Policy"}
+                </h3>
+                {policyModalType === "view" && selectedPolicy && (
+                  <div className="mt-2">
+                    <p>Name: {selectedPolicy.name}</p>
+                    <p>Days: {selectedPolicy.days}</p>
+                    <p>Description: {selectedPolicy.description}</p>
+                  </div>
+                )}
+                {policyModalType === "edit" && selectedPolicy && (
+                  <div className="mt-2">
+                    <label htmlFor="policyName" className="block text-sm font-medium text-gray-700">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      name="policyName"
+                      id="policyName"
+                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      value={editingPolicy.name}
+                      onChange={(e) => setEditingPolicy({ ...editingPolicy, name: e.target.value })}
+                    />
+                    <label htmlFor="policyDays" className="block text-sm font-medium text-gray-700">
+                      Days
+                    </label>
+                    <input
+                      type="number"
+                      name="policyDays"
+                      id="policyDays"
+                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      value={editingPolicy.days}
+                      onChange={(e) => setEditingPolicy({ ...editingPolicy, days: e.target.value })}
+                    />
+                    <label htmlFor="policyDescription" className="block text-sm font-medium text-gray-700">
+                      Description
+                    </label>
+                    <textarea
+                      name="policyDescription"
+                      id="policyDescription"
+                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      value={editingPolicy.description}
+                      onChange={(e) => setEditingPolicy({ ...editingPolicy, description: e.target.value })}
+                    />
+                  </div>
+                )}
+                {policyModalType === "delete" && selectedPolicy && (
+                  <div className="mt-2">
+                    <p>Are you sure you want to delete {selectedPolicy.name}?</p>
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
-                <textarea
-                  rows={3}
-                  value={selectedPolicy.description}
-                  disabled={policyModalType === 'view'}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Annual Days
-                  </label>
-                  <input
-                    type="number"
-                    value={selectedPolicy.days}
-                    disabled={policyModalType === 'view'}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Current Usage (%)
-                  </label>
-                  <input
-                    type="number"
-                    value={selectedPolicy.usage}
-                    disabled={policyModalType === 'view'}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-                  />
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button
-                variant="outline"
-                onClick={() => setShowPolicyModal(false)}
-              >
-                {policyModalType === 'view' ? 'Close' : 'Cancel'}
-              </Button>
-              {policyModalType === 'edit' && (
+              <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                {policyModalType === "edit" && (
+                  <Button
+                    type="button"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm"
+                    onClick={handleSavePolicyChanges}
+                    disabled={isSavingPolicy}
+                  >
+                    {isSavingPolicy ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </Button>
+                )}
+                {policyModalType === "delete" && selectedPolicy && (
+                  <Button
+                    type="button"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:col-start-2 sm:text-sm"
+                    onClick={() => handleDeletePolicy(selectedPolicy.name)}
+                    disabled={isSavingPolicy}
+                  >
+                    {isSavingPolicy ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      "Delete Policy"
+                    )}
+                  </Button>
+                )}
                 <Button
-                  onClick={() => {
-                    setShowPolicyModal(false)
-                    toast({
-                      title: "Success",
-                      description: "Policy updated successfully.",
-                    })
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                  onClick={() => setShowPolicyModal(false)}
                 >
-                  Save Changes
+                  Cancel
                 </Button>
-              )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* Document Modal */}
-      {showDocumentModal && selectedDocument && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">
-                {documentModalType === 'view' ? 'View' : documentModalType === 'edit' ? 'Edit' : 'Add'} Document
-              </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowDocumentModal(false)}
-              >
-                <X className="w-4 h-4" />
-              </Button>
+      {showDocumentModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 py-8">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
             </div>
-            
-            <div className="space-y-4">
+
+            <div className="relative bg-white rounded-lg px-4 pt-5 pb-4 sm:p-6 sm:pb-4 w-full max-w-3xl">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Document Name
-                </label>
-                <input
-                  type="text"
-                  value={selectedDocument.name}
-                  disabled={documentModalType === 'view'}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-                />
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  {documentModalType === "view"
+                    ? "View Document"
+                    : documentModalType === "edit"
+                      ? "Edit Document"
+                      : documentModalType === "add"
+                        ? "Add Document"
+                        : "Delete Document"}
+                </h3>
+
+                {documentModalType === "view" && selectedDocument && (
+                  <div className="mt-2">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="text-md font-semibold text-gray-800">{selectedDocument.name}</h4>
+                      <div className="flex space-x-2">
+                        <Button variant="outline" size="icon" onClick={handleZoomIn}>
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="icon" onClick={handleZoomOut}>
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="icon" onClick={handleDownload}>
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="icon" onClick={handleFullscreen}>
+                          {isFullscreen ? <X className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`relative overflow-auto ${isFullscreen ? "fixed inset-0 bg-white z-50" : "h-[400px]"} transition-all duration-300`}
+                    >
+                      <div style={{ zoom: `${documentZoom}%` }} className="p-4">
+                        <pre className="font-mono text-sm whitespace-pre-wrap break-words">
+                          {documentPreviewContent}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {documentModalType === "edit" && selectedDocument && (
+                  <div className="mt-2">
+                    <label htmlFor="documentName" className="block text-sm font-medium text-gray-700">
+                      Document Name
+                    </label>
+                    <input
+                      type="text"
+                      name="documentName"
+                      id="documentName"
+                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      value={documentName}
+                      onChange={(e) => setDocumentName(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                {documentModalType === "add" && (
+                  <div className="mt-2">
+                    <label htmlFor="documentName" className="block text-sm font-medium text-gray-700">
+                      Document Name
+                    </label>
+                    <input
+                      type="text"
+                      name="documentName"
+                      id="documentName"
+                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      value={documentName}
+                      onChange={(e) => setDocumentName(e.target.value)}
+                    />
+
+                    <label className="block text-sm font-medium text-gray-700 mt-4">Upload Document</label>
+                    <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                      <div className="space-y-1 text-center">
+                        <svg
+                          className="mx-auto h-12 w-12 text-gray-400"
+                          stroke="currentColor"
+                          fill="none"
+                          viewBox="0 0 48 48"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4V12a4 4 0 014-4h16m-8 0h8m-8 0l5 5m-5-5l-5 5"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        <div className="flex text-sm text-gray-600">
+                          <label
+                            htmlFor="file-upload"
+                            className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
+                          >
+                            <span>Upload a file</span>
+                            <input
+                              id="file-upload"
+                              name="file-upload"
+                              type="file"
+                              className="sr-only"
+                              onChange={handleFileUpload}
+                            />
+                          </label>
+                          <p className="pl-1">or drag and drop</p>
+                        </div>
+                        <p className="text-xs text-gray-500">PDF, DOC, DOCX up to 10MB</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {documentModalType === "delete" && selectedDocument && (
+                  <div className="mt-2">
+                    <p>Are you sure you want to delete {selectedDocument.name}?</p>
+                  </div>
+                )}
               </div>
+              <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                {documentModalType === "edit" && (
+                  <Button
+                    type="button"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm"
+                    onClick={handleEditDocument}
+                    disabled={isSavingDocument}
+                  >
+                    {isSavingDocument ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </Button>
+                )}
+
+                {documentModalType === "add" && (
+                  <Button
+                    type="button"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm"
+                    onClick={handleSaveDocument}
+                    disabled={isSavingDocument}
+                  >
+                    {isSavingDocument ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Upload Document"
+                    )}
+                  </Button>
+                )}
+
+                {documentModalType === "delete" && selectedDocument && (
+                  <Button
+                    type="button"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:col-start-2 sm:text-sm"
+                    onClick={() => handleDeleteDocumentInner(selectedDocument.id)}
+                    disabled={isSavingDocument}
+                  >
+                    {isSavingDocument ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      "Delete Document"
+                    )}
+                  </Button>
+                )}
+
+                <Button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                  onClick={() => setShowDocumentModal(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Salary Grade Modal */}
+      {showAddSalaryGradeModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 py-8">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <div className="relative bg-white rounded-lg px-4 pt-5 pb-4 sm:p-6 sm:pb-4 w-full max-w-md">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category
-                </label>
-                <select
-                  value={selected
+                <h3 className="text-lg leading-6 font-medium text-gray-900">Add New Salary Grade</h3>
+                <div className="mt-2">
+                  <label htmlFor="grade" className="block text-sm font-medium text-gray-700">
+                    Grade
+                  </label>
+                  <input
+                    type="text"
+                    name="grade"
+                    id="grade"
+                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value=""
+                    onChange={() => {}}
+                  />
+                </div>
+                <div className="mt-2">
+                  <label htmlFor="level" className="block text-sm font-medium text-gray-700">
+                    Level
+                  </label>
+                  <input
+                    type="text"
+                    name="level"
+                    id="level"
+                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value=""
+                    onChange={() => {}}
+                  />
+                </div>
+                <div className="mt-2">
+                  <label htmlFor="minSalary" className="block text-sm font-medium text-gray-700">
+                    Min Salary
+                  </label>
+                  <input
+                    type="number"
+                    name="minSalary"
+                    id="minSalary"
+                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value=""
+                    onChange={() => {}}
+                  />
+                </div>
+                <div className="mt-2">
+                  <label htmlFor="maxSalary" className="block text-sm font-medium text-gray-700">
+                    Max Salary
+                  </label>
+                  <input
+                    type="number"
+                    name="maxSalary"
+                    id="maxSalary"
+                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value=""
+                    onChange={() => {}}
+                  />
+                </div>
+                <div className="mt-2">
+                  <label htmlFor="steps" className="block text-sm font-medium text-gray-700">
+                    Steps
+                  </label>
+                  <input
+                    type="number"
+                    name="steps"
+                    id="steps"
+                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value=""
+                    onChange={() => {}}
+                  />
+                </div>
+              </div>
+              <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                <Button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm"
+                  onClick={handleSaveSalaryGrade}
+                  disabled={isSavingPayroll}
+                >
+                  {isSavingPayroll ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Add Grade"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                  onClick={() => setShowAddSalaryGradeModal(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Tax Band Modal */}
+      {showEditTaxBandModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 py-8">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <div className="relative bg-white rounded-lg px-4 pt-5 pb-4 sm:p-6 sm:pb-4 w-full max-w-md">
+              <div>
+                <h3 className="text-lg leading-6 font-medium text-gray-900">Add New Tax Band</h3>
+                <div className="mt-2">
+                  <label htmlFor="band" className="block text-sm font-medium text-gray-700">
+                    Band
+                  </label>
+                  <input
+                    type="number"
+                    name="band"
+                    id="band"
+                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value=""
+                    onChange={() => {}}
+                  />
+                </div>
+                <div className="mt-2">
+                  <label htmlFor="rate" className="block text-sm font-medium text-gray-700">
+                    Rate
+                  </label>
+                  <input
+                    type="number"
+                    name="rate"
+                    id="rate"
+                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value=""
+                    onChange={() => {}}
+                  />
+                </div>
+                <div className="mt-2">
+                  <label htmlFor="from" className="block text-sm font-medium text-gray-700">
+                    From
+                  </label>
+                  <input
+                    type="number"
+                    name="from"
+                    id="from"
+                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value=""
+                    onChange={() => {}}
+                  />
+                </div>
+                <div className="mt-2">
+                  <label htmlFor="to" className="block text-sm font-medium text-gray-700">
+                    To
+                  </label>
+                  <input
+                    type="number"
+                    name="to"
+                    id="to"
+                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value=""
+                    onChange={() => {}}
+                  />
+                </div>
+                <div className="mt-2">
+                  <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                    Description
+                  </label>
+                  <input
+                    type="text"
+                    name="description"
+                    id="description"
+                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    value=""
+                    onChange={() => {}}
+                  />
+                </div>
+              </div>
+              <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                <Button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm"
+                  onClick={handleSaveTaxBand}
+                  disabled={isSavingPayroll}
+                >
+                  {isSavingPayroll ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Add Tax Band"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                  onClick={() => setShowAddTaxBandModal(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
