@@ -104,6 +104,32 @@ const handleManageSalaryGrades = () => {
   console.log("Manage salary grades")
 }
 
+const handleGenerateIndividualInsight = async (policyName: string, policyData: any) => {
+  try {
+    const response = await fetch("/api/ai-insights", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "individual_policy",
+        policyName,
+        policyData,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to generate insight")
+    }
+
+    const data = await response.json()
+    return data.insight
+  } catch (error) {
+    console.error("Error generating individual insight:", error)
+    throw error
+  }
+}
+
 export default function SettingsPage() {
   console.log("[v0] SettingsPage component initializing...")
 
@@ -155,9 +181,30 @@ export default function SettingsPage() {
   const [uploadedFile, setUploadedFile] = useState(null)
   const [documentName, setDocumentName] = useState("")
   const [currentPolicies, setCurrentPolicies] = useState([
-    { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Annual vacation leave" },
-    { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness" },
-    { name: "Maternity Leave", days: 84, usage: "12%", trend: "stable", description: "Maternity and paternity leave" },
+    {
+      name: "Annual Leave",
+      days: 21,
+      usage: "68%",
+      description: "Annual vacation leave",
+      aiInsight: "",
+      isLoadingInsight: false,
+    },
+    {
+      name: "Sick Leave",
+      days: 10,
+      usage: "23%",
+      description: "Medical leave for illness",
+      aiInsight: "",
+      isLoadingInsight: false,
+    },
+    {
+      name: "Maternity Leave",
+      days: 84,
+      usage: "12%",
+      description: "Maternity and paternity leave",
+      aiInsight: "",
+      isLoadingInsight: false,
+    },
   ])
 
   const [divisions, setDivisions] = useState<string[]>([])
@@ -920,8 +967,10 @@ export default function SettingsPage() {
     <Tabs defaultValue="payroll">
       <TabsList>
         <TabsTrigger value="payroll">Payroll</TabsTrigger>
+        <TabsTrigger value="leave-policies">Leave Policies</TabsTrigger>
         <TabsTrigger value="notifications">Notifications</TabsTrigger>
       </TabsList>
+
       <TabsContent value="payroll">
         <div className="space-y-6">
           <Card>
@@ -1148,6 +1197,113 @@ export default function SettingsPage() {
                       </div>
                     </div>
                   </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="leave-policies">
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="w-5 h-5" />
+                  <span>Leave Policies</span>
+                </div>
+                <Button onClick={() => setShowAddLeaveTypeModal(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Leave Type
+                </Button>
+              </CardTitle>
+              <CardDescription>Manage leave policies and generate AI insights</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {currentPolicies.map((policy, index) => (
+                  <Card key={policy.name} className="border-l-4 border-l-blue-500">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg">{policy.name}</CardTitle>
+                      <CardDescription>{policy.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Days</Label>
+                          <div className="text-2xl font-bold">{policy.days}</div>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">Usage</Label>
+                          <div className="text-2xl font-bold">{policy.usage}</div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium text-muted-foreground">AI Insight</Label>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              // Update loading state
+                              setCurrentPolicies((prev) =>
+                                prev.map((p, i) => (i === index ? { ...p, isLoadingInsight: true } : p)),
+                              )
+
+                              try {
+                                const insight = await handleGenerateIndividualInsight(policy.name, {
+                                  days: policy.days,
+                                  usage: policy.usage,
+                                  description: policy.description,
+                                })
+
+                                // Update with insight
+                                setCurrentPolicies((prev) =>
+                                  prev.map((p, i) =>
+                                    i === index ? { ...p, aiInsight: insight, isLoadingInsight: false } : p,
+                                  ),
+                                )
+                              } catch (error) {
+                                setCurrentPolicies((prev) =>
+                                  prev.map((p, i) => (i === index ? { ...p, isLoadingInsight: false } : p)),
+                                )
+                                toast({
+                                  title: "Error",
+                                  description: "Failed to generate AI insight",
+                                  variant: "destructive",
+                                })
+                              }
+                            }}
+                            disabled={policy.isLoadingInsight}
+                          >
+                            {policy.isLoadingInsight ? "Generating..." : "Generate"}
+                          </Button>
+                        </div>
+
+                        {policy.aiInsight ? (
+                          <div className="p-3 bg-muted rounded-lg text-sm">{policy.aiInsight}</div>
+                        ) : (
+                          <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground italic">
+                            Click "Generate" to get AI insights about this leave policy
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex space-x-2">
+                        <Button variant="outline" size="sm">
+                          View
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          Edit
+                        </Button>
+                        <Button variant="destructive" size="sm">
+                          Delete
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             </CardContent>
