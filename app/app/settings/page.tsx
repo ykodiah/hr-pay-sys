@@ -260,6 +260,103 @@ export default function SettingsPage() {
     { code: 'EMERGE', description: 'Emergency Loan', maxAmount: 10000, interestRate: 5, rateMethod: 'Straight Line Met', adminCharges: 200, loanTenure: 6 }
   ])
 
+  const [selectedCurrency, setSelectedCurrency] = useState('ghs')
+  const [payeTaxBands, setPayeTaxBands] = useState([
+    { band: 0, rate: 0, from: 4350, to: null, description: '% on first' },
+    { band: 5, rate: 5, from: 1000, to: null, description: '% on next' },
+    { band: 10, rate: 10, from: 2000, to: null, description: '% on next' },
+    { band: 17.5, rate: 17.5, from: 20000, to: null, description: '% on next' },
+    { band: 25, rate: 25, from: 25000, to: null, description: '% on next' },
+    { band: 30, rate: 30, from: null, to: null, description: '% on remaining amount' }
+  ])
+  const [ssnitRates, setSsnitRates] = useState({
+    employee: 5.5,
+    employer: 13,
+    total: 18.5
+  })
+  const [tier2Rates, setTier2Rates] = useState({
+    employee: 5.5,
+    employer: 5.5,
+    total: 11.0
+  })
+  const [tier3Rates, setTier3Rates] = useState({
+    employee: 5,
+    employer: 5,
+    total: 10.0
+  })
+
+  const currencyConfig = {
+    ghs: { 
+      symbol: '₵', 
+      name: 'Ghana Cedis (GHS)',
+      taxBands: [
+        { band: 0, rate: 0, from: 4350, to: null, description: '% on first' },
+        { band: 5, rate: 5, from: 1000, to: null, description: '% on next' },
+        { band: 10, rate: 10, from: 2000, to: null, description: '% on next' },
+        { band: 17.5, rate: 17.5, from: 20000, to: null, description: '% on next' },
+        { band: 25, rate: 25, from: 25000, to: null, description: '% on next' },
+        { band: 30, rate: 30, from: null, to: null, description: '% on remaining amount' }
+      ]
+    },
+    usd: { 
+      symbol: '$', 
+      name: 'US Dollar (USD)',
+      taxBands: [
+        { band: 10, rate: 10, from: 11000, to: 44725, description: '% on income' },
+        { band: 12, rate: 12, from: 44726, to: 95375, description: '% on income' },
+        { band: 22, rate: 22, from: 95376, to: 182050, description: '% on income' },
+        { band: 24, rate: 24, from: 182051, to: 231250, description: '% on income' },
+        { band: 32, rate: 32, from: 231251, to: 578125, description: '% on income' },
+        { band: 37, rate: 37, from: 578126, to: null, description: '% on remaining amount' }
+      ]
+    },
+    eur: { 
+      symbol: '€', 
+      name: 'Euro (EUR)',
+      taxBands: [
+        { band: 0, rate: 0, from: 10908, to: null, description: '% on first' },
+        { band: 14, rate: 14, from: 10909, to: 61972, description: '% on income' },
+        { band: 42, rate: 42, from: 61973, to: 277826, description: '% on income' },
+        { band: 45, rate: 45, from: 277827, to: null, description: '% on remaining amount' }
+      ]
+    },
+    ngn: { 
+      symbol: '₦', 
+      name: 'Nigerian Naira (NGN)',
+      taxBands: [
+        { band: 7, rate: 7, from: 300000, to: null, description: '% on first' },
+        { band: 11, rate: 11, from: 300000, to: null, description: '% on next' },
+        { band: 15, rate: 15, from: 500000, to: null, description: '% on next' },
+        { band: 19, rate: 19, from: 500000, to: null, description: '% on next' },
+        { band: 21, rate: 21, from: 1600000, to: null, description: '% on next' },
+        { band: 24, rate: 24, from: null, to: null, description: '% on remaining amount' }
+      ]
+    }
+  }
+
+  const handleCurrencyChange = (currency: string) => {
+    setSelectedCurrency(currency)
+    setPayeTaxBands(currencyConfig[currency as keyof typeof currencyConfig].taxBands)
+  }
+
+  const updateSsnitRates = (field: 'employee' | 'employer', value: number) => {
+    const newRates = { ...ssnitRates, [field]: value }
+    newRates.total = newRates.employee + newRates.employer
+    setSsnitRates(newRates)
+  }
+
+  const updateTier2Rates = (field: 'employee' | 'employer', value: number) => {
+    const newRates = { ...tier2Rates, [field]: value }
+    newRates.total = newRates.employee + newRates.employer
+    setTier2Rates(newRates)
+  }
+
+  const updateTier3Rates = (field: 'employee' | 'employer', value: number) => {
+    const newRates = { ...tier3Rates, [field]: value }
+    newRates.total = newRates.employee + newRates.employer
+    setTier3Rates(newRates)
+  }
+
   const handleZoomIn = () => {
     setDocumentZoom((prev) => Math.min(prev + 25, 200))
   }
@@ -3296,20 +3393,21 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
                   <div>
                     <Label htmlFor="currency">Currency</Label>
-                    <Select defaultValue="ghs">
+                    <Select value={selectedCurrency} onValueChange={handleCurrencyChange}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ghs">Ghana Cedis (GHS)</SelectItem>
-                        <SelectItem value="usd">USD</SelectItem>
-                        <SelectItem value="eur">EUR</SelectItem>
+                        <SelectItem value="usd">US Dollar (USD)</SelectItem>
+                        <SelectItem value="eur">Euro (EUR)</SelectItem>
+                        <SelectItem value="ngn">Nigerian Naira (NGN)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div>
-                    <Label htmlFor="minimumWage">Minimum Wage (USD)</Label>
+                    <Label htmlFor="minimumWage">Minimum Wage ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})</Label>
                     <Input type="number" defaultValue="18.15" />
                   </div>
 
@@ -3343,6 +3441,16 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     <Label htmlFor="autoCalculateProvidentFund">Auto-calculate Provident Fund (Tier 3)</Label>
                   </div>
                 </div>
+
+                <div className="flex justify-end">
+                  <Button onClick={() => {
+                    // Save payroll configuration
+                    console.log('[v0] Saving payroll configuration...')
+                  }}>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Payroll Configuration
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -3359,7 +3467,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="font-medium">PAYE Tax Bands</h4>
-                    <Button size="sm" variant="outline">
+                    <Button size="sm" variant="outline" onClick={() => {
+                      console.log('[v0] Adding new tax band...')
+                    }}>
                       <Plus className="w-4 h-4 mr-2" />
                       Add Band
                     </Button>
@@ -3370,86 +3480,63 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <tr className="bg-gray-50">
                           <th className="border border-gray-200 px-4 py-2 text-left">Band</th>
                           <th className="border border-gray-200 px-4 py-2 text-left">Rate (%)</th>
-                          <th className="border border-gray-200 px-4 py-2 text-left">From (USD)</th>
-                          <th className="border border-gray-200 px-4 py-2 text-left">To (USD)</th>
+                          <th className="border border-gray-200 px-4 py-2 text-left">From ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})</th>
+                          <th className="border border-gray-200 px-4 py-2 text-left">To ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})</th>
                           <th className="border border-gray-200 px-4 py-2 text-center">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        <tr>
-                          <td className="border border-gray-200 px-4 py-2">0</td>
-                          <td className="border border-gray-200 px-4 py-2">% on first USD</td>
-                          <td className="border border-gray-200 px-4 py-2">4350</td>
-                          <td className="border border-gray-200 px-4 py-2">-</td>
-                          <td className="border border-gray-200 px-4 py-2 text-center">
-                            <Button size="sm" variant="ghost">Edit</Button>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-200 px-4 py-2">5</td>
-                          <td className="border border-gray-200 px-4 py-2">% on next USD</td>
-                          <td className="border border-gray-200 px-4 py-2">1000</td>
-                          <td className="border border-gray-200 px-4 py-2">-</td>
-                          <td className="border border-gray-200 px-4 py-2 text-center">
-                            <Button size="sm" variant="ghost">Edit</Button>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-200 px-4 py-2">10</td>
-                          <td className="border border-gray-200 px-4 py-2">% on next USD</td>
-                          <td className="border border-gray-200 px-4 py-2">2000</td>
-                          <td className="border border-gray-200 px-4 py-2">-</td>
-                          <td className="border border-gray-200 px-4 py-2 text-center">
-                            <Button size="sm" variant="ghost">Edit</Button>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-200 px-4 py-2">17.5</td>
-                          <td className="border border-gray-200 px-4 py-2">% on next USD</td>
-                          <td className="border border-gray-200 px-4 py-2">20000</td>
-                          <td className="border border-gray-200 px-4 py-2">-</td>
-                          <td className="border border-gray-200 px-4 py-2 text-center">
-                            <Button size="sm" variant="ghost">Edit</Button>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-200 px-4 py-2">25</td>
-                          <td className="border border-gray-200 px-4 py-2">% on next USD</td>
-                          <td className="border border-gray-200 px-4 py-2">25000</td>
-                          <td className="border border-gray-200 px-4 py-2">-</td>
-                          <td className="border border-gray-200 px-4 py-2 text-center">
-                            <Button size="sm" variant="ghost">Edit</Button>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-gray-200 px-4 py-2">30</td>
-                          <td className="border border-gray-200 px-4 py-2">% on remaining amount</td>
-                          <td className="border border-gray-200 px-4 py-2">-</td>
-                          <td className="border border-gray-200 px-4 py-2">-</td>
-                          <td className="border border-gray-200 px-4 py-2 text-center">
-                            <Button size="sm" variant="ghost">Edit</Button>
-                          </td>
-                        </tr>
+                        {payeTaxBands.map((band, index) => (
+                          <tr key={index}>
+                            <td className="border border-gray-200 px-4 py-2">{band.rate}</td>
+                            <td className="border border-gray-200 px-4 py-2">{band.description} {currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol}</td>
+                            <td className="border border-gray-200 px-4 py-2">{band.from ? band.from.toLocaleString() : '-'}</td>
+                            <td className="border border-gray-200 px-4 py-2">{band.to ? band.to.toLocaleString() : '-'}</td>
+                            <td className="border border-gray-200 px-4 py-2 text-center">
+                              <Button size="sm" variant="ghost" onClick={() => {
+                                console.log('[v0] Editing tax band:', band)
+                              }}>Edit</Button>
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
                     <h4 className="font-medium mb-3">SSNIT Rates</h4>
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
                         <span>Employee:</span>
-                        <span className="font-medium">5.5%</span>
+                        <div className="flex items-center space-x-2">
+                          <Input 
+                            type="number" 
+                            step="0.1" 
+                            value={ssnitRates.employee}
+                            onChange={(e) => updateSsnitRates('employee', Number.parseFloat(e.target.value) || 0)}
+                            className="w-20 h-8 text-right"
+                          />
+                          <span>%</span>
+                        </div>
                       </div>
                       <div className="flex justify-between items-center">
                         <span>Employer:</span>
-                        <span className="font-medium">13%</span>
+                        <div className="flex items-center space-x-2">
+                          <Input 
+                            type="number" 
+                            step="0.1" 
+                            value={ssnitRates.employer}
+                            onChange={(e) => updateSsnitRates('employer', Number.parseFloat(e.target.value) || 0)}
+                            className="w-20 h-8 text-right"
+                          />
+                          <span>%</span>
+                        </div>
                       </div>
                       <div className="flex justify-between items-center font-medium border-t pt-2">
                         <span>Total:</span>
-                        <span>18.5%</span>
+                        <span>{ssnitRates.total.toFixed(1)}%</span>
                       </div>
                     </div>
                   </div>
@@ -3459,15 +3546,33 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
                         <span>Employee:</span>
-                        <span className="font-medium">5.5%</span>
+                        <div className="flex items-center space-x-2">
+                          <Input 
+                            type="number" 
+                            step="0.1" 
+                            value={tier2Rates.employee}
+                            onChange={(e) => updateTier2Rates('employee', Number.parseFloat(e.target.value) || 0)}
+                            className="w-20 h-8 text-right"
+                          />
+                          <span>%</span>
+                        </div>
                       </div>
                       <div className="flex justify-between items-center">
                         <span>Employer:</span>
-                        <span className="font-medium">5.5%</span>
+                        <div className="flex items-center space-x-2">
+                          <Input 
+                            type="number" 
+                            step="0.1" 
+                            value={tier2Rates.employer}
+                            onChange={(e) => updateTier2Rates('employer', Number.parseFloat(e.target.value) || 0)}
+                            className="w-20 h-8 text-right"
+                          />
+                          <span>%</span>
+                        </div>
                       </div>
                       <div className="flex justify-between items-center font-medium border-t pt-2">
                         <span>Total:</span>
-                        <span>11.0%</span>
+                        <span>{tier2Rates.total.toFixed(1)}%</span>
                       </div>
                     </div>
                   </div>
@@ -3477,18 +3582,45 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
                         <span>Employee:</span>
-                        <span className="font-medium">5%</span>
+                        <div className="flex items-center space-x-2">
+                          <Input 
+                            type="number" 
+                            step="0.1" 
+                            value={tier3Rates.employee}
+                            onChange={(e) => updateTier3Rates('employee', Number.parseFloat(e.target.value) || 0)}
+                            className="w-20 h-8 text-right"
+                          />
+                          <span>%</span>
+                        </div>
                       </div>
                       <div className="flex justify-between items-center">
                         <span>Employer:</span>
-                        <span className="font-medium">5%</span>
+                        <div className="flex items-center space-x-2">
+                          <Input 
+                            type="number" 
+                            step="0.1" 
+                            value={tier3Rates.employer}
+                            onChange={(e) => updateTier3Rates('employer', Number.parseFloat(e.target.value) || 0)}
+                            className="w-20 h-8 text-right"
+                          />
+                          <span>%</span>
+                        </div>
                       </div>
                       <div className="flex justify-between items-center font-medium border-t pt-2">
                         <span>Total:</span>
-                        <span>10.0%</span>
+                        <span>{tier3Rates.total.toFixed(1)}%</span>
                       </div>
                     </div>
                   </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button onClick={() => {
+                    console.log('[v0] Saving tax configuration...')
+                  }}>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Tax Configuration
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -4396,220 +4528,23 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 <CardDescription>Import settings from a CSV file</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Label htmlFor="importFile">Choose CSV File</Label>
-                <Input
-                  type="file"
-                  id="importFile"
-                  accept=".csv"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      handleImportSettings(file)
-                      setImportModal(false)
-                    }
-                  }}
-                />
-                <div className="flex justify-end space-x-2">
-                  <Button variant="ghost" onClick={() => setImportModal(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={() => setImportModal(false)}>Import</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {/* Add Leave Type Modal */}
-      {showAddLeaveTypeModal && (
-        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
-          <div className="relative m-8 md:m-16 lg:m-24">
-            <Card className="max-w-lg mx-auto">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">Add New Leave Type</CardTitle>
-                <CardDescription>Define a new leave type for your organization</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Label htmlFor="leaveTypeName">Leave Type Name</Label>
-                <Input
-                  id="leaveTypeName"
-                  placeholder="Enter leave type name"
-                  value={newLeaveType.name}
-                  onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
-                />
-
-                <Label htmlFor="leaveTypeDays">Days</Label>
-                <Input
-                  id="leaveTypeDays"
-                  type="number"
-                  placeholder="Enter number of days"
-                  value={newLeaveType.days}
-                  onChange={(e) => setNewLeaveType({ ...newLeaveType, days: e.target.value })}
-                />
-
-                <Label htmlFor="leaveTypeDescription">Description</Label>
-                <Textarea
-                  id="leaveTypeDescription"
-                  placeholder="Enter description"
-                  value={newLeaveType.description}
-                  onChange={(e) => setNewLeaveType({ ...newLeaveType, description: e.target.value })}
-                />
-
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    checked={newLeaveType.carryOver}
-                    onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, carryOver: checked })}
-                  />
-                  <Label htmlFor="leaveTypeCarryOver">Allow Carry Over</Label>
-                </div>
-
-                <div className="flex justify-end space-x-2">
-                  <Button variant="ghost" onClick={() => setShowAddLeaveTypeModal(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleAddLeaveType} disabled={isManagingLeaveTypes}>
-                    {isManagingLeaveTypes ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Adding...
-                      </>
-                    ) : (
-                      "Add Leave Type"
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {/* Policy Modal */}
-      {showPolicyModal && selectedPolicy && (
-        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
-          <div className="relative m-8 md:m-16 lg:m-24">
-            <Card className="max-w-lg mx-auto">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">
-                  {policyModalType === "view"
-                    ? "View Policy"
-                    : policyModalType === "edit"
-                      ? "Edit Policy"
-                      : "Delete Policy"}
-                </CardTitle>
-                <CardDescription>
-                  {policyModalType === "view"
-                    ? "View the details of the selected policy"
-                    : policyModalType === "edit"
-                      ? "Edit the details of the selected policy"
-                      : "Confirm deletion of the selected policy"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {policyModalType === "view" && (
-                  <>
-                    <Label>Policy Name</Label>
-                    <Input value={selectedPolicy.name} disabled />
-
-                    <Label>Days</Label>
-                    <Input value={selectedPolicy.days} disabled />
-
-                    <Label>Description</Label>
-                    <Textarea value={selectedPolicy.description} disabled />
-                  </>
-                )}
-
-                {policyModalType === "edit" && (
-                  <>
-                    <Label htmlFor="editPolicyName">Policy Name</Label>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="importFile">Select CSV File</Label>
                     <Input
-                      id="editPolicyName"
-                      placeholder="Enter policy name"
-                      value={editingPolicy.name}
-                      onChange={(e) => setEditingPolicy({ ...editingPolicy, name: e.target.value })}
+                      id="importFile"
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleImportSettings(file)
+                        }
+                      }}
                     />
-
-                    <Label htmlFor="editPolicyDays">Days</Label>
-                    <Input
-                      id="editPolicyDays"
-                      type="number"
-                      placeholder="Enter number of days"
-                      value={editingPolicy.days}
-                      onChange={(e) => setEditingPolicy({ ...editingPolicy, days: Number.parseInt(e.target.value) })}
-                    />
-
-                    <Label htmlFor="editPolicyDescription">Description</Label>
-                    <Textarea
-                      id="editPolicyDescription"
-                      placeholder="Enter description"
-                      value={editingPolicy.description}
-                      onChange={(e) => setEditingPolicy({ ...editingPolicy, description: e.target.value })}
-                    />
-                  </>
-                )}
-
-                {policyModalType === "delete" && (
-                  <p>Are you sure you want to delete the {selectedPolicy.name} policy?</p>
-                )}
-
-                <div className="flex justify-end space-x-2">
-                  <Button variant="ghost" onClick={() => setShowPolicyModal(false)}>
-                    Cancel
-                  </Button>
-                  {policyModalType === "edit" && (
-                    <Button onClick={handleSavePolicyChanges} disabled={isSavingPolicy}>
-                      {isSavingPolicy ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        "Save Changes"
-                      )}
-                    </Button>
-                  )}
-                  {policyModalType === "delete" && (
-                    <Button variant="destructive" onClick={() => handleDeletePolicy(selectedPolicy.name)}>
-                      Delete
-                    </Button>
-                  )}
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Upload a CSV file with subsidiary settings. The file should include columns for name, tax_id, ssnit_number, industry, etc.
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {/* Document Modal */}
-      {showDocumentModal && selectedDocument && (
-        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
-          <div className="relative m-8 md:m-16 lg:m-24">
-            <Card className="max-w-3xl mx-auto">
-              <CardHeader>
-                <CardTitle className="text-xl">
-                  {documentModalType === "view"
-                    ? "View Document"
-                    : documentModalType === "edit"
-                      ? "Edit Document"
-                      : documentModalType === "add"
-                        ? "Add Document"
-                        : "Delete Document"}
-                </CardTitle>
-                <CardDescription>
-                  {documentModalType === "view"
-                    ? "View the content of the selected document"
-                    : documentModalType === "edit"
-                      ? "Edit the details of the selected document"
-                      : documentModalType === "add"
-                        ? "Upload a new document"
-                        : "Confirm deletion of the selected document"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {documentModalType === "view" && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <Label>Document Name</Label>
-                      <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm" onClick={handleZoomIn}>\
+                <div className="flex justify-end space-x-2">\
