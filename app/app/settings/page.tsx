@@ -3112,11 +3112,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       <Plus className="w-4 h-4 mr-2" />
                       Add Leave Type
                     </Button>
-                    {/* Update the Generate AI Insights button to use the new handler */}
-                    <Button variant="outline" onClick={handleGenerateAIInsights}>
-                      <Brain className="w-4 h-4 mr-2" />
-                      Generate AI Insights
-                    </Button>
                   </div>
                 </div>
                 <CardDescription>Manage leave policies and generate AI insights</CardDescription>
