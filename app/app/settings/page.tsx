@@ -438,8 +438,12 @@ export default function SettingsPage() {
     },
   ])
 
+  const getCurrencyConfig = (currency: string) => {
+    return currencyConfig[currency as keyof typeof currencyConfig] || currencyConfig.ghs
+  }
+
   const calculateTax = (income: number, currency: string = selectedCurrency) => {
-    const config = currencyConfig[currency as keyof typeof currencyConfig]
+    const config = getCurrencyConfig(currency)
     if (!config) return 0
 
     let tax = 0
@@ -532,7 +536,7 @@ export default function SettingsPage() {
   const handleCurrencyChange = (currency: string) => {
     setSelectedCurrency(currency)
     // Update payeTaxBands based on the selected currency
-    const selectedConfig = currencyConfig[currency as keyof typeof currencyConfig]
+    const selectedConfig = getCurrencyConfig(currency)
     if (selectedConfig && selectedConfig.taxBands) {
       setPayeTaxBands(selectedConfig.taxBands)
       // Update SSNIT, Tier2, Tier3 rates if they exist in the config
@@ -3624,9 +3628,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   </div>
 
                   <div>
-                    <Label htmlFor="minimumWage">
-                      Minimum Wage ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})
-                    </Label>
+                    <Label htmlFor="minimumWage">Minimum Wage ({getCurrencyConfig(selectedCurrency).symbol})</Label>
                     <Input type="number" defaultValue="18.15" />
                   </div>
 
@@ -3690,9 +3692,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     <div>
                       <h4 className="font-medium">PAYE Tax Bands</h4>
                       <p className="text-sm text-gray-500">
-                        {currencyConfig[selectedCurrency as keyof typeof currencyConfig].country} - Version{" "}
-                        {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.version} - Last Updated:{" "}
-                        {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.lastUpdated}
+                        {getCurrencyConfig(selectedCurrency).country} - Version{" "}
+                        {getCurrencyConfig(selectedCurrency)?.version} - Last Updated:{" "}
+                        {getCurrencyConfig(selectedCurrency)?.lastUpdated}
                       </p>
                     </div>
                     <div className="flex space-x-2">
@@ -3725,50 +3727,48 @@ Format the response in a professional, actionable manner for HR decision-makers.
                           <th className="border border-gray-200 px-4 py-3 text-left font-medium">Band</th>
                           <th className="border border-gray-200 px-4 py-3 text-left font-medium">Rate (%)</th>
                           <th className="border border-gray-200 px-4 py-3 text-left font-medium">
-                            From ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})
+                            From ({getCurrencyConfig(selectedCurrency).symbol})
                           </th>
                           <th className="border border-gray-200 px-4 py-3 text-left font-medium">
-                            To ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})
+                            To ({getCurrencyConfig(selectedCurrency).symbol})
                           </th>
                           <th className="border border-gray-200 px-4 py-3 text-left font-medium">
-                            Cumulative Tax ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})
+                            Cumulative Tax ({getCurrencyConfig(selectedCurrency).symbol})
                           </th>
                           <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.taxBands.map(
-                          (band, index) => (
-                            <tr key={index} className="hover:bg-gray-50">
-                              <td className="border border-gray-200 px-4 py-3 font-medium">{band.rate}</td>
-                              <td className="border border-gray-200 px-4 py-3">
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                  {band.rate}%
-                                </span>
-                              </td>
-                              <td className="border border-gray-200 px-4 py-3">
-                                {band.from ? band.from.toLocaleString() : "0"}
-                              </td>
-                              <td className="border border-gray-200 px-4 py-3">
-                                {band.to ? band.to.toLocaleString() : "∞"}
-                              </td>
-                              <td className="border border-gray-200 px-4 py-3 font-medium text-green-600">
-                                {band.cumulative ? band.cumulative.toLocaleString() : "0"}
-                              </td>
-                              <td className="border border-gray-200 px-4 py-3 text-center">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => {
-                                    console.log("[v0] Editing tax band:", band)
-                                  }}
-                                >
-                                  Edit
-                                </Button>
-                              </td>
-                            </tr>
-                          ),
-                        )}
+                        {getCurrencyConfig(selectedCurrency)?.taxBands.map((band, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="border border-gray-200 px-4 py-3 font-medium">{band.rate}</td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {band.rate}%
+                              </span>
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              {band.from ? band.from.toLocaleString() : "0"}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              {band.to ? band.to.toLocaleString() : "∞"}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3 font-medium text-green-600">
+                              {band.cumulative ? band.cumulative.toLocaleString() : "0"}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3 text-center">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  console.log("[v0] Editing tax band:", band)
+                                }}
+                              >
+                                Edit
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
@@ -3778,14 +3778,12 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                       <div>
                         <span className="text-gray-600">Annual Income: </span>
-                        <span className="font-medium">
-                          {currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol}100,000
-                        </span>
+                        <span className="font-medium">{getCurrencyConfig(selectedCurrency).symbol}100,000</span>
                       </div>
                       <div>
                         <span className="text-gray-600">Tax Due: </span>
                         <span className="font-medium text-red-600">
-                          {currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol}
+                          {getCurrencyConfig(selectedCurrency).symbol}
                           {calculateTax(100000).toLocaleString()}
                         </span>
                       </div>
@@ -3808,9 +3806,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <span className="text-sm text-gray-600">Employee:</span>
                         <div className="flex items-center space-x-2">
                           <span className="font-medium">
-                            {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.socialSecurity
-                              ?.employee || ssnitRates.employee}
-                            %
+                            {getCurrencyConfig(selectedCurrency)?.socialSecurity?.employee || ssnitRates.employee}%
                           </span>
                           <Badge variant="secondary" className="text-xs">
                             Active
@@ -3821,9 +3817,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <span className="text-sm text-gray-600">Employer:</span>
                         <div className="flex items-center space-x-2">
                           <span className="font-medium">
-                            {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.socialSecurity
-                              ?.employer || ssnitRates.employer}
-                            %
+                            {getCurrencyConfig(selectedCurrency)?.socialSecurity?.employer || ssnitRates.employer}%
                           </span>
                           <Badge variant="secondary" className="text-xs">
                             Active
@@ -3833,17 +3827,13 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       <div className="flex justify-between items-center pt-2 border-t">
                         <span className="text-sm font-medium">Total:</span>
                         <span className="font-bold text-blue-600">
-                          {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.socialSecurity?.total ||
-                            ssnitRates.total}
-                          %
+                          {getCurrencyConfig(selectedCurrency)?.socialSecurity?.total || ssnitRates.total}%
                         </span>
                       </div>
-                      {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.socialSecurity?.cap && (
+                      {getCurrencyConfig(selectedCurrency)?.socialSecurity?.cap && (
                         <div className="text-xs text-gray-500 mt-2">
-                          Annual Cap: {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.symbol}
-                          {currencyConfig[
-                            selectedCurrency as keyof typeof currencyConfig
-                          ]?.socialSecurity?.cap.toLocaleString()}
+                          Annual Cap: {getCurrencyConfig(selectedCurrency).symbol}
+                          {getCurrencyConfig(selectedCurrency).socialSecurity?.cap.toLocaleString()}
                         </div>
                       )}
                     </div>
@@ -3859,9 +3849,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <span className="text-sm text-gray-600">Employee:</span>
                         <div className="flex items-center space-x-2">
                           <span className="font-medium">
-                            {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.tier2?.employee ||
-                              tier2Rates.employee}
-                            %
+                            {getCurrencyConfig(selectedCurrency)?.tier2?.employee || tier2Rates.employee}%
                           </span>
                           <Badge variant="secondary" className="text-xs">
                             Active
@@ -3872,9 +3860,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <span className="text-sm text-gray-600">Employer:</span>
                         <div className="flex items-center space-x-2">
                           <span className="font-medium">
-                            {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.tier2?.employer ||
-                              tier2Rates.employer}
-                            %
+                            {getCurrencyConfig(selectedCurrency)?.tier2?.employer || tier2Rates.employer}%
                           </span>
                           <Badge variant="secondary" className="text-xs">
                             Active
@@ -3884,9 +3870,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       <div className="flex justify-between items-center pt-2 border-t">
                         <span className="text-sm font-medium">Total:</span>
                         <span className="font-bold text-blue-600">
-                          {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.tier2?.total ||
-                            tier2Rates.total}
-                          %
+                          {getCurrencyConfig(selectedCurrency)?.tier2?.total || tier2Rates.total}%
                         </span>
                       </div>
                     </div>
@@ -3902,9 +3886,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <span className="text-sm text-gray-600">Employee:</span>
                         <div className="flex items-center space-x-2">
                           <span className="font-medium">
-                            {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.tier3?.employee ||
-                              tier3Rates.employee}
-                            %
+                            {getCurrencyConfig(selectedCurrency)?.tier3?.employee || tier3Rates.employee}%
                           </span>
                           <Badge variant="secondary" className="text-xs">
                             Active
@@ -3915,9 +3897,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <span className="text-sm text-gray-600">Employer:</span>
                         <div className="flex items-center space-x-2">
                           <span className="font-medium">
-                            {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.tier3?.employer ||
-                              tier3Rates.employer}
-                            %
+                            {getCurrencyConfig(selectedCurrency)?.tier3?.employer || tier3Rates.employer}%
                           </span>
                           <Badge variant="secondary" className="text-xs">
                             Active
@@ -3927,9 +3907,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       <div className="flex justify-between items-center pt-2 border-t">
                         <span className="text-sm font-medium">Total:</span>
                         <span className="font-bold text-blue-600">
-                          {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.tier3?.total ||
-                            tier3Rates.total}
-                          %
+                          {getCurrencyConfig(selectedCurrency)?.tier3?.total || tier3Rates.total}%
                         </span>
                       </div>
                     </div>
@@ -3951,7 +3929,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
                             <span className="capitalize font-medium">{country}</span>
                             <div className="flex items-center space-x-2">
                               <div
-                                className={`w-2 h-2 rounded-full ${status.connected ? "bg-green-500" : "bg-red-500"}`}
+                                className={`w-2 h-2 rounded-full mt-1 ${
+                                  status.connected ? "bg-green-500" : "bg-red-500"
+                                }`}
                               />
                               <span className="text-sm text-gray-600">
                                 {status.connected ? "Connected" : "Disconnected"}
