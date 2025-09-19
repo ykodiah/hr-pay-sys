@@ -32,6 +32,7 @@ import {
   DollarSign,
   Minus,
   Calculator,
+  RotateCcw,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -280,13 +281,37 @@ export default function SettingsPage() {
 
   const [selectedCurrency, setSelectedCurrency] = useState("ghs")
   const [payeTaxBands, setPayeTaxBands] = useState([
-    { band: 0, rate: 0, from: 4350, to: null, description: "% on first" },
-    { band: 5, rate: 5, from: 1000, to: null, description: "% on next" },
-    { band: 10, rate: 10, from: 2000, to: null, description: "% on next" },
-    { band: 17.5, rate: 17.5, from: 20000, to: null, description: "% on next" },
-    { band: 25, rate: 25, from: 25000, to: null, description: "% on next" },
-    { band: 30, rate: 30, from: null, to: null, description: "% on remaining amount" },
+    { band: 0, rate: 0, from: 0, to: 4350, description: "% on first ₵4,350" },
+    { band: 5, rate: 5, from: 4351, to: 5350, description: "% on next ₵1,000" },
+    { band: 10, rate: 10, from: 5351, to: 7350, description: "% on next ₵2,000" },
+    { band: 17.5, rate: 17.5, from: 7351, to: 27350, description: "% on next ₵20,000" },
+    { band: 25, rate: 25, from: 27351, to: 52350, description: "% on next ₵25,000" },
+    { band: 30, rate: 30, from: 52351, to: null, description: "% on remaining amount" },
   ])
+
+  const [taxVersions, setTaxVersions] = useState([
+    {
+      id: 1,
+      version: "2024.1",
+      effectiveDate: "2024-01-01",
+      status: "active",
+      source: "manual",
+      confidence: 100,
+      approvedBy: "System Admin",
+      approvedAt: "2024-01-01T00:00:00Z",
+    },
+  ])
+  const [governmentApiStatus, setGovernmentApiStatus] = useState({
+    ghana: { connected: false, lastSync: null, status: "disconnected" },
+    nigeria: { connected: false, lastSync: null, status: "disconnected" },
+  })
+  const [autoUpdateSettings, setAutoUpdateSettings] = useState({
+    enabled: false,
+    requireApproval: true,
+    notifyOnUpdates: true,
+    confidenceThreshold: 85,
+  })
+
   const [ssnitRates, setSsnitRates] = useState({
     employee: 5.5,
     employer: 13,
@@ -308,13 +333,28 @@ export default function SettingsPage() {
       symbol: "₵",
       name: "Ghana Cedis (GHS)",
       taxBands: [
-        { band: 0, rate: 0, from: 4350, to: null, description: "% on first" },
-        { band: 5, rate: 5, from: 1000, to: null, description: "% on next" },
-        { band: 10, rate: 10, from: 2000, to: null, description: "% on next" },
-        { band: 17.5, rate: 17.5, from: 20000, to: null, description: "% on next" },
-        { band: 25, rate: 25, from: 25000, to: null, description: "% on next" },
-        { band: 30, rate: 30, from: null, to: null, description: "% on remaining amount" },
+        { band: 0, rate: 0, from: 0, to: 4350, description: "% on first ₵4,350" },
+        { band: 5, rate: 5, from: 4351, to: 5350, description: "% on next ₵1,000" },
+        { band: 10, rate: 10, from: 5351, to: 7350, description: "% on next ₵2,000" },
+        { band: 17.5, rate: 17.5, from: 7351, to: 27350, description: "% on next ₵20,000" },
+        { band: 25, rate: 25, from: 27351, to: 52350, description: "% on next ₵25,000" },
+        { band: 30, rate: 30, from: 52351, to: null, description: "% on remaining amount" },
       ],
+      ssnitRates: {
+        employee: 5.5,
+        employer: 13.0,
+        total: 18.5,
+      },
+      tier2Rates: {
+        employee: 5.5,
+        employer: 5.5,
+        total: 11.0,
+      },
+      tier3Rates: {
+        employee: 5.0,
+        employer: 5.0,
+        total: 10.0,
+      },
     },
     usd: {
       symbol: "$",
@@ -355,6 +395,9 @@ export default function SettingsPage() {
   const handleCurrencyChange = (currency: string) => {
     setSelectedCurrency(currency)
     setPayeTaxBands(currencyConfig[currency as keyof typeof currencyConfig].taxBands)
+    setSsnitRates(currencyConfig[currency as keyof typeof currencyConfig].ssnitRates)
+    setTier2Rates(currencyConfig[currency as keyof typeof currencyConfig].tier2Rates)
+    setTier3Rates(currencyConfig[currency as keyof typeof currencyConfig].tier3Rates)
   }
 
   const updateSsnitRates = (field: "employee" | "employer", value: number) => {
@@ -1991,8 +2034,6 @@ SECTION V: SAFETY AND SECURITY
 
 ═══════════════════════════════════════════════════════════════
 
-SECTION I: WELCOME AND INTRODUCTION
-
 1. WELCOME MESSAGE
 
 Dear Team Member,
@@ -2453,6 +2494,57 @@ Format the response in a professional, actionable manner for HR decision-makers.
   const [showAIInsights, setShowAIInsights] = useState(false)
   const [aiInsightsLoading, setAiInsightsLoading] = useState(false)
 
+  const handleGovernmentApiSync = async (country: string) => {
+    console.log(`[v0] Syncing with ${country} government API...`)
+    setGovernmentApiStatus((prev) => ({
+      ...prev,
+      [country]: { ...prev[country as keyof typeof prev], status: "syncing" },
+    }))
+
+    // Simulate API call
+    setTimeout(() => {
+      setGovernmentApiStatus((prev) => ({
+        ...prev,
+        [country]: {
+          connected: true,
+          lastSync: new Date().toISOString(),
+          status: "connected",
+        },
+      }))
+    }, 2000)
+  }
+
+  const handleTaxVersionApproval = (versionId: number, approved: boolean) => {
+    console.log(`[v0] ${approved ? "Approving" : "Rejecting"} tax version:`, versionId)
+    setTaxVersions((prev) =>
+      prev.map((version) =>
+        version.id === versionId
+          ? { ...version, status: approved ? "active" : "rejected" }
+          : { ...version, status: version.status === "active" ? "inactive" : version.status },
+      ),
+    )
+  }
+
+  const exportTaxConfiguration = () => {
+    const config = {
+      currency: selectedCurrency,
+      taxBands: payeTaxBands,
+      ssnitRates,
+      tier2Rates,
+      tier3Rates,
+      exportDate: new Date().toISOString(),
+      version: taxVersions.find((v) => v.status === "active")?.version || "1.0",
+    }
+
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `tax-config-${selectedCurrency}-${new Date().toISOString().split("T")[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -2695,7 +2787,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
           </Card>
         </TabsContent>
 
-        {/* Multi-Company Management */}
         <TabsContent value="subsidiaries">
           <Card>
             <CardHeader>
@@ -3478,16 +3569,73 @@ Format the response in a professional, actionable manner for HR decision-makers.
             {/* Tax Configuration Section */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Calculator className="w-5 h-5" />
-                  <span>Tax Configuration</span>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Calculator className="w-5 h-5" />
+                    <span>Tax Configuration</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleGovernmentApiSync(selectedCurrency === "ghs" ? "ghana" : "nigeria")}
+                      disabled={
+                        governmentApiStatus[
+                          selectedCurrency === "ghs" ? "ghana" : ("nigeria" as keyof typeof governmentApiStatus)
+                        ].status === "syncing"
+                      }
+                    >
+                      <RefreshCw
+                        className={`w-4 h-4 mr-2 ${governmentApiStatus[selectedCurrency === "ghs" ? "ghana" : ("nigeria" as keyof typeof governmentApiStatus)].status === "syncing" ? "animate-spin" : ""}`}
+                      />
+                      Sync with Gov API
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={exportTaxConfiguration}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Export Config
+                    </Button>
+                  </div>
                 </CardTitle>
-                <CardDescription>Configure tax bands and SSNIT rates</CardDescription>
+                <CardDescription>
+                  Configure tax bands and SSNIT rates with government API integration
+                  {governmentApiStatus[
+                    selectedCurrency === "ghs" ? "ghana" : ("nigeria" as keyof typeof governmentApiStatus)
+                  ].connected && <span className="ml-2 text-green-600 text-sm">✓ Connected to Government API</span>}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-blue-900">Tax Version Management</h4>
+                    <Badge variant="secondary">
+                      Active: {taxVersions.find((v) => v.status === "active")?.version || "N/A"}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-blue-700">Effective Date:</span>
+                      <p className="font-medium">
+                        {taxVersions.find((v) => v.status === "active")?.effectiveDate || "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-blue-700">Source:</span>
+                      <p className="font-medium capitalize">
+                        {taxVersions.find((v) => v.status === "active")?.source || "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-blue-700">Confidence:</span>
+                      <p className="font-medium">{taxVersions.find((v) => v.status === "active")?.confidence || 0}%</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-medium">PAYE Tax Bands</h4>
+                    <h4 className="font-medium">
+                      PAYE Tax Bands - {currencyConfig[selectedCurrency as keyof typeof currencyConfig].name}
+                    </h4>
                     <Button
                       size="sm"
                       variant="outline"
@@ -3505,6 +3653,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <tr className="bg-gray-50">
                           <th className="border border-gray-200 px-4 py-2 text-left">Band</th>
                           <th className="border border-gray-200 px-4 py-2 text-left">Rate (%)</th>
+                          <th className="border border-gray-200 px-4 py-2 text-left">Description</th>
                           <th className="border border-gray-200 px-4 py-2 text-left">
                             From ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})
                           </th>
@@ -3516,17 +3665,15 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       </thead>
                       <tbody>
                         {payeTaxBands.map((band, index) => (
-                          <tr key={index}>
-                            <td className="border border-gray-200 px-4 py-2">{band.rate}</td>
+                          <tr key={index} className={index % 2 === 0 ? "bg-gray-25" : ""}>
+                            <td className="border border-gray-200 px-4 py-2 font-medium">{index + 1}</td>
+                            <td className="border border-gray-200 px-4 py-2 font-medium">{band.rate}%</td>
+                            <td className="border border-gray-200 px-4 py-2">{band.description}</td>
                             <td className="border border-gray-200 px-4 py-2">
-                              {band.description}{" "}
-                              {currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol}
+                              {band.from ? band.from.toLocaleString() : "0"}
                             </td>
                             <td className="border border-gray-200 px-4 py-2">
-                              {band.from ? band.from.toLocaleString() : "-"}
-                            </td>
-                            <td className="border border-gray-200 px-4 py-2">
-                              {band.to ? band.to.toLocaleString() : "-"}
+                              {band.to ? band.to.toLocaleString() : "∞"}
                             </td>
                             <td className="border border-gray-200 px-4 py-2 text-center">
                               <Button
@@ -3547,116 +3694,179 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <h4 className="font-medium mb-3">SSNIT Rates</h4>
-                    <div className="space-y-2">
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h4 className="font-medium mb-3 text-green-900">SSNIT Rates (Tier 1)</h4>
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <span>Employee:</span>
+                        <span className="text-green-700">Employee:</span>
                         <div className="flex items-center space-x-2">
                           <Input
                             type="number"
                             step="0.1"
                             value={ssnitRates.employee}
                             onChange={(e) => updateSsnitRates("employee", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right"
+                            className="w-20 h-8 text-right bg-white"
                           />
-                          <span>%</span>
+                          <span className="text-green-700">%</span>
                         </div>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span>Employer:</span>
+                        <span className="text-green-700">Employer:</span>
                         <div className="flex items-center space-x-2">
                           <Input
                             type="number"
                             step="0.1"
                             value={ssnitRates.employer}
                             onChange={(e) => updateSsnitRates("employer", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right"
+                            className="w-20 h-8 text-right bg-white"
                           />
-                          <span>%</span>
+                          <span className="text-green-700">%</span>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center font-medium border-t pt-2">
-                        <span>Total:</span>
-                        <span>{ssnitRates.total.toFixed(1)}%</span>
+                      <div className="flex justify-between items-center font-medium border-t border-green-200 pt-2">
+                        <span className="text-green-900">Total:</span>
+                        <span className="text-green-900">{ssnitRates.total.toFixed(1)}%</span>
                       </div>
                     </div>
                   </div>
 
-                  <div>
-                    <h4 className="font-medium mb-3">Tier 2 Rates</h4>
-                    <div className="space-y-2">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium mb-3 text-blue-900">Tier 2 Rates</h4>
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <span>Employee:</span>
+                        <span className="text-blue-700">Employee:</span>
                         <div className="flex items-center space-x-2">
                           <Input
                             type="number"
                             step="0.1"
                             value={tier2Rates.employee}
                             onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right"
+                            className="w-20 h-8 text-right bg-white"
                           />
-                          <span>%</span>
+                          <span className="text-blue-700">%</span>
                         </div>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span>Employer:</span>
+                        <span className="text-blue-700">Employer:</span>
                         <div className="flex items-center space-x-2">
                           <Input
                             type="number"
                             step="0.1"
                             value={tier2Rates.employer}
                             onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right"
+                            className="w-20 h-8 text-right bg-white"
                           />
-                          <span>%</span>
+                          <span className="text-blue-700">%</span>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center font-medium border-t pt-2">
-                        <span>Total:</span>
-                        <span>{tier2Rates.total.toFixed(1)}%</span>
+                      <div className="flex justify-between items-center font-medium border-t border-blue-200 pt-2">
+                        <span className="text-blue-900">Total:</span>
+                        <span className="text-blue-900">{tier2Rates.total.toFixed(1)}%</span>
                       </div>
                     </div>
                   </div>
 
-                  <div>
-                    <h4 className="font-medium mb-3">Tier 3 Rates</h4>
-                    <div className="space-y-2">
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <h4 className="font-medium mb-3 text-purple-900">Tier 3 Rates</h4>
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <span>Employee:</span>
+                        <span className="text-purple-700">Employee:</span>
                         <div className="flex items-center space-x-2">
                           <Input
                             type="number"
                             step="0.1"
                             value={tier3Rates.employee}
                             onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right"
+                            className="w-20 h-8 text-right bg-white"
                           />
-                          <span>%</span>
+                          <span className="text-purple-700">%</span>
                         </div>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span>Employer:</span>
+                        <span className="text-purple-700">Employer:</span>
                         <div className="flex items-center space-x-2">
                           <Input
                             type="number"
                             step="0.1"
                             value={tier3Rates.employer}
                             onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right"
+                            className="w-20 h-8 text-right bg-white"
                           />
-                          <span>%</span>
+                          <span className="text-purple-700">%</span>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center font-medium border-t pt-2">
-                        <span>Total:</span>
-                        <span>{tier3Rates.total.toFixed(1)}%</span>
+                      <div className="flex justify-between items-center font-medium border-t border-purple-200 pt-2">
+                        <span className="text-purple-900">Total:</span>
+                        <span className="text-purple-900">{tier3Rates.total.toFixed(1)}%</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex justify-end">
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <h4 className="font-medium mb-3 text-yellow-900">Auto-Update Settings</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-yellow-700">Enable Auto-Updates:</span>
+                      <Switch
+                        checked={autoUpdateSettings.enabled}
+                        onCheckedChange={(checked) => setAutoUpdateSettings((prev) => ({ ...prev, enabled: checked }))}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-yellow-700">Require Approval:</span>
+                      <Switch
+                        checked={autoUpdateSettings.requireApproval}
+                        onCheckedChange={(checked) =>
+                          setAutoUpdateSettings((prev) => ({ ...prev, requireApproval: checked }))
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-yellow-700">Notify on Updates:</span>
+                      <Switch
+                        checked={autoUpdateSettings.notifyOnUpdates}
+                        onCheckedChange={(checked) =>
+                          setAutoUpdateSettings((prev) => ({ ...prev, notifyOnUpdates: checked }))
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-yellow-700">Confidence Threshold:</span>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={autoUpdateSettings.confidenceThreshold}
+                          onChange={(e) =>
+                            setAutoUpdateSettings((prev) => ({
+                              ...prev,
+                              confidenceThreshold: Number.parseInt(e.target.value) || 85,
+                            }))
+                          }
+                          className="w-20 h-8 text-right bg-white"
+                        />
+                        <span className="text-yellow-700">%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      console.log("[v0] Resetting to defaults...")
+                      setPayeTaxBands(currencyConfig[selectedCurrency as keyof typeof currencyConfig].taxBands)
+                      setSsnitRates(currencyConfig[selectedCurrency as keyof typeof currencyConfig].ssnitRates)
+                      setTier2Rates(currencyConfig[selectedCurrency as keyof typeof currencyConfig].tier2Rates)
+                      setTier3Rates(currencyConfig[selectedCurrency as keyof typeof currencyConfig].tier3Rates)
+                    }}
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Reset to Defaults
+                  </Button>
                   <Button
                     onClick={() => {
                       console.log("[v0] Saving tax configuration...")
