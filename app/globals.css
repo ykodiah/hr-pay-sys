@@ -36,6 +36,12 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Added missing theme variables to fix CSS compilation */
+  --theme-primary-50: oklch(0.97 0.02 220);
+  --theme-primary-500: oklch(0.5 0.15 220);
+  --theme-primary-600: oklch(0.4 0.18 220);
+  --theme-primary-700: oklch(0.3 0.2 220);
 }
 
 .dark {
@@ -71,6 +77,12 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+
+  /* Added dark mode theme variables */
+  --theme-primary-50: oklch(0.2 0.02 220);
+  --theme-primary-500: oklch(0.6 0.15 220);
+  --theme-primary-600: oklch(0.7 0.18 220);
+  --theme-primary-700: oklch(0.8 0.2 220);
 }
 
 @theme inline {
@@ -123,7 +135,7 @@
 }
 
 @layer components {
-  /* Added theme-aware utility classes */
+  /* Updated theme-aware utility classes to use defined variables */
   .theme-bg-primary-50 {
     background-color: var(--theme-primary-50);
   }
