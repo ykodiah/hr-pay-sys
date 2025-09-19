@@ -9,7 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { Settings, Building2, Users, Shield, Bell, Database, Palette } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Settings, Building2, Users, Shield, Bell, Database, Palette, Calculator, DollarSign } from "lucide-react"
 import { createBrowserClient } from "@supabase/ssr"
 
 console.log("[v0] SettingsPage component initializing...")
@@ -25,6 +27,45 @@ export default function SettingsPage() {
     email: "",
     taxId: "",
   })
+
+  const [payrollSettings, setPayrollSettings] = useState({
+    currency: "GHS",
+    currencySymbol: "GH₵",
+    minimumWage: 18.0,
+    overtimeWeekdayMultiplier: 1.5,
+    overtimeWeekendMultiplier: 2.0,
+    autoCalculatePAYE: true,
+    autoCalculateSSNIT: true,
+    payrollFrequency: "monthly",
+  })
+
+  const [taxBands, setTaxBands] = useState([
+    { band: 1, rate: 0, from: 0, to: 490, description: "0% on first GH₵ 490" },
+    { band: 2, rate: 5, from: 490, to: 600, description: "5% on next GH₵ 110" },
+    { band: 3, rate: 10, from: 600, to: 730, description: "10% on next GH₵ 130" },
+    { band: 4, rate: 17.5, from: 730, to: 3896.67, description: "17.5% on next GH₵ 3,166.67" },
+    { band: 5, rate: 25, from: 3896.67, to: 19896.67, description: "25% on next GH₵ 16,000" },
+    { band: 6, rate: 30, from: 19896.67, to: 50416.67, description: "30% on next GH₵ 30,520" },
+    { band: 7, rate: 35, from: 50416.67, to: null, description: "35% on amounts exceeding GH₵ 50,416.67" },
+  ])
+
+  const [ssnitRates, setSSNITRates] = useState({
+    employee: 5.5,
+    employer: 13.0,
+    total: 18.5,
+  })
+
+  const [allowances, setAllowances] = useState([
+    { code: "TRANS", description: "Transport Allowance", taxable: true, amount: 0, percentage: 0 },
+    { code: "HOUSE", description: "Housing Allowance", taxable: true, amount: 0, percentage: 0 },
+    { code: "MED", description: "Medical Allowance", taxable: false, amount: 0, percentage: 0 },
+  ])
+
+  const [deductions, setDeductions] = useState([
+    { code: "TAX", description: "Tax Deduction", taxable: false, amount: 0, percentage: 0 },
+    { code: "SSNIT", description: "SSNIT Deduction", taxable: false, amount: 0, percentage: 5.5 },
+    { code: "LOAN", description: "Loan Deduction", taxable: false, amount: 0, percentage: 0 },
+  ])
 
   const [employees, setEmployees] = useState([])
   const [subsidiaries, setSubsidiaries] = useState([])
@@ -103,6 +144,11 @@ export default function SettingsPage() {
     alert("Company settings saved successfully!")
   }
 
+  const handleSavePayrollSettings = async () => {
+    console.log("[v0] Saving payroll settings:", payrollSettings)
+    alert("Payroll settings saved successfully!")
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -127,10 +173,14 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="company" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="company" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             Company
+          </TabsTrigger>
+          <TabsTrigger value="payroll" className="flex items-center gap-2">
+            <Calculator className="h-4 w-4" />
+            Payroll
           </TabsTrigger>
           <TabsTrigger value="employees" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
@@ -155,6 +205,7 @@ export default function SettingsPage() {
         </TabsList>
 
         <TabsContent value="company" className="space-y-6">
+          {/* ... existing company content ... */}
           <Card>
             <CardHeader>
               <CardTitle>Company Information</CardTitle>
@@ -248,6 +299,263 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="payroll" className="space-y-6">
+          {/* General Payroll Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                General Payroll Settings
+              </CardTitle>
+              <CardDescription>Configure basic payroll parameters and currency settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="currency">Currency</Label>
+                  <Select
+                    value={payrollSettings.currency}
+                    onValueChange={(value) => setPayrollSettings({ ...payrollSettings, currency: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="GHS">Ghana Cedi (GHS)</SelectItem>
+                      <SelectItem value="USD">US Dollar (USD)</SelectItem>
+                      <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                      <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="minimum-wage">Minimum Wage ({payrollSettings.currencySymbol})</Label>
+                  <Input
+                    id="minimum-wage"
+                    type="number"
+                    step="0.01"
+                    value={payrollSettings.minimumWage}
+                    onChange={(e) =>
+                      setPayrollSettings({ ...payrollSettings, minimumWage: Number.parseFloat(e.target.value) })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="payroll-frequency">Payroll Frequency</Label>
+                  <Select
+                    value={payrollSettings.payrollFrequency}
+                    onValueChange={(value) => setPayrollSettings({ ...payrollSettings, payrollFrequency: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="overtime-weekday">Weekday Overtime Multiplier</Label>
+                  <Input
+                    id="overtime-weekday"
+                    type="number"
+                    step="0.1"
+                    value={payrollSettings.overtimeWeekdayMultiplier}
+                    onChange={(e) =>
+                      setPayrollSettings({
+                        ...payrollSettings,
+                        overtimeWeekdayMultiplier: Number.parseFloat(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="overtime-weekend">Weekend Overtime Multiplier</Label>
+                  <Input
+                    id="overtime-weekend"
+                    type="number"
+                    step="0.1"
+                    value={payrollSettings.overtimeWeekendMultiplier}
+                    onChange={(e) =>
+                      setPayrollSettings({
+                        ...payrollSettings,
+                        overtimeWeekendMultiplier: Number.parseFloat(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="auto-paye">Auto-calculate PAYE</Label>
+                    <p className="text-sm text-gray-600">Automatically calculate Pay As You Earn tax</p>
+                  </div>
+                  <Switch
+                    id="auto-paye"
+                    checked={payrollSettings.autoCalculatePAYE}
+                    onCheckedChange={(checked) =>
+                      setPayrollSettings({ ...payrollSettings, autoCalculatePAYE: checked })
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="auto-ssnit">Auto-calculate SSNIT</Label>
+                    <p className="text-sm text-gray-600">Automatically calculate Social Security contributions</p>
+                  </div>
+                  <Switch
+                    id="auto-ssnit"
+                    checked={payrollSettings.autoCalculateSSNIT}
+                    onCheckedChange={(checked) =>
+                      setPayrollSettings({ ...payrollSettings, autoCalculateSSNIT: checked })
+                    }
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="flex justify-end">
+                <Button onClick={handleSavePayrollSettings} className="bg-blue-600 hover:bg-blue-700">
+                  Save Payroll Settings
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tax Configuration */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Tax Configuration</CardTitle>
+              <CardDescription>Configure PAYE tax bands and SSNIT rates for Ghana</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* PAYE Tax Bands */}
+              <div>
+                <h4 className="font-semibold mb-3">PAYE Tax Bands (Ghana 2025)</h4>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Band</TableHead>
+                      <TableHead>Rate (%)</TableHead>
+                      <TableHead>From (GH₵)</TableHead>
+                      <TableHead>To (GH₵)</TableHead>
+                      <TableHead>Description</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {taxBands.map((band) => (
+                      <TableRow key={band.band}>
+                        <TableCell>{band.band}</TableCell>
+                        <TableCell>{band.rate}%</TableCell>
+                        <TableCell>{band.from.toLocaleString()}</TableCell>
+                        <TableCell>{band.to ? band.to.toLocaleString() : "No limit"}</TableCell>
+                        <TableCell className="text-sm text-gray-600">{band.description}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* SSNIT Rates */}
+              <div>
+                <h4 className="font-semibold mb-3">SSNIT Contribution Rates</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">{ssnitRates.employee}%</div>
+                        <div className="text-sm text-gray-600">Employee Contribution</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">{ssnitRates.employer}%</div>
+                        <div className="text-sm text-gray-600">Employer Contribution</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-purple-600">{ssnitRates.total}%</div>
+                        <div className="text-sm text-gray-600">Total Contribution</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Allowances and Deductions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Allowances</CardTitle>
+                <CardDescription>Configure standard allowances</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {allowances.map((allowance, index) => (
+                    <div key={allowance.code} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{allowance.description}</h4>
+                        <p className="text-sm text-gray-600">
+                          Code: {allowance.code} • {allowance.taxable ? "Taxable" : "Non-taxable"}
+                        </p>
+                      </div>
+                      <Badge variant={allowance.taxable ? "default" : "secondary"}>
+                        {allowance.taxable ? "Taxable" : "Non-taxable"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" className="mt-4 w-full bg-transparent">
+                  Add Allowance
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Deductions</CardTitle>
+                <CardDescription>Configure standard deductions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {deductions.map((deduction, index) => (
+                    <div key={deduction.code} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{deduction.description}</h4>
+                        <p className="text-sm text-gray-600">
+                          Code: {deduction.code} •{" "}
+                          {deduction.percentage > 0 ? `${deduction.percentage}%` : "Fixed Amount"}
+                        </p>
+                      </div>
+                      <Badge variant="outline">{deduction.percentage > 0 ? `${deduction.percentage}%` : "Fixed"}</Badge>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" className="mt-4 w-full bg-transparent">
+                  Add Deduction
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ... existing other tabs content ... */}
         <TabsContent value="employees" className="space-y-6">
           <Card>
             <CardHeader>
