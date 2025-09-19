@@ -246,6 +246,9 @@ export default function SettingsPage() {
   const [policyInsights, setPolicyInsights] = useState<Record<string, string>>({})
   const [loadingInsights, setLoadingInsights] = useState<Record<string, boolean>>({})
 
+  const [editingAllowance, setEditingAllowance] = useState<number | null>(null)
+  const [editingDeduction, setEditingDeduction] = useState<number | null>(null)
+
   const [allowances, setAllowances] = useState([
     {
       code: "TRANS",
@@ -2705,6 +2708,18 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
   }
 
+  const handleAllowanceFieldChange = (index: number, field: string, value: any) => {
+    const updatedAllowances = [...allowances]
+    updatedAllowances[index] = { ...updatedAllowances[index], [field]: value }
+    setAllowances(updatedAllowances)
+  }
+
+  const handleDeductionFieldChange = (index: number, field: string, value: any) => {
+    const updatedDeductions = [...deductions]
+    updatedDeductions[index] = { ...updatedDeductions[index], [field]: value }
+    setDeductions(updatedDeductions)
+  }
+
   const handleAddAllowance = () => {
     const newAllowance = {
       code: "",
@@ -2732,7 +2747,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
   const handleEditAllowance = (index: number) => {
     console.log(`[v0] Editing allowance at index ${index}`)
-    // Implementation for editing allowance
+    setEditingAllowance(index)
   }
 
   const handleDeleteAllowance = (index: number) => {
@@ -2746,7 +2761,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
   const handleEditDeduction = (index: number) => {
     console.log(`[v0] Editing deduction at index ${index}`)
-    // Implementation for editing deduction
+    setEditingDeduction(index)
   }
 
   const handleDeleteDeduction = (index: number) => {
@@ -4091,20 +4106,68 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     <tbody>
                       {allowances.map((allowance, index) => (
                         <tr key={index} className="hover:bg-gray-50">
-                          <td className="border border-gray-200 px-4 py-3 font-medium">{allowance.code}</td>
-                          <td className="border border-gray-200 px-4 py-3">{allowance.description}</td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Switch checked={allowance.taxable} />
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={allowance.code}
+                              onChange={(e) => handleAllowanceFieldChange(index, "code", e.target.value)}
+                              className="border-0 bg-transparent p-0 font-medium"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={allowance.description}
+                              onChange={(e) => handleAllowanceFieldChange(index, "description", e.target.value)}
+                              className="border-0 bg-transparent p-0"
+                            />
                           </td>
                           <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Switch checked={allowance.recurring} />
+                            <Switch
+                              checked={allowance.taxable}
+                              onCheckedChange={(checked) => handleAllowanceFieldChange(index, "taxable", checked)}
+                            />
                           </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">{allowance.amount}</td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">{allowance.percentage}</td>
                           <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Badge variant={allowance.type === "FIXED" ? "default" : "secondary"}>
-                              {allowance.type}
-                            </Badge>
+                            <Switch
+                              checked={allowance.recurring}
+                              onCheckedChange={(checked) => handleAllowanceFieldChange(index, "recurring", checked)}
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              value={allowance.amount}
+                              onChange={(e) =>
+                                handleAllowanceFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={allowance.percentage}
+                              onChange={(e) =>
+                                handleAllowanceFieldChange(index, "percentage", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Select
+                              value={allowance.type}
+                              onValueChange={(value) => handleAllowanceFieldChange(index, "type", value)}
+                            >
+                              <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
+                                <Badge variant={allowance.type === "FIXED" ? "default" : "secondary"}>
+                                  {allowance.type}
+                                </Badge>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="FIXED">FIXED</SelectItem>
+                                <SelectItem value="VARIABLE">VARIABLE</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </td>
                           <td className="border border-gray-200 px-4 py-3 text-center">
                             <DropdownMenu>
@@ -4114,10 +4177,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => console.log(`[v0] Viewing allowance ${index}`)}>
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  View
-                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleEditAllowance(index)}>
                                   <Edit className="w-4 h-4 mr-2" />
                                   Edit
@@ -4167,17 +4226,62 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     <tbody>
                       {deductions.map((deduction, index) => (
                         <tr key={index} className="hover:bg-gray-50">
-                          <td className="border border-gray-200 px-4 py-3 font-medium">{deduction.code}</td>
-                          <td className="border border-gray-200 px-4 py-3">{deduction.description}</td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Switch checked={deduction.recurring} />
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={deduction.code}
+                              onChange={(e) => handleDeductionFieldChange(index, "code", e.target.value)}
+                              className="border-0 bg-transparent p-0 font-medium"
+                            />
                           </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">{deduction.amount}</td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">{deduction.percentage}</td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={deduction.description}
+                              onChange={(e) => handleDeductionFieldChange(index, "description", e.target.value)}
+                              className="border-0 bg-transparent p-0"
+                            />
+                          </td>
                           <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Badge variant={deduction.type === "FIXED" ? "default" : "secondary"}>
-                              {deduction.type}
-                            </Badge>
+                            <Switch
+                              checked={deduction.recurring}
+                              onCheckedChange={(checked) => handleDeductionFieldChange(index, "recurring", checked)}
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              value={deduction.amount}
+                              onChange={(e) =>
+                                handleDeductionFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={deduction.percentage}
+                              onChange={(e) =>
+                                handleDeductionFieldChange(index, "percentage", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Select
+                              value={deduction.type}
+                              onValueChange={(value) => handleDeductionFieldChange(index, "type", value)}
+                            >
+                              <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
+                                <Badge variant={deduction.type === "FIXED" ? "default" : "secondary"}>
+                                  {deduction.type}
+                                </Badge>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="FIXED">FIXED</SelectItem>
+                                <SelectItem value="VARIABLE">VARIABLE</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </td>
                           <td className="border border-gray-200 px-4 py-3 text-center">
                             <DropdownMenu>
@@ -4187,10 +4291,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => console.log(`[v0] Viewing deduction ${index}`)}>
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  View
-                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleEditDeduction(index)}>
                                   <Edit className="w-4 h-4 mr-2" />
                                   Edit
