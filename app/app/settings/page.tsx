@@ -10,23 +10,9 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import {
-  Settings,
-  Calculator,
-  Shield,
-  Wifi,
-  Bell,
-  RefreshCw,
-  Plus,
-  Loader2,
-  Building,
-  Building2,
-  Users,
-  Key,
-  Lock,
-  Save,
-} from "lucide-react"
+import { Settings, Calculator, Shield, Wifi, Bell, RefreshCw, Plus, Loader2 } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 interface Company {
   id: string
@@ -268,11 +254,11 @@ export default function SettingsPage() {
   const [payeTaxBands, setPayeTaxBands] = useState([
     { band: 0, rate: 0, from: 0, to: 490, cumulativeTax: 0 },
     { band: 5, rate: 5, from: 491, to: 600, cumulativeTax: 0 },
-    { band: 10, rate: 10, from: 601, to: 730, cumulativeTax: 5.45 },
-    { band: 17.5, rate: 17.5, from: 731, to: 3896.67, cumulativeTax: 18.45 },
-    { band: 25, rate: 25, from: 3896.68, to: 19896.67, cumulativeTax: 572.5 },
-    { band: 30, rate: 30, from: 19896.68, to: 50416.67, cumulativeTax: 4572.5 },
-    { band: 35, rate: 35, from: 50416.68, to: Number.POSITIVE_INFINITY, cumulativeTax: 13728.5 },
+    { band: 10, rate: 10, from: 601, to: 730, cumulativeTax: 5.5 },
+    { band: 17.5, rate: 17.5, from: 731, to: 3896.67, cumulativeTax: 18.5 },
+    { band: 25, rate: 25, from: 3896.68, to: 19896.67, cumulativeTax: 572.67 },
+    { band: 30, rate: 30, from: 19896.68, to: 50416.67, cumulativeTax: 4572.67 },
+    { band: 35, rate: 35, from: 50416.68, to: Number.POSITIVE_INFINITY, cumulativeTax: 13728.67 },
   ])
 
   const [ssnitRates, setSsnitRates] = useState({
@@ -449,10 +435,10 @@ export default function SettingsPage() {
     let tax = 0
     let remainingIncome = monthlyIncome
 
-    // Use the updated payeTaxBands for calculation if the currency is GHS
-    const bandsToUse = currency === "ghs" ? payeTaxBands : config.taxBands
+    // Use the correct tax bands based on the selected currency
+    const currentTaxBands = currency === "ghs" ? payeTaxBands : config.taxBands
 
-    for (const band of bandsToUse) {
+    for (const band of currentTaxBands) {
       if (remainingIncome <= 0) break
 
       const bandMax = band.to === Number.POSITIVE_INFINITY ? Number.POSITIVE_INFINITY : band.to
@@ -493,9 +479,9 @@ export default function SettingsPage() {
     return errors
   }
 
-  const syncWithGovernmentAPI = async (country: string) => {
+  const syncTaxRates = async () => {
     try {
-      console.log(`[v0] Syncing tax rates for ${country}...`)
+      console.log(`[v0] Syncing tax rates for ${selectedCurrency}...`)
 
       // Simulate API call
       const response = await new Promise((resolve) =>
@@ -503,7 +489,7 @@ export default function SettingsPage() {
           () =>
             resolve({
               success: true,
-              data: currencyConfig[country as keyof typeof currencyConfig]?.taxBands || [],
+              data: currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.taxBands || [],
               version: "2024.1",
               confidence: 95,
             }),
@@ -513,7 +499,7 @@ export default function SettingsPage() {
 
       setApiStatus((prev) => ({
         ...prev,
-        [country]: {
+        [selectedCurrency]: {
           connected: true,
           lastSync: new Date().toISOString(),
           status: "active",
@@ -527,16 +513,26 @@ export default function SettingsPage() {
           id: Date.now().toString(),
           type: "sync_success",
           priority: "medium",
-          title: `${country.toUpperCase()} Tax Rates Synced`,
+          title: `${selectedCurrency.toUpperCase()} Tax Rates Synced`,
           message: `Successfully updated tax rates from government API`,
           timestamp: new Date().toISOString(),
           read: false,
         },
       ])
 
+      toast({
+        title: "Sync Successful",
+        description: `Tax rates for ${selectedCurrency.toUpperCase()} have been synced.`,
+      })
+
       return response
     } catch (error) {
-      console.error(`[v0] Failed to sync ${country} tax rates:`, error)
+      console.error(`[v0] Failed to sync ${selectedCurrency} tax rates:`, error)
+      toast({
+        title: "Sync Failed",
+        description: `Failed to sync tax rates for ${selectedCurrency.toUpperCase()}.`,
+        variant: "destructive",
+      })
       throw error
     }
   }
@@ -546,12 +542,11 @@ export default function SettingsPage() {
     // Update payeTaxBands based on the selected currency
     const selectedConfig = getCurrencyConfig(currency)
     if (selectedConfig && selectedConfig.taxBands) {
-      // Only update payeTaxBands if the currency is GHS, otherwise use the config's taxBands
+      // Use the correct tax bands based on the selected currency
       if (currency === "ghs") {
-        setPayeTaxBands(selectedConfig.taxBands)
+        setPayeTaxBands(selectedConfig.taxBands) // Use the default GHS bands if available
       } else {
-        // For other currencies, we might need to map their tax bands to a similar structure if needed
-        // For now, we'll assume the config.taxBands is directly usable or we'll handle it in calculateTax
+        setPayeTaxBands(selectedConfig.taxBands) // Use the selected currency's bands
       }
 
       // Update SSNIT, Tier2, Tier3 rates if they exist in the config
@@ -1127,7 +1122,7 @@ Follow all applicable laws, regulations, and company policies.`,
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => syncWithGovernmentAPI(selectedCurrency)}
+                      onClick={syncTaxRates}
                       disabled={!apiStatus[selectedCurrency as keyof typeof apiStatus]?.connected}
                     >
                       <RefreshCw className="w-4 h-4 mr-2" />
@@ -1147,48 +1142,57 @@ Follow all applicable laws, regulations, and company policies.`,
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-200">
+                  <table className="w-full border-collapse border border-gray-200 rounded-lg">
                     <thead>
                       <tr className="bg-gray-50">
-                        <th className="border border-gray-200 px-4 py-2 text-left">Band</th>
-                        <th className="border border-gray-200 px-4 py-2 text-left">Rate (%)</th>
-                        <th className="border border-gray-200 px-4 py-2 text-left">
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Band</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Rate (%)</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">
                           From ({getCurrencyConfig(selectedCurrency).symbol})
                         </th>
-                        <th className="border border-gray-200 px-4 py-2 text-left">
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">
                           To ({getCurrencyConfig(selectedCurrency).symbol})
                         </th>
-                        <th className="border border-gray-200 px-4 py-2 text-left">
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">
                           Cumulative Tax ({getCurrencyConfig(selectedCurrency).symbol})
                         </th>
-                        <th className="border border-gray-200 px-4 py-2 text-left">Actions</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {payeTaxBands.map((band, index) => (
-                        <tr key={index}>
-                          <td className="border border-gray-200 px-4 py-2">{band.band}</td>
-                          <td className="border border-gray-200 px-4 py-2">
-                            <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
-                              {band.rate}%
-                            </span>
-                          </td>
-                          <td className="border border-gray-200 px-4 py-2 text-green-600 font-medium">
-                            {band.from.toLocaleString()}
-                          </td>
-                          <td className="border border-gray-200 px-4 py-2 text-green-600 font-medium">
-                            {band.to === Number.POSITIVE_INFINITY ? "∞" : band.to.toLocaleString()}
-                          </td>
-                          <td className="border border-gray-200 px-4 py-2 text-green-600 font-medium">
-                            {band.cumulativeTax.toLocaleString()}
-                          </td>
-                          <td className="border border-gray-200 px-4 py-2">
-                            <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-800">
-                              Edit
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
+                      {/* Use the correct tax bands based on the selected currency */}
+                      {(selectedCurrency === "ghs" ? payeTaxBands : getCurrencyConfig(selectedCurrency)?.taxBands).map(
+                        (band, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="border border-gray-200 px-4 py-3 font-medium">{band.band}</td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {band.rate}%
+                              </span>
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              {band.from ? band.from.toLocaleString() : "0"}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              {band.to === Number.POSITIVE_INFINITY ? "∞" : band.to.toLocaleString()}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3 font-medium text-green-600">
+                              {band.cumulativeTax ? band.cumulativeTax.toLocaleString() : "0"}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3 text-center">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  console.log("[v0] Editing tax band:", band)
+                                }}
+                              >
+                                Edit
+                              </Button>
+                            </td>
+                          </tr>
+                        ),
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1388,50 +1392,58 @@ Follow all applicable laws, regulations, and company policies.`,
           </Card>
         </TabsContent>
 
+        {/* Other tab contents */}
         <TabsContent value="company">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Building className="w-5 h-5" />
-                <span>Company Information</span>
-              </CardTitle>
+              <CardTitle>Company Information</CardTitle>
               <CardDescription>Manage your company details and settings</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="companyName">Company Name</Label>
-                  <Input id="companyName" placeholder="Enter company name" />
+            <CardContent>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="companyName">Company Name</Label>
+                      <Input id="companyName" placeholder="Enter company name" defaultValue={companyData.name} />
+                    </div>
+                    <div>
+                      <Label htmlFor="companyEmail">Company Email</Label>
+                      <Input
+                        id="companyEmail"
+                        type="email"
+                        placeholder="company@example.com"
+                        defaultValue={companyData.email_address}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="companyPhone">Phone Number</Label>
+                      <Input id="companyPhone" placeholder="+233 XX XXX XXXX" defaultValue={companyData.phone_number} />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="companyAddress">Address</Label>
+                      <Textarea
+                        id="companyAddress"
+                        placeholder="Enter company address"
+                        defaultValue={companyData.address}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="taxId">Tax ID</Label>
+                      <Input
+                        id="taxId"
+                        placeholder="Enter tax identification number"
+                        defaultValue={companyData.tax_id}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="companyCode">Company Code</Label>
-                  <Input id="companyCode" placeholder="Enter company code" />
-                </div>
-                <div>
-                  <Label htmlFor="taxId">Tax ID</Label>
-                  <Input id="taxId" placeholder="Enter tax identification number" />
-                </div>
-                <div>
-                  <Label htmlFor="registrationNumber">Registration Number</Label>
-                  <Input id="registrationNumber" placeholder="Enter registration number" />
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="address">Address</Label>
-                  <Textarea id="address" placeholder="Enter company address" />
-                </div>
-                <div>
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" placeholder="Enter phone number" />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="Enter email address" />
+                <div className="flex justify-end">
+                  <Button>Save Company Information</Button>
                 </div>
               </div>
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Save className="w-4 h-4 mr-2" />
-                Save Company Information
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1439,45 +1451,74 @@ Follow all applicable laws, regulations, and company policies.`,
         <TabsContent value="multi-company">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Building2 className="w-5 h-5" />
-                <span>Multi-Company Management</span>
-              </CardTitle>
+              <CardTitle>Multi-Company Management</CardTitle>
               <CardDescription>Manage subsidiaries and related companies</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Subsidiaries</h3>
-                <Button className="bg-green-600 hover:bg-green-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Subsidiary
-                </Button>
-              </div>
-              <div className="border rounded-lg">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-gray-50">
-                      <th className="text-left p-4">Company Name</th>
-                      <th className="text-left p-4">Code</th>
-                      <th className="text-left p-4">Status</th>
-                      <th className="text-left p-4">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b">
-                      <td className="p-4">Akwaaba Tech Ltd</td>
-                      <td className="p-4">ATL001</td>
-                      <td className="p-4">
-                        <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-sm">Active</span>
-                      </td>
-                      <td className="p-4">
-                        <Button variant="ghost" size="sm">
-                          Edit
-                        </Button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-lg font-medium">Subsidiaries</h4>
+                  <Button onClick={() => setShowAddSubsidiary(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Subsidiary
+                  </Button>
+                </div>
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Company Name</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {subsidiaries.map((sub) => (
+                        <TableRow key={sub.id}>
+                          <TableCell>{sub.name}</TableCell>
+                          <TableCell>Subsidiary</TableCell>
+                          <TableCell>
+                            <Badge variant={sub.status === "active" ? "default" : "destructive"}>{sub.status}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedSubsidiary(sub)
+                                setShowSubsidiaryDetails(true)
+                              }}
+                            >
+                              View
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedSubsidiary(sub)
+                                setShowEditSubsidiary(true)
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSubsidiaryToToggle(sub)
+                                setShowDeactivateConfirm(sub.status === "active")
+                                setShowReactivateConfirm(sub.status !== "active")
+                              }}
+                            >
+                              {sub.status === "active" ? "Deactivate" : "Reactivate"}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1486,52 +1527,63 @@ Follow all applicable laws, regulations, and company policies.`,
         <TabsContent value="hr">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Users className="w-5 h-5" />
-                <span>HR Configuration</span>
-              </CardTitle>
+              <CardTitle>HR Configuration</CardTitle>
               <CardDescription>Configure HR policies and procedures</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="workingDays">Working Days per Week</Label>
-                  <Select defaultValue="5">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5">5 Days</SelectItem>
-                      <SelectItem value="6">6 Days</SelectItem>
-                      <SelectItem value="7">7 Days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="workingHours">Working Hours per Day</Label>
-                  <Input id="workingHours" type="number" defaultValue="8" />
-                </div>
-                <div>
-                  <Label htmlFor="annualLeave">Annual Leave Days</Label>
-                  <Input id="annualLeave" type="number" defaultValue="21" />
-                </div>
-                <div>
-                  <Label htmlFor="sickLeave">Sick Leave Days</Label>
-                  <Input id="sickLeave" type="number" defaultValue="10" />
-                </div>
-                <div>
-                  <Label htmlFor="probationPeriod">Probation Period (months)</Label>
-                  <Input id="probationPeriod" type="number" defaultValue="3" />
-                </div>
-                <div>
-                  <Label htmlFor="noticePeriod">Notice Period (days)</Label>
-                  <Input id="noticePeriod" type="number" defaultValue="30" />
+            <CardContent>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Leave Policies</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {currentPolicies.map((policy) => (
+                          <div key={policy.name} className="flex justify-between">
+                            <span>{policy.name}</span>
+                            <span>{policy.days} days</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setShowAddLeaveTypeModal(true)
+                            setPolicyModalType("add")
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Manage Leave Types
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Working Hours</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span>Standard Hours</span>
+                          <span>{hrConfig.workingHoursPerDay} hours/day</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Working Days</span>
+                          <span>{hrConfig.workingDaysPerWeek} days/week</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Overtime Rate</span>
+                          <span>1.5x</span> {/* This should be configurable */}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Save className="w-4 h-4 mr-2" />
-                Save HR Configuration
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1539,47 +1591,35 @@ Follow all applicable laws, regulations, and company policies.`,
         <TabsContent value="notifications">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Bell className="w-5 h-5" />
-                <span>Notification Settings</span>
-              </CardTitle>
-              <CardDescription>Configure notification preferences</CardDescription>
+              <CardTitle>Notification Settings</CardTitle>
+              <CardDescription>Configure system notifications and alerts</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">Email Notifications</h4>
-                    <p className="text-sm text-muted-foreground">Receive notifications via email</p>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="emailNotifications">Email Notifications</Label>
+                      <p className="text-sm text-muted-foreground">Receive notifications via email</p>
+                    </div>
+                    <Switch id="emailNotifications" defaultChecked={hrConfig.emailNotifications} />
                   </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">Payroll Reminders</h4>
-                    <p className="text-sm text-muted-foreground">Get reminded about payroll processing</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="smsNotifications">SMS Notifications</Label>
+                      <p className="text-sm text-muted-foreground">Receive notifications via SMS</p>
+                    </div>
+                    <Switch id="smsNotifications" />
                   </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">Leave Requests</h4>
-                    <p className="text-sm text-muted-foreground">Notifications for leave requests</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="pushNotifications">Push Notifications</Label>
+                      <p className="text-sm text-muted-foreground">Receive browser push notifications</p>
+                    </div>
+                    <Switch id="pushNotifications" />
                   </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">System Updates</h4>
-                    <p className="text-sm text-muted-foreground">Updates about system changes</p>
-                  </div>
-                  <Switch />
                 </div>
               </div>
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Save className="w-4 h-4 mr-2" />
-                Save Notification Settings
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1587,63 +1627,44 @@ Follow all applicable laws, regulations, and company policies.`,
         <TabsContent value="roles">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Shield className="w-5 h-5" />
-                <span>Role Management</span>
-              </CardTitle>
-              <CardDescription>Manage user roles and permissions</CardDescription>
+              <CardTitle>Roles & Permissions</CardTitle>
+              <CardDescription>Manage user roles and access permissions</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">System Roles</h3>
-                <Button className="bg-green-600 hover:bg-green-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Role
-                </Button>
-              </div>
-              <div className="border rounded-lg">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-gray-50">
-                      <th className="text-left p-4">Role Name</th>
-                      <th className="text-left p-4">Description</th>
-                      <th className="text-left p-4">Users</th>
-                      <th className="text-left p-4">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b">
-                      <td className="p-4 font-medium">Administrator</td>
-                      <td className="p-4">Full system access</td>
-                      <td className="p-4">2</td>
-                      <td className="p-4">
-                        <Button variant="ghost" size="sm">
-                          Edit
-                        </Button>
-                      </td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="p-4 font-medium">HR Manager</td>
-                      <td className="p-4">HR operations and employee management</td>
-                      <td className="p-4">3</td>
-                      <td className="p-4">
-                        <Button variant="ghost" size="sm">
-                          Edit
-                        </Button>
-                      </td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="p-4 font-medium">Payroll Officer</td>
-                      <td className="p-4">Payroll processing and management</td>
-                      <td className="p-4">1</td>
-                      <td className="p-4">
-                        <Button variant="ghost" size="sm">
-                          Edit
-                        </Button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-lg font-medium">System Roles</h4>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Role
+                  </Button>
+                </div>
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Role Name</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Users</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {roles.map((role) => (
+                        <TableRow key={role.id}>
+                          <TableCell>{role.name}</TableCell>
+                          <TableCell>{role.description}</TableCell>
+                          <TableCell>{role.user_count}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm">
+                              Edit
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1652,47 +1673,40 @@ Follow all applicable laws, regulations, and company policies.`,
         <TabsContent value="access">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Key className="w-5 h-5" />
-                <span>Access Control</span>
-              </CardTitle>
-              <CardDescription>Manage system access and permissions</CardDescription>
-            </Header>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-medium mb-3">Module Permissions</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center justify-between p-3 border rounded">
-                      <span>Employee Management</span>
-                      <Switch defaultChecked />
+              <CardTitle>Access Control</CardTitle>
+              <CardDescription>Configure system access and security settings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="twoFactor">Two-Factor Authentication</Label>
+                        <p className="text-sm text-muted-foreground">Require 2FA for all users</p>
+                      </div>
+                      <Switch id="twoFactor" />
                     </div>
-                    <div className="flex items-center justify-between p-3 border rounded">
-                      <span>Payroll Processing</span>
-                      <Switch defaultChecked />
-                    </div>
-                    <div className="flex items-center justify-between p-3 border rounded">
-                      <span>Leave Management</span>
-                      <Switch defaultChecked />
-                    </div>
-                    <div className="flex items-center justify-between p-3 border rounded">
-                      <span>Reports & Analytics</span>
-                      <Switch />
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="sessionTimeout">Auto Session Timeout</Label>
+                        <p className="text-sm text-muted-foreground">Automatically log out inactive users</p>
+                      </div>
+                      <Switch id="sessionTimeout" />
                     </div>
                   </div>
-                </div>
-                <div>
-                  <h4 className="font-medium mb-3">IP Restrictions</h4>
-                  <div className="space-y-2">
-                    <Input placeholder="Enter allowed IP addresses (comma separated)" />
-                    <p className="text-sm text-muted-foreground">Leave empty to allow access from any IP</p>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="sessionDuration">Session Duration (minutes)</Label>
+                      <Input id="sessionDuration" type="number" placeholder="30" />
+                    </div>
+                    <div>
+                      <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
+                      <Input id="maxLoginAttempts" type="number" placeholder="5" />
+                    </div>
                   </div>
                 </div>
               </div>
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Save className="w-4 h-4 mr-2" />
-                Save Access Settings
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1700,69 +1714,62 @@ Follow all applicable laws, regulations, and company policies.`,
         <TabsContent value="security">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Lock className="w-5 h-5" />
-                <span>Security Settings</span>
-              </CardTitle>
-              <CardDescription>Configure security policies and authentication</CardDescription>
+              <CardTitle>Security Settings</CardTitle>
+              <CardDescription>Configure advanced security options</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent>
               <div className="space-y-6">
-                <div>
-                  <h4 className="font-medium mb-3">Password Policy</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="minLength">Minimum Length</Label>
-                      <Input id="minLength" type="number" defaultValue="8" />
-                    </div>
-                    <div>
-                      <Label htmlFor="maxAge">Password Age (days)</Label>
-                      <Input id="maxAge" type="number" defaultValue="90" />
-                    </div>
-                  </div>
-                  <div className="mt-4 space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="requireUppercase" defaultChecked />
-                      <Label htmlFor="requireUppercase">Require uppercase letters</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="requireNumbers" defaultChecked />
-                      <Label htmlFor="requireNumbers">Require numbers</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="requireSpecial" defaultChecked />
-                      <Label htmlFor="requireSpecial">Require special characters</Label>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <h4 className="font-medium mb-3">Session Management</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
-                      <Input id="sessionTimeout" type="number" defaultValue="30" />
-                    </div>
-                    <div>
-                      <Label htmlFor="maxSessions">Max Concurrent Sessions</Label>
-                      <Input id="maxSessions" type="number" defaultValue="3" />
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <h4 className="font-medium mb-3">Two-Factor Authentication</h4>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Enable 2FA for all users</p>
-                      <p className="text-sm text-muted-foreground">Require two-factor authentication</p>
-                    </div>
-                    <Switch />
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Password Policy</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span>Minimum Length</span>
+                          <span>8 characters</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Require Uppercase</span>
+                          <Switch defaultChecked />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Require Numbers</span>
+                          <Switch defaultChecked />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Require Symbols</span>
+                          <Switch />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Audit Logs</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span>Enable Logging</span>
+                          <Switch defaultChecked />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Log Retention</span>
+                          <span>90 days</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Export Logs</span>
+                          <Button variant="outline" size="sm">
+                            Export
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Save className="w-4 h-4 mr-2" />
-                Save Security Settings
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
