@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Settings, Building2, Users, Shield, Bell, Database, Palette, Calculator, DollarSign } from "lucide-react"
+import { Settings, Building2, Users, Shield, Bell, Calculator, DollarSign } from "lucide-react"
 import { createBrowserClient } from "@supabase/ssr"
 
 console.log("[v0] SettingsPage component initializing...")
@@ -173,39 +173,42 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="company" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="company" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             Company
+          </TabsTrigger>
+          <TabsTrigger value="multi-company" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Multi-Company
+          </TabsTrigger>
+          <TabsTrigger value="roles-access" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            Roles & Access
+          </TabsTrigger>
+          <TabsTrigger value="users" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Users
           </TabsTrigger>
           <TabsTrigger value="payroll" className="flex items-center gap-2">
             <Calculator className="h-4 w-4" />
             Payroll
           </TabsTrigger>
-          <TabsTrigger value="employees" className="flex items-center gap-2">
+          <TabsTrigger value="hr" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            Employees
+            HR
           </TabsTrigger>
-          <TabsTrigger value="roles" className="flex items-center gap-2">
+          <TabsTrigger value="security" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
-            Roles
+            Security
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
             Notifications
           </TabsTrigger>
-          <TabsTrigger value="integrations" className="flex items-center gap-2">
-            <Database className="h-4 w-4" />
-            Integrations
-          </TabsTrigger>
-          <TabsTrigger value="appearance" className="flex items-center gap-2">
-            <Palette className="h-4 w-4" />
-            Appearance
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="company" className="space-y-6">
-          {/* ... existing company content ... */}
           <Card>
             <CardHeader>
               <CardTitle>Company Information</CardTitle>
@@ -274,11 +277,13 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
 
+        <TabsContent value="multi-company" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Subsidiaries</CardTitle>
-              <CardDescription>Manage your company subsidiaries and locations</CardDescription>
+              <CardTitle>Subsidiaries & Branches</CardTitle>
+              <CardDescription>Manage your company subsidiaries and branch locations</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -288,7 +293,12 @@ export default function SettingsPage() {
                       <h4 className="font-medium">{subsidiary.name}</h4>
                       <p className="text-sm text-gray-600">{subsidiary.location}</p>
                     </div>
-                    <Badge variant="secondary">Active</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">Active</Badge>
+                      <Button variant="outline" size="sm">
+                        Edit
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -299,8 +309,69 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="roles-access" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Role Management</CardTitle>
+              <CardDescription>Configure user roles and access permissions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {roles.map((role: any) => (
+                  <div key={role.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <h4 className="font-medium">{role.name}</h4>
+                      <p className="text-sm text-gray-600">Permissions: {role.permissions.join(", ")}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">{role.permissions.length} permissions</Badge>
+                      <Button variant="outline" size="sm">
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Button variant="outline" className="mt-4 bg-transparent">
+                Add Role
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="users" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>User Management</CardTitle>
+              <CardDescription>Manage system users and their access</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {employees.map((employee: any) => (
+                  <div key={employee.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <h4 className="font-medium">{employee.name}</h4>
+                      <p className="text-sm text-gray-600">
+                        {employee.role} - {employee.department}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">Active</Badge>
+                      <Button variant="outline" size="sm">
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Button variant="outline" className="mt-4 bg-transparent">
+                Add User
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="payroll" className="space-y-6">
-          {/* General Payroll Settings */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -431,14 +502,12 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Tax Configuration */}
           <Card>
             <CardHeader>
               <CardTitle>Tax Configuration</CardTitle>
               <CardDescription>Configure PAYE tax bands and SSNIT rates for Ghana</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* PAYE Tax Bands */}
               <div>
                 <h4 className="font-semibold mb-3">PAYE Tax Bands (Ghana 2025)</h4>
                 <Table>
@@ -465,7 +534,6 @@ export default function SettingsPage() {
                 </Table>
               </div>
 
-              {/* SSNIT Rates */}
               <div>
                 <h4 className="font-semibold mb-3">SSNIT Contribution Rates</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -498,7 +566,6 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Allowances and Deductions */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -555,57 +622,81 @@ export default function SettingsPage() {
           </div>
         </TabsContent>
 
-        {/* ... existing other tabs content ... */}
-        <TabsContent value="employees" className="space-y-6">
+        <TabsContent value="hr" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Employee Management</CardTitle>
-              <CardDescription>View and manage employee information</CardDescription>
+              <CardTitle>HR Policies & Settings</CardTitle>
+              <CardDescription>Configure HR policies, leave types, and employee benefits</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {employees.map((employee: any) => (
-                  <div key={employee.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <h4 className="font-medium">{employee.name}</h4>
-                      <p className="text-sm text-gray-600">
-                        {employee.role} - {employee.department}
-                      </p>
-                    </div>
-                    <Badge variant="secondary">Active</Badge>
-                  </div>
-                ))}
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="annual-leave">Annual Leave Days</Label>
+                  <Input id="annual-leave" type="number" defaultValue="21" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sick-leave">Sick Leave Days</Label>
+                  <Input id="sick-leave" type="number" defaultValue="10" />
+                </div>
               </div>
-              <Button variant="outline" className="mt-4 bg-transparent">
-                Add Employee
-              </Button>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="probation-period">Probation Period (months)</Label>
+                    <p className="text-sm text-gray-600">Default probation period for new employees</p>
+                  </div>
+                  <Input id="probation-period" type="number" defaultValue="3" className="w-20" />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="notice-period">Notice Period (days)</Label>
+                    <p className="text-sm text-gray-600">Standard notice period for resignation</p>
+                  </div>
+                  <Input id="notice-period" type="number" defaultValue="30" className="w-20" />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="roles" className="space-y-6">
+        <TabsContent value="security" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Role Management</CardTitle>
-              <CardDescription>Configure user roles and permissions</CardDescription>
+              <CardTitle>Security Settings</CardTitle>
+              <CardDescription>Configure system security and access controls</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {roles.map((role: any) => (
-                  <div key={role.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <h4 className="font-medium">{role.name}</h4>
-                      <p className="text-sm text-gray-600">Permissions: {role.permissions.join(", ")}</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Edit
-                    </Button>
-                  </div>
-                ))}
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="two-factor">Two-Factor Authentication</Label>
+                  <p className="text-sm text-gray-600">Require 2FA for all users</p>
+                </div>
+                <Switch id="two-factor" />
               </div>
-              <Button variant="outline" className="mt-4 bg-transparent">
-                Add Role
-              </Button>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="session-timeout">Auto Session Timeout</Label>
+                  <p className="text-sm text-gray-600">Automatically log out inactive users</p>
+                </div>
+                <Switch id="session-timeout" defaultChecked />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password-policy">Password Policy</Label>
+                <Select defaultValue="medium">
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low Security</SelectItem>
+                    <SelectItem value="medium">Medium Security</SelectItem>
+                    <SelectItem value="high">High Security</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -640,77 +731,13 @@ export default function SettingsPage() {
                 </div>
                 <Switch id="employee-updates" />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="integrations" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>System Integrations</CardTitle>
-              <CardDescription>Manage external system connections and APIs</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <h4 className="font-medium">Supabase Database</h4>
-                  <p className="text-sm text-gray-600">Primary database connection</p>
-                </div>
-                <Badge variant="default" className="bg-green-100 text-green-800">
-                  Connected
-                </Badge>
-              </div>
-
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <h4 className="font-medium">Tax API Integration</h4>
-                  <p className="text-sm text-gray-600">Automated tax calculations</p>
-                </div>
-                <Badge variant="secondary">Available</Badge>
-              </div>
-
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <h4 className="font-medium">Banking Integration</h4>
-                  <p className="text-sm text-gray-600">Direct deposit and payments</p>
-                </div>
-                <Badge variant="outline">Not Connected</Badge>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="appearance" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Appearance Settings</CardTitle>
-              <CardDescription>Customize the look and feel of your HR system</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="dark-mode">Dark Mode</Label>
-                  <p className="text-sm text-gray-600">Switch to dark theme</p>
-                </div>
-                <Switch id="dark-mode" />
-              </div>
 
               <div className="flex items-center justify-between">
                 <div>
-                  <Label htmlFor="compact-view">Compact View</Label>
-                  <p className="text-sm text-gray-600">Reduce spacing and padding</p>
+                  <Label htmlFor="tax-updates">Tax Rate Updates</Label>
+                  <p className="text-sm text-gray-600">Notifications for government tax changes</p>
                 </div>
-                <Switch id="compact-view" />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Theme Color</Label>
-                <div className="flex gap-2">
-                  <div className="w-8 h-8 rounded-full bg-blue-600 border-2 border-blue-600"></div>
-                  <div className="w-8 h-8 rounded-full bg-green-600 border-2 border-transparent hover:border-green-600 cursor-pointer"></div>
-                  <div className="w-8 h-8 rounded-full bg-purple-600 border-2 border-transparent hover:border-purple-600 cursor-pointer"></div>
-                  <div className="w-8 h-8 rounded-full bg-red-600 border-2 border-transparent hover:border-red-600 cursor-pointer"></div>
-                </div>
+                <Switch id="tax-updates" defaultChecked />
               </div>
             </CardContent>
           </Card>
