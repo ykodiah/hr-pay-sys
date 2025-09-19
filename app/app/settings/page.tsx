@@ -1,5 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
+import { CardFooter } from "@/components/ui/card"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -36,6 +38,8 @@ import {
   Bell,
   MoreHorizontal,
   Trash2,
+  Send,
+  Mail,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -50,6 +54,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Separator } from "@/components/ui/separator" // Added for Separator
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table" // Added for Table components
 
 interface Company {
   id: string
@@ -221,7 +227,7 @@ export default function SettingsPage() {
   const [isManagingLeaveTypes, setIsManagingLeaveTypes] = useState(false)
   const [selectedPolicy, setSelectedPolicy] = useState<string | null>(null)
 
-  const [isSaving, setIsSaving] = useState(false)
+  const [isSaving, setIsSaving] = useState(false) // General saving state
 
   const [hrDocuments, setHrDocuments] = useState([
     { id: 1, name: "Employee Handbook", type: "PDF", size: "2.4 MB", visibleToAll: true },
@@ -427,6 +433,80 @@ export default function SettingsPage() {
 
   const [selectedCurrency, setSelectedCurrency] = useState("ghs")
   const [payeTaxBands, setPayeTaxBands] = useState(currencyConfig.ghs.taxBands)
+
+  const [notificationTemplates, setNotificationTemplates] = useState([
+    {
+      id: "1",
+      name: "Employee Welcome",
+      category: "HR",
+      type: "Email",
+      status: "Active",
+      lastModified: "2024-01-15",
+      description: "Welcome email sent to new employees",
+    },
+    {
+      id: "2",
+      name: "Payroll Processed",
+      category: "Payroll",
+      type: "Email",
+      status: "Active",
+      lastModified: "2024-01-10",
+      description: "Notification when payroll is processed",
+    },
+    {
+      id: "3",
+      name: "Leave Request Approved",
+      category: "Leave",
+      type: "Email",
+      status: "Active",
+      lastModified: "2024-01-08",
+      description: "Notification when leave is approved",
+    },
+    {
+      id: "4",
+      name: "Attendance Alert",
+      category: "Attendance",
+      type: "SMS",
+      status: "Draft",
+      lastModified: "2024-01-05",
+      description: "Alert for attendance issues",
+    },
+  ])
+
+  const [emailConfig, setEmailConfig] = useState({
+    provider: "smtp",
+    smtpHost: "smtp.gmail.com",
+    smtpPort: 587,
+    smtpUsername: "",
+    smtpPassword: "",
+    fromEmail: "hr@company.com",
+    fromName: "HR Department",
+    replyTo: "noreply@company.com",
+    enableTLS: true,
+    enableSSL: false,
+  })
+
+  const [notificationSettings, setNotificationSettings] = useState({
+    payrollNotifications: true,
+    leaveNotifications: true,
+    attendanceAlerts: true,
+    promotionNotifications: true,
+    systemMaintenanceAlerts: true,
+    emailDigest: "daily",
+    smsAlerts: false,
+    pushNotifications: true,
+  })
+
+  const [isAddingTemplate, setIsAddingTemplate] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState(null)
+  const [newTemplate, setNewTemplate] = useState({
+    name: "",
+    category: "HR",
+    type: "Email",
+    subject: "",
+    body: "",
+    variables: [],
+  })
 
   const getCurrencyConfig = (currency: string) => {
     return currencyConfig[currency as keyof typeof currencyConfig] || currencyConfig.ghs
@@ -2773,6 +2853,133 @@ Format the response in a professional, actionable manner for HR decision-makers.
     })
   }
 
+  const handleAddNotificationTemplate = () => {
+    setIsAddingTemplate(true)
+    setNewTemplate({
+      name: "",
+      category: "HR",
+      type: "Email",
+      subject: "",
+      body: "",
+      variables: [],
+    })
+  }
+
+  const handleSaveTemplate = async () => {
+    if (!newTemplate.name || !newTemplate.subject || !newTemplate.body) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSaving(true) // Use the general saving state
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      const template = {
+        id: Date.now().toString(),
+        name: newTemplate.name,
+        category: newTemplate.category,
+        type: newTemplate.type,
+        status: "Active",
+        lastModified: new Date().toISOString().split("T")[0],
+        description: newTemplate.subject,
+      }
+
+      setNotificationTemplates([...notificationTemplates, template])
+      setIsAddingTemplate(false)
+      setEditingTemplate(null) // Clear editing state
+
+      toast({
+        title: "Template Created",
+        description: `${newTemplate.name} template has been created successfully`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create template",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleEditTemplate = (template) => {
+    setEditingTemplate(template)
+    setNewTemplate({
+      name: template.name,
+      category: template.category,
+      type: template.type,
+      subject: template.description, // Assuming description holds the subject for editing
+      body: `Dear {{employee_name}},\n\nThis is a sample template for ${template.name}.\n\nBest regards,\nHR Team`, // Placeholder body
+      variables: ["employee_name", "company_name"], // Placeholder variables
+    })
+    setIsAddingTemplate(true)
+  }
+
+  const handleDeleteTemplate = async (templateId) => {
+    setIsSaving(true) // Use the general saving state
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      setNotificationTemplates(notificationTemplates.filter((t) => t.id !== templateId))
+      toast({
+        title: "Template Deleted",
+        description: "Template has been deleted successfully",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete template",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleTestEmail = async () => {
+    setIsSaving(true) // Use the general saving state
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      toast({
+        title: "Test Email Sent",
+        description: "Test email has been sent successfully to your email address",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send test email",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleSaveEmailConfig = async () => {
+    setIsSaving(true) // Use the general saving state
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      toast({
+        title: "Email Configuration Saved",
+        description: "Email settings have been updated successfully",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save email configuration",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -4329,25 +4536,397 @@ Format the response in a professional, actionable manner for HR decision-makers.
         </TabsContent>
 
         <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Settings className="w-5 h-5" />
-                <span>Notifications</span>
-              </CardTitle>
-              <CardDescription>Configure email and system notifications</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <Button variant="outline" onClick={handleAddEmailTemplateInner}>
-                  Add Email Template
-                </Button>
-                <Button variant="outline" onClick={() => handleEditEmailTemplateInner("Welcome Email")}>
-                  Edit Welcome Email
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Bell className="w-5 h-5" />
+                  <span>Notification Templates</span>
+                </CardTitle>
+                <CardDescription>Manage email and SMS templates for HR and payroll notifications</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div className="flex space-x-2">
+                      <Button onClick={handleAddNotificationTemplate} className="bg-green-600 hover:bg-green-700">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Template
+                      </Button>
+                      <Button variant="outline" onClick={handleTestEmail} disabled={isSaving}>
+                        {isSaving ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4 mr-2" />
+                        )}
+                        Test Email
+                      </Button>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary">{notificationTemplates.length} Templates</Badge>
+                    </div>
+                  </div>
+
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Template Name</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Last Modified</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {notificationTemplates.map((template) => (
+                          <TableRow key={template.id}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{template.name}</div>
+                                <div className="text-sm text-muted-foreground">{template.description}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{template.category}</Badge>
+                            </TableCell>
+                            <TableCell>{template.type}</TableCell>
+                            <TableCell>
+                              <Badge variant={template.status === "Active" ? "default" : "secondary"}>
+                                {template.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{template.lastModified}</TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleDeleteTemplate(template.id)}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Email Configuration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Mail className="w-5 h-5" />
+                  <span>Email Configuration</span>
+                </CardTitle>
+                <CardDescription>Configure SMTP settings for sending notifications</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="provider">Email Provider</Label>
+                      <Select
+                        value={emailConfig.provider}
+                        onValueChange={(value) => setEmailConfig({ ...emailConfig, provider: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="smtp">SMTP</SelectItem>
+                          <SelectItem value="sendgrid">SendGrid</SelectItem>
+                          <SelectItem value="mailgun">Mailgun</SelectItem>
+                          <SelectItem value="ses">Amazon SES</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="smtpHost">SMTP Host</Label>
+                      <Input
+                        id="smtpHost"
+                        value={emailConfig.smtpHost}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpHost: e.target.value })}
+                        placeholder="smtp.gmail.com"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="smtpPort">SMTP Port</Label>
+                      <Input
+                        id="smtpPort"
+                        type="number"
+                        value={emailConfig.smtpPort}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpPort: Number.parseInt(e.target.value) })}
+                        placeholder="587"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="smtpUsername">Username</Label>
+                      <Input
+                        id="smtpUsername"
+                        value={emailConfig.smtpUsername}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpUsername: e.target.value })}
+                        placeholder="your-email@company.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="fromEmail">From Email</Label>
+                      <Input
+                        id="fromEmail"
+                        value={emailConfig.fromEmail}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, fromEmail: e.target.value })}
+                        placeholder="hr@company.com"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="fromName">From Name</Label>
+                      <Input
+                        id="fromName"
+                        value={emailConfig.fromName}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, fromName: e.target.value })}
+                        placeholder="HR Department"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="replyTo">Reply To</Label>
+                      <Input
+                        id="replyTo"
+                        value={emailConfig.replyTo}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, replyTo: e.target.value })}
+                        placeholder="noreply@company.com"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="enableTLS"
+                          checked={emailConfig.enableTLS}
+                          onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableTLS: checked })}
+                        />
+                        <Label htmlFor="enableTLS">Enable TLS</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="enableSSL"
+                          checked={emailConfig.enableSSL}
+                          onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableSSL: checked })}
+                        />
+                        <Label htmlFor="enableSSL">Enable SSL</Label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end space-x-2">
+                  <Button variant="outline" onClick={handleTestEmail} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                    Test Connection
+                  </Button>
+                  <Button onClick={handleSaveEmailConfig} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                    Save Configuration
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Notification Preferences */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Settings className="w-5 h-5" />
+                  <span>Notification Preferences</span>
+                </CardTitle>
+                <CardDescription>Configure default notification settings for all employees</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <h4 className="font-medium">HR Notifications</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Employee Welcome</Label>
+                            <p className="text-sm text-muted-foreground">Send welcome email to new employees</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.payrollNotifications} // Corrected to use a relevant setting
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Leave Notifications</Label>
+                            <p className="text-sm text-muted-foreground">Notify about leave requests and approvals</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.leaveNotifications}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, leaveNotifications: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Promotion Notifications</Label>
+                            <p className="text-sm text-muted-foreground">Send promotion and transfer notifications</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.promotionNotifications}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, promotionNotifications: checked })
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="font-medium">Payroll & Attendance</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Payroll Processing</Label>
+                            <p className="text-sm text-muted-foreground">Notify when payroll is processed</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.payrollNotifications}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Attendance Alerts</Label>
+                            <p className="text-sm text-muted-foreground">Send alerts for attendance issues</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.attendanceAlerts}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, attendanceAlerts: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>System Maintenance</Label>
+                            <p className="text-sm text-muted-foreground">Notify about system maintenance</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.systemMaintenanceAlerts}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, systemMaintenanceAlerts: checked })
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <Label>Email Digest Frequency</Label>
+                      <Select
+                        value={notificationSettings.emailDigest}
+                        onValueChange={(value) =>
+                          setNotificationSettings({ ...notificationSettings, emailDigest: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="immediate">Immediate</SelectItem>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="smsAlerts"
+                        checked={notificationSettings.smsAlerts}
+                        onCheckedChange={(checked) =>
+                          setNotificationSettings({ ...notificationSettings, smsAlerts: checked })
+                        }
+                      />
+                      <div>
+                        <Label htmlFor="smsAlerts">SMS Alerts</Label>
+                        <p className="text-sm text-muted-foreground">Enable SMS notifications</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="pushNotifications"
+                        checked={notificationSettings.pushNotifications}
+                        onCheckedChange={(checked) =>
+                          setNotificationSettings({ ...notificationSettings, pushNotifications: checked })
+                        }
+                      />
+                      <div>
+                        <Label htmlFor="pushNotifications">Push Notifications</Label>
+                        <p className="text-sm text-muted-foreground">Enable browser push notifications</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => {
+                        setIsSaving(true) // Use the general saving state
+                        setTimeout(() => {
+                          setIsSaving(false)
+                          toast({
+                            title: "Preferences Saved",
+                            description: "Notification preferences have been updated successfully",
+                          })
+                        }, 1500)
+                      }}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                      Save Preferences
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="roles">
@@ -5100,6 +5679,138 @@ Format the response in a professional, actionable manner for HR decision-makers.
               </CardContent>
             </Card>
           </div>
+        </div>
+      )}
+
+      {isAddingTemplate && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle>{editingTemplate ? "Edit Template" : "Create New Template"}</CardTitle>
+              <CardDescription>
+                {editingTemplate
+                  ? "Update the notification template"
+                  : "Create a new notification template for HR/Payroll system"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="templateName">Template Name</Label>
+                  <Input
+                    id="templateName"
+                    value={newTemplate.name}
+                    onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
+                    placeholder="e.g., Employee Welcome"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="templateCategory">Category</Label>
+                  <Select
+                    value={newTemplate.category}
+                    onValueChange={(value) => setNewTemplate({ ...newTemplate, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="HR">HR</SelectItem>
+                      <SelectItem value="Payroll">Payroll</SelectItem>
+                      <SelectItem value="Leave">Leave</SelectItem>
+                      <SelectItem value="Attendance">Attendance</SelectItem>
+                      <SelectItem value="Promotion">Promotion</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="templateType">Type</Label>
+                  <Select
+                    value={newTemplate.type}
+                    onValueChange={(value) => setNewTemplate({ ...newTemplate, type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Email">Email</SelectItem>
+                      <SelectItem value="SMS">SMS</SelectItem>
+                      <SelectItem value="Push">Push Notification</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="templateSubject">Subject</Label>
+                <Input
+                  id="templateSubject"
+                  value={newTemplate.subject}
+                  onChange={(e) => setNewTemplate({ ...newTemplate, subject: e.target.value })}
+                  placeholder="e.g., Welcome to {{company_name}}!"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="templateBody">Message Body</Label>
+                <Textarea
+                  id="templateBody"
+                  value={newTemplate.body}
+                  onChange={(e) => setNewTemplate({ ...newTemplate, body: e.target.value })}
+                  placeholder="Enter your message template here. Use {{variable_name}} for dynamic content."
+                  rows={8}
+                />
+              </div>
+
+              <div>
+                <Label>Available Variables</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {[
+                    "employee_name",
+                    "company_name",
+                    "employee_id",
+                    "department",
+                    "position",
+                    "start_date",
+                    "pay_period",
+                    "gross_pay",
+                    "net_pay",
+                  ].map((variable) => (
+                    <Badge
+                      key={variable}
+                      variant="outline"
+                      className="cursor-pointer"
+                      onClick={() => {
+                        const cursorPos = document.getElementById("templateBody")?.selectionStart || 0
+                        const newBody =
+                          newTemplate.body.slice(0, cursorPos) + `{{${variable}}}` + newTemplate.body.slice(cursorPos)
+                        setNewTemplate({ ...newTemplate, body: newBody })
+                      }}
+                    >
+                      {`{{${variable}}}`}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsAddingTemplate(false)
+                  setEditingTemplate(null) // Clear editing state
+                }}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSaveTemplate} disabled={isSaving}>
+                {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                {editingTemplate ? "Update Template" : "Create Template"}
+              </Button>
+            </CardFooter>
+          </Card>
         </div>
       )}
     </div>
