@@ -32,7 +32,9 @@ import {
   DollarSign,
   Minus,
   Calculator,
-  RotateCcw,
+  Shield,
+  Wifi,
+  Bell,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -281,37 +283,14 @@ export default function SettingsPage() {
 
   const [selectedCurrency, setSelectedCurrency] = useState("ghs")
   const [payeTaxBands, setPayeTaxBands] = useState([
-    { band: 0, rate: 0, from: 0, to: 4350, description: "% on first ₵4,350" },
-    { band: 5, rate: 5, from: 4351, to: 5350, description: "% on next ₵1,000" },
-    { band: 10, rate: 10, from: 5351, to: 7350, description: "% on next ₵2,000" },
-    { band: 17.5, rate: 17.5, from: 7351, to: 27350, description: "% on next ₵20,000" },
-    { band: 25, rate: 25, from: 27351, to: 52350, description: "% on next ₵25,000" },
-    { band: 30, rate: 30, from: 52351, to: null, description: "% on remaining amount" },
+    { band: 0, rate: 0, from: 0, to: 4350, description: "% on first", cumulative: 0 },
+    { band: 5, rate: 5, from: 4351, to: 5350, description: "% on next", cumulative: 0 },
+    { band: 10, rate: 10, from: 5351, to: 7350, description: "% on next", cumulative: 50 },
+    { band: 17.5, rate: 17.5, from: 7351, to: 27350, description: "% on next", cumulative: 250 },
+    { band: 25, rate: 25, from: 27351, to: 52350, description: "% on next", cumulative: 3750 },
+    { band: 30, rate: 30, from: 52351, to: 130000, description: "% on next", cumulative: 10000 },
+    { band: 35, rate: 35, from: 130001, to: null, description: "% on remaining amount", cumulative: 33295 },
   ])
-
-  const [taxVersions, setTaxVersions] = useState([
-    {
-      id: 1,
-      version: "2024.1",
-      effectiveDate: "2024-01-01",
-      status: "active",
-      source: "manual",
-      confidence: 100,
-      approvedBy: "System Admin",
-      approvedAt: "2024-01-01T00:00:00Z",
-    },
-  ])
-  const [governmentApiStatus, setGovernmentApiStatus] = useState({
-    ghana: { connected: false, lastSync: null, status: "disconnected" },
-    nigeria: { connected: false, lastSync: null, status: "disconnected" },
-  })
-  const [autoUpdateSettings, setAutoUpdateSettings] = useState({
-    enabled: false,
-    requireApproval: true,
-    notifyOnUpdates: true,
-    confidenceThreshold: 85,
-  })
-
   const [ssnitRates, setSsnitRates] = useState({
     employee: 5.5,
     employer: 13,
@@ -332,25 +311,39 @@ export default function SettingsPage() {
     ghs: {
       symbol: "₵",
       name: "Ghana Cedis (GHS)",
+      country: "Ghana",
+      apiEndpoint: "https://api.gra.gov.gh/tax-rates",
+      lastUpdated: "2024-01-01",
+      version: "2024.1",
       taxBands: [
-        { band: 0, rate: 0, from: 0, to: 4350, description: "% on first ₵4,350" },
-        { band: 5, rate: 5, from: 4351, to: 5350, description: "% on next ₵1,000" },
-        { band: 10, rate: 10, from: 5351, to: 7350, description: "% on next ₵2,000" },
-        { band: 17.5, rate: 17.5, from: 7351, to: 27350, description: "% on next ₵20,000" },
-        { band: 25, rate: 25, from: 27351, to: 52350, description: "% on next ₵25,000" },
-        { band: 30, rate: 30, from: 52351, to: null, description: "% on remaining amount" },
+        { band: 0, rate: 0, from: 0, to: 4350, description: "% on first", cumulative: 0, annual: true },
+        { band: 5, rate: 5, from: 4351, to: 5350, description: "% on next", cumulative: 0, annual: true },
+        { band: 10, rate: 10, from: 5351, to: 7350, description: "% on next", cumulative: 50, annual: true },
+        { band: 17.5, rate: 17.5, from: 7351, to: 27350, description: "% on next", cumulative: 250, annual: true },
+        { band: 25, rate: 25, from: 27351, to: 52350, description: "% on next", cumulative: 3750, annual: true },
+        { band: 30, rate: 30, from: 52351, to: 130000, description: "% on next", cumulative: 10000, annual: true },
+        {
+          band: 35,
+          rate: 35,
+          from: 130001,
+          to: null,
+          description: "% on remaining amount",
+          cumulative: 33295,
+          annual: true,
+        },
       ],
-      ssnitRates: {
+      socialSecurity: {
         employee: 5.5,
         employer: 13.0,
         total: 18.5,
+        cap: 2000000, // Annual cap in GHS
       },
-      tier2Rates: {
+      tier2: {
         employee: 5.5,
         employer: 5.5,
         total: 11.0,
       },
-      tier3Rates: {
+      tier3: {
         employee: 5.0,
         employer: 5.0,
         total: 10.0,
@@ -359,45 +352,212 @@ export default function SettingsPage() {
     usd: {
       symbol: "$",
       name: "US Dollar (USD)",
+      country: "United States",
+      apiEndpoint: "https://api.irs.gov/tax-rates",
+      lastUpdated: "2024-01-01",
+      version: "2024.1",
       taxBands: [
-        { band: 10, rate: 10, from: 11000, to: 44725, description: "% on income" },
-        { band: 12, rate: 12, from: 44726, to: 95375, description: "% on income" },
-        { band: 22, rate: 22, from: 95376, to: 182050, description: "% on income" },
-        { band: 24, rate: 24, from: 182051, to: 231250, description: "% on income" },
-        { band: 32, rate: 32, from: 231251, to: 578125, description: "% on income" },
-        { band: 37, rate: 37, from: 578126, to: null, description: "% on remaining amount" },
-      ],
-    },
-    eur: {
-      symbol: "€",
-      name: "Euro (EUR)",
-      taxBands: [
-        { band: 0, rate: 0, from: 10908, to: null, description: "% on first" },
-        { band: 14, rate: 14, from: 10909, to: 61972, description: "% on income" },
-        { band: 42, rate: 42, from: 61973, to: 277826, description: "% on income" },
-        { band: 45, rate: 45, from: 277827, to: null, description: "% on remaining amount" },
+        { band: 10, rate: 10, from: 0, to: 11000, description: "% on income", cumulative: 0, annual: true },
+        { band: 12, rate: 12, from: 11001, to: 44725, description: "% on income", cumulative: 1100, annual: true },
+        { band: 22, rate: 22, from: 44726, to: 95375, description: "% on income", cumulative: 5147, annual: true },
+        { band: 24, rate: 24, from: 95376, to: 182050, description: "% on income", cumulative: 16290, annual: true },
+        { band: 32, rate: 32, from: 182051, to: 231250, description: "% on income", cumulative: 37104, annual: true },
+        { band: 37, rate: 37, from: 231251, to: 578125, description: "% on income", cumulative: 52832, annual: true },
+        {
+          band: 37,
+          rate: 37,
+          from: 578126,
+          to: null,
+          description: "% on remaining amount",
+          cumulative: 181244,
+          annual: true,
+        },
       ],
     },
     ngn: {
       symbol: "₦",
       name: "Nigerian Naira (NGN)",
+      country: "Nigeria",
+      apiEndpoint: "https://api.firs.gov.ng/tax-rates",
+      lastUpdated: "2024-01-01",
+      version: "2024.1",
       taxBands: [
-        { band: 7, rate: 7, from: 300000, to: null, description: "% on first" },
-        { band: 11, rate: 11, from: 300000, to: null, description: "% on next" },
-        { band: 15, rate: 15, from: 500000, to: null, description: "% on next" },
-        { band: 19, rate: 19, from: 500000, to: null, description: "% on next" },
-        { band: 21, rate: 21, from: 1600000, to: null, description: "% on next" },
-        { band: 24, rate: 24, from: null, to: null, description: "% on remaining amount" },
+        { band: 7, rate: 7, from: 0, to: 300000, description: "% on first", cumulative: 0, annual: true },
+        { band: 11, rate: 11, from: 300001, to: 600000, description: "% on next", cumulative: 21000, annual: true },
+        { band: 15, rate: 15, from: 600001, to: 1100000, description: "% on next", cumulative: 54000, annual: true },
+        { band: 19, rate: 19, from: 1100001, to: 1600000, description: "% on next", cumulative: 129000, annual: true },
+        { band: 21, rate: 21, from: 1600001, to: 3200000, description: "% on next", cumulative: 224000, annual: true },
+        {
+          band: 24,
+          rate: 24,
+          from: 3200001,
+          to: null,
+          description: "% on remaining amount",
+          cumulative: 560000,
+          annual: true,
+        },
       ],
+      socialSecurity: {
+        employee: 8.0,
+        employer: 10.0,
+        total: 18.0,
+        cap: 1800000, // Annual cap in NGN
+      },
     },
+  }
+
+  const [taxVersions, setTaxVersions] = useState([
+    {
+      id: "v2024.1",
+      version: "2024.1",
+      effectiveDate: "2024-01-01",
+      status: "active",
+      source: "government_api",
+      confidence: 95,
+      lastUpdated: "2024-01-01T00:00:00Z",
+      approvedBy: "System Admin",
+      changes: "Updated for 2024 tax year",
+    },
+  ])
+
+  const [apiStatus, setApiStatus] = useState({
+    ghana: { connected: true, lastSync: "2024-01-01T00:00:00Z", status: "active" },
+    nigeria: { connected: false, lastSync: null, status: "inactive" },
+    usa: { connected: false, lastSync: null, status: "inactive" },
+  })
+
+  const [notifications, setNotifications] = useState([
+    {
+      id: "1",
+      type: "tax_update",
+      priority: "high",
+      title: "Ghana PAYE Rates Updated",
+      message: "New tax rates effective January 1, 2024",
+      timestamp: "2024-01-01T00:00:00Z",
+      read: false,
+    },
+  ])
+
+  const calculateTax = (income: number, currency: string = selectedCurrency) => {
+    const config = currencyConfig[currency as keyof typeof currencyConfig]
+    if (!config) return 0
+
+    let tax = 0
+    let remainingIncome = income
+
+    for (const band of config.taxBands) {
+      if (remainingIncome <= 0) break
+
+      const bandIncome = band.to ? Math.min(remainingIncome, band.to - (band.from || 0)) : remainingIncome
+      tax += (bandIncome * band.rate) / 100
+      remainingIncome -= bandIncome
+    }
+
+    return tax
+  }
+
+  const validateTaxBands = (bands: any[]) => {
+    const errors = []
+
+    for (let i = 0; i < bands.length; i++) {
+      const band = bands[i]
+
+      // Check for overlapping bands
+      if (i > 0 && band.from <= bands[i - 1].to) {
+        errors.push(`Band ${i + 1}: Overlapping with previous band`)
+      }
+
+      // Check for gaps
+      if (i > 0 && band.from !== bands[i - 1].to + 1) {
+        errors.push(`Band ${i + 1}: Gap detected with previous band`)
+      }
+
+      // Check rate validity
+      if (band.rate < 0 || band.rate > 100) {
+        errors.push(`Band ${i + 1}: Invalid tax rate (${band.rate}%)`)
+      }
+    }
+
+    return errors
+  }
+
+  const syncWithGovernmentAPI = async (country: string) => {
+    try {
+      console.log(`[v0] Syncing tax rates for ${country}...`)
+
+      // Simulate API call
+      const response = await new Promise((resolve) =>
+        setTimeout(
+          () =>
+            resolve({
+              success: true,
+              data: currencyConfig[country as keyof typeof currencyConfig]?.taxBands || [],
+              version: "2024.1",
+              confidence: 95,
+            }),
+          2000,
+        ),
+      )
+
+      setApiStatus((prev) => ({
+        ...prev,
+        [country]: {
+          connected: true,
+          lastSync: new Date().toISOString(),
+          status: "active",
+        },
+      }))
+
+      // Add notification
+      setNotifications((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          type: "sync_success",
+          priority: "medium",
+          title: `${country.toUpperCase()} Tax Rates Synced`,
+          message: `Successfully updated tax rates from government API`,
+          timestamp: new Date().toISOString(),
+          read: false,
+        },
+      ])
+
+      return response
+    } catch (error) {
+      console.error(`[v0] Failed to sync ${country} tax rates:`, error)
+      throw error
+    }
   }
 
   const handleCurrencyChange = (currency: string) => {
     setSelectedCurrency(currency)
-    setPayeTaxBands(currencyConfig[currency as keyof typeof currencyConfig].taxBands)
-    setSsnitRates(currencyConfig[currency as keyof typeof currencyConfig].ssnitRates)
-    setTier2Rates(currencyConfig[currency as keyof typeof currencyConfig].tier2Rates)
-    setTier3Rates(currencyConfig[currency as keyof typeof currencyConfig].tier3Rates)
+    // Update payeTaxBands based on the selected currency
+    const selectedConfig = currencyConfig[currency as keyof typeof currencyConfig]
+    if (selectedConfig && selectedConfig.taxBands) {
+      setPayeTaxBands(selectedConfig.taxBands)
+      // Update SSNIT, Tier2, Tier3 rates if they exist in the config
+      if (selectedConfig.socialSecurity) {
+        setSsnitRates({
+          employee: selectedConfig.socialSecurity.employee,
+          employer: selectedConfig.socialSecurity.employer,
+          total: selectedConfig.socialSecurity.total,
+        })
+      }
+      if (selectedConfig.tier2) {
+        setTier2Rates({
+          employee: selectedConfig.tier2.employee,
+          employer: selectedConfig.tier2.employer,
+          total: selectedConfig.tier2.total,
+        })
+      }
+      if (selectedConfig.tier3) {
+        setTier3Rates({
+          employee: selectedConfig.tier3.employee,
+          employer: selectedConfig.tier3.employer,
+          total: selectedConfig.tier3.total,
+        })
+      }
+    }
   }
 
   const updateSsnitRates = (field: "employee" | "employer", value: number) => {
@@ -2494,57 +2654,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
   const [showAIInsights, setShowAIInsights] = useState(false)
   const [aiInsightsLoading, setAiInsightsLoading] = useState(false)
 
-  const handleGovernmentApiSync = async (country: string) => {
-    console.log(`[v0] Syncing with ${country} government API...`)
-    setGovernmentApiStatus((prev) => ({
-      ...prev,
-      [country]: { ...prev[country as keyof typeof prev], status: "syncing" },
-    }))
-
-    // Simulate API call
-    setTimeout(() => {
-      setGovernmentApiStatus((prev) => ({
-        ...prev,
-        [country]: {
-          connected: true,
-          lastSync: new Date().toISOString(),
-          status: "connected",
-        },
-      }))
-    }, 2000)
-  }
-
-  const handleTaxVersionApproval = (versionId: number, approved: boolean) => {
-    console.log(`[v0] ${approved ? "Approving" : "Rejecting"} tax version:`, versionId)
-    setTaxVersions((prev) =>
-      prev.map((version) =>
-        version.id === versionId
-          ? { ...version, status: approved ? "active" : "rejected" }
-          : { ...version, status: version.status === "active" ? "inactive" : version.status },
-      ),
-    )
-  }
-
-  const exportTaxConfiguration = () => {
-    const config = {
-      currency: selectedCurrency,
-      taxBands: payeTaxBands,
-      ssnitRates,
-      tier2Rates,
-      tier3Rates,
-      exportDate: new Date().toISOString(),
-      version: taxVersions.find((v) => v.status === "active")?.version || "1.0",
-    }
-
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `tax-config-${selectedCurrency}-${new Date().toISOString().split("T")[0]}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -3569,312 +3678,320 @@ Format the response in a professional, actionable manner for HR decision-makers.
             {/* Tax Configuration Section */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Calculator className="w-5 h-5" />
-                    <span>Tax Configuration</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleGovernmentApiSync(selectedCurrency === "ghs" ? "ghana" : "nigeria")}
-                      disabled={
-                        governmentApiStatus[
-                          selectedCurrency === "ghs" ? "ghana" : ("nigeria" as keyof typeof governmentApiStatus)
-                        ].status === "syncing"
-                      }
-                    >
-                      <RefreshCw
-                        className={`w-4 h-4 mr-2 ${governmentApiStatus[selectedCurrency === "ghs" ? "ghana" : ("nigeria" as keyof typeof governmentApiStatus)].status === "syncing" ? "animate-spin" : ""}`}
-                      />
-                      Sync with Gov API
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={exportTaxConfiguration}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Export Config
-                    </Button>
-                  </div>
+                <CardTitle className="flex items-center space-x-2">
+                  <Calculator className="w-5 h-5" />
+                  <span>Tax Configuration</span>
                 </CardTitle>
-                <CardDescription>
-                  Configure tax bands and SSNIT rates with government API integration
-                  {governmentApiStatus[
-                    selectedCurrency === "ghs" ? "ghana" : ("nigeria" as keyof typeof governmentApiStatus)
-                  ].connected && <span className="ml-2 text-green-600 text-sm">✓ Connected to Government API</span>}
-                </CardDescription>
+                <CardDescription>Configure tax bands and SSNIT rates</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-blue-900">Tax Version Management</h4>
-                    <Badge variant="secondary">
-                      Active: {taxVersions.find((v) => v.status === "active")?.version || "N/A"}
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <span className="text-blue-700">Effective Date:</span>
-                      <p className="font-medium">
-                        {taxVersions.find((v) => v.status === "active")?.effectiveDate || "N/A"}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-blue-700">Source:</span>
-                      <p className="font-medium capitalize">
-                        {taxVersions.find((v) => v.status === "active")?.source || "N/A"}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-blue-700">Confidence:</span>
-                      <p className="font-medium">{taxVersions.find((v) => v.status === "active")?.confidence || 0}%</p>
-                    </div>
-                  </div>
-                </div>
-
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-medium">
-                      PAYE Tax Bands - {currencyConfig[selectedCurrency as keyof typeof currencyConfig].name}
-                    </h4>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        console.log("[v0] Adding new tax band...")
-                      }}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Band
-                    </Button>
+                    <div>
+                      <h4 className="font-medium">PAYE Tax Bands</h4>
+                      <p className="text-sm text-gray-500">
+                        {currencyConfig[selectedCurrency as keyof typeof currencyConfig].country} - Version{" "}
+                        {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.version} - Last Updated:{" "}
+                        {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.lastUpdated}
+                      </p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => syncWithGovernmentAPI(selectedCurrency)}
+                        disabled={!apiStatus[selectedCurrency as keyof typeof apiStatus]?.connected}
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Sync API
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          console.log("[v0] Adding new tax band...")
+                        }}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Band
+                      </Button>
+                    </div>
                   </div>
+
                   <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border border-gray-200">
+                    <table className="w-full border-collapse border border-gray-200 rounded-lg">
                       <thead>
                         <tr className="bg-gray-50">
-                          <th className="border border-gray-200 px-4 py-2 text-left">Band</th>
-                          <th className="border border-gray-200 px-4 py-2 text-left">Rate (%)</th>
-                          <th className="border border-gray-200 px-4 py-2 text-left">Description</th>
-                          <th className="border border-gray-200 px-4 py-2 text-left">
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">Band</th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">Rate (%)</th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
                             From ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})
                           </th>
-                          <th className="border border-gray-200 px-4 py-2 text-left">
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
                             To ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})
                           </th>
-                          <th className="border border-gray-200 px-4 py-2 text-center">Actions</th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
+                            Cumulative Tax ({currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol})
+                          </th>
+                          <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {payeTaxBands.map((band, index) => (
-                          <tr key={index} className={index % 2 === 0 ? "bg-gray-25" : ""}>
-                            <td className="border border-gray-200 px-4 py-2 font-medium">{index + 1}</td>
-                            <td className="border border-gray-200 px-4 py-2 font-medium">{band.rate}%</td>
-                            <td className="border border-gray-200 px-4 py-2">{band.description}</td>
-                            <td className="border border-gray-200 px-4 py-2">
-                              {band.from ? band.from.toLocaleString() : "0"}
-                            </td>
-                            <td className="border border-gray-200 px-4 py-2">
-                              {band.to ? band.to.toLocaleString() : "∞"}
-                            </td>
-                            <td className="border border-gray-200 px-4 py-2 text-center">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  console.log("[v0] Editing tax band:", band)
-                                }}
-                              >
-                                Edit
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
+                        {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.taxBands.map(
+                          (band, index) => (
+                            <tr key={index} className="hover:bg-gray-50">
+                              <td className="border border-gray-200 px-4 py-3 font-medium">{band.rate}</td>
+                              <td className="border border-gray-200 px-4 py-3">
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  {band.rate}%
+                                </span>
+                              </td>
+                              <td className="border border-gray-200 px-4 py-3">
+                                {band.from ? band.from.toLocaleString() : "0"}
+                              </td>
+                              <td className="border border-gray-200 px-4 py-3">
+                                {band.to ? band.to.toLocaleString() : "∞"}
+                              </td>
+                              <td className="border border-gray-200 px-4 py-3 font-medium text-green-600">
+                                {band.cumulative ? band.cumulative.toLocaleString() : "0"}
+                              </td>
+                              <td className="border border-gray-200 px-4 py-3 text-center">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    console.log("[v0] Editing tax band:", band)
+                                  }}
+                                >
+                                  Edit
+                                </Button>
+                              </td>
+                            </tr>
+                          ),
+                        )}
                       </tbody>
                     </table>
+                  </div>
+
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                    <h5 className="font-medium mb-2">Tax Calculation Preview</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Annual Income: </span>
+                        <span className="font-medium">
+                          {currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol}100,000
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Tax Due: </span>
+                        <span className="font-medium text-red-600">
+                          {currencyConfig[selectedCurrency as keyof typeof currencyConfig].symbol}
+                          {calculateTax(100000).toLocaleString()}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Effective Rate: </span>
+                        <span className="font-medium">{((calculateTax(100000) / 100000) * 100).toFixed(2)}%</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <h4 className="font-medium mb-3 text-green-900">SSNIT Rates (Tier 1)</h4>
+                  <div>
+                    <h5 className="font-medium mb-3 flex items-center">
+                      <Shield className="w-4 h-4 mr-2" />
+                      SSNIT Rates
+                    </h5>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="text-green-700">Employee:</span>
+                        <span className="text-sm text-gray-600">Employee:</span>
                         <div className="flex items-center space-x-2">
-                          <Input
-                            type="number"
-                            step="0.1"
-                            value={ssnitRates.employee}
-                            onChange={(e) => updateSsnitRates("employee", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right bg-white"
-                          />
-                          <span className="text-green-700">%</span>
+                          <span className="font-medium">
+                            {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.socialSecurity
+                              ?.employee || ssnitRates.employee}
+                            %
+                          </span>
+                          <Badge variant="secondary" className="text-xs">
+                            Active
+                          </Badge>
                         </div>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-green-700">Employer:</span>
+                        <span className="text-sm text-gray-600">Employer:</span>
                         <div className="flex items-center space-x-2">
-                          <Input
-                            type="number"
-                            step="0.1"
-                            value={ssnitRates.employer}
-                            onChange={(e) => updateSsnitRates("employer", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right bg-white"
-                          />
-                          <span className="text-green-700">%</span>
+                          <span className="font-medium">
+                            {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.socialSecurity
+                              ?.employer || ssnitRates.employer}
+                            %
+                          </span>
+                          <Badge variant="secondary" className="text-xs">
+                            Active
+                          </Badge>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center font-medium border-t border-green-200 pt-2">
-                        <span className="text-green-900">Total:</span>
-                        <span className="text-green-900">{ssnitRates.total.toFixed(1)}%</span>
+                      <div className="flex justify-between items-center pt-2 border-t">
+                        <span className="text-sm font-medium">Total:</span>
+                        <span className="font-bold text-blue-600">
+                          {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.socialSecurity?.total ||
+                            ssnitRates.total}
+                          %
+                        </span>
+                      </div>
+                      {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.socialSecurity?.cap && (
+                        <div className="text-xs text-gray-500 mt-2">
+                          Annual Cap: {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.symbol}
+                          {currencyConfig[
+                            selectedCurrency as keyof typeof currencyConfig
+                          ]?.socialSecurity?.cap.toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h5 className="font-medium mb-3 flex items-center">
+                      <Shield className="w-4 h-4 mr-2" />
+                      Tier 2 Rates
+                    </h5>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Employee:</span>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">
+                            {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.tier2?.employee ||
+                              tier2Rates.employee}
+                            %
+                          </span>
+                          <Badge variant="secondary" className="text-xs">
+                            Active
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Employer:</span>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">
+                            {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.tier2?.employer ||
+                              tier2Rates.employer}
+                            %
+                          </span>
+                          <Badge variant="secondary" className="text-xs">
+                            Active
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t">
+                        <span className="text-sm font-medium">Total:</span>
+                        <span className="font-bold text-blue-600">
+                          {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.tier2?.total ||
+                            tier2Rates.total}
+                          %
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="font-medium mb-3 text-blue-900">Tier 2 Rates</h4>
+                  <div>
+                    <h5 className="font-medium mb-3 flex items-center">
+                      <Shield className="w-4 h-4 mr-2" />
+                      Tier 3 Rates
+                    </h5>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="text-blue-700">Employee:</span>
+                        <span className="text-sm text-gray-600">Employee:</span>
                         <div className="flex items-center space-x-2">
-                          <Input
-                            type="number"
-                            step="0.1"
-                            value={tier2Rates.employee}
-                            onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right bg-white"
-                          />
-                          <span className="text-blue-700">%</span>
+                          <span className="font-medium">
+                            {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.tier3?.employee ||
+                              tier3Rates.employee}
+                            %
+                          </span>
+                          <Badge variant="secondary" className="text-xs">
+                            Active
+                          </Badge>
                         </div>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-blue-700">Employer:</span>
+                        <span className="text-sm text-gray-600">Employer:</span>
                         <div className="flex items-center space-x-2">
-                          <Input
-                            type="number"
-                            step="0.1"
-                            value={tier2Rates.employer}
-                            onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right bg-white"
-                          />
-                          <span className="text-blue-700">%</span>
+                          <span className="font-medium">
+                            {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.tier3?.employer ||
+                              tier3Rates.employer}
+                            %
+                          </span>
+                          <Badge variant="secondary" className="text-xs">
+                            Active
+                          </Badge>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center font-medium border-t border-blue-200 pt-2">
-                        <span className="text-blue-900">Total:</span>
-                        <span className="text-blue-900">{tier2Rates.total.toFixed(1)}%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-purple-50 p-4 rounded-lg">
-                    <h4 className="font-medium mb-3 text-purple-900">Tier 3 Rates</h4>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-purple-700">Employee:</span>
-                        <div className="flex items-center space-x-2">
-                          <Input
-                            type="number"
-                            step="0.1"
-                            value={tier3Rates.employee}
-                            onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right bg-white"
-                          />
-                          <span className="text-purple-700">%</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-purple-700">Employer:</span>
-                        <div className="flex items-center space-x-2">
-                          <Input
-                            type="number"
-                            step="0.1"
-                            value={tier3Rates.employer}
-                            onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right bg-white"
-                          />
-                          <span className="text-purple-700">%</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center font-medium border-t border-purple-200 pt-2">
-                        <span className="text-purple-900">Total:</span>
-                        <span className="text-purple-900">{tier3Rates.total.toFixed(1)}%</span>
+                      <div className="flex justify-between items-center pt-2 border-t">
+                        <span className="text-sm font-medium">Total:</span>
+                        <span className="font-bold text-blue-600">
+                          {currencyConfig[selectedCurrency as keyof typeof currencyConfig]?.tier3?.total ||
+                            tier3Rates.total}
+                          %
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-yellow-50 p-4 rounded-lg">
-                  <h4 className="font-medium mb-3 text-yellow-900">Auto-Update Settings</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-yellow-700">Enable Auto-Updates:</span>
-                      <Switch
-                        checked={autoUpdateSettings.enabled}
-                        onCheckedChange={(checked) => setAutoUpdateSettings((prev) => ({ ...prev, enabled: checked }))}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-yellow-700">Require Approval:</span>
-                      <Switch
-                        checked={autoUpdateSettings.requireApproval}
-                        onCheckedChange={(checked) =>
-                          setAutoUpdateSettings((prev) => ({ ...prev, requireApproval: checked }))
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-yellow-700">Notify on Updates:</span>
-                      <Switch
-                        checked={autoUpdateSettings.notifyOnUpdates}
-                        onCheckedChange={(checked) =>
-                          setAutoUpdateSettings((prev) => ({ ...prev, notifyOnUpdates: checked }))
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-yellow-700">Confidence Threshold:</span>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={autoUpdateSettings.confidenceThreshold}
-                          onChange={(e) =>
-                            setAutoUpdateSettings((prev) => ({
-                              ...prev,
-                              confidenceThreshold: Number.parseInt(e.target.value) || 85,
-                            }))
-                          }
-                          className="w-20 h-8 text-right bg-white"
-                        />
-                        <span className="text-yellow-700">%</span>
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <Wifi className="w-5 h-5" />
+                        <span>API Status</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {Object.entries(apiStatus).map(([country, status]) => (
+                          <div key={country} className="flex items-center justify-between">
+                            <span className="capitalize font-medium">{country}</span>
+                            <div className="flex items-center space-x-2">
+                              <div
+                                className={`w-2 h-2 rounded-full ${status.connected ? "bg-green-500" : "bg-red-500"}`}
+                              />
+                              <span className="text-sm text-gray-600">
+                                {status.connected ? "Connected" : "Disconnected"}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  </div>
-                </div>
+                    </CardContent>
+                  </Card>
 
-                <div className="flex justify-end space-x-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      console.log("[v0] Resetting to defaults...")
-                      setPayeTaxBands(currencyConfig[selectedCurrency as keyof typeof currencyConfig].taxBands)
-                      setSsnitRates(currencyConfig[selectedCurrency as keyof typeof currencyConfig].ssnitRates)
-                      setTier2Rates(currencyConfig[selectedCurrency as keyof typeof currencyConfig].tier2Rates)
-                      setTier3Rates(currencyConfig[selectedCurrency as keyof typeof currencyConfig].tier3Rates)
-                    }}
-                  >
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    Reset to Defaults
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      console.log("[v0] Saving tax configuration...")
-                    }}
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Tax Configuration
-                  </Button>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <Bell className="w-5 h-5" />
+                        <span>Recent Updates</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {notifications.slice(0, 3).map((notification) => (
+                          <div key={notification.id} className="flex items-start space-x-3">
+                            <div
+                              className={`w-2 h-2 rounded-full mt-2 ${
+                                notification.priority === "high"
+                                  ? "bg-red-500"
+                                  : notification.priority === "medium"
+                                    ? "bg-yellow-500"
+                                    : "bg-blue-500"
+                              }`}
+                            />
+                            <div className="flex-1">
+                              <p className="text-sm font-medium">{notification.title}</p>
+                              <p className="text-xs text-gray-500">{notification.message}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </CardContent>
             </Card>
