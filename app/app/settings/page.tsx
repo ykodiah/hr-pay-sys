@@ -785,7 +785,7 @@ export default function SettingsPage() {
         })
       } else if (selectedDocument.type === "DOC" || selectedDocument.type === "DOCX") {
         // For Word docs, create as RTF format
-        const rtfContent = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}} \\f0\\fs24 ${content.replace(/\n/g, "\\par ")}}`
+        const rtfContent = `{\\\\rtf1\\\\ansi\\\\deff0 {\\\\fonttbl {\\\\f0 Times New Roman;}} \\\\f0\\\\fs24 ${content.replace(/\\n/g, "\\\\par ")}}`
         blob = new Blob([rtfContent], { type: "application/rtf" })
         filename = `${selectedDocument.name}.rtf`
       } else {
@@ -6715,127 +6715,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 </div>
               </CardContent>
             </Card>
-          </div>
-        </div>
-      )}
-
-      {showSalaryGradeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">{editingGrade ? "Edit Salary Grade" : "Add New Salary Grade"}</h2>
-              <Button variant="ghost" size="sm" onClick={() => setShowSalaryGradeModal(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <p className="text-sm text-muted-foreground mb-6">Configure salary grade details and notch structure</p>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="gradeName">Grade Name</Label>
-                  <Input
-                    id="gradeName"
-                    value={newGrade.name}
-                    onChange={(e) => setNewGrade((prev) => ({ ...prev, name: e.target.value }))}
-                    placeholder="e.g., Grade 1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="gradeDescription">Description</Label>
-                  <Input
-                    id="gradeDescription"
-                    value={newGrade.description}
-                    onChange={(e) => setNewGrade((prev) => ({ ...prev, description: e.target.value }))}
-                    placeholder="e.g., Entry Level"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="minSalary">Minimum Salary (₵)</Label>
-                  <Input
-                    id="minSalary"
-                    type="number"
-                    value={newGrade.minSalary}
-                    onChange={(e) => setNewGrade((prev) => ({ ...prev, minSalary: e.target.value }))}
-                    placeholder="2500"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="maxSalary">Maximum Salary (₵)</Label>
-                  <Input
-                    id="maxSalary"
-                    type="number"
-                    value={newGrade.maxSalary}
-                    onChange={(e) => setNewGrade((prev) => ({ ...prev, maxSalary: e.target.value }))}
-                    placeholder="4000"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="numberOfNotches">Number of Notches/Steps</Label>
-                  <Input
-                    id="numberOfNotches"
-                    type="number"
-                    min="2"
-                    max="20"
-                    value={newGrade.numberOfNotches}
-                    onChange={(e) =>
-                      setNewGrade((prev) => ({ ...prev, numberOfNotches: Number.parseInt(e.target.value) || 5 }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Button
-                  onClick={handleGenerateNotches}
-                  disabled={isGeneratingNotches || !newGrade.minSalary || !newGrade.maxSalary}
-                  className="flex items-center space-x-2"
-                >
-                  {isGeneratingNotches ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Generating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Settings className="w-4 h-4" />
-                      <span>Generate Notches</span>
-                    </>
-                  )}
-                </Button>
-                <span className="text-sm text-muted-foreground">{newGrade.notches.length} notches configured</span>
-              </div>
-
-              {newGrade.notches.length > 0 && (
-                <div>
-                  <Label>Generated Notches Preview</Label>
-                  <div className="mt-2 bg-gray-50 border border-gray-200 rounded-md p-4 max-h-40 overflow-y-auto">
-                    <div className="space-y-2">
-                      {newGrade.notches.map((notch) => (
-                        <div key={notch.step} className="flex justify-between text-sm">
-                          <span>Step {notch.step}</span>
-                          <span className="font-medium">₵{notch.amount.toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button variant="outline" onClick={() => setShowSalaryGradeModal(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSaveSalaryGrade} className="bg-black text-white hover:bg-gray-800">
-                <Save className="w-4 h-4 mr-2" />
-                {editingGrade ? "Update Grade" : "Save Grade"}
-              </Button>
-            </div>
           </div>
         </div>
       )}
