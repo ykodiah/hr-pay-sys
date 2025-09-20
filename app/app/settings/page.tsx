@@ -2,6 +2,50 @@
 import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
+
+import {
+  Building,
+  Building2,
+  DollarSign,
+  Plus,
+  Save,
+  Loader2,
+  Eye,
+  Edit,
+  MoreHorizontal,
+  Trash2,
+  Settings,
+  Users,
+  Lock,
+  Shield,
+  ShieldCheck,
+  Bell,
+  Calculator,
+} from "lucide-react"
 
 interface Company {
   id: string
@@ -1247,4 +1291,608 @@ export default function SettingsPage() {
     loadEmployees()
     loadSubsidiaries()
   }, [])
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+          <p className="text-muted-foreground">Manage your organization settings and configurations</p>
+        </div>
+      </div>
+
+      <Tabs defaultValue="company" className="w-full">
+        <TabsList className="grid w-full grid-cols-8">
+          <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="multi-company">Multi-Company</TabsTrigger>
+          <TabsTrigger value="hr">HR</TabsTrigger>
+          <TabsTrigger value="payroll">Payroll</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="roles">Roles</TabsTrigger>
+          <TabsTrigger value="access">Access</TabsTrigger>
+          <TabsTrigger value="security">Security</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="company" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building className="h-5 w-5" />
+                Company Information
+              </CardTitle>
+              <CardDescription>Update your company details and contact information</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="company-name">Company Name</Label>
+                  <Input
+                    id="company-name"
+                    value={companyData.name}
+                    onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
+                    placeholder="Enter company name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={companyData.email_address}
+                    onChange={(e) => setCompanyData({ ...companyData, email_address: e.target.value })}
+                    placeholder="company@example.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tax-id">Tax ID</Label>
+                  <Input
+                    id="tax-id"
+                    value={companyData.tax_id}
+                    onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
+                    placeholder="Enter tax identification number"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ssnit">SSNIT Number</Label>
+                  <Input
+                    id="ssnit"
+                    value={companyData.ssnit_number}
+                    onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
+                    placeholder="Enter SSNIT number"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="industry">Industry</Label>
+                  <Select
+                    value={companyData.industry}
+                    onValueChange={(value) => setCompanyData({ ...companyData, industry: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select industry" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="technology">Technology</SelectItem>
+                      <SelectItem value="finance">Finance</SelectItem>
+                      <SelectItem value="healthcare">Healthcare</SelectItem>
+                      <SelectItem value="education">Education</SelectItem>
+                      <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                      <SelectItem value="retail">Retail</SelectItem>
+                      <SelectItem value="consulting">Consulting</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={companyData.phone_number}
+                    onChange={(e) => setCompanyData({ ...companyData, phone_number: e.target.value })}
+                    placeholder="Enter phone number"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">Address</Label>
+                <Textarea
+                  id="address"
+                  value={companyData.address}
+                  onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
+                  placeholder="Enter company address"
+                  rows={3}
+                />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button onClick={() => console.log("Save company data")} disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="multi-company" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Multi-Company Management
+              </CardTitle>
+              <CardDescription>Manage subsidiaries and related companies</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold">Subsidiaries ({subsidiaries.length})</h3>
+                  <p className="text-sm text-muted-foreground">Manage your company subsidiaries</p>
+                </div>
+                <Button onClick={() => setShowAddSubsidiary(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Subsidiary
+                </Button>
+              </div>
+              <div className="grid gap-4">
+                {subsidiaries.map((subsidiary) => (
+                  <Card key={subsidiary.id} className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                          <Building2 className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold">{subsidiary.name}</h4>
+                          <p className="text-sm text-muted-foreground">{subsidiary.industry}</p>
+                          <div className="flex items-center gap-4 mt-1">
+                            <span className="text-xs text-muted-foreground">{subsidiary.employee_count} employees</span>
+                            <Badge variant={subsidiary.status === "active" ? "default" : "secondary"}>
+                              {subsidiary.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem>
+                              <Settings className="mr-2 h-4 w-4" />
+                              Settings
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Users className="mr-2 h-4 w-4" />
+                              View Employees
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="hr" className="space-y-6">
+          <div className="grid gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  HR Configuration
+                </CardTitle>
+                <CardDescription>Configure HR policies and settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Leave Year Start</Label>
+                    <Select
+                      value={hrConfig.leaveYearStart}
+                      onValueChange={(value) => setHrConfig({ ...hrConfig, leaveYearStart: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="January">January</SelectItem>
+                        <SelectItem value="April">April</SelectItem>
+                        <SelectItem value="July">July</SelectItem>
+                        <SelectItem value="October">October</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Probation Period (months)</Label>
+                    <Input
+                      type="number"
+                      value={hrConfig.probationPeriod}
+                      onChange={(e) => setHrConfig({ ...hrConfig, probationPeriod: Number.parseInt(e.target.value) })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Auto-approve Leave Requests</Label>
+                      <p className="text-sm text-muted-foreground">Automatically approve leave requests under 3 days</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.autoApproveLeave}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, autoApproveLeave: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Email Notifications</Label>
+                      <p className="text-sm text-muted-foreground">Send email notifications for HR events</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.emailNotifications}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, emailNotifications: checked })}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button onClick={() => console.log("Save HR config")}>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Configuration
+                </Button>
+              </CardFooter>
+            </Card>
+
+            {/* Salary Grades & Notches Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Salary Grades & Notches
+                </CardTitle>
+                <CardDescription>Manage salary grade structures and notch progressions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold">Current Salary Grades ({salaryGrades.length})</h3>
+                    <p className="text-sm text-muted-foreground">Define salary ranges and progression steps</p>
+                  </div>
+                  <Button onClick={() => setShowAddGrade(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Grade
+                  </Button>
+                </div>
+                <div className="space-y-4">
+                  {salaryGrades.map((grade) => (
+                    <Card key={grade.id} className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-semibold">{grade.grade}</h4>
+                          <p className="text-sm text-muted-foreground">{grade.description}</p>
+                          <div className="flex items-center gap-4 mt-2">
+                            <span className="text-sm">
+                              Range: ₵{grade.minSalary.toLocaleString()} - ₵{grade.maxSalary.toLocaleString()}
+                            </span>
+                            <Badge variant="outline">{grade.notches.length} notches</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingGrade(grade)
+                              setNewGrade({
+                                grade: grade.grade,
+                                description: grade.description,
+                                minSalary: grade.minSalary,
+                                maxSalary: grade.maxSalary,
+                                notchCount: grade.notches.length,
+                                notches: grade.notches,
+                              })
+                              setShowAddGrade(true)
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSalaryGrades(salaryGrades.filter((g) => g.id !== grade.id))
+                              toast({
+                                title: "Grade deleted",
+                                description: `${grade.grade} has been removed`,
+                              })
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="payroll" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="h-5 w-5" />
+                Payroll Settings
+              </CardTitle>
+              <CardDescription>Configure payroll calculations and tax settings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">Payroll configuration content will be displayed here.</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Notification Settings
+              </CardTitle>
+              <CardDescription>Configure email and system notifications</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">Notification settings content will be displayed here.</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="roles" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Role Management
+              </CardTitle>
+              <CardDescription>Manage user roles and permissions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">Role management content will be displayed here.</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="access" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5" />
+                Access Control
+              </CardTitle>
+              <CardDescription>Configure authentication and access settings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">Access control content will be displayed here.</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="security" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5" />
+                Security Settings
+              </CardTitle>
+              <CardDescription>Configure security policies and backup settings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">Security settings content will be displayed here.</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Add Grade Modal */}
+      {showAddGrade && (
+        <Dialog open={showAddGrade} onOpenChange={setShowAddGrade}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{editingGrade ? "Edit Salary Grade" : "Add New Salary Grade"}</DialogTitle>
+              <DialogDescription>Configure salary grade details and notch structure</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Grade Name</Label>
+                  <Input
+                    value={newGrade.grade}
+                    onChange={(e) => setNewGrade({ ...newGrade, grade: e.target.value })}
+                    placeholder="Grade 1"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Input
+                    value={newGrade.description}
+                    onChange={(e) => setNewGrade({ ...newGrade, description: e.target.value })}
+                    placeholder="Entry Level"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Minimum Salary (₵)</Label>
+                  <Input
+                    type="number"
+                    value={newGrade.minSalary}
+                    onChange={(e) => setNewGrade({ ...newGrade, minSalary: Number.parseInt(e.target.value) })}
+                    placeholder="2500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Maximum Salary (₵)</Label>
+                  <Input
+                    type="number"
+                    value={newGrade.maxSalary}
+                    onChange={(e) => setNewGrade({ ...newGrade, maxSalary: Number.parseInt(e.target.value) })}
+                    placeholder="4000"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Number of Notches/Steps</Label>
+                  <Input
+                    type="number"
+                    min="2"
+                    max="20"
+                    value={newGrade.notchCount}
+                    onChange={(e) => setNewGrade({ ...newGrade, notchCount: Number.parseInt(e.target.value) })}
+                    placeholder="7"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsGeneratingNotches(true)
+                    setTimeout(() => {
+                      const notches = []
+                      const increment = (newGrade.maxSalary - newGrade.minSalary) / (newGrade.notchCount - 1)
+                      for (let i = 0; i < newGrade.notchCount; i++) {
+                        notches.push({
+                          step: i + 1,
+                          amount: Math.round(newGrade.minSalary + increment * i),
+                        })
+                      }
+                      setNewGrade({ ...newGrade, notches })
+                      setIsGeneratingNotches(false)
+                      toast({
+                        title: "Notches generated",
+                        description: `Generated ${newGrade.notchCount} salary notches`,
+                      })
+                    }, 1500)
+                  }}
+                  disabled={isGeneratingNotches || !newGrade.minSalary || !newGrade.maxSalary || !newGrade.notchCount}
+                >
+                  {isGeneratingNotches ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Settings className="mr-2 h-4 w-4" />
+                      Generate Notches
+                    </>
+                  )}
+                </Button>
+                <span className="text-sm text-muted-foreground">{newGrade.notches.length} notches configured</span>
+              </div>
+              {newGrade.notches.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Generated Notches Preview</Label>
+                  <div className="max-h-40 overflow-y-auto border rounded-md p-3 space-y-1">
+                    {newGrade.notches.map((notch) => (
+                      <div key={notch.step} className="flex justify-between text-sm">
+                        <span>Step {notch.step}</span>
+                        <span>₵{notch.amount.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddGrade(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsSavingGrade(true)
+                  setTimeout(() => {
+                    const gradeToAdd = {
+                      id: editingGrade ? editingGrade.id : Date.now(),
+                      grade: newGrade.grade,
+                      description: newGrade.description,
+                      minSalary: newGrade.minSalary,
+                      maxSalary: newGrade.maxSalary,
+                      notches: newGrade.notches,
+                    }
+
+                    if (editingGrade) {
+                      // Update existing grade
+                      setSalaryGrades((prev) => prev.map((g) => (g.id === editingGrade.id ? gradeToAdd : g)))
+                      toast({
+                        title: "Grade updated",
+                        description: `${newGrade.grade} has been updated successfully`,
+                      })
+                    } else {
+                      // Add new grade
+                      setSalaryGrades((prev) => [...prev, gradeToAdd])
+                      toast({
+                        title: "Grade added",
+                        description: `${newGrade.grade} has been added successfully`,
+                      })
+                    }
+
+                    setShowAddGrade(false)
+                    setEditingGrade(null)
+                    setNewGrade({
+                      grade: "",
+                      description: "",
+                      minSalary: 0,
+                      maxSalary: 0,
+                      notchCount: 7,
+                      notches: [],
+                    })
+                    setIsSavingGrade(false)
+                  }, 1000)
+                }}
+                disabled={isSavingGrade || !newGrade.grade || !newGrade.description || newGrade.notches.length === 0}
+              >
+                {isSavingGrade ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    {editingGrade ? "Update Grade" : "Save Grade"}
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  )
 }
