@@ -1,154 +1,89 @@
 "use client"
-import { useState, useEffect } from "react"
-import { useToast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
 
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { toast } from "@/hooks/use-toast"
 import {
-  Building,
   Building2,
-  DollarSign,
   Plus,
+  Edit,
+  Trash2,
+  Eye,
+  EyeOff,
   Save,
   Loader2,
-  Eye,
-  Edit,
-  MoreHorizontal,
-  Trash2,
-  Settings,
-  Users,
-  Lock,
-  Shield,
-  ShieldCheck,
-  Bell,
-  Calculator,
+  CheckCircle,
+  XCircle,
+  Zap,
+  DollarSign,
+  Mail,
+  Ear as Gear,
 } from "lucide-react"
 
-interface Company {
-  id: string
-  name: string
-  tax_id: string
-  ssnit_number: string
-  industry: string
-  address: string
-  phone_number: string
-  email_address: string
-  logo_file_id?: string
-  logo_url?: string
-  divisions?: string[]
-  departments?: string[]
-  locations?: string[]
-  status?: string
-}
-
-interface Employee {
-  id: string
-  first_name: string
-  last_name: string
-  full_name?: string
-  corporate_email: string
-  personal_email: string
-  position: string
-  department: string
-  status: string
-}
-
-interface Subsidiary {
-  id: string
-  company_id: string
-  name: string
-  tax_id: string
-  ssnit_number: string
-  industry: string
-  status: string
-  email_address: string
-  phone_number: string
-  address: string
-  logo_url?: string
-  divisions: any[] | string[]
-  departments: any[] | string[]
-  locations: any[] | string[]
-  created_at?: string
-  updated_at?: string
-  // Computed fields for display
-  divisions_count?: number
-  departments_count?: number
-  locations_count?: number
-  employee_count?: number
-  legal_name?: string
-  city?: string
-  region?: string
-  country?: string
-  phone?: string
-  website?: string
-}
-
-interface Role {
-  id: string
-  name: string
-  description: string
-  permissions: string[]
-  user_count: number
-}
-
-// Added for Access Control and Security
-interface AccessSettings {
-  twoFactorEnabled: boolean
-  ssoEnabled: boolean
-  passwordExpiryEnabled: boolean
-  sessionTimeout: number
-  maxLoginAttempts: number
-  passwordMinLength: number
-  ipRestrictionsEnabled: boolean
-  allowedIPs: string[]
-}
-
-interface SecuritySettings {
-  dataEncryptionEnabled: boolean
-  auditLoggingEnabled: boolean
-  autoBackupEnabled: boolean
-  backupFrequency: string
-  dataRetentionDays: number
-}
-
-interface AuditLog {
-  id: string
-  user_email: string
-  action: string
-  timestamp: string
-  ip_address: string
-  severity: "high" | "medium" | "low"
-}
-
-interface ActiveSession {
-  id: string
-  user_email: string
-  ip_address: string
-  device: string
-  last_activity: string
+const currencyConfig = {
+  ghs: {
+    symbol: "₵",
+    name: "Ghana Cedi",
+    taxBands: [
+      { from: 0, to: 4800, rate: 0 },
+      { from: 4800, to: 7200, rate: 5 },
+      { from: 7200, to: 50000, rate: 10 },
+      { from: 50000, to: 120000, rate: 17.5 },
+      { from: 120000, to: null, rate: 25 },
+    ],
+    socialSecurity: { employee: 5.5, employer: 13, total: 18.5 },
+    tier2: { employee: 5, employer: 5, total: 10 },
+    tier3: { employee: 5, employer: 0, total: 5 },
+  },
+  usd: {
+    symbol: "$",
+    name: "US Dollar",
+    taxBands: [
+      { from: 0, to: 12950, rate: 10 },
+      { from: 12950, to: 49400, rate: 12 },
+      { from: 49400, to: 100000, rate: 22 },
+      { from: 100000, to: 200000, rate: 24 },
+      { from: 200000, to: null, rate: 37 },
+    ],
+    socialSecurity: { employee: 6.2, employer: 6.2, total: 12.4 },
+    tier2: { employee: 1.45, employer: 1.45, total: 2.9 },
+    tier3: { employee: 0, employer: 0, total: 0 },
+  },
+  eur: {
+    symbol: "€",
+    name: "Euro",
+    taxBands: [
+      { from: 0, to: 10000, rate: 0 },
+      { from: 10000, to: 28000, rate: 14 },
+      { from: 28000, to: 54000, rate: 30 },
+      { from: 54000, to: 100000, rate: 37 },
+      { from: 100000, to: null, rate: 45 },
+    ],
+    socialSecurity: { employee: 9.3, employer: 14.6, total: 23.9 },
+    tier2: { employee: 2, employer: 2, total: 4 },
+    tier3: { employee: 0, employer: 0, total: 0 },
+  },
+  gbp: {
+    symbol: "£",
+    name: "British Pound",
+    taxBands: [
+      { from: 0, to: 12570, rate: 0 },
+      { from: 12570, to: 50270, rate: 20 },
+      { from: 50270, to: 125140, rate: 40 },
+      { from: 125140, to: null, rate: 45 },
+    ],
+    socialSecurity: { employee: 12, employer: 13.8, total: 25.8 },
+    tier2: { employee: 0, employer: 0, total: 0 },
+    tier3: { employee: 0, employer: 0, total: 0 },
+  },
 }
 
 const isDemoMode = () => {
@@ -166,37 +101,38 @@ const parseDocumentContent = (document: any) => {
 }
 
 export default function SettingsPage() {
-  console.log("[v0] SettingsPage component initializing...")
+  const [activeTab, setActiveTab] = useState("company")
+  const [showPasswordEmail, setShowPasswordEmail] = useState(false)
+  const [isTestingConnection, setIsTestingConnection] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<"idle" | "testing" | "success" | "error">("idle")
 
-  const { toast } = useToast()
-  const supabase = createClient()
-
-  const [companyData, setCompanyData] = useState<Company>({
-    id: "",
-    name: "",
-    email_address: "",
-    tax_id: "",
-    ssnit_number: "",
-    industry: "",
-    address: "",
-    phone_number: "",
-    divisions: [],
-    departments: [],
-    locations: [],
+  // Company settings state
+  const [companyData, setCompanyData] = useState({
+    name: "Akwaaba Technologies",
+    address: "123 Business Street, Accra, Ghana",
+    phone: "+233 20 123 4567",
+    email: "info@akwaaba.com",
+    website: "www.akwaaba.com",
+    registration_number: "CS-123456789",
+    tax_id: "TIN-987654321",
+    logo_url: "",
   })
 
-  const [hrConfig, setHrConfig] = useState({
-    leaveYearStart: "January",
-    probationPeriod: 3,
-    workingHoursPerDay: 8,
-    workingDaysPerWeek: 5,
-    autoApproveLeave: false,
-    emailNotifications: true,
-    aiRecommendations: true,
-    smartScheduling: false,
-    performanceTracking: true,
+  // Email configuration state
+  const [emailConfig, setEmailConfig] = useState({
+    provider: "SMTP",
+    host: "smtp.gmail.com",
+    port: "587",
+    username: "your-email@company.com",
+    password: "",
+    fromEmail: "hr@company.com",
+    fromName: "HR Department",
+    replyTo: "noreply@company.com",
+    enableTLS: true,
+    enableSSL: false,
   })
 
+  // Salary grades state
   const [salaryGrades, setSalaryGrades] = useState([
     {
       id: 1,
@@ -204,6 +140,7 @@ export default function SettingsPage() {
       description: "Entry Level",
       minSalary: 2500,
       maxSalary: 4000,
+      notchCount: 7,
       notches: [
         { step: 1, amount: 2500 },
         { step: 2, amount: 2750 },
@@ -214,518 +151,49 @@ export default function SettingsPage() {
         { step: 7, amount: 4000 },
       ],
     },
-    {
-      id: 2,
-      grade: "Grade 2",
-      description: "Mid Level",
-      minSalary: 4000,
-      maxSalary: 6500,
-      notches: [
-        { step: 1, amount: 4000 },
-        { step: 2, amount: 4350 },
-        { step: 3, amount: 4700 },
-        { step: 4, amount: 5050 },
-        { step: 5, amount: 5400 },
-        { step: 6, amount: 5750 },
-        { step: 7, amount: 6100 },
-        { step: 8, amount: 6500 },
-      ],
-    },
-    {
-      id: 3,
-      grade: "Grade 3",
-      description: "Senior Level",
-      minSalary: 6500,
-      maxSalary: 10000,
-      notches: [
-        { step: 1, amount: 6500 },
-        { step: 2, amount: 7000 },
-        { step: 3, amount: 7500 },
-        { step: 4, amount: 8000 },
-        { step: 5, amount: 8500 },
-        { step: 6, amount: 9000 },
-        { step: 7, amount: 9500 },
-        { step: 8, amount: 10000 },
-      ],
-    },
   ])
 
-  const [editingGrade, setEditingGrade] = useState<any>(null) // Changed to 'any' for flexibility
-  const [showAddGrade, setShowAddGrade] = useState(false)
+  const [showAddGradeModal, setShowAddGradeModal] = useState(false)
+  const [editingGrade, setEditingGrade] = useState<any>(null)
+  const [isGeneratingNotches, setIsGeneratingNotches] = useState(false)
+  const [isSavingGrade, setIsSavingGrade] = useState(false)
   const [newGrade, setNewGrade] = useState({
     grade: "",
     description: "",
     minSalary: 0,
     maxSalary: 0,
     notchCount: 7,
-    notches: [],
-  })
-  const [isSavingGrade, setIsSavingGrade] = useState(false)
-  const [isGeneratingNotches, setIsGeneratingNotches] = useState(false)
-
-  const [editingPolicy, setEditingPolicy] = useState({
-    name: "",
-    days: 0,
-    description: "",
-  })
-  const [isSavingPolicy, setIsSavingPolicy] = useState(false)
-  const [isSavingDocument, setIsSavingDocument] = useState(false)
-  const [showDocumentPreview, setShowDocumentPreview] = useState(false)
-  const [documentPreviewContent, setDocumentPreviewContent] = useState("")
-
-  const [documentZoom, setDocumentZoom] = useState(100)
-  const [isFullscreen, setIsFullscreen] = useState(false)
-
-  const [showDocumentModal, setShowDocumentModal] = useState(false)
-  const [documentModalType, setDocumentModalType] = useState("add") // add, view, edit, delete
-  const [selectedDocument, setSelectedDocument] = useState(null)
-  const [uploadedFile, setUploadedFile] = useState(null)
-  const [documentName, setDocumentName] = useState("")
-  const [currentPolicies, setCurrentPolicies] = useState([
-    { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Annual vacation leave" },
-    { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness" },
-    { name: "Maternity Leave", days: 84, usage: "12%", trend: "stable", description: "Maternity and paternity leave" },
-  ])
-
-  const [divisions, setDivisions] = useState<string[]>([])
-  const [departments, setDepartments] = useState<string[]>([])
-  const [locations, setLocations] = useState<string[]>([])
-  const [logoPreview, setLogoPreview] = useState<string>("")
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([])
-  const [roles, setRoles] = useState<Role[]>([])
-  const [isBackingUp, setIsBackingUp] = useState<boolean>(false)
-  const [lastBackupTime, setLastBackupTime] = useState<string | null>(null)
-  const [showAddSubsidiary, setShowAddSubsidiary] = useState<boolean>(false)
-  const [showEditSubsidiary, setShowEditSubsidiary] = useState<boolean>(false)
-  const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState(false)
-  const [selectedSubsidiary, setSelectedSubsidiary] = useState<Subsidiary | null>(null)
-  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<boolean>(false)
-  const [showReactivateConfirm, setShowReactivateConfirm] = useState<boolean>(false)
-  const [subsidiaryToToggle, setSubsidiaryToToggle] = useState<Subsidiary | null>(null)
-
-  const [companyLogoPreview, setCompanyLogoPreview] = useState<string>("")
-  const [subsidiaryLogoPreview, setSubsidiaryLogoPreview] = useState<string>("")
-  const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false)
-
-  const [viewEmployeesModal, setViewEmployeesModal] = useState<{
-    isOpen: boolean
-    subsidiaryId: string
-    employees?: any[]
-  }>({ isOpen: false, subsidiaryId: "" })
-
-  const [importModal, setImportModal] = useState(false)
-
-  const [isSavingSubsidiary, setIsSavingSubsidiary] = useState(false)
-
-  const [isSavingSettings, setIsSavingSettings] = useState(false)
-
-  const [isSavingSubsidiaries, setIsSavingSubsidiaries] = useState(false)
-
-  const [isManagingLeaveTypes, setIsManagingLeaveTypes] = useState(false)
-  const [selectedPolicy, setSelectedPolicy] = useState<string | null>(null)
-
-  const [isSaving, setIsSaving] = useState(false) // General saving state
-
-  const [hrDocuments, setHrDocuments] = useState([
-    { id: 1, name: "Employee Handbook", type: "PDF", size: "2.4 MB", visibleToAll: true },
-    { id: 2, name: "Code of Conduct", type: "PDF", size: "1.8 MB", visibleToAll: false },
-  ])
-  const [showAddLeaveTypeModal, setShowAddLeaveTypeModal] = useState(false)
-  const [showPolicyModal, setShowPolicyModal] = useState(false)
-  const [policyModalType, setPolicyModalType] = useState("view") // view, edit, delete
-  const [newLeaveType, setNewLeaveType] = useState({
-    name: "",
-    days: 0,
-    description: "",
-    carryOver: false,
+    notches: [] as any[],
   })
 
-  const [leaveTypeAIInsights, setLeaveTypeAIInsights] = useState<string[]>([])
-
-  const [showAIInsightsModal, setShowAIInsightsModal] = useState(false)
-  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false)
-  const [aiInsights, setAiInsights] = useState<string>("")
-
-  const [policyInsights, setPolicyInsights] = useState<Record<string, string>>({})
-  const [loadingInsights, setLoadingInsights] = useState<Record<string, boolean>>({})
-
-  const [editingAllowance, setEditingAllowance] = useState<number | null>(null)
-  const [editingDeduction, setEditingDeduction] = useState<number | null>(null)
-
-  const [allowances, setAllowances] = useState([
-    {
-      code: "TRANS",
-      description: "Transport Allowance",
-      taxable: true,
-      recurring: true,
-      amount: 0,
-      percentage: 0,
-      type: "FIXED",
-    },
-    {
-      code: "HOUSE",
-      description: "Housing Allowance",
-      taxable: true,
-      recurring: true,
-      amount: 0,
-      percentage: 0,
-      type: "FIXED",
-    },
-    {
-      code: "MED",
-      description: "Medical Allowance",
-      taxable: false,
-      recurring: true,
-      amount: 0,
-      percentage: 0,
-      type: "FIXED",
-    },
-  ])
-
-  const [deductions, setDeductions] = useState([
-    { code: "TAX", description: "Tax Deduction", recurring: true, amount: 0, percentage: 0, type: "VARIABLE" },
-    { code: "SSNIT", description: "SSNIT Deduction", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE" },
-    { code: "LOAN", description: "Loan Deduction", recurring: true, amount: 0, percentage: 0, type: "FIXED" },
-  ])
-
-  const [ssnitRates, setSsnitRates] = useState({
-    employee: 5.5,
-    employer: 13,
-    total: 18.5,
-  })
-
-  const [tier2Rates, setTier2Rates] = useState({
-    employee: 5.5,
-    employer: 5.5,
-    total: 11,
-  })
-
-  const [tier3Rates, setTier3Rates] = useState({
-    employee: 5,
-    employer: 5,
-    total: 10,
-  })
-
-  const [isSavingPayroll, setIsSavingPayroll] = useState(false)
-  const [isSavingTax, setIsSavingTax] = useState(false)
-  const [isSyncing, setIsSyncing] = useState(false)
-
-  const currencyConfig = {
-    ghs: {
-      symbol: "₵",
-      name: "Ghana Cedis (GHS)",
-      country: "Ghana",
-      apiEndpoint: "https://api.gra.gov.gh/tax-rates",
-      lastUpdated: "2024-01-01",
-      version: "2024.1",
-      taxBands: [
-        { rate: 0, from: 0, to: 490, cumulativeTax: 0 },
-        { rate: 5, from: 491, to: 600, cumulativeTax: 0 },
-        { rate: 10, from: 601, to: 730, cumulativeTax: 5.5 },
-        { rate: 17.5, from: 731, to: 3896.67, cumulativeTax: 18.5 },
-        { rate: 25, from: 3896.68, to: 19896.67, cumulativeTax: 572.54 },
-        { rate: 30, from: 19896.68, to: 50416.67, cumulativeTax: 4572.54 },
-        { rate: 35, from: 50416.68, to: Number.POSITIVE_INFINITY, cumulativeTax: 13728.54 },
-      ],
-      socialSecurity: {
-        employee: 5.5,
-        employer: 13.0,
-        total: 18.5,
-        cap: 2000000, // Annual cap in GHS
-      },
-      tier2: {
-        employee: 5.5,
-        employer: 5.5,
-        total: 11.0,
-      },
-      tier3: {
-        employee: 5.0,
-        employer: 5.0,
-        total: 10.0,
-      },
-    },
-    usd: {
-      symbol: "$",
-      name: "US Dollar (USD)",
-      country: "United States",
-      apiEndpoint: "https://api.irs.gov/tax-rates",
-      lastUpdated: "2024-01-01",
-      version: "2024.1",
-      taxBands: [
-        { rate: 10, from: 0, to: 916.67, cumulativeTax: 0 },
-        { rate: 12, from: 916.68, to: 3083.33, cumulativeTax: 91.67 },
-        { rate: 22, from: 3083.34, to: 8333.33, cumulativeTax: 351.67 },
-        { rate: 24, from: 8333.34, to: 14583.33, cumulativeTax: 1506.67 },
-        { rate: 32, from: 14583.34, to: 18750, cumulativeTax: 3006.67 },
-        { rate: 35, from: 18750.01, to: 47083.33, cumulativeTax: 4340.01 },
-        { rate: 37, from: 47083.34, to: Number.POSITIVE_INFINITY, cumulativeTax: 14256.68 },
-      ],
-    },
-    eur: {
-      country: "Germany",
-      symbol: "€",
-      version: "2024.1",
-      lastUpdated: "2024-01-01",
-      taxBands: [
-        { rate: 0, from: 0, to: 916.67, cumulativeTax: 0 },
-        { rate: 14, from: 916.68, to: 4583.33, cumulativeTax: 0 },
-        { rate: 24, from: 4583.34, to: 4791.67, cumulativeTax: 513.33 },
-        { rate: 42, from: 4791.68, to: 22500, cumulativeTax: 563.33 },
-        { rate: 45, from: 22500.01, to: Number.POSITIVE_INFINITY, cumulativeTax: 8000.83 },
-      ],
-    },
-    ngn: {
-      country: "Nigeria",
-      symbol: "₦",
-      version: "2024.1",
-      lastUpdated: "2024-01-01",
-      taxBands: [
-        { rate: 7, from: 0, to: 25000, cumulativeTax: 0 },
-        { rate: 11, from: 25001, to: 50000, cumulativeTax: 1750 },
-        { rate: 15, from: 50001, to: 83333.33, cumulativeTax: 4500 },
-        { rate: 19, from: 83333.34, to: 133333.33, cumulativeTax: 9500 },
-        { rate: 21, from: 133333.34, to: 208333.33, cumulativeTax: 19000 },
-        { rate: 24, from: 208333.34, to: Number.POSITIVE_INFINITY, cumulativeTax: 34750 },
-      ],
-      socialSecurity: {
-        employee: 8.0,
-        employer: 10.0,
-        total: 18.0,
-        cap: 1800000, // Annual cap in NGN
-      },
-    },
-  }
-
-  const [taxVersions, setTaxVersions] = useState([
-    {
-      id: "v2024.1",
-      version: "2024.1",
-      effectiveDate: "2024-01-01",
-      status: "active",
-      source: "government_api",
-      confidence: 95,
-      lastUpdated: "2024-01-01T00:00:00Z",
-      approvedBy: "System Admin",
-      changes: "Updated for 2024 tax year",
-    },
-  ])
-
-  const [apiStatus, setApiStatus] = useState({
-    ghana: { connected: true, lastSync: "2024-01-01T00:00:00Z", status: "active" },
-    nigeria: { connected: false, lastSync: null, status: "inactive" },
-    usa: { connected: false, lastSync: null, status: "inactive" },
-  })
-
-  const [notifications, setNotifications] = useState([
-    {
-      id: "1",
-      type: "tax_update",
-      priority: "high",
-      title: "Ghana PAYE Rates Updated",
-      message: "New tax rates effective January 1, 2024",
-      timestamp: "2024-01-01T00:00:00Z",
-      read: false,
-    },
-  ])
-
+  // Other state variables
   const [selectedCurrency, setSelectedCurrency] = useState("ghs")
   const [payeTaxBands, setPayeTaxBands] = useState(currencyConfig.ghs.taxBands)
+  const [ssnitRates, setSsnitRates] = useState(currencyConfig.ghs.socialSecurity)
+  const [tier2Rates, setTier2Rates] = useState(currencyConfig.ghs.tier2)
+  const [tier3Rates, setTier3Rates] = useState(currencyConfig.ghs.tier3)
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+  const [companyLogoPreview, setCompanyLogoPreview] = useState("")
+  const [subsidiaryLogoPreview, setSubsidiaryLogoPreview] = useState("")
+  const [subsidiaries, setSubsidiaries] = useState<any[]>([])
+  const [selectedSubsidiary, setSelectedSubsidiary] = useState<any>(null)
+  const [documentZoom, setDocumentZoom] = useState(100)
+  const [selectedDocument, setSelectedDocument] = useState<any>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
-  const [notificationTemplates, setNotificationTemplates] = useState([
-    {
-      id: "1",
-      name: "Employee Welcome",
-      category: "HR",
-      type: "Email",
-      status: "Active",
-      lastModified: "2024-01-15",
-      description: "Welcome email sent to new employees",
-    },
-    {
-      id: "2",
-      name: "Payroll Processed",
-      category: "Payroll",
-      type: "Email",
-      status: "Active",
-      lastModified: "2024-01-10",
-      description: "Notification when payroll is processed",
-    },
-    {
-      id: "3",
-      name: "Leave Request Approved",
-      category: "Leave",
-      type: "Email",
-      status: "Active",
-      lastModified: "2024-01-08",
-      description: "Notification when leave is approved",
-    },
-    {
-      id: "4",
-      name: "Attendance Alert",
-      category: "Attendance",
-      type: "SMS",
-      status: "Draft",
-      lastModified: "2024-01-05",
-      description: "Alert for attendance issues",
-    },
-  ])
-
-  const [emailConfig, setEmailConfig] = useState({
-    provider: "smtp",
-    smtpHost: "smtp.gmail.com",
-    smtpPort: 587,
-    smtpUsername: "",
-    smtpPassword: "",
-    fromEmail: "hr@company.com",
-    fromName: "HR Department",
-    replyTo: "noreply@company.com",
-    enableTLS: true,
-    enableSSL: false,
-  })
-
-  const [notificationSettings, setNotificationSettings] = useState({
-    payrollNotifications: true,
-    leaveNotifications: true,
-    attendanceAlerts: true,
-    promotionNotifications: true,
-    systemMaintenanceAlerts: true,
-    emailDigest: "daily",
-    smsAlerts: false,
-    pushNotifications: true,
-  })
-
-  const [isAddingTemplate, setIsAddingTemplate] = useState(false)
-  const [editingTemplate, setEditingTemplate] = useState(null)
-  const [newTemplate, setNewTemplate] = useState({
-    name: "",
-    category: "HR",
-    type: "Email",
-    subject: "",
-    body: "",
-    variables: [],
-  })
-
-  // Added for Access Control and Security
-  const [accessSettings, setAccessSettings] = useState<AccessSettings>({
-    twoFactorEnabled: false,
-    ssoEnabled: false,
-    passwordExpiryEnabled: true,
-    sessionTimeout: 30,
-    maxLoginAttempts: 5,
-    passwordMinLength: 8,
-    ipRestrictionsEnabled: false,
-    allowedIPs: [],
-  })
-  const [isSavingAccessSettings, setIsSavingAccessSettings] = useState(false)
-  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([])
-  const [isRefreshingSessions, setIsRefreshingSessions] = useState(false)
-
-  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
-    dataEncryptionEnabled: true,
-    auditLoggingEnabled: true,
-    autoBackupEnabled: true,
-    backupFrequency: "daily",
-    dataRetentionDays: 90,
-  })
-  const [isSavingSecuritySettings, setIsSavingSecuritySettings] = useState(false)
-  const [backupSize, setBackupSize] = useState<string | null>(null)
-  const [backupStatus, setBackupStatus] = useState<string | null>(null)
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
-  const [isExportingReport, setIsExportingReport] = useState(false)
-
-  const [showPassword, setShowPassword] = useState(false)
-  const [testConnectionStatus, setTestConnectionStatus] = useState<"idle" | "testing" | "success" | "error">("idle")
+  useEffect(() => {
+    console.log("[v0] SettingsPage initialized")
+  }, [])
 
   const getCurrencyConfig = (currency: string) => {
     return currencyConfig[currency as keyof typeof currencyConfig] || currencyConfig.ghs
   }
 
-  const calculateTax = (income: number, currency: string = selectedCurrency) => {
-    const config = getCurrencyConfig(currency)
-    if (!config) return 0
-
-    let tax = 0
-    let remainingIncome = income
-
-    for (const band of config.taxBands) {
-      if (remainingIncome <= 0) break
-
-      const bandIncome = band.to ? Math.min(remainingIncome, band.to - (band.from || 0)) : remainingIncome
-      tax += (bandIncome * band.rate) / 100
-      remainingIncome -= bandIncome
-    }
-
-    return tax
-  }
-
-  const validateTaxBands = (bands: any[]) => {
-    const errors = []
-
-    for (let i = 0; i < bands.length; i++) {
-      const band = bands[i]
-
-      // Check for overlapping bands
-      if (i > 0 && band.from <= bands[i - 1].to) {
-        errors.push(`Band ${i + 1}: Overlapping with previous band`)
-      }
-
-      // Check for gaps
-      if (i > 0 && band.from !== bands[i - 1].to + 1) {
-        errors.push(`Band ${i + 1}: Gap detected with previous band`)
-      }
-
-      // Check rate validity
-      if (band.rate < 0 || band.rate > 100) {
-        errors.push(`Band ${i + 1}: Invalid tax rate (${band.rate}%)`)
-      }
-    }
-
-    return errors
-  }
-
-  const syncWithGovernmentAPI = async (currency: string) => {
-    setIsSyncing(true)
-    console.log(`[v0] Syncing ${currency} tax rates with government API...`)
-
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Update API status
-      setApiStatus((prev) => ({
-        ...prev,
-        [currency]: {
-          ...prev[currency as keyof typeof prev],
-          connected: true,
-          lastSync: new Date().toISOString(),
-          status: "active",
-        },
-      }))
-
-      toast({
-        title: "Success",
-        description: `${currency.toUpperCase()} tax rates synced successfully`,
-      })
-    } catch (error) {
-      console.error(`[v0] Error syncing ${currency} tax rates:`, error)
-      toast({
-        title: "Error",
-        description: "Failed to sync tax rates",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSyncing(false)
-    }
-  }
-
   const handleCurrencyChange = (currency: string) => {
     setSelectedCurrency(currency)
-    // Update payeTaxBands based on the selected currency
     const selectedConfig = getCurrencyConfig(currency)
     if (selectedConfig && selectedConfig.taxBands) {
       setPayeTaxBands(selectedConfig.taxBands)
-      // Update SSNIT, Tier2, Tier3 rates if they exist in the config
       if (selectedConfig.socialSecurity) {
         setSsnitRates({
           employee: selectedConfig.socialSecurity.employee,
@@ -750,558 +218,167 @@ export default function SettingsPage() {
     }
   }
 
-  const updateSsnitRates = (field: string, value: number) => {
-    const newRates = { ...ssnitRates, [field]: value }
-    if (field !== "total") {
-      newRates.total = newRates.employee + newRates.employer
-    }
-    setSsnitRates(newRates)
-  }
+  const handleTestConnection = async () => {
+    setIsTestingConnection(true)
+    setConnectionStatus("testing")
 
-  const updateTier2Rates = (field: string, value: number) => {
-    const newRates = { ...tier2Rates, [field]: value }
-    if (field !== "total") {
-      newRates.total = newRates.employee + newRates.employer
-    }
-    setTier2Rates(newRates)
-  }
-
-  const updateTier3Rates = (field: string, value: number) => {
-    const newRates = { ...tier3Rates, [field]: value }
-    if (field !== "total") {
-      newRates.total = newRates.employee + newRates.employer
-    }
-    setTier3Rates(newRates)
-  }
-
-  const handleZoomIn = () => {
-    setDocumentZoom((prev) => Math.min(prev + 25, 200))
-  }
-
-  const handleZoomOut = () => {
-    setDocumentZoom((prev) => Math.max(prev - 25, 50))
-  }
-
-  const handleDownload = () => {
-    if (selectedDocument) {
-      const content = parseDocumentContent(selectedDocument)
-      let blob
-      let filename
-
-      if (selectedDocument.type === "PDF") {
-        // For demo purposes, download as text file since we don't have actual PDF binary data
-        // In production, this would fetch the actual PDF file from storage
-        blob = new Blob([content], { type: "text/plain" })
-        filename = `${selectedDocument.name}.txt`
-
-        toast({
-          title: "Download Note",
-          description: "PDF downloaded as text file for demo purposes",
-        })
-      } else if (selectedDocument.type === "DOC" || selectedDocument.type === "DOCX") {
-        // For Word docs, create as RTF format
-        const rtfContent = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}} \\f0\\fs24 ${content.replace(/\n/g, "\\par ")}}`
-        blob = new Blob([rtfContent], { type: "application/rtf" })
-        filename = `${selectedDocument.name}.rtf`
-      } else {
-        blob = new Blob([content], { type: "text/plain" })
-        filename = `${selectedDocument.name}.txt`
-      }
-
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement("a")
-      link.href = url
-      link.download = filename
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
-      toast({
-        title: "Download Started",
-        description: `Downloading ${filename}...`,
-      })
-    }
-  }
-
-  const handleFullscreen = () => {
-    setIsFullscreen(!isFullscreen)
-    if (!isFullscreen) {
-      toast({
-        title: "Fullscreen Mode",
-        description: "Press ESC to exit fullscreen",
-      })
-    }
-  }
-
-  // Logo upload function
-  const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
-    if (!file) return
-
-    setIsUploadingLogo(true)
     try {
-      // Create form data for blob upload
-      const formData = new FormData()
-      formData.append("file", file)
+      // Simulate API call to test email connection
+      await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      // Upload to Vercel Blob
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      })
+      // Simulate success/failure based on configuration
+      const isValid = emailConfig.host && emailConfig.username && emailConfig.password
 
-      if (!response.ok) {
-        throw new Error("Upload failed")
-      }
-
-      const { url } = await response.json()
-
-      // Set preview based on type
-      if (type === "company") {
-        setCompanyLogoPreview(url)
-        setCompanyData({ ...companyData, logo_url: url })
+      if (isValid) {
+        setConnectionStatus("success")
+        toast({
+          title: "Connection Successful",
+          description: "Email configuration is working correctly.",
+        })
       } else {
-        setSubsidiaryLogoPreview(url)
-        if (selectedSubsidiary) {
-          const updatedSubsidiary = { ...selectedSubsidiary, logo_url: url }
-          setSelectedSubsidiary(updatedSubsidiary)
-          // Also update the subsidiary in the main list
-          setSubsidiaries((prev) =>
-            prev.map((sub) => (sub.id === selectedSubsidiary.id ? { ...sub, logo_url: url } : sub)),
-          )
-        }
+        setConnectionStatus("error")
+        toast({
+          title: "Connection Failed",
+          description: "Please check your email configuration settings.",
+          variant: "destructive",
+        })
       }
-
-      toast({
-        title: "Logo uploaded successfully",
-        description: "Your logo has been uploaded and is ready to use.",
-      })
     } catch (error) {
-      console.error("Logo upload error:", error)
+      setConnectionStatus("error")
       toast({
-        title: "Upload failed",
-        description: "Failed to upload logo. Please try again.",
+        title: "Connection Failed",
+        description: "Unable to test email connection. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setIsUploadingLogo(false)
+      setIsTestingConnection(false)
+      // Reset status after 3 seconds
+      setTimeout(() => setConnectionStatus("idle"), 3000)
     }
   }
 
-  // Load functions
-  const loadCompanyData = async () => {
-    console.log("[v0] Loading company data...")
-
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock company data")
-      setCompanyData({
-        id: "demo-company-001",
-        name: "Akwaaba Technologies Ltd",
-        email_address: "ykodiah@gmail.com",
-        tax_id: "C0012345678",
-        ssnit_number: "1234567890",
-        industry: "Technology",
-        status: "active",
-        address: "123 Liberation Road, Labone, Accra, Ghana",
-        phone_number: "0249397960",
-        divisions: ["Head Office", "Regional Office"],
-        departments: ["Technology", "Human Resources", "Finance"],
-        locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
+  const handleGenerateNotches = async () => {
+    if (!newGrade.minSalary || !newGrade.maxSalary || newGrade.notchCount < 2) {
+      toast({
+        title: "Invalid Input",
+        description: "Please enter valid minimum salary, maximum salary, and number of notches (minimum 2).",
+        variant: "destructive",
       })
-      setDivisions(["Head Office", "Regional Office"])
-      setDepartments(["Technology", "Human Resources", "Finance"])
-      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
       return
     }
 
+    setIsGeneratingNotches(true)
+
     try {
-      const { data, error } = await supabase.from("companies").select("*").single()
+      // Simulate generation delay
+      await new Promise((resolve) => setTimeout(resolve, 1500))
 
-      if (error) throw error
+      const notches = []
+      const salaryDifference = newGrade.maxSalary - newGrade.minSalary
+      const stepIncrement = salaryDifference / (newGrade.notchCount - 1)
 
-      if (data) {
-        setCompanyData({
-          id: data.id,
-          name: data.name || "",
-          email_address: data.email_address || "",
-          tax_id: data.tax_id || "",
-          ssnit_number: data.ssnit_number || "",
-          industry: data.industry || "",
-          status: "active",
-          address: data.address || "",
-          phone_number: data.phone_number || "",
-          divisions: data.divisions || [],
-          departments: data.departments || [],
-          locations: data.locations || [],
+      for (let i = 0; i < newGrade.notchCount; i++) {
+        notches.push({
+          step: i + 1,
+          amount: Math.round(newGrade.minSalary + stepIncrement * i),
         })
-
-        setDivisions(data.divisions || [])
-        setDepartments(data.departments || [])
-        setLocations(data.locations || [])
-        setLogoPreview(data.logo_url || "")
       }
+
+      setNewGrade({ ...newGrade, notches })
+
+      toast({
+        title: "Notches Generated",
+        description: `Successfully generated ${newGrade.notchCount} salary notches.`,
+      })
     } catch (error) {
-      console.error("[v0] Error loading company data:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode")
-        // Set demo session cookie to prevent future database calls
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        // Load demo data
-        setCompanyData({
-          id: "demo-company-001",
-          name: "Akwaaba Technologies Ltd",
-          email_address: "ykodiah@gmail.com",
-          tax_id: "C0012345678",
-          ssnit_number: "1234567890",
-          industry: "Technology",
-          status: "active",
-          address: "123 Liberation Road, Labone, Accra, Ghana",
-          phone_number: "0249397960",
-          divisions: ["Head Office", "Regional Office"],
-          departments: ["Technology", "Human Resources", "Finance"],
-          locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
+      toast({
+        title: "Generation Failed",
+        description: "Failed to generate notches. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsGeneratingNotches(false)
+    }
+  }
+
+  const handleSaveSalaryGrade = () => {
+    if (!newGrade.grade || !newGrade.description || newGrade.notches.length === 0) {
+      toast({
+        title: "Incomplete Information",
+        description: "Please fill in all required fields and generate notches.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSavingGrade(true)
+
+    setTimeout(() => {
+      const gradeToAdd = {
+        id: editingGrade ? editingGrade.id : Date.now(),
+        ...newGrade,
+      }
+
+      if (editingGrade) {
+        setSalaryGrades((prev) => prev.map((grade) => (grade.id === editingGrade.id ? gradeToAdd : grade)))
+        toast({
+          title: "Grade Updated",
+          description: "Salary grade has been successfully updated.",
         })
-        setDivisions(["Head Office", "Regional Office"])
-        setDepartments(["Technology", "Human Resources", "Finance"])
-        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-        return
+        setEditingGrade(null)
+      } else {
+        setSalaryGrades((prev) => [...prev, gradeToAdd])
+        toast({
+          title: "Grade Added",
+          description: "New salary grade has been successfully added.",
+        })
       }
-      toast({
-        title: "Error",
-        description: "Failed to load company data",
-        variant: "destructive",
+
+      setShowAddGradeModal(false)
+      setNewGrade({
+        grade: "",
+        description: "",
+        minSalary: 0,
+        maxSalary: 0,
+        notchCount: 7,
+        notches: [],
       })
-    }
+      setIsSavingGrade(false)
+    }, 1000)
   }
 
-  const loadEmployees = async () => {
-    console.log("[v0] Loading employees...")
-
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock employees data")
-      setEmployees([
-        {
-          id: "emp-001",
-          first_name: "John",
-          last_name: "Doe",
-          full_name: "John Doe",
-          corporate_email: "john.doe@akwaaba.com",
-          personal_email: "john.doe@gmail.com",
-          position: "Software Engineer",
-          department: "Technology",
-          status: "active",
-        },
-        {
-          id: "emp-002",
-          first_name: "Jane",
-          last_name: "Smith",
-          full_name: "Jane Smith",
-          corporate_email: "jane.smith@akwaaba.com",
-          personal_email: "jane.smith@gmail.com",
-          position: "HR Manager",
-          department: "Human Resources",
-          status: "active",
-        },
-      ])
-      return
-    }
-
-    try {
-      const { data, error } = await supabase.from("employees").select("*").order("created_at", { ascending: false })
-
-      if (error) throw error
-      setEmployees(data || [])
-    } catch (error) {
-      console.error("Error loading employees:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode for employees")
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        setEmployees([
-          {
-            id: "emp-001",
-            first_name: "John",
-            last_name: "Doe",
-            full_name: "John Doe",
-            corporate_email: "john.doe@akwaaba.com",
-            personal_email: "john.doe@gmail.com",
-            position: "Software Engineer",
-            department: "Technology",
-            status: "active",
-          },
-          {
-            id: "emp-002",
-            first_name: "Jane",
-            last_name: "Smith",
-            full_name: "Jane Smith",
-            corporate_email: "jane.smith@akwaaba.com",
-            personal_email: "jane.smith@gmail.com",
-            position: "HR Manager",
-            department: "Human Resources",
-            status: "active",
-          },
-        ])
-        return
-      }
-      toast({
-        title: "Error",
-        description: "Failed to load employees",
-        variant: "destructive",
-      })
-    }
+  const handleEditGrade = (grade: any) => {
+    setEditingGrade(grade)
+    setNewGrade({
+      grade: grade.grade,
+      description: grade.description,
+      minSalary: grade.minSalary,
+      maxSalary: grade.maxSalary,
+      notchCount: grade.notchCount,
+      notches: grade.notches,
+    })
+    setShowAddGradeModal(true)
   }
 
-  const loadSubsidiaries = async () => {
-    console.log("[v0] Loading subsidiaries...")
-
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock subsidiaries data")
-      setSubsidiaries([
-        {
-          id: "sub-001",
-          company_id: "comp-001",
-          name: "Akwaaba Digital Solutions",
-          email_address: "info@akwaabadigital.com",
-          phone_number: "+233 30 276 5432",
-          tax_id: "TIN-ADS-2023-001",
-          ssnit_number: "SSNIT-ADS-789012",
-          address: "15 Liberation Road, Ridge, Accra, Ghana",
-          status: "active",
-          industry: "Digital Marketing & Web Development",
-          divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
-          departments: ["Marketing", "Development", "Design", "Sales"],
-          locations: ["Accra - Ridge", "Kumasi Branch"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 45,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-002",
-          company_id: "comp-001",
-          name: "Akwaaba Consulting Group",
-          email_address: "consulting@akwaaba.com",
-          phone_number: "+233 30 276 5433",
-          tax_id: "TIN-ACG-2023-002",
-          ssnit_number: "SSNIT-ACG-789013",
-          address: "8 Airport Residential Area, Accra, Ghana",
-          status: "active",
-          industry: "Business Consulting & Strategy",
-          divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
-          departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
-          locations: ["Accra - Airport", "Tema Office"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 32,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-003",
-          company_id: "comp-001",
-          name: "Akwaaba Financial Services",
-          email_address: "finance@akwaabafs.com",
-          phone_number: "+233 30 276 5434",
-          tax_id: "TIN-AFS-2023-003",
-          ssnit_number: "SSNIT-AFS-789014",
-          address: "25 Independence Avenue, Accra, Ghana",
-          status: "active",
-          industry: "Financial Technology & Services",
-          divisions: ["Fintech Solutions", "Payment Processing", "Financial Advisory"],
-          departments: ["Finance", "Technology", "Compliance", "Customer Service"],
-          locations: ["Accra - Independence Ave", "Ho Regional Office"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 28,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-004",
-          company_id: "comp-001",
-          name: "Akwaaba Logistics Ltd",
-          email_address: "logistics@akwaabalog.com",
-          phone_number: "+233 30 276 5435",
-          tax_id: "TIN-ALL-2023-004",
-          ssnit_number: "SSNIT-ALL-789015",
-          address: "12 Spintex Road, Accra, Ghana",
-          status: "active",
-          industry: "Supply Chain & Logistics",
-          divisions: ["Transportation", "Warehousing", "Supply Chain Management"],
-          departments: ["Operations", "Fleet Management", "Warehousing", "Customer Service"],
-          locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 3,
-          employee_count: 67,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-005",
-          company_id: "comp-001",
-          name: "Akwaaba Training Institute",
-          email_address: "training@akwaabainstitute.com",
-          phone_number: "+233 30 276 5436",
-          tax_id: "TIN-ATI-2023-005",
-          ssnit_number: "SSNIT-ATI-789016",
-          address: "5 Cantonments Road, Accra, Ghana",
-          status: "active",
-          industry: "Education & Professional Training",
-          divisions: ["Corporate Training", "IT Certification", "Professional Development"],
-          departments: ["Training", "Curriculum Development", "Student Services", "Administration"],
-          locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 3,
-          employee_count: 23,
-          created_at: new Date().toISOString(),
-        },
-      ])
-      return
-    }
-
-    try {
-      // Load subsidiaries with employee counts
-      const { data: subsidiariesData, error } = await supabase.from("subsidiaries").select("*")
-
-      if (error) throw error
-
-      if (subsidiariesData) {
-        setSubsidiaries(subsidiariesData)
-      }
-    } catch (error) {
-      console.error("[v0] Error loading subsidiaries:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode for subsidiaries")
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        setSubsidiaries([
-          {
-            id: "sub-001",
-            company_id: "comp-001",
-            name: "Akwaaba Digital Solutions",
-            email_address: "info@akwaabadigital.com",
-            phone_number: "+233 30 276 5432",
-            tax_id: "TIN-ADS-2023-001",
-            ssnit_number: "SSNIT-ADS-789012",
-            address: "15 Liberation Road, Ridge, Accra, Ghana",
-            status: "active",
-            industry: "Digital Marketing & Web Development",
-            divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
-            departments: ["Marketing", "Development", "Design", "Sales"],
-            locations: ["Accra - Ridge", "Kumasi Branch"],
-            divisions_count: 3,
-            departments_count: 4,
-            locations_count: 2,
-            employee_count: 45,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: "sub-002",
-            company_id: "comp-001",
-            name: "Akwaaba Consulting Group",
-            email_address: "consulting@akwaaba.com",
-            phone_number: "+233 30 276 5433",
-            tax_id: "TIN-ACG-2023-002",
-            ssnit_number: "SSNIT-ACG-789013",
-            address: "8 Airport Residential Area, Accra, Ghana",
-            status: "active",
-            industry: "Business Consulting & Strategy",
-            divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
-            departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
-            locations: ["Accra - Airport", "Tema Office"],
-            divisions_count: 3,
-            departments_count: 4,
-            locations_count: 2,
-            employee_count: 32,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: "sub-003",
-            company_id: "comp-001",
-            name: "Akwaaba Financial Services",
-            email_address: "finance@akwaabafs.com",
-            phone_number: "+233 30 276 5434",
-            tax_id: "TIN-AFS-2023-003",
-            ssnit_number: "SSNIT-AFS-789014",
-            address: "25 Independence Avenue, Accra, Ghana",
-            status: "active",
-            industry: "Financial Technology & Services",
-            divisions: ["Fintech Solutions", "Payment Processing", "Financial Advisory"],
-            departments: ["Finance", "Technology", "Compliance", "Customer Service"],
-            locations: ["Accra - Independence Ave", "Ho Regional Office"],
-            divisions_count: 3,
-            departments_count: 4,
-            locations_count: 2,
-            employee_count: 28,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: "sub-004",
-            company_id: "comp-001",
-            name: "Akwaaba Logistics Ltd",
-            email_address: "logistics@akwaabalog.com",
-            phone_number: "+233 30 276 5435",
-            tax_id: "TIN-ALL-2023-004",
-            ssnit_number: "SSNIT-ALL-789015",
-            address: "12 Spintex Road, Accra, Ghana",
-            status: "active",
-            industry: "Supply Chain & Logistics",
-            divisions: ["Transportation", "Warehousing", "Supply Chain Management"],
-            departments: ["Operations", "Fleet Management", "Warehousing", "Customer Service"],
-            locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub"],
-            divisions_count: 3,
-            departments_count: 4,
-            locations_count: 3,
-            employee_count: 67,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: "sub-005",
-            company_id: "comp-001",
-            name: "Akwaaba Training Institute",
-            email_address: "training@akwaabainstitute.com",
-            phone_number: "+233 30 276 5436",
-            tax_id: "TIN-ATI-2023-005",
-            ssnit_number: "SSNIT-ATI-789016",
-            address: "5 Cantonments Road, Accra, Ghana",
-            status: "active",
-            industry: "Education & Professional Training",
-            divisions: ["Corporate Training", "IT Certification", "Professional Development"],
-            departments: ["Training", "Curriculum Development", "Student Services", "Administration"],
-            locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform"],
-            divisions_count: 3,
-            departments_count: 4,
-            locations_count: 3,
-            employee_count: 23,
-            created_at: new Date().toISOString(),
-          },
-        ])
-        return
-      }
-      toast({
-        title: "Error",
-        description: "Failed to load subsidiaries",
-        variant: "destructive",
-      })
-    }
+  const handleDeleteGrade = (gradeId: number) => {
+    setSalaryGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
+    toast({
+      title: "Grade Deleted",
+      description: "Salary grade has been successfully deleted.",
+    })
   }
-
-  useEffect(() => {
-    loadCompanyData()
-    loadEmployees()
-    loadSubsidiaries()
-  }, [])
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-          <p className="text-muted-foreground">Manage your organization settings and configurations</p>
+          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+          <p className="text-gray-600">Manage your organization settings and configurations</p>
         </div>
       </div>
 
-      <Tabs defaultValue="company" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="company">Company</TabsTrigger>
           <TabsTrigger value="multi-company">Multi-Company</TabsTrigger>
@@ -1313,329 +390,161 @@ export default function SettingsPage() {
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="company" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building className="h-5 w-5" />
-                Company Information
-              </CardTitle>
-              <CardDescription>Update your company details and contact information</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="company-name">Company Name</Label>
-                  <Input
-                    id="company-name"
-                    value={companyData.name}
-                    onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
-                    placeholder="Enter company name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={companyData.email_address}
-                    onChange={(e) => setCompanyData({ ...companyData, email_address: e.target.value })}
-                    placeholder="company@example.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="tax-id">Tax ID</Label>
-                  <Input
-                    id="tax-id"
-                    value={companyData.tax_id}
-                    onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
-                    placeholder="Enter tax identification number"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ssnit">SSNIT Number</Label>
-                  <Input
-                    id="ssnit"
-                    value={companyData.ssnit_number}
-                    onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
-                    placeholder="Enter SSNIT number"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="industry">Industry</Label>
-                  <Select
-                    value={companyData.industry}
-                    onValueChange={(value) => setCompanyData({ ...companyData, industry: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select industry" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="technology">Technology</SelectItem>
-                      <SelectItem value="finance">Finance</SelectItem>
-                      <SelectItem value="healthcare">Healthcare</SelectItem>
-                      <SelectItem value="education">Education</SelectItem>
-                      <SelectItem value="manufacturing">Manufacturing</SelectItem>
-                      <SelectItem value="retail">Retail</SelectItem>
-                      <SelectItem value="consulting">Consulting</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    value={companyData.phone_number}
-                    onChange={(e) => setCompanyData({ ...companyData, phone_number: e.target.value })}
-                    placeholder="Enter phone number"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Textarea
-                  id="address"
-                  value={companyData.address}
-                  onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
-                  placeholder="Enter company address"
-                  rows={3}
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button onClick={() => console.log("Save company data")} disabled={isSaving}>
-                {isSaving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Changes
-                  </>
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="multi-company" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Multi-Company Management
-              </CardTitle>
-              <CardDescription>Manage subsidiaries and related companies</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold">Subsidiaries ({subsidiaries.length})</h3>
-                  <p className="text-sm text-muted-foreground">Manage your company subsidiaries</p>
-                </div>
-                <Button onClick={() => setShowAddSubsidiary(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Subsidiary
-                </Button>
-              </div>
-              <div className="grid gap-4">
-                {subsidiaries.map((subsidiary) => (
-                  <Card key={subsidiary.id} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                          <Building2 className="h-6 w-6 text-primary" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold">{subsidiary.name}</h4>
-                          <p className="text-sm text-muted-foreground">{subsidiary.industry}</p>
-                          <div className="flex items-center gap-4 mt-1">
-                            <span className="text-xs text-muted-foreground">{subsidiary.employee_count} employees</span>
-                            <Badge variant={subsidiary.status === "active" ? "default" : "secondary"}>
-                              {subsidiary.status}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem>
-                              <Settings className="mr-2 h-4 w-4" />
-                              Settings
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Users className="mr-2 h-4 w-4" />
-                              View Employees
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="hr" className="space-y-6">
-          <div className="grid gap-6">
+        {/* Company Tab */}
+        <TabsContent value="company">
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  HR Configuration
+                <CardTitle className="flex items-center space-x-2">
+                  <Building2 className="w-5 h-5" />
+                  <span>Company Information</span>
                 </CardTitle>
-                <CardDescription>Configure HR policies and settings</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Leave Year Start</Label>
-                    <Select
-                      value={hrConfig.leaveYearStart}
-                      onValueChange={(value) => setHrConfig({ ...hrConfig, leaveYearStart: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="January">January</SelectItem>
-                        <SelectItem value="April">April</SelectItem>
-                        <SelectItem value="July">July</SelectItem>
-                        <SelectItem value="October">October</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Probation Period (months)</Label>
+                  <div>
+                    <Label htmlFor="companyName">Company Name</Label>
                     <Input
-                      type="number"
-                      value={hrConfig.probationPeriod}
-                      onChange={(e) => setHrConfig({ ...hrConfig, probationPeriod: Number.parseInt(e.target.value) })}
+                      id="companyName"
+                      value={companyData.name}
+                      onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="registrationNumber">Registration Number</Label>
+                    <Input
+                      id="registrationNumber"
+                      value={companyData.registration_number}
+                      onChange={(e) => setCompanyData({ ...companyData, registration_number: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="taxId">Tax ID</Label>
+                    <Input
+                      id="taxId"
+                      value={companyData.tax_id}
+                      onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="website">Website</Label>
+                    <Input
+                      id="website"
+                      value={companyData.website}
+                      onChange={(e) => setCompanyData({ ...companyData, website: e.target.value })}
                     />
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Auto-approve Leave Requests</Label>
-                      <p className="text-sm text-muted-foreground">Automatically approve leave requests under 3 days</p>
-                    </div>
-                    <Switch
-                      checked={hrConfig.autoApproveLeave}
-                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, autoApproveLeave: checked })}
+                <div>
+                  <Label htmlFor="address">Address</Label>
+                  <Textarea
+                    id="address"
+                    value={companyData.address}
+                    onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      value={companyData.phone}
+                      onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })}
                     />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Email Notifications</Label>
-                      <p className="text-sm text-muted-foreground">Send email notifications for HR events</p>
-                    </div>
-                    <Switch
-                      checked={hrConfig.emailNotifications}
-                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, emailNotifications: checked })}
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      value={companyData.email}
+                      onChange={(e) => setCompanyData({ ...companyData, email: e.target.value })}
                     />
                   </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button className="bg-emerald-600 hover:bg-emerald-700">
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </Button>
                 </div>
               </CardContent>
-              <CardFooter>
-                <Button onClick={() => console.log("Save HR config")}>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Configuration
-                </Button>
-              </CardFooter>
             </Card>
+          </div>
+        </TabsContent>
 
+        {/* HR Tab */}
+        <TabsContent value="hr">
+          <div className="space-y-6">
             {/* Salary Grades & Notches Card */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
-                  Salary Grades & Notches
-                </CardTitle>
-                <CardDescription>Manage salary grade structures and notch progressions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-center mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold">Current Salary Grades ({salaryGrades.length})</h3>
-                    <p className="text-sm text-muted-foreground">Define salary ranges and progression steps</p>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-5 h-5" />
+                    <span>Salary Grades & Notches</span>
                   </div>
-                  <Button onClick={() => setShowAddGrade(true)}>
+                  <Button
+                    onClick={() => {
+                      setEditingGrade(null)
+                      setNewGrade({
+                        grade: "",
+                        description: "",
+                        minSalary: 0,
+                        maxSalary: 0,
+                        notchCount: 7,
+                        notches: [],
+                      })
+                      setShowAddGradeModal(true)
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
                     <Plus className="mr-2 h-4 w-4" />
                     Add Grade
                   </Button>
-                </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-4">
                   {salaryGrades.map((grade) => (
-                    <Card key={grade.id} className="p-4">
-                      <div className="flex items-center justify-between">
+                    <div key={grade.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
                         <div>
-                          <h4 className="font-semibold">{grade.grade}</h4>
-                          <p className="text-sm text-muted-foreground">{grade.description}</p>
-                          <div className="flex items-center gap-4 mt-2">
-                            <span className="text-sm">
-                              Range: ₵{grade.minSalary.toLocaleString()} - ₵{grade.maxSalary.toLocaleString()}
-                            </span>
-                            <Badge variant="outline">{grade.notches.length} notches</Badge>
-                          </div>
+                          <h3 className="font-semibold">{grade.grade}</h3>
+                          <p className="text-sm text-gray-600">{grade.description}</p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setEditingGrade(grade)
-                              setNewGrade({
-                                grade: grade.grade,
-                                description: grade.description,
-                                minSalary: grade.minSalary,
-                                maxSalary: grade.maxSalary,
-                                notchCount: grade.notches.length,
-                                notches: grade.notches,
-                              })
-                              setShowAddGrade(true)
-                            }}
-                          >
+                        <div className="flex items-center space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => handleEditGrade(grade)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSalaryGrades(salaryGrades.filter((g) => g.id !== grade.id))
-                              toast({
-                                title: "Grade deleted",
-                                description: `${grade.grade} has been removed`,
-                              })
-                            }}
-                          >
+                          <Button variant="outline" size="sm" onClick={() => handleDeleteGrade(grade.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
-                    </Card>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-500">Min Salary:</span>
+                          <p className="font-medium">₵{grade.minSalary.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Max Salary:</span>
+                          <p className="font-medium">₵{grade.maxSalary.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Notches:</span>
+                          <p className="font-medium">{grade.notches.length} steps</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Increment:</span>
+                          <p className="font-medium">
+                            ₵
+                            {Math.round(
+                              (grade.maxSalary - grade.minSalary) / (grade.notches.length - 1),
+                            ).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </CardContent>
@@ -1643,163 +552,293 @@ export default function SettingsPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="payroll" className="space-y-6">
+        {/* Notifications Tab */}
+        <TabsContent value="notifications">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Mail className="w-5 h-5" />
+                  <span>Email Configuration</span>
+                </CardTitle>
+                <p className="text-sm text-gray-600">Configure SMTP settings for sending notifications</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="emailProvider">Email Provider</Label>
+                    <Select
+                      value={emailConfig.provider}
+                      onValueChange={(value) => setEmailConfig({ ...emailConfig, provider: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="SMTP">SMTP</SelectItem>
+                        <SelectItem value="SendGrid">SendGrid</SelectItem>
+                        <SelectItem value="Mailgun">Mailgun</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="fromEmail">From Email</Label>
+                    <Input
+                      id="fromEmail"
+                      value={emailConfig.fromEmail}
+                      onChange={(e) => setEmailConfig({ ...emailConfig, fromEmail: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="smtpHost">SMTP Host</Label>
+                    <Input
+                      id="smtpHost"
+                      value={emailConfig.host}
+                      onChange={(e) => setEmailConfig({ ...emailConfig, host: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fromName">From Name</Label>
+                    <Input
+                      id="fromName"
+                      value={emailConfig.fromName}
+                      onChange={(e) => setEmailConfig({ ...emailConfig, fromName: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="smtpPort">SMTP Port</Label>
+                    <Input
+                      id="smtpPort"
+                      value={emailConfig.port}
+                      onChange={(e) => setEmailConfig({ ...emailConfig, port: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="replyTo">Reply To</Label>
+                    <Input
+                      id="replyTo"
+                      value={emailConfig.replyTo}
+                      onChange={(e) => setEmailConfig({ ...emailConfig, replyTo: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="username">Username</Label>
+                    <Input
+                      id="username"
+                      value={emailConfig.username}
+                      onChange={(e) => setEmailConfig({ ...emailConfig, username: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="enableTLS"
+                        checked={emailConfig.enableTLS}
+                        onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableTLS: checked })}
+                      />
+                      <Label htmlFor="enableTLS">Enable TLS</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="enableSSL"
+                        checked={emailConfig.enableSSL}
+                        onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableSSL: checked })}
+                      />
+                      <Label htmlFor="enableSSL">Enable SSL</Label>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPasswordEmail ? "text" : "password"}
+                      value={emailConfig.password}
+                      onChange={(e) => setEmailConfig({ ...emailConfig, password: e.target.value })}
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPasswordEmail(!showPasswordEmail)}
+                    >
+                      {showPasswordEmail ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex justify-between">
+                  <Button
+                    variant="outline"
+                    onClick={handleTestConnection}
+                    disabled={isTestingConnection}
+                    className={`
+                      ${connectionStatus === "success" ? "border-green-500 text-green-600" : ""}
+                      ${connectionStatus === "error" ? "border-red-500 text-red-600" : ""}
+                    `}
+                  >
+                    {isTestingConnection ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Testing...
+                      </>
+                    ) : connectionStatus === "success" ? (
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Connection Successful
+                      </>
+                    ) : connectionStatus === "error" ? (
+                      <>
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Connection Failed
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="mr-2 h-4 w-4" />
+                        Test Connection
+                      </>
+                    )}
+                  </Button>
+                  <Button className="bg-emerald-600 hover:bg-emerald-700">
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Configuration
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Other tabs content would go here */}
+        <TabsContent value="multi-company">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calculator className="h-5 w-5" />
-                Payroll Settings
-              </CardTitle>
-              <CardDescription>Configure payroll calculations and tax settings</CardDescription>
+              <CardTitle>Multi-Company Settings</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Payroll configuration content will be displayed here.</p>
+              <p>Multi-company configuration options will be displayed here.</p>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications" className="space-y-6">
+        <TabsContent value="payroll">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                Notification Settings
-              </CardTitle>
-              <CardDescription>Configure email and system notifications</CardDescription>
+              <CardTitle>Payroll Settings</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Notification settings content will be displayed here.</p>
+              <p>Payroll configuration options will be displayed here.</p>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="roles" className="space-y-6">
+        <TabsContent value="roles">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Role Management
-              </CardTitle>
-              <CardDescription>Manage user roles and permissions</CardDescription>
+              <CardTitle>Role Management</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Role management content will be displayed here.</p>
+              <p>Role and permission management will be displayed here.</p>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="access" className="space-y-6">
+        <TabsContent value="access">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Lock className="h-5 w-5" />
-                Access Control
-              </CardTitle>
-              <CardDescription>Configure authentication and access settings</CardDescription>
+              <CardTitle>Access Control</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Access control content will be displayed here.</p>
+              <p>Access control settings will be displayed here.</p>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="security" className="space-y-6">
+        <TabsContent value="security">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5" />
-                Security Settings
-              </CardTitle>
-              <CardDescription>Configure security policies and backup settings</CardDescription>
+              <CardTitle>Security Settings</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Security settings content will be displayed here.</p>
+              <p>Security configuration options will be displayed here.</p>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Add Grade Modal */}
-      {showAddGrade && (
-        <Dialog open={showAddGrade} onOpenChange={setShowAddGrade}>
+      {/* Add/Edit Salary Grade Modal */}
+      {showAddGradeModal && (
+        <Dialog open={showAddGradeModal} onOpenChange={setShowAddGradeModal}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>{editingGrade ? "Edit Salary Grade" : "Add New Salary Grade"}</DialogTitle>
-              <DialogDescription>Configure salary grade details and notch structure</DialogDescription>
+              <p className="text-sm text-gray-600">Configure salary grade details and notch structure</p>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Grade Name</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="gradeName">Grade Name</Label>
                   <Input
+                    id="gradeName"
                     value={newGrade.grade}
                     onChange={(e) => setNewGrade({ ...newGrade, grade: e.target.value })}
                     placeholder="Grade 1"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
+                <div>
+                  <Label htmlFor="description">Description</Label>
                   <Input
+                    id="description"
                     value={newGrade.description}
                     onChange={(e) => setNewGrade({ ...newGrade, description: e.target.value })}
                     placeholder="Entry Level"
                   />
                 </div>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Minimum Salary (₵)</Label>
+                <div>
+                  <Label htmlFor="minSalary">Minimum Salary (₵)</Label>
                   <Input
+                    id="minSalary"
                     type="number"
                     value={newGrade.minSalary}
-                    onChange={(e) => setNewGrade({ ...newGrade, minSalary: Number.parseInt(e.target.value) })}
+                    onChange={(e) => setNewGrade({ ...newGrade, minSalary: Number(e.target.value) })}
                     placeholder="2500"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Maximum Salary (₵)</Label>
+                <div>
+                  <Label htmlFor="maxSalary">Maximum Salary (₵)</Label>
                   <Input
+                    id="maxSalary"
                     type="number"
                     value={newGrade.maxSalary}
-                    onChange={(e) => setNewGrade({ ...newGrade, maxSalary: Number.parseInt(e.target.value) })}
+                    onChange={(e) => setNewGrade({ ...newGrade, maxSalary: Number(e.target.value) })}
                     placeholder="4000"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Number of Notches/Steps</Label>
-                  <Input
-                    type="number"
-                    min="2"
-                    max="20"
-                    value={newGrade.notchCount}
-                    onChange={(e) => setNewGrade({ ...newGrade, notchCount: Number.parseInt(e.target.value) })}
-                    placeholder="7"
-                  />
-                </div>
               </div>
+
+              <div>
+                <Label htmlFor="notchCount">Number of Notches/Steps</Label>
+                <Input
+                  id="notchCount"
+                  type="number"
+                  min="2"
+                  max="20"
+                  value={newGrade.notchCount}
+                  onChange={(e) => setNewGrade({ ...newGrade, notchCount: Number(e.target.value) })}
+                  placeholder="7"
+                />
+                <p className="text-xs text-gray-500 mt-1">Specify between 2-20 steps for this grade</p>
+              </div>
+
               <div className="flex items-center justify-between">
                 <Button
-                  variant="outline"
-                  onClick={() => {
-                    setIsGeneratingNotches(true)
-                    setTimeout(() => {
-                      const notches = []
-                      const increment = (newGrade.maxSalary - newGrade.minSalary) / (newGrade.notchCount - 1)
-                      for (let i = 0; i < newGrade.notchCount; i++) {
-                        notches.push({
-                          step: i + 1,
-                          amount: Math.round(newGrade.minSalary + increment * i),
-                        })
-                      }
-                      setNewGrade({ ...newGrade, notches })
-                      setIsGeneratingNotches(false)
-                      toast({
-                        title: "Notches generated",
-                        description: `Generated ${newGrade.notchCount} salary notches`,
-                      })
-                    }, 1500)
-                  }}
-                  disabled={isGeneratingNotches || !newGrade.minSalary || !newGrade.maxSalary || !newGrade.notchCount}
+                  onClick={handleGenerateNotches}
+                  disabled={isGeneratingNotches || !newGrade.minSalary || !newGrade.maxSalary}
+                  className="bg-blue-600 hover:bg-blue-700"
                 >
                   {isGeneratingNotches ? (
                     <>
@@ -1808,21 +847,24 @@ export default function SettingsPage() {
                     </>
                   ) : (
                     <>
-                      <Settings className="mr-2 h-4 w-4" />
+                      <Gear className="mr-2 h-4 w-4" />
                       Generate Notches
                     </>
                   )}
                 </Button>
-                <span className="text-sm text-muted-foreground">{newGrade.notches.length} notches configured</span>
+                {newGrade.notches.length > 0 && (
+                  <span className="text-sm text-gray-600">{newGrade.notches.length} notches configured</span>
+                )}
               </div>
+
               {newGrade.notches.length > 0 && (
-                <div className="space-y-2">
+                <div>
                   <Label>Generated Notches Preview</Label>
-                  <div className="max-h-40 overflow-y-auto border rounded-md p-3 space-y-1">
+                  <div className="mt-2 max-h-40 overflow-y-auto border rounded-lg p-3 bg-gray-50">
                     {newGrade.notches.map((notch) => (
-                      <div key={notch.step} className="flex justify-between text-sm">
-                        <span>Step {notch.step}</span>
-                        <span>₵{notch.amount.toLocaleString()}</span>
+                      <div key={notch.step} className="flex justify-between py-1">
+                        <span className="text-sm">Step {notch.step}</span>
+                        <span className="text-sm font-medium">₵{notch.amount.toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
@@ -1830,52 +872,13 @@ export default function SettingsPage() {
               )}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddGrade(false)}>
+              <Button variant="outline" onClick={() => setShowAddGradeModal(false)}>
                 Cancel
               </Button>
               <Button
-                onClick={() => {
-                  setIsSavingGrade(true)
-                  setTimeout(() => {
-                    const gradeToAdd = {
-                      id: editingGrade ? editingGrade.id : Date.now(),
-                      grade: newGrade.grade,
-                      description: newGrade.description,
-                      minSalary: newGrade.minSalary,
-                      maxSalary: newGrade.maxSalary,
-                      notches: newGrade.notches,
-                    }
-
-                    if (editingGrade) {
-                      // Update existing grade
-                      setSalaryGrades((prev) => prev.map((g) => (g.id === editingGrade.id ? gradeToAdd : g)))
-                      toast({
-                        title: "Grade updated",
-                        description: `${newGrade.grade} has been updated successfully`,
-                      })
-                    } else {
-                      // Add new grade
-                      setSalaryGrades((prev) => [...prev, gradeToAdd])
-                      toast({
-                        title: "Grade added",
-                        description: `${newGrade.grade} has been added successfully`,
-                      })
-                    }
-
-                    setShowAddGrade(false)
-                    setEditingGrade(null)
-                    setNewGrade({
-                      grade: "",
-                      description: "",
-                      minSalary: 0,
-                      maxSalary: 0,
-                      notchCount: 7,
-                      notches: [],
-                    })
-                    setIsSavingGrade(false)
-                  }, 1000)
-                }}
+                onClick={handleSaveSalaryGrade}
                 disabled={isSavingGrade || !newGrade.grade || !newGrade.description || newGrade.notches.length === 0}
+                className="bg-emerald-600 hover:bg-emerald-700"
               >
                 {isSavingGrade ? (
                   <>
