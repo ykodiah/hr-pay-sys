@@ -248,8 +248,8 @@ export default function SettingsPage() {
   const [isBackingUp, setIsBackingUp] = useState<boolean>(false)
   const [lastBackupTime, setLastBackupTime] = useState<string | null>(null)
   const [showAddSubsidiary, setShowAddSubsidiary] = useState<boolean>(false)
-  const [showEditSubsidiary, setShowEditSubsidiary] = useState<boolean>(false)
-  const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState<boolean>(false)
+  const [showEditSubsidiary, setShowEditSubsidiary] = useState(false)
+  const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState(false)
   const [selectedSubsidiary, setSelectedSubsidiary] = useState<Subsidiary | null>(null)
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<boolean>(false)
   const [showReactivateConfirm, setShowReactivateConfirm] = useState<boolean>(false)
@@ -785,7 +785,7 @@ export default function SettingsPage() {
         })
       } else if (selectedDocument.type === "DOC" || selectedDocument.type === "DOCX") {
         // For Word docs, create as RTF format
-        const rtfContent = `{\\\\rtf1\\\\ansi\\\\deff0 {\\\\fonttbl {\\\\f0 Times New Roman;}} \\\\f0\\\\fs24 ${content.replace(/\\n/g, "\\\\par ")}}`
+        const rtfContent = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}} \\f0\\fs24 ${content.replace(/\n/g, "\\par ")}`
         blob = new Blob([rtfContent], { type: "application/rtf" })
         filename = `${selectedDocument.name}.rtf`
       } else {
