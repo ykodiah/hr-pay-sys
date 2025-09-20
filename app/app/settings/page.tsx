@@ -40,6 +40,9 @@ import {
   Trash2,
   Send,
   Mail,
+  Shield,
+  Database,
+  FileText,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -122,6 +125,43 @@ interface Role {
   description: string
   permissions: string[]
   user_count: number
+}
+
+// Added for Access Control and Security
+interface AccessSettings {
+  twoFactorEnabled: boolean
+  ssoEnabled: boolean
+  passwordExpiryEnabled: boolean
+  sessionTimeout: number
+  maxLoginAttempts: number
+  passwordMinLength: number
+  ipRestrictionsEnabled: boolean
+  allowedIPs: string[]
+}
+
+interface SecuritySettings {
+  dataEncryptionEnabled: boolean
+  auditLoggingEnabled: boolean
+  autoBackupEnabled: boolean
+  backupFrequency: string
+  dataRetentionDays: number
+}
+
+interface AuditLog {
+  id: string
+  user_email: string
+  action: string
+  timestamp: string
+  ip_address: string
+  severity: "high" | "medium" | "low"
+}
+
+interface ActiveSession {
+  id: string
+  user_email: string
+  ip_address: string
+  device: string
+  last_activity: string
 }
 
 const isDemoMode = () => {
@@ -507,6 +547,34 @@ export default function SettingsPage() {
     body: "",
     variables: [],
   })
+
+  // Added for Access Control and Security
+  const [accessSettings, setAccessSettings] = useState<AccessSettings>({
+    twoFactorEnabled: false,
+    ssoEnabled: false,
+    passwordExpiryEnabled: true,
+    sessionTimeout: 30,
+    maxLoginAttempts: 5,
+    passwordMinLength: 8,
+    ipRestrictionsEnabled: false,
+    allowedIPs: [],
+  })
+  const [isSavingAccessSettings, setIsSavingAccessSettings] = useState(false)
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([])
+  const [isRefreshingSessions, setIsRefreshingSessions] = useState(false)
+
+  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
+    dataEncryptionEnabled: true,
+    auditLoggingEnabled: true,
+    autoBackupEnabled: true,
+    backupFrequency: "daily",
+    dataRetentionDays: 90,
+  })
+  const [isSavingSecuritySettings, setIsSavingSecuritySettings] = useState(false)
+  const [backupSize, setBackupSize] = useState<string | null>(null)
+  const [backupStatus, setBackupStatus] = useState<string | null>(null)
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
+  const [isExportingReport, setIsExportingReport] = useState(false)
 
   const getCurrencyConfig = (currency: string) => {
     return currencyConfig[currency as keyof typeof currencyConfig] || currencyConfig.ghs
@@ -1134,10 +1202,88 @@ export default function SettingsPage() {
     }
   }
 
+  // Added for Access Control and Security
+  const loadAccessAndSecurityData = async () => {
+    console.log("[v0] Loading access and security data...")
+    // Simulate fetching data
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    // Mock data for demonstration
+    setAccessSettings({
+      twoFactorEnabled: true,
+      ssoEnabled: false,
+      passwordExpiryEnabled: true,
+      sessionTimeout: 30,
+      maxLoginAttempts: 5,
+      passwordMinLength: 10,
+      ipRestrictionsEnabled: true,
+      allowedIPs: ["192.168.1.0/24", "10.0.0.1"],
+    })
+    setSecuritySettings({
+      dataEncryptionEnabled: true,
+      auditLoggingEnabled: true,
+      autoBackupEnabled: true,
+      backupFrequency: "daily",
+      dataRetentionDays: 180,
+    })
+    setLastBackupTime(new Date("2024-03-10T10:00:00Z").toISOString())
+    setBackupSize("50 MB")
+    setBackupStatus("Completed")
+    setAuditLogs([
+      {
+        id: "log-001",
+        user_email: "admin@example.com",
+        action: "User logged in",
+        timestamp: new Date("2024-03-11T09:00:00Z").toISOString(),
+        ip_address: "192.168.1.10",
+        severity: "low",
+      },
+      {
+        id: "log-002",
+        user_email: "hr@example.com",
+        action: "Updated employee record",
+        timestamp: new Date("2024-03-11T09:05:00Z").toISOString(),
+        ip_address: "192.168.1.11",
+        severity: "medium",
+      },
+      {
+        id: "log-003",
+        user_email: "admin@example.com",
+        action: "Security settings modified",
+        timestamp: new Date("2024-03-11T09:10:00Z").toISOString(),
+        ip_address: "192.168.1.10",
+        severity: "high",
+      },
+    ])
+    setActiveSessions([
+      {
+        id: "session-001",
+        user_email: "admin@example.com",
+        ip_address: "192.168.1.10",
+        device: "Desktop",
+        last_activity: new Date("2024-03-11T09:10:00Z").toISOString(),
+      },
+      {
+        id: "session-002",
+        user_email: "user@example.com",
+        ip_address: "10.0.0.5",
+        device: "Mobile",
+        last_activity: new Date("2024-03-11T08:30:00Z").toISOString(),
+      },
+    ])
+    console.log("[v0] Access and security data loaded.")
+  }
+
   const loadAllData = async () => {
     console.log("[v0] Loading all settings data...")
     try {
-      await Promise.all([loadCompanyData(), loadEmployees(), loadSubsidiaries(), loadRoles()])
+      await Promise.all([
+        loadCompanyData(),
+        loadEmployees(),
+        loadSubsidiaries(),
+        loadRoles(),
+        loadAccessAndSecurityData(),
+      ])
       console.log("[v0] All settings data loaded successfully")
     } catch (error) {
       console.error("[v0] Error loading settings data:", error)
@@ -2978,6 +3124,83 @@ Format the response in a professional, actionable manner for HR decision-makers.
     } finally {
       setIsSaving(false)
     }
+  }
+
+  // Added for Access Control
+  const handleRefreshSessions = async () => {
+    setIsRefreshingSessions(true)
+    console.log("[v0] Refreshing active sessions...")
+    await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate API call
+    // Mock data update
+    setActiveSessions([
+      {
+        id: "session-001",
+        user_email: "admin@example.com",
+        ip_address: "192.168.1.10",
+        device: "Desktop",
+        last_activity: new Date().toISOString(),
+      },
+      {
+        id: "session-003",
+        user_email: "newuser@example.com",
+        ip_address: "192.168.1.15",
+        device: "Laptop",
+        last_activity: new Date().toISOString(),
+      },
+    ])
+    setIsRefreshingSessions(false)
+    toast({ title: "Sessions Refreshed", description: "Active sessions have been updated." })
+  }
+
+  const handleTerminateSession = async (sessionId: string) => {
+    console.log(`[v0] Terminating session: ${sessionId}`)
+    if (!confirm("Are you sure you want to terminate this session?")) return
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    setActiveSessions((prev) => prev.filter((session) => session.id !== sessionId))
+    toast({ title: "Session Terminated", description: "The selected session has been terminated." })
+  }
+
+  const handleSaveAccessSettings = async () => {
+    setIsSavingAccessSettings(true)
+    console.log("[v0] Saving access settings...")
+    await new Promise((resolve) => setTimeout(resolve, 1500)) // Simulate API call
+    setIsSavingAccessSettings(false)
+    toast({ title: "Access Settings Saved", description: "Access control settings have been updated." })
+  }
+
+  // Added for Security
+  const handleBackupNowInner = async () => {
+    setIsBackingUp(true)
+    console.log("[v0] Initiating manual backup...")
+    await new Promise((resolve) => setTimeout(resolve, 3000)) // Simulate backup process
+    setLastBackupTime(new Date().toISOString())
+    setBackupSize("55 MB") // Simulate updated size
+    setBackupStatus("Completed")
+    toast({ title: "Backup Successful", description: "Manual backup completed." })
+    setIsBackingUp(false)
+  }
+
+  const handleSaveSecuritySettings = async () => {
+    setIsSavingSecuritySettings(true)
+    console.log("[v0] Saving security settings...")
+    await new Promise((resolve) => setTimeout(resolve, 1500)) // Simulate API call
+    setIsSavingSecuritySettings(false)
+    toast({ title: "Security Settings Saved", description: "Security configurations have been updated." })
+  }
+
+  const handleViewAllLogs = () => {
+    console.log("[v0] Navigating to Audit Logs page...")
+    // In a real app, this would navigate to a dedicated audit logs page
+    toast({ title: "View All Logs", description: "Navigating to the full audit log history." })
+  }
+
+  const handleExportSecurityReport = async () => {
+    setIsExportingReport(true)
+    console.log("[v0] Exporting security report...")
+    await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate export process
+    setIsExportingReport(false)
+    toast({ title: "Report Exported", description: "Security report generated and downloaded." })
   }
 
   return (
@@ -4970,31 +5193,212 @@ Format the response in a professional, actionable manner for HR decision-makers.
           </Card>
         </TabsContent>
 
+        {/* Access Control Tab Content */}
         <TabsContent value="access">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <Settings className="w-5 h-5" />
+                <Shield className="w-5 h-5" />
                 <span>Access Control</span>
               </CardTitle>
               <CardDescription>Manage user access and authentication settings</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Authentication Settings */}
               <div className="space-y-4">
-                <Label>Two-Factor Authentication</Label>
-                <Switch />
+                <h3 className="text-lg font-semibold">Authentication Settings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="twoFactor">Two-Factor Authentication</Label>
+                      <Switch
+                        id="twoFactor"
+                        checked={accessSettings.twoFactorEnabled}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, twoFactorEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="ssoEnabled">Single Sign-On (SSO)</Label>
+                      <Switch
+                        id="ssoEnabled"
+                        checked={accessSettings.ssoEnabled}
+                        onCheckedChange={(checked) => setAccessSettings({ ...accessSettings, ssoEnabled: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="passwordExpiry">Password Expiry</Label>
+                      <Switch
+                        id="passwordExpiry"
+                        checked={accessSettings.passwordExpiryEnabled}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordExpiryEnabled: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
+                      <Input
+                        id="sessionTimeout"
+                        type="number"
+                        value={accessSettings.sessionTimeout}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, sessionTimeout: Number.parseInt(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
+                      <Input
+                        id="maxLoginAttempts"
+                        type="number"
+                        value={accessSettings.maxLoginAttempts}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, maxLoginAttempts: Number.parseInt(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="passwordMinLength">Minimum Password Length</Label>
+                      <Input
+                        id="passwordMinLength"
+                        type="number"
+                        value={accessSettings.passwordMinLength}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, passwordMinLength: Number.parseInt(e.target.value) })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* IP Restrictions */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">IP Access Control</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="ipRestrictions">Enable IP Restrictions</Label>
+                    <Switch
+                      id="ipRestrictions"
+                      checked={accessSettings.ipRestrictionsEnabled}
+                      onCheckedChange={(checked) =>
+                        setAccessSettings({ ...accessSettings, ipRestrictionsEnabled: checked })
+                      }
+                    />
+                  </div>
+                  {accessSettings.ipRestrictionsEnabled && (
+                    <div className="space-y-2">
+                      <Label>Allowed IP Addresses</Label>
+                      {accessSettings.allowedIPs.map((ip, index) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <Input
+                            value={ip}
+                            onChange={(e) => {
+                              const newIPs = [...accessSettings.allowedIPs]
+                              newIPs[index] = e.target.value
+                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
+                            }}
+                            placeholder="192.168.1.0/24"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const newIPs = accessSettings.allowedIPs.filter((_, i) => i !== index)
+                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setAccessSettings({
+                            ...accessSettings,
+                            allowedIPs: [...accessSettings.allowedIPs, ""],
+                          })
+                        }
+                      >
+                        Add IP Range
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Active Sessions */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Active Sessions</h3>
+                  <Button variant="outline" onClick={handleRefreshSessions} disabled={isRefreshingSessions}>
+                    {isRefreshingSessions ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    Refresh
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {activeSessions.map((session) => (
+                    <Card key={session.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{session.user_email}</p>
+                            <p className="text-sm text-gray-600">
+                              {session.ip_address} • {session.device} • Last active:{" "}
+                              {new Date(session.last_activity).toLocaleString()}
+                            </p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => handleTerminateSession(session.id)}>
+                            Terminate
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveAccessSettings}
+                  disabled={isSavingAccessSettings}
+                >
+                  {isSavingAccessSettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Access Settings
+                    </>
+                  )}
+                </Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Security Tab Content */}
         <TabsContent value="security">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center space-x-2">
-                  <Settings className="w-5 h-5" />
-                  <span>Security</span>
+                  <Shield className="w-5 h-5" />
+                  <span>Security Settings</span>
                 </CardTitle>
                 <Button variant="outline" onClick={handleBackupNowInner} disabled={isBackingUp}>
                   {isBackingUp ? (
@@ -5010,12 +5414,181 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   )}
                 </Button>
               </div>
-              <CardDescription>Manage security settings and backups</CardDescription>
+              <CardDescription>Manage security settings, backups, and audit logs</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Security Policies */}
               <div className="space-y-4">
-                <Label>Last Backup</Label>
-                <p>{lastBackupTime ? new Date(lastBackupTime).toLocaleString() : "No backup yet"}</p>
+                <h3 className="text-lg font-semibold">Security Policies</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="dataEncryption">Data Encryption at Rest</Label>
+                      <Switch
+                        id="dataEncryption"
+                        checked={securitySettings.dataEncryptionEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, dataEncryptionEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="auditLogging">Audit Logging</Label>
+                      <Switch
+                        id="auditLogging"
+                        checked={securitySettings.auditLoggingEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, auditLoggingEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="autoBackup">Automatic Backups</Label>
+                      <Switch
+                        id="autoBackup"
+                        checked={securitySettings.autoBackupEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, autoBackupEnabled: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="backupFrequency">Backup Frequency</Label>
+                      <Select
+                        value={securitySettings.backupFrequency}
+                        onValueChange={(value) => setSecuritySettings({ ...securitySettings, backupFrequency: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="retentionPeriod">Data Retention Period (days)</Label>
+                      <Input
+                        id="retentionPeriod"
+                        type="number"
+                        value={securitySettings.dataRetentionDays}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            dataRetentionDays: Number.parseInt(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Backup Status */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Backup Status</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <p className="text-sm font-medium">Last Backup</p>
+                          <p className="text-lg font-bold">
+                            {lastBackupTime ? new Date(lastBackupTime).toLocaleDateString() : "Never"}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Database className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="text-sm font-medium">Backup Size</p>
+                          <p className="text-lg font-bold">{backupSize || "0 MB"}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="w-5 h-5 text-emerald-600" />
+                        <div>
+                          <p className="text-sm font-medium">Status</p>
+                          <p className="text-lg font-bold">{backupStatus || "Ready"}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Audit Logs */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Recent Audit Logs</h3>
+                  <Button variant="outline" onClick={handleViewAllLogs}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    View All Logs
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {auditLogs.slice(0, 5).map((log) => (
+                    <Card key={log.id}>
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-sm">{log.action}</p>
+                            <p className="text-xs text-gray-600">
+                              {log.user_email} • {log.ip_address} •{new Date(log.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                          <Badge variant={log.severity === "high" ? "destructive" : "secondary"}>{log.severity}</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={handleExportSecurityReport} disabled={isExportingReport}>
+                  {isExportingReport ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4 mr-2" />
+                      Export Security Report
+                    </>
+                  )}
+                </Button>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveSecuritySettings}
+                  disabled={isSavingSecuritySettings}
+                >
+                  {isSavingSecuritySettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Security Settings
+                    </>
+                  )}
+                </Button>
               </div>
             </CardContent>
           </Card>
