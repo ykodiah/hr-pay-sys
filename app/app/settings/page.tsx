@@ -60,6 +60,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator" // Added for Separator
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table" // Added for Table components
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface Company {
   id: string
@@ -3059,6 +3067,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
       body: "",
       variables: [],
     })
+    setEditingTemplate(null) // Ensure editing state is cleared
   }
 
   const handleSaveTemplate = async () => {
@@ -3071,33 +3080,53 @@ Format the response in a professional, actionable manner for HR decision-makers.
       return
     }
 
-    setIsSaving(true) // Use the general saving state
+    setIsSaving(true)
     try {
-      // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1500))
 
-      const template = {
-        id: Date.now().toString(),
-        name: newTemplate.name,
-        category: newTemplate.category,
-        type: newTemplate.type,
-        status: "Active",
-        lastModified: new Date().toISOString().split("T")[0],
-        description: newTemplate.subject,
+      if (editingTemplate) {
+        // Update existing template
+        const updatedTemplate = {
+          ...editingTemplate,
+          name: newTemplate.name,
+          category: newTemplate.category,
+          type: newTemplate.type,
+          description: newTemplate.subject,
+          lastModified: new Date().toISOString().split("T")[0],
+        }
+
+        setNotificationTemplates((prev) => prev.map((t) => (t.id === editingTemplate.id ? updatedTemplate : t)))
+
+        toast({
+          title: "Template Updated",
+          description: `${newTemplate.name} template has been updated successfully`,
+        })
+      } else {
+        // Create new template
+        const template = {
+          id: Date.now().toString(),
+          name: newTemplate.name,
+          category: newTemplate.category,
+          type: newTemplate.type,
+          status: "Active",
+          lastModified: new Date().toISOString().split("T")[0],
+          description: newTemplate.subject,
+        }
+
+        setNotificationTemplates((prev) => [...prev, template])
+
+        toast({
+          title: "Template Created",
+          description: `${newTemplate.name} template has been created successfully`,
+        })
       }
 
-      setNotificationTemplates([...notificationTemplates, template])
       setIsAddingTemplate(false)
-      setEditingTemplate(null) // Clear editing state
-
-      toast({
-        title: "Template Created",
-        description: `${newTemplate.name} template has been created successfully`,
-      })
+      setEditingTemplate(null)
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to create template",
+        description: editingTemplate ? "Failed to update template" : "Failed to create template",
         variant: "destructive",
       })
     } finally {
@@ -5145,24 +5174,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <Plus className="w-4 h-4 mr-2" />
                         Add Template
                       </Button>
-                      <Button variant="outline" onClick={handleTestEmail} disabled={testConnectionStatus === "testing"}>
-                        {testConnectionStatus === "testing" ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : testConnectionStatus === "success" ? (
-                          <Check className="w-4 h-4 mr-2 text-green-600" />
-                        ) : testConnectionStatus === "error" ? (
-                          <X className="w-4 h-4 mr-2 text-red-600" />
-                        ) : (
-                          <Send className="w-4 h-4 mr-2" />
-                        )}
-                        {testConnectionStatus === "testing"
-                          ? "Testing Connection..."
-                          : testConnectionStatus === "success"
-                            ? "Connection Successful"
-                            : testConnectionStatus === "error"
-                              ? "Connection Failed"
-                              : "Test Connection"}
-                      </Button>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Badge variant="secondary">{notificationTemplates.length} Templates</Badge>
@@ -6828,6 +6839,131 @@ Format the response in a professional, actionable manner for HR decision-makers.
           </div>
         </div>
       )}
+
+      <Dialog open={isAddingTemplate} onOpenChange={setIsAddingTemplate}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingTemplate ? "Edit Template" : "Add New Template"}</DialogTitle>
+            <DialogDescription>
+              {editingTemplate
+                ? "Update the notification template details below."
+                : "Create a new notification template for HR and payroll communications."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="templateName">Template Name *</Label>
+                <Input
+                  id="templateName"
+                  placeholder="e.g., Employee Welcome"
+                  value={newTemplate.name}
+                  onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="templateCategory">Category *</Label>
+                <Select
+                  value={newTemplate.category}
+                  onValueChange={(value) => setNewTemplate({ ...newTemplate, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="HR">HR</SelectItem>
+                    <SelectItem value="Payroll">Payroll</SelectItem>
+                    <SelectItem value="Leave">Leave</SelectItem>
+                    <SelectItem value="Attendance">Attendance</SelectItem>
+                    <SelectItem value="Performance">Performance</SelectItem>
+                    <SelectItem value="Training">Training</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="templateType">Notification Type *</Label>
+              <Select
+                value={newTemplate.type}
+                onValueChange={(value) => setNewTemplate({ ...newTemplate, type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Email">Email</SelectItem>
+                  <SelectItem value="SMS">SMS</SelectItem>
+                  <SelectItem value="Push">Push Notification</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="templateSubject">Subject/Title *</Label>
+              <Input
+                id="templateSubject"
+                placeholder="e.g., Welcome to the team!"
+                value={newTemplate.subject}
+                onChange={(e) => setNewTemplate({ ...newTemplate, subject: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="templateBody">Message Body *</Label>
+              <Textarea
+                id="templateBody"
+                placeholder="Enter your template message here. You can use variables like {{employee_name}}, {{company_name}}, etc."
+                rows={6}
+                value={newTemplate.body}
+                onChange={(e) => setNewTemplate({ ...newTemplate, body: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Available Variables</Label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  "{{employee_name}}",
+                  "{{company_name}}",
+                  "{{department}}",
+                  "{{manager_name}}",
+                  "{{date}}",
+                  "{{amount}}",
+                ].map((variable) => (
+                  <Badge
+                    key={variable}
+                    variant="outline"
+                    className="cursor-pointer hover:bg-muted"
+                    onClick={() => setNewTemplate({ ...newTemplate, body: newTemplate.body + " " + variable })}
+                  >
+                    {variable}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddingTemplate(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveTemplate} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {editingTemplate ? "Updating..." : "Creating..."}
+                </>
+              ) : editingTemplate ? (
+                "Update Template"
+              ) : (
+                "Create Template"
+              )}
+            </Button>
+          </DialogFooter>
+        </Dialog>
+      </TabsContent>
     </div>
   )
 }
