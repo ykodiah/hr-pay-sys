@@ -207,6 +207,70 @@ export default function SettingsPage() {
     performanceTracking: true,
   })
 
+  const [salaryGrades, setSalaryGrades] = useState([
+    {
+      id: 1,
+      grade: "Grade 1",
+      description: "Entry Level",
+      minSalary: 2500,
+      maxSalary: 4000,
+      notches: [
+        { step: 1, amount: 2500 },
+        { step: 2, amount: 2750 },
+        { step: 3, amount: 3000 },
+        { step: 4, amount: 3250 },
+        { step: 5, amount: 3500 },
+        { step: 6, amount: 3750 },
+        { step: 7, amount: 4000 },
+      ],
+    },
+    {
+      id: 2,
+      grade: "Grade 2",
+      description: "Mid Level",
+      minSalary: 4000,
+      maxSalary: 6500,
+      notches: [
+        { step: 1, amount: 4000 },
+        { step: 2, amount: 4350 },
+        { step: 3, amount: 4700 },
+        { step: 4, amount: 5050 },
+        { step: 5, amount: 5400 },
+        { step: 6, amount: 5750 },
+        { step: 7, amount: 6100 },
+        { step: 8, amount: 6500 },
+      ],
+    },
+    {
+      id: 3,
+      grade: "Grade 3",
+      description: "Senior Level",
+      minSalary: 6500,
+      maxSalary: 10000,
+      notches: [
+        { step: 1, amount: 6500 },
+        { step: 2, amount: 7000 },
+        { step: 3, amount: 7500 },
+        { step: 4, amount: 8000 },
+        { step: 5, amount: 8500 },
+        { step: 6, amount: 9000 },
+        { step: 7, amount: 9500 },
+        { step: 8, amount: 10000 },
+      ],
+    },
+  ])
+
+  const [editingGrade, setEditingGrade] = useState(null)
+  const [showAddGrade, setShowAddGrade] = useState(false)
+  const [newGrade, setNewGrade] = useState({
+    grade: "",
+    description: "",
+    minSalary: 0,
+    maxSalary: 0,
+    notches: [],
+  })
+  const [isSavingGrade, setIsSavingGrade] = useState(false)
+
   const [editingPolicy, setEditingPolicy] = useState({
     name: "",
     days: 0,
@@ -3225,6 +3289,107 @@ Format the response in a professional, actionable manner for HR decision-makers.
     toast({ title: "Report Exported", description: "Security report generated and downloaded." })
   }
 
+  const handleAddSalaryGrade = () => {
+    setShowAddGrade(true)
+    setNewGrade({
+      grade: "",
+      description: "",
+      minSalary: 0,
+      maxSalary: 0,
+      notches: [],
+    })
+  }
+
+  const handleSaveSalaryGrade = async () => {
+    if (!newGrade.grade || !newGrade.description || newGrade.minSalary <= 0 || newGrade.maxSalary <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields with valid values.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSavingGrade(true)
+    try {
+      // Generate notches automatically based on min/max salary
+      const notchCount = 7
+      const increment = (newGrade.maxSalary - newGrade.minSalary) / (notchCount - 1)
+      const generatedNotches = Array.from({ length: notchCount }, (_, i) => ({
+        step: i + 1,
+        amount: Math.round(newGrade.minSalary + increment * i),
+      }))
+
+      const gradeToAdd = {
+        ...newGrade,
+        id: Date.now(),
+        notches: generatedNotches,
+      }
+
+      setSalaryGrades((prev) => [...prev, gradeToAdd])
+      setShowAddGrade(false)
+
+      toast({
+        title: "Success",
+        description: "Salary grade created successfully with auto-generated notches.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create salary grade. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingGrade(false)
+    }
+  }
+
+  const handleEditSalaryGrade = (gradeId) => {
+    const grade = salaryGrades.find((g) => g.id === gradeId)
+    setEditingGrade(grade)
+    setNewGrade(grade)
+    setShowAddGrade(true)
+  }
+
+  const handleDeleteSalaryGrade = async (gradeId) => {
+    try {
+      setSalaryGrades((prev) => prev.filter((g) => g.id !== gradeId))
+      toast({
+        title: "Success",
+        description: "Salary grade deleted successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete salary grade. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleGenerateNotches = () => {
+    if (newGrade.minSalary && newGrade.maxSalary && newGrade.maxSalary > newGrade.minSalary) {
+      const notchCount = 7
+      const increment = (newGrade.maxSalary - newGrade.minSalary) / (notchCount - 1)
+      const generatedNotches = Array.from({ length: notchCount }, (_, i) => ({
+        step: i + 1,
+        amount: Math.round(newGrade.minSalary + increment * i),
+      }))
+
+      setNewGrade((prev) => ({ ...prev, notches: generatedNotches }))
+      toast({
+        title: "Notches Generated",
+        description: `Generated ${notchCount} salary notches automatically.`,
+      })
+    } else {
+      toast({
+        title: "Invalid Range",
+        description: "Please enter valid minimum and maximum salary amounts.",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -4147,6 +4312,225 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     </Card>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center space-x-2">
+                    <TrendingUp className="w-5 h-5" />
+                    <span>Salary Grades & Notches</span>
+                  </CardTitle>
+                  <Button onClick={handleAddSalaryGrade} className="bg-black text-white hover:bg-gray-800">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Salary Grade
+                  </Button>
+                </div>
+                <CardDescription>Manage salary grades and notch structures for employee compensation</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {salaryGrades.map((grade) => (
+                    <Card key={grade.id} className="border-l-4 border-l-purple-500">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-lg font-semibold">{grade.grade}</CardTitle>
+                            <CardDescription>{grade.description}</CardDescription>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditSalaryGrade(grade.id)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteSalaryGrade(grade.id)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">Salary Range:</span>
+                          <span className="font-medium">
+                            {getCurrencyConfig(selectedCurrency).symbol}
+                            {grade.minSalary.toLocaleString()} - {getCurrencyConfig(selectedCurrency).symbol}
+                            {grade.maxSalary.toLocaleString()}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">Notches ({grade.notches.length})</span>
+                            <Badge variant="secondary" className="text-xs">
+                              {grade.notches.length} Steps
+                            </Badge>
+                          </div>
+
+                          <div className="max-h-32 overflow-y-auto space-y-1">
+                            {grade.notches.map((notch) => (
+                              <div
+                                key={notch.step}
+                                className="flex justify-between items-center text-xs bg-gray-50 p-2 rounded"
+                              >
+                                <span>Step {notch.step}</span>
+                                <span className="font-medium">
+                                  {getCurrencyConfig(selectedCurrency).symbol}
+                                  {notch.amount.toLocaleString()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Increment:</span>
+                            <span>
+                              {getCurrencyConfig(selectedCurrency).symbol}
+                              {Math.round(
+                                (grade.maxSalary - grade.minSalary) / (grade.notches.length - 1),
+                              ).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Add/Edit Grade Dialog */}
+                {showAddGrade && (
+                  <Card className="border-2 border-dashed border-gray-300">
+                    <CardHeader>
+                      <CardTitle className="text-lg">
+                        {editingGrade ? "Edit Salary Grade" : "Add New Salary Grade"}
+                      </CardTitle>
+                      <CardDescription>Configure salary grade details and notch structure</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="gradeName">Grade Name</Label>
+                          <Input
+                            id="gradeName"
+                            placeholder="e.g., Grade 4"
+                            value={newGrade.grade}
+                            onChange={(e) => setNewGrade((prev) => ({ ...prev, grade: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="gradeDescription">Description</Label>
+                          <Input
+                            id="gradeDescription"
+                            placeholder="e.g., Executive Level"
+                            value={newGrade.description}
+                            onChange={(e) => setNewGrade((prev) => ({ ...prev, description: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="minSalary">
+                            Minimum Salary ({getCurrencyConfig(selectedCurrency).symbol})
+                          </Label>
+                          <Input
+                            id="minSalary"
+                            type="number"
+                            placeholder="0"
+                            value={newGrade.minSalary || ""}
+                            onChange={(e) => setNewGrade((prev) => ({ ...prev, minSalary: Number(e.target.value) }))}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="maxSalary">
+                            Maximum Salary ({getCurrencyConfig(selectedCurrency).symbol})
+                          </Label>
+                          <Input
+                            id="maxSalary"
+                            type="number"
+                            placeholder="0"
+                            value={newGrade.maxSalary || ""}
+                            onChange={(e) => setNewGrade((prev) => ({ ...prev, maxSalary: Number(e.target.value) }))}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <Button
+                          variant="outline"
+                          onClick={handleGenerateNotches}
+                          disabled={!newGrade.minSalary || !newGrade.maxSalary}
+                        >
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Generate Notches
+                        </Button>
+                        <span className="text-sm text-muted-foreground">
+                          {newGrade.notches.length} notches configured
+                        </span>
+                      </div>
+
+                      {newGrade.notches.length > 0 && (
+                        <div className="space-y-2">
+                          <Label>Generated Notches Preview</Label>
+                          <div className="max-h-24 overflow-y-auto space-y-1 bg-gray-50 p-3 rounded">
+                            {newGrade.notches.map((notch) => (
+                              <div key={notch.step} className="flex justify-between text-xs">
+                                <span>Step {notch.step}</span>
+                                <span>
+                                  {getCurrencyConfig(selectedCurrency).symbol}
+                                  {notch.amount.toLocaleString()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-end space-x-2 pt-4">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setShowAddGrade(false)
+                            setEditingGrade(null)
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleSaveSalaryGrade}
+                          disabled={isSavingGrade}
+                          className="bg-black text-white hover:bg-gray-800"
+                        >
+                          {isSavingGrade ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="mr-2 h-4 w-4" />
+                              {editingGrade ? "Update Grade" : "Save Grade"}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </CardContent>
             </Card>
           </div>
