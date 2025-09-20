@@ -267,9 +267,11 @@ export default function SettingsPage() {
     description: "",
     minSalary: 0,
     maxSalary: 0,
+    notchCount: 7,
     notches: [],
   })
   const [isSavingGrade, setIsSavingGrade] = useState(false)
+  const [isGeneratingNotches, setIsGeneratingNotches] = useState(false)
 
   const [editingPolicy, setEditingPolicy] = useState({
     name: "",
@@ -1690,11 +1692,8 @@ export default function SettingsPage() {
     setSubsidiaryToToggle(null)
   }
 
-  const handleManageLeaveTypesInner = () => {
-    toast({
-      title: "Leave Types Management",
-      description: "Opening leave types configuration...",
-    })
+  const handleManageLeaveTypes = () => {
+    setShowAddLeaveTypeModal(true)
   }
 
   const handleManageAllowancesInner = () => {
@@ -2071,62 +2070,8 @@ export default function SettingsPage() {
     setSubsidiaryToToggle(null)
   }
 
-  const handleAddLeaveType = async () => {
-    setIsManagingLeaveTypes(true)
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // Add new leave type to current policies
-      const newPolicy = {
-        name: newLeaveType.name,
-        days: Number.parseInt(newLeaveType.days),
-        usage: "0%",
-        trend: "stable",
-        description: newLeaveType.description,
-      }
-
-      setCurrentPolicies((prev) => [...prev, newPolicy])
-
-      // Reset form
-      setNewLeaveType({
-        name: "",
-        days: 0,
-        description: "",
-        carryOver: false,
-      })
-
-      setShowAddLeaveTypeModal(false)
-
-      toast({
-        title: "Leave Type Added",
-        description: `${newLeaveType.name} has been successfully added to your policies.`,
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add leave type. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsManagingLeaveTypes(false)
-    }
-  }
-
-  const handlePolicyAction = (action, policyName) => {
-    const policy = currentPolicies.find((p) => p.name === policyName)
-
-    setSelectedPolicy(policy)
-    setPolicyModalType(action)
-
-    if (action === "edit") {
-      setEditingPolicy({
-        name: policy.name,
-        days: policy.days,
-        description: policy.description,
-      })
-    }
-
-    setShowPolicyModal(true)
+  const handleManageLeaveTypes = () => {
+    setShowAddLeaveTypeModal(true)
   }
 
   const handleSavePolicyChanges = async () => {
@@ -3296,6 +3241,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
       description: "",
       minSalary: 0,
       maxSalary: 0,
+      notchCount: 7,
       notches: [],
     })
   }
@@ -3312,8 +3258,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
     setIsSavingGrade(true)
     try {
-      // Generate notches automatically based on min/max salary
-      const notchCount = 7
+      const notchCount = newGrade.notchCount || 7
       const increment = (newGrade.maxSalary - newGrade.minSalary) / (notchCount - 1)
       const generatedNotches = Array.from({ length: notchCount }, (_, i) => ({
         step: i + 1,
@@ -3367,20 +3312,35 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
   }
 
-  const handleGenerateNotches = () => {
+  const handleGenerateNotches = async () => {
     if (newGrade.minSalary && newGrade.maxSalary && newGrade.maxSalary > newGrade.minSalary) {
-      const notchCount = 7
-      const increment = (newGrade.maxSalary - newGrade.minSalary) / (notchCount - 1)
-      const generatedNotches = Array.from({ length: notchCount }, (_, i) => ({
-        step: i + 1,
-        amount: Math.round(newGrade.minSalary + increment * i),
-      }))
+      setIsGeneratingNotches(true)
 
-      setNewGrade((prev) => ({ ...prev, notches: generatedNotches }))
-      toast({
-        title: "Notches Generated",
-        description: `Generated ${notchCount} salary notches automatically.`,
-      })
+      try {
+        // Simulate processing time for better UX
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+
+        const notchCount = newGrade.notchCount || 7
+        const increment = (newGrade.maxSalary - newGrade.minSalary) / (notchCount - 1)
+        const generatedNotches = Array.from({ length: notchCount }, (_, i) => ({
+          step: i + 1,
+          amount: Math.round(newGrade.minSalary + increment * i),
+        }))
+
+        setNewGrade((prev) => ({ ...prev, notches: generatedNotches }))
+        toast({
+          title: "Notches Generated",
+          description: `Generated ${notchCount} salary notches automatically.`,
+        })
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to generate notches. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsGeneratingNotches(false)
+      }
     } else {
       toast({
         title: "Invalid Range",
@@ -3388,6 +3348,21 @@ Format the response in a professional, actionable manner for HR decision-makers.
         variant: "destructive",
       })
     }
+  }
+
+  // Helper function for policy actions
+  const handlePolicyAction = (action: string, policyName: string) => {
+    const policy = currentPolicies.find((p) => p.name === policyName)
+    if (!policy) return
+
+    setSelectedPolicy(policyName)
+    setEditingPolicy({
+      name: policy.name,
+      days: policy.days,
+      description: policy.description,
+    })
+    setPolicyModalType(action)
+    setShowPolicyModal(true)
   }
 
   return (
@@ -3929,7 +3904,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     <CardDescription>Synchronize settings across all subsidiary companies</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <h4 className="font-medium mb-2">Sync Options</h4>
                         <div className="space-y-2">
@@ -4327,7 +4302,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     Add Salary Grade
                   </Button>
                 </div>
-                <CardDescription>Manage salary grades and notch structures for employee compensation</CardDescription>
+                <CardDescription>Manage salary grades and notch structure for employee compensation</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -4469,14 +4444,41 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         </div>
                       </div>
 
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="notchCount">Number of Notches/Steps</Label>
+                          <Input
+                            id="notchCount"
+                            type="number"
+                            min="2"
+                            max="20"
+                            placeholder="7"
+                            value={newGrade.notchCount || ""}
+                            onChange={(e) => setNewGrade((prev) => ({ ...prev, notchCount: Number(e.target.value) }))}
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Specify how many salary steps to generate (2-20)
+                          </p>
+                        </div>
+                      </div>
+
                       <div className="flex items-center justify-between">
                         <Button
                           variant="outline"
                           onClick={handleGenerateNotches}
-                          disabled={!newGrade.minSalary || !newGrade.maxSalary}
+                          disabled={!newGrade.minSalary || !newGrade.maxSalary || isGeneratingNotches}
                         >
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          Generate Notches
+                          {isGeneratingNotches ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4 mr-2" />
+                              Generate Notches
+                            </>
+                          )}
                         </Button>
                         <span className="text-sm text-muted-foreground">
                           {newGrade.notches.length} notches configured
@@ -5629,7 +5631,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   <span>Roles & Permissions</span>
                 </CardTitle>
                 <div className="flex items-center space-x-2">
-                  <Button variant="outline" onClick={handleAddRoleInner}>
+                  <Button variant="outline" onClick={handleAddRole}>
                     Add Role
                   </Button>
                 </div>
@@ -5648,7 +5650,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         </div>
                         <div className="flex items-center space-x-4">
                           <span className="text-sm text-gray-500">{role.user_count} Users</span>
-                          <Button variant="outline" size="sm" onClick={() => handleEditRoleInner(role.name)}>
+                          <Button variant="outline" size="sm" onClick={() => handleEditRole(role.name)}>
                             Edit
                           </Button>
                         </div>
