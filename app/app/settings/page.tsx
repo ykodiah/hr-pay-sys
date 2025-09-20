@@ -1683,9 +1683,11 @@ export default function SettingsPage() {
       // Simulate backup process
       await new Promise((resolve) => setTimeout(resolve, 3000))
       setLastBackupTime(new Date().toISOString())
+      setBackupSize("55 MB") // Simulate updated size
+      setBackupStatus("Completed")
       toast({
-        title: "Backup Completed",
-        description: "System backup completed successfully.",
+        title: "Backup Successful",
+        description: "Manual backup completed.",
       })
     } catch (error) {
       toast({
@@ -2752,12 +2754,24 @@ Next Review Date: January 15, 2025`,
   const handleBackupNow = async () => {
     setIsBackingUp(true)
     console.log("[v0] Initiating manual backup...")
-    await new Promise((resolve) => setTimeout(resolve, 3000)) // Simulate backup process
-    setLastBackupTime(new Date().toISOString())
-    setBackupSize("55 MB") // Simulate updated size
-    setBackupStatus("Completed")
-    toast({ title: "Backup Successful", description: "Manual backup completed." })
-    setIsBackingUp(false)
+    try {
+      // Simulate backup process
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      setLastBackupTime(new Date().toISOString())
+      setBackupSize("55 MB") // Simulate updated size
+      setBackupStatus("Completed")
+      toast({
+        title: "Backup Successful",
+        description: "Manual backup completed successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Backup Failed",
+        description: "Failed to complete system backup.",
+      })
+    } finally {
+      setIsBackingUp(false)
+    }
   }
 
   const handleGenerateAIInsights = async () => {
