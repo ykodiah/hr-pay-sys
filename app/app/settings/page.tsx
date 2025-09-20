@@ -2751,22 +2751,13 @@ Next Review Date: January 15, 2025`,
 
   const handleBackupNow = async () => {
     setIsBackingUp(true)
-    try {
-      // Simulate backup process
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-      setLastBackupTime(new Date().toISOString())
-      toast({
-        title: "Backup Completed",
-        description: "System backup completed successfully.",
-      })
-    } catch (error) {
-      toast({
-        title: "Backup Failed",
-        description: "Failed to complete system backup.",
-      })
-    } finally {
-      setIsBackingUp(false)
-    }
+    console.log("[v0] Initiating manual backup...")
+    await new Promise((resolve) => setTimeout(resolve, 3000)) // Simulate backup process
+    setLastBackupTime(new Date().toISOString())
+    setBackupSize("55 MB") // Simulate updated size
+    setBackupStatus("Completed")
+    toast({ title: "Backup Successful", description: "Manual backup completed." })
+    setIsBackingUp(false)
   }
 
   const handleGenerateAIInsights = async () => {
@@ -3170,16 +3161,16 @@ Format the response in a professional, actionable manner for HR decision-makers.
   }
 
   // Added for Security
-  const handleBackupNow = async () => {
-    setIsBackingUp(true)
-    console.log("[v0] Initiating manual backup...")
-    await new Promise((resolve) => setTimeout(resolve, 3000)) // Simulate backup process
-    setLastBackupTime(new Date().toISOString())
-    setBackupSize("55 MB") // Simulate updated size
-    setBackupStatus("Completed")
-    toast({ title: "Backup Successful", description: "Manual backup completed." })
-    setIsBackingUp(false)
-  }
+  // const handleBackupNow = async () => { // This function was duplicated and is now removed.
+  //   setIsBackingUp(true)
+  //   console.log("[v0] Initiating manual backup...")
+  //   await new Promise((resolve) => setTimeout(resolve, 3000)) // Simulate backup process
+  //   setLastBackupTime(new Date().toISOString())
+  //   setBackupSize("55 MB") // Simulate updated size
+  //   setBackupStatus("Completed")
+  //   toast({ title: "Backup Successful", description: "Manual backup completed." })
+  //   setIsBackingUp(false)
+  // }
 
   const handleSaveSecuritySettings = async () => {
     setIsSavingSecuritySettings(true)
