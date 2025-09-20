@@ -610,6 +610,10 @@ export default function SettingsPage() {
   })
   const [isGeneratingNotches, setIsGeneratingNotches] = useState(false)
 
+  const [newDivisionName, setNewDivisionName] = useState("")
+  const [newDepartmentName, setNewDepartmentName] = useState("")
+  const [newLocationName, setNewLocationName] = useState("")
+
   const getCurrencyConfig = (currency: string) => {
     return currencyConfig[currency as keyof typeof currencyConfig] || currencyConfig.ghs
   }
@@ -3378,6 +3382,78 @@ Format the response in a professional, actionable manner for HR decision-makers.
     })
   }
 
+  const handleAddDivision = () => {
+    const newDivision = newDivisionName.trim()
+    if (newDivision && !divisions.includes(newDivision)) {
+      const updatedDivisions = [...divisions, newDivision]
+      setDivisions(updatedDivisions)
+      setCompanyData({ ...companyData, divisions: updatedDivisions })
+      setNewDivisionName("")
+      toast({
+        title: "Success",
+        description: "Division added successfully",
+      })
+    }
+  }
+
+  const handleRemoveDivision = (divisionToRemove: string) => {
+    const updatedDivisions = divisions.filter((division) => division !== divisionToRemove)
+    setDivisions(updatedDivisions)
+    setCompanyData({ ...companyData, divisions: updatedDivisions })
+    toast({
+      title: "Success",
+      description: "Division removed successfully",
+    })
+  }
+
+  const handleAddDepartment = () => {
+    const newDept = newDepartmentName.trim()
+    if (newDept && !departments.includes(newDept)) {
+      const updatedDepartments = [...departments, newDept]
+      setDepartments(updatedDepartments)
+      setCompanyData({ ...companyData, departments: updatedDepartments })
+      setNewDepartmentName("")
+      toast({
+        title: "Success",
+        description: "Department added successfully",
+      })
+    }
+  }
+
+  const handleRemoveDepartment = (departmentToRemove: string) => {
+    const updatedDepartments = departments.filter((dept) => dept !== departmentToRemove)
+    setDepartments(updatedDepartments)
+    setCompanyData({ ...companyData, departments: updatedDepartments })
+    toast({
+      title: "Success",
+      description: "Department removed successfully",
+    })
+  }
+
+  const handleAddLocation = () => {
+    const newLoc = newLocationName.trim()
+    if (newLoc && !locations.includes(newLoc)) {
+      const updatedLocations = [...locations, newLoc]
+      setLocations(updatedLocations)
+      setCompanyData({ ...companyData, locations: updatedLocations })
+      setNewLocationName("")
+      toast({
+        title: "Success",
+        description: "Location added successfully",
+      })
+    }
+  }
+
+  const handleRemoveLocation = (locationToRemove: string) => {
+    const updatedLocations = locations.filter((loc) => loc !== locationToRemove)
+    setLocations(updatedLocations)
+    setCompanyData({ ...companyData, locations: updatedLocations })
+    toast({
+      title: "Success",
+      description: "Location removed successfully",
+    })
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -3536,61 +3612,115 @@ Format the response in a professional, actionable manner for HR decision-makers.
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <Label>Departments</Label>
-                  <div className="space-y-2">
-                    {departments.map((dept, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <Input
-                          value={dept}
-                          onChange={(e) => {
-                            const newDepts = [...departments]
-                            newDepts[index] = e.target.value
-                            setDepartments(newDepts)
-                          }}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDepartments(departments.filter((_, i) => i !== index))}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                <Label className="text-base font-semibold">Divisions</Label>
+                <div className="space-y-3">
+                  {divisions.length > 0 ? (
+                    <div className="space-y-2">
+                      {divisions.map((division, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <span className="font-medium">{division}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveDivision(division)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No divisions added yet</p>
+                  )}
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Enter division name"
+                      value={newDivisionName}
+                      onChange={(e) => setNewDivisionName(e.target.value)}
+                      onKeyPress={(e) => e.key === "Enter" && handleAddDivision()}
+                    />
+                    <Button variant="outline" size="sm" onClick={handleAddDivision} disabled={!newDivisionName.trim()}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Division
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Departments</Label>
+                <div className="space-y-3">
+                  {departments.length > 0 ? (
+                    <div className="space-y-2">
+                      {departments.map((department, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <span className="font-medium">{department}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveDepartment(department)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No departments added yet</p>
+                  )}
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Enter department name"
+                      value={newDepartmentName}
+                      onChange={(e) => setNewDepartmentName(e.target.value)}
+                      onKeyPress={(e) => e.key === "Enter" && handleAddDepartment()}
+                    />
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setDepartments([...departments, "New Department"])}
+                      onClick={handleAddDepartment}
+                      disabled={!newDepartmentName.trim()}
                     >
+                      <Plus className="h-4 w-4 mr-1" />
                       Add Department
                     </Button>
                   </div>
                 </div>
+              </div>
 
-                <div>
-                  <Label>Locations</Label>
-                  <div className="space-y-2">
-                    {locations.map((location, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <Input
-                          value={location}
-                          onChange={(e) => {
-                            const newLocations = [...locations]
-                            newLocations[index] = e.target.value
-                            setLocations(newLocations)
-                          }}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setLocations(locations.filter((_, i) => i !== index))}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button variant="outline" size="sm" onClick={() => setLocations([...locations, "New Location"])}>
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Locations</Label>
+                <div className="space-y-3">
+                  {locations.length > 0 ? (
+                    <div className="space-y-2">
+                      {locations.map((location, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <span className="font-medium">{location}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveLocation(location)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No locations added yet</p>
+                  )}
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Enter location name"
+                      value={newLocationName}
+                      onChange={(e) => setNewLocationName(e.target.value)}
+                      onKeyPress={(e) => e.key === "Enter" && handleAddLocation()}
+                    />
+                    <Button variant="outline" size="sm" onClick={handleAddLocation} disabled={!newLocationName.trim()}>
+                      <Plus className="h-4 w-4 mr-1" />
                       Add Location
                     </Button>
                   </div>
@@ -6022,7 +6152,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   <div className="space-y-2">
                     <Label>Locations</Label>
                     <div className="space-y-2">
-                      <Input placeholder="Enter location" />
+                      <Input placeholder="Enter location name" />
                       <Button variant="outline" size="sm">
                         Add Location
                       </Button>
