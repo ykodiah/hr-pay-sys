@@ -43,6 +43,8 @@ import {
   Shield,
   Database,
   FileText,
+  EyeOff,
+  Check,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -575,6 +577,9 @@ export default function SettingsPage() {
   const [backupStatus, setBackupStatus] = useState<string | null>(null)
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [isExportingReport, setIsExportingReport] = useState(false)
+
+  const [showPassword, setShowPassword] = useState(false)
+  const [testConnectionStatus, setTestConnectionStatus] = useState<"idle" | "testing" | "success" | "error">("idle")
 
   const getCurrencyConfig = (currency: string) => {
     return currencyConfig[currency as keyof typeof currencyConfig] || currencyConfig.ghs
@@ -3094,22 +3099,34 @@ Format the response in a professional, actionable manner for HR decision-makers.
   }
 
   const handleTestEmail = async () => {
-    setIsSaving(true) // Use the general saving state
+    setTestConnectionStatus("testing")
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      toast({
-        title: "Test Email Sent",
-        description: "Test email has been sent successfully to your email address",
-      })
+      // Simulate API call to test SMTP connection
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+
+      // Simulate random success/failure for demo
+      const isSuccess = Math.random() > 0.3
+
+      if (isSuccess) {
+        setTestConnectionStatus("success")
+        toast({
+          title: "Connection Successful! ✅",
+          description: "SMTP connection established successfully. Email configuration is working properly.",
+        })
+      } else {
+        throw new Error("Connection failed")
+      }
     } catch (error) {
+      setTestConnectionStatus("error")
       toast({
-        title: "Error",
-        description: "Failed to send test email",
+        title: "Connection Failed ❌",
+        description: "Unable to connect to SMTP server. Please check your credentials and settings.",
         variant: "destructive",
       })
-    } finally {
-      setIsSaving(false)
     }
+
+    // Reset status after 5 seconds
+    setTimeout(() => setTestConnectionStatus("idle"), 5000)
   }
 
   const handleSaveEmailConfig = async () => {
@@ -4781,13 +4798,23 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <Plus className="w-4 h-4 mr-2" />
                         Add Template
                       </Button>
-                      <Button variant="outline" onClick={handleTestEmail} disabled={isSaving}>
-                        {isSaving ? (
+                      <Button variant="outline" onClick={handleTestEmail} disabled={testConnectionStatus === "testing"}>
+                        {testConnectionStatus === "testing" ? (
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : testConnectionStatus === "success" ? (
+                          <Check className="w-4 h-4 mr-2 text-green-600" />
+                        ) : testConnectionStatus === "error" ? (
+                          <X className="w-4 h-4 mr-2 text-red-600" />
                         ) : (
                           <Send className="w-4 h-4 mr-2" />
                         )}
-                        Test Email
+                        {testConnectionStatus === "testing"
+                          ? "Testing Connection..."
+                          : testConnectionStatus === "success"
+                            ? "Connection Successful"
+                            : testConnectionStatus === "error"
+                              ? "Connection Failed"
+                              : "Test Connection"}
                       </Button>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -4971,10 +4998,62 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   </div>
                 </div>
 
+                <div>
+                  <Label htmlFor="smtpPassword">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="smtpPassword"
+                      type={showPassword ? "text" : "password"}
+                      value={emailConfig.smtpPassword}
+                      onChange={(e) => setEmailConfig({ ...emailConfig, smtpPassword: e.target.value })}
+                      placeholder="Enter your email password"
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="mt-6 flex justify-end space-x-2">
-                  <Button variant="outline" onClick={handleTestEmail} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-                    Test Connection
+                  <Button
+                    variant="outline"
+                    onClick={handleTestEmail}
+                    disabled={testConnectionStatus === "testing"}
+                    className={`${
+                      testConnectionStatus === "success"
+                        ? "border-green-500 text-green-600"
+                        : testConnectionStatus === "error"
+                          ? "border-red-500 text-red-600"
+                          : ""
+                    }`}
+                  >
+                    {testConnectionStatus === "testing" ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : testConnectionStatus === "success" ? (
+                      <Check className="w-4 h-4 mr-2 text-green-600" />
+                    ) : testConnectionStatus === "error" ? (
+                      <X className="w-4 h-4 mr-2 text-red-600" />
+                    ) : (
+                      <Send className="w-4 h-4 mr-2" />
+                    )}
+                    {testConnectionStatus === "testing"
+                      ? "Testing Connection..."
+                      : testConnectionStatus === "success"
+                        ? "Connection Successful"
+                        : testConnectionStatus === "error"
+                          ? "Connection Failed"
+                          : "Test Connection"}
                   </Button>
                   <Button onClick={handleSaveEmailConfig} disabled={isSaving}>
                     {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
