@@ -1275,7 +1275,7 @@ export default function SettingsPage() {
   }
 
   const loadAllData = async () => {
-    console.log("[v0] Loading all settings data...")
+    console.log("[v0] Loading settings data...")
     try {
       await Promise.all([
         loadCompanyData(),
@@ -2845,7 +2845,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
       const response = await fetch("/api/policy-insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.JSON.stringify({ policy }),
+        body: JSON.stringify({ policy }),
       })
 
       if (!response.ok) throw new Error("Failed to generate insight")
@@ -3170,7 +3170,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
   }
 
   // Added for Security
-  const handleBackupNowInner = async () => {
+  const handleBackupNow = async () => {
     setIsBackingUp(true)
     console.log("[v0] Initiating manual backup...")
     await new Promise((resolve) => setTimeout(resolve, 3000)) // Simulate backup process
@@ -5400,7 +5400,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   <Shield className="w-5 h-5" />
                   <span>Security Settings</span>
                 </CardTitle>
-                <Button variant="outline" onClick={handleBackupNowInner} disabled={isBackingUp}>
+                <Button variant="outline" onClick={handleBackupNow} disabled={isBackingUp}>
                   {isBackingUp ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
