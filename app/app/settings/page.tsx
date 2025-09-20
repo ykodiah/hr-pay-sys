@@ -1366,44 +1366,56 @@ export default function SettingsPage() {
     }
   }
 
-  const viewSubsidiaryEmployees = async (subsidiaryId: string) => {
-    console.log("[v0] Viewing employees for subsidiary:", subsidiaryId)
+  const refreshEmployeeCount = async (subsidiaryId: string) => {
+    console.log("[v0] Refreshing employee count for subsidiary:", subsidiaryId)
 
     if (isDemoMode()) {
-      const mockEmployees = [
-        {
-          id: "emp-1",
-          name: "John Doe",
-          position: "Software Engineer",
-          department: "Technology",
-          email: "john@company.com",
-        },
-        {
-          id: "emp-2",
-          name: "Jane Smith",
-          position: "Marketing Manager",
-          department: "Marketing",
-          email: "jane@company.com",
-        },
-        {
-          id: "emp-3",
-          name: "Mike Johnson",
-          position: "HR Specialist",
-          department: "Human Resources",
-          email: "mike@company.com",
-        },
-      ]
-
-      // Update employee count in subsidiary
+      // Simulate employee count refresh in demo mode
+      const mockCount = Math.floor(Math.random() * 100) + 10 // Random count between 10-110
       const updatedSubsidiaries = subsidiaries.map((sub) =>
-        sub.id === subsidiaryId ? { ...sub, employee_count: mockEmployees.length } : sub,
+        sub.id === subsidiaryId ? { ...sub, employee_count: mockCount } : sub,
       )
       setSubsidiaries(updatedSubsidiaries)
 
-      // Update selectedSubsidiary if it matches
       if (selectedSubsidiary?.id === subsidiaryId) {
-        setSelectedSubsidiary({ ...selectedSubsidiary, employee_count: mockEmployees.length })
+        setSelectedSubsidiary({ ...selectedSubsidiary, employee_count: mockCount })
       }
+      return mockCount
+    }
+
+    try {
+      const { count, error } = await supabase
+        .from("employees")
+        .select("*", { count: "exact", head: true })
+        .eq("subsidiary_id", subsidiaryId)
+
+      if (error) throw error
+
+      const employeeCount = count || 0
+      await updateSubsidiary(subsidiaryId, { employee_count: employeeCount })
+
+      return employeeCount
+    } catch (error) {
+      console.error("Refresh employee count error:", error)
+      return 0
+    }
+  }
+
+  const viewSubsidiaryEmployees = async (subsidiaryId: string) => {
+    console.log("[v0] Viewing employees for subsidiary:", subsidiaryId)
+
+    const currentCount = await refreshEmployeeCount(subsidiaryId)
+
+    if (isDemoMode()) {
+      const mockEmployees = Array.from({ length: currentCount }, (_, i) => ({
+        id: `emp-${i + 1}`,
+        name: `Employee ${i + 1}`,
+        position: ["Software Engineer", "Marketing Manager", "HR Specialist", "Sales Representative", "Accountant"][
+          i % 5
+        ],
+        department: ["Technology", "Marketing", "Human Resources", "Sales", "Finance"][i % 5],
+        email: `employee${i + 1}@company.com`,
+      }))
 
       setViewEmployeesModal({
         isOpen: true,
@@ -1418,10 +1430,6 @@ export default function SettingsPage() {
 
       if (error) throw error
 
-      // Update employee count in subsidiary
-      const employeeCount = employees?.length || 0
-      await updateSubsidiary(subsidiaryId, { employee_count: employeeCount })
-
       setViewEmployeesModal({
         isOpen: true,
         subsidiaryId,
@@ -1431,7 +1439,7 @@ export default function SettingsPage() {
       console.error("View employees error:", error)
       toast({
         title: "Error",
-        description: "Failed to load subsidiary employees",
+        description: "Failed to load employees",
         variant: "destructive",
       })
     }
@@ -1519,24 +1527,25 @@ export default function SettingsPage() {
     console.log("[v0] Updating subsidiary:", subsidiaryId, updates)
 
     if (isDemoMode()) {
+      // Update in local state for demo mode
       const updatedSubsidiaries = subsidiaries.map((sub) => {
         if (sub.id === subsidiaryId) {
           const updatedSub = {
             ...sub,
             ...updates,
-            // Recalculate statistics based on updated data
-            divisions_count: updates.divisions?.length || sub.divisions?.length || 0,
-            departments_count: updates.departments?.length || sub.departments?.length || 0,
-            locations_count: updates.locations?.length || sub.locations?.length || 0,
+            // Recalculate counts based on arrays
+            divisions_count: Array.isArray(updates.divisions) ? updates.divisions.length : sub.divisions_count,
+            departments_count: Array.isArray(updates.departments) ? updates.departments.length : sub.departments_count,
+            locations_count: Array.isArray(updates.locations) ? updates.locations.length : sub.locations_count,
+            updated_at: new Date().toISOString(),
           }
           return updatedSub
         }
         return sub
       })
-
       setSubsidiaries(updatedSubsidiaries)
 
-      // Update selectedSubsidiary if it's the one being updated
+      // Update selectedSubsidiary if it matches
       if (selectedSubsidiary?.id === subsidiaryId) {
         const updatedSelected = updatedSubsidiaries.find((sub) => sub.id === subsidiaryId)
         if (updatedSelected) {
@@ -1545,37 +1554,35 @@ export default function SettingsPage() {
       }
 
       toast({
-        title: "Subsidiary updated",
-        description: "Subsidiary information has been updated successfully.",
+        title: "Success",
+        description: "Subsidiary updated successfully (Demo Mode)",
       })
       return
     }
 
     try {
-      const { error } = await supabase.from("subsidiaries").update(updates).eq("id", subsidiaryId)
+      const { error } = await supabase
+        .from("subsidiaries")
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", subsidiaryId)
 
       if (error) throw error
 
-      // Reload subsidiaries to get fresh data with updated statistics
+      // Reload subsidiaries to get fresh data
       await loadSubsidiaries()
 
-      // Update selectedSubsidiary with fresh data
-      if (selectedSubsidiary?.id === subsidiaryId) {
-        const updatedSub = subsidiaries.find((sub) => sub.id === subsidiaryId)
-        if (updatedSub) {
-          setSelectedSubsidiary(updatedSub)
-        }
-      }
-
       toast({
-        title: "Subsidiary updated",
-        description: "Subsidiary information has been updated successfully.",
+        title: "Success",
+        description: "Subsidiary updated successfully",
       })
     } catch (error) {
       console.error("Update subsidiary error:", error)
       toast({
         title: "Error",
-        description: "Failed to update subsidiary information",
+        description: "Failed to update subsidiary",
         variant: "destructive",
       })
     }
@@ -6311,7 +6318,29 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   <Button variant="ghost" onClick={() => setShowEditSubsidiary(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={() => setShowEditSubsidiary(false)}>Save Changes</Button>
+                  <Button
+                    onClick={async () => {
+                      if (selectedSubsidiary) {
+                        await updateSubsidiary(selectedSubsidiary.id, {
+                          name: selectedSubsidiary.name,
+                          industry: selectedSubsidiary.industry,
+                          tax_id: selectedSubsidiary.tax_id,
+                          ssnit_number: selectedSubsidiary.ssnit_number,
+                          email_address: selectedSubsidiary.email_address,
+                          phone_number: selectedSubsidiary.phone_number,
+                          address: selectedSubsidiary.address,
+                          divisions: selectedSubsidiary.divisions,
+                          departments: selectedSubsidiary.departments,
+                          locations: selectedSubsidiary.locations,
+                          logo_url: subsidiaryLogoPreview || selectedSubsidiary.logo_url,
+                        })
+                        setShowEditSubsidiary(false)
+                        setSubsidiaryLogoPreview("")
+                      }
+                    }}
+                  >
+                    Save Changes
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -6483,7 +6512,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                           <div className="flex items-center justify-between">
                             <div>
                               <h3 className="text-base font-semibold">{employee.name}</h3>
-                              <p className="text-xs text-gray-600">{employee.position}</p>
+                              <p className="text-sm text-gray-600">{employee.position}</p>
                             </div>
                             <div className="flex items-center space-x-4">
                               <span className="text-sm text-gray-500">{employee.email}</span>
