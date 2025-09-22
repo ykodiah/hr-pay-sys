@@ -60,6 +60,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator" // Added for Separator
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table" // Added for Table components
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog" // Added for Dialog components
 
 interface Company {
   id: string
@@ -6405,7 +6406,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <img
                           src={subsidiaryLogoPreview || "/placeholder.svg"}
                           alt="Subsidiary Logo"\
-                          className="w-20 h-20 object-cover rounded-lg border"
+                          className=\"w-20 h-20 object-cover rounded-lg border"
                         />
                         <Button
                           variant="ghost"
@@ -7264,19 +7265,24 @@ Format the response in a professional, actionable manner for HR decision-makers.
         </div>
       </div>
     )showAddLeaveTypeModal && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-md">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Add New Leave Type</h2>
-            <Button variant="ghost" size="sm" onClick={() => setShowAddLeaveTypeModal(false)}>
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-
-          <p className="text-sm text-muted-foreground mb-6">
-            Define a new leave type with its allocation and description
-          </p>
-
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="leaveTypeName\">Leave
+      <Dialog open={showAddLeaveTypeModal} onOpenChange={setShowAddLeaveTypeModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add Leave Type</DialogTitle>
+            <DialogDescription>
+              Create a new leave type for your organization.
+            </DialogDialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="leaveTypeName" className="text-right">
+                Leave Type Name
+              </Label>
+              <Input
+                id="leaveTypeName"
+                value={newLeaveType.name}
+                onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
+                className="col-span-3"
+              />
+            </div>\
+            <div
