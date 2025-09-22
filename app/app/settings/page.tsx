@@ -7295,4 +7295,11 @@ Format the response in a professional, actionable manner for HR decision-makers.
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Add New Leave Type</h2>
               <Button variant="ghost" size="sm" onClick={() => setShowAddLeaveTypeModal(false)}>
-                <X className\
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <p className="text-sm text-muted-foreground mb-6">Enter details for the new leave type</p>
+
+            <div className="space-y-4">\
+              <div>
