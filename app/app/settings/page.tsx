@@ -7145,7 +7145,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
           </div>
         </div>
       </div>
-    {showSalaryGradeModal && (
+    )showSalaryGradeModal && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
@@ -7264,8 +7264,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
           </div>
         </div>
       </div>
-      )}   {/* <-- close the Salary Grade modal conditional properly */}
-    {showAddLeaveTypeModal && (
+    )showAddLeaveTypeModal && (
       <Dialog open={showAddLeaveTypeModal} onOpenChange={setShowAddLeaveTypeModal}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
