@@ -626,8 +626,8 @@ export default function SettingsPage() {
   const [newUnstructured, setNewUnstructured] = useState({
     name: "",
     description: "",
-    generalIncrement: { type: "percentage", value: 0, minValue: 0, maxValue: 0 },
-    performanceIncrement: { type: "percentage", value: 0, minValue: 0, maxValue: 0 },
+    generalIncrement: { type: "percentage", value: 0, min: 0, max: 0 },
+    performanceIncrement: { type: "percentage", value: 0, min: 0, max: 0 },
   })
 
   const handleExportSalaryGrades = async (format: "csv" | "excel") => {
@@ -2222,7 +2222,7 @@ export default function SettingsPage() {
     setSubsidiaryToToggle(null)
   }
 
-  const handleAddLeaveType = async () => {
+  const handleSaveLeaveType = async () => {
     if (!newLeaveType.name || !newLeaveType.days) {
       toast({
         title: "Validation Error",
@@ -3653,8 +3653,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setNewUnstructured({
       name: "",
       description: "",
-      generalIncrement: { type: "percentage", value: 0, minValue: 0, maxValue: 0 },
-      performanceIncrement: { type: "percentage", value: 0, minValue: 0, maxValue: 0 },
+      generalIncrement: { type: "percentage", value: 0, min: 0, max: 0 },
+      performanceIncrement: { type: "percentage", value: 0, min: 0, max: 0 },
     })
     setShowUnstructuredModal(true)
   }
@@ -3707,8 +3707,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setNewUnstructured({
       name: "",
       description: "",
-      generalIncrement: { type: "percentage", value: 0, minValue: 0, maxValue: 0 },
-      performanceIncrement: { type: "percentage", value: 0, minValue: 0, maxValue: 0 },
+      generalIncrement: { type: "percentage", value: 0, min: 0, max: 0 },
+      performanceIncrement: { type: "percentage", value: 0, min: 0, max: 0 },
     })
   }
 
