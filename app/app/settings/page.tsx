@@ -7148,7 +7148,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">{editingGrade ? "Edit Salary Grade" : "Add New Salary Grade"}</h2>
+            <h2 className="text-xl font-semibold">
+              {editingGrade ? "Edit Salary Grade" : "Add New Salary Grade"}
+            </h2>
             <Button variant="ghost" size="sm" onClick={() => setShowSalaryGradeModal(false)}>
               <X className="w-4 h-4" />
             </Button>
@@ -7208,7 +7210,10 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   max="20"
                   value={newGrade.numberOfNotches}
                   onChange={(e) =>
-                    setNewGrade((prev) => ({ ...prev, numberOfNotches: Number.parseInt(e.target.value) || 5 }))
+                    setNewGrade((prev) => ({
+                      ...prev,
+                      numberOfNotches: Number.parseInt(e.target.value) || 5,
+                    }))
                   }
                 />
               </div>
@@ -7232,7 +7237,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   </>
                 )}
               </Button>
-              <span className="text-sm text-muted-foreground">{newGrade.notches.length} notches configured</span>
+              <span className="text-sm text-muted-foreground">
+                {newGrade.notches.length} notches configured
+              </span>
             </div>
 
             {newGrade.notches.length > 0 && (
@@ -7279,6 +7286,4 @@ Format the response in a professional, actionable manner for HR decision-makers.
             Configure unstructured salary grade with flexible increment ranges
           </p>
 
-          <div className="space-y-6">
-            {/* Basic Information */}\
-            <div className
+          <div className=\"space-
