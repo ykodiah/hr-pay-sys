@@ -617,8 +617,8 @@ export default function SettingsPage() {
       id: 1,
       name: "Management Level",
       description: "Senior management positions",
-      generalIncrement: { type: "percentage", value: 5 },
-      performanceIncrement: { type: "percentage", value: 10 },
+      generalIncrement: { type: "percentage", minValue: 5, maxValue: 10 },
+      performanceIncrement: { type: "percentage", minValue: 5, maxValue: 10 },
     },
   ])
   const [showUnstructuredModal, setShowUnstructuredModal] = useState(false)
@@ -626,8 +626,16 @@ export default function SettingsPage() {
   const [newUnstructured, setNewUnstructured] = useState({
     name: "",
     description: "",
-    generalIncrement: { type: "percentage", value: 0 },
-    performanceIncrement: { type: "percentage", value: 0 },
+    generalIncrement: {
+      type: "percentage",
+      minValue: 0,
+      maxValue: 0
+    },
+    performanceIncrement: {
+      type: "percentage",
+      minValue: 0,
+      maxValue: 0
+    },
   })
 
   const handleExportSalaryGrades = async (format: "csv" | "excel") => {
@@ -3653,8 +3661,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setNewUnstructured({
       name: "",
       description: "",
-      generalIncrement: { type: "percentage", value: 0 },
-      performanceIncrement: { type: "percentage", value: 0 },
+      generalIncrement: { type: "percentage", minValue: 0, maxValue: 0 },
+      performanceIncrement: { type: "percentage", minValue: 0, maxValue: 0 },
     })
     setShowUnstructuredModal(true)
   }
@@ -3707,8 +3715,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setNewUnstructured({
       name: "",
       description: "",
-      generalIncrement: { type: "percentage", value: 0 },
-      performanceIncrement: { type: "percentage", value: 0 },
+      generalIncrement: { type: "percentage", minValue: 0, maxValue: 0 },
+      performanceIncrement: { type: "percentage", minValue: 0, maxValue: 0 },
     })
   }
 
@@ -4817,8 +4825,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 <span className="text-sm font-medium text-green-800">General Increment</span>
                                 <span className="text-sm font-semibold text-green-900">
                                   {grade.generalIncrement.type === "percentage"
-                                    ? `${grade.generalIncrement.value}%`
-                                    : `₵${grade.generalIncrement.value.toLocaleString()}`}
+                                    ? `${grade.generalIncrement.minValue || grade.generalIncrement.value || 0}% - ${grade.generalIncrement.maxValue || grade.generalIncrement.value || 0}%`
+                                    : `₵${(grade.generalIncrement.minValue || grade.generalIncrement.value || 0).toLocaleString()} - ₵${(grade.generalIncrement.maxValue || grade.generalIncrement.value || 0).toLocaleString()}`}
                                 </span>
                               </div>
                             </div>
@@ -4828,8 +4836,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 <span className="text-sm font-medium text-blue-800">Performance Increment</span>
                                 <span className="text-sm font-semibold text-blue-900">
                                   {grade.performanceIncrement.type === "percentage"
-                                    ? `${grade.performanceIncrement.value}%`
-                                    : `₵${grade.performanceIncrement.value.toLocaleString()}`}
+                                    ? `${grade.performanceIncrement.minValue || grade.performanceIncrement.value || 0}% - ${grade.performanceIncrement.maxValue || grade.performanceIncrement.value || 0}%`
+                                    : `₵${(grade.performanceIncrement.minValue || grade.performanceIncrement.value || 0).toLocaleString()} - ₵${(grade.performanceIncrement.maxValue || grade.performanceIncrement.value || 0).toLocaleString()}`}
                                 </span>
                               </div>
                             </div>
@@ -7287,25 +7295,4 @@ Format the response in a professional, actionable manner for HR decision-makers.
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Add New Leave Type</h2>
               <Button variant="ghost" size="sm" onClick={() => setShowAddLeaveTypeModal(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="leaveName">Leave Type Name</Label>
-                <Input
-                  id="leaveName"
-                  value={newLeaveType.name}
-                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g., Study Leave"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="leaveDays">Number of Days</Label>
-                <Input
-                  id="leaveDays"
-                  type="number"
-                  value={newLeaveType.days}
-                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, days: Number(e.target.value)
+                <X className\
