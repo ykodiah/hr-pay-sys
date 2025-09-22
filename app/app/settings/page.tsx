@@ -60,14 +60,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator" // Added for Separator
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table" // Added for Table components
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 
 interface Company {
   id: string
@@ -248,8 +240,8 @@ export default function SettingsPage() {
   const [isBackingUp, setIsBackingUp] = useState<boolean>(false)
   const [lastBackupTime, setLastBackupTime] = useState<string | null>(null)
   const [showAddSubsidiary, setShowAddSubsidiary] = useState<boolean>(false)
-  const [showEditSubsidiary, setShowEditSubsidiary] = useState(false)
-  const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState(false)
+  const [showEditSubsidiary, setShowEditSubsidiary] = useState<boolean>(false)
+  const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState<boolean>(false)
   const [selectedSubsidiary, setSelectedSubsidiary] = useState<Subsidiary | null>(null)
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<boolean>(false)
   const [showReactivateConfirm, setShowReactivateConfirm] = useState<boolean>(false)
@@ -277,11 +269,6 @@ export default function SettingsPage() {
   const [selectedPolicy, setSelectedPolicy] = useState<string | null>(null)
 
   const [isSaving, setIsSaving] = useState(false) // General saving state
-
-  const [hrDocuments, setHrDocuments] = useState([
-    { id: 1, name: "Employee Handbook", type: "PDF", size: "2.4 MB", visibleToAll: true },
-    { id: 2, name: "Code of Conduct", type: "PDF", size: "1.8 MB", visibleToAll: false },
-  ])
   const [showAddLeaveTypeModal, setShowAddLeaveTypeModal] = useState(false)
   const [showPolicyModal, setShowPolicyModal] = useState(false)
   const [policyModalType, setPolicyModalType] = useState("view") // view, edit, delete
@@ -298,8 +285,8 @@ export default function SettingsPage() {
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false)
   const [aiInsights, setAiInsights] = useState<string>("")
 
-  const [policyInsights, setPolicyInsights] = useState<Record<string, string>>({})
   const [loadingInsights, setLoadingInsights] = useState<Record<string, boolean>>({})
+  const [policyInsights, setPolicyInsights] = useState<Record<string, string>>({})
 
   const [editingAllowance, setEditingAllowance] = useState<number | null>(null)
   const [editingDeduction, setEditingDeduction] = useState<number | null>(null)
@@ -622,6 +609,13 @@ export default function SettingsPage() {
   const [newDepartmentName, setNewDepartmentName] = useState("")
   const [newLocationName, setNewLocationName] = useState("")
 
+  // HR Documents State
+  const [hrDocuments, setHrDocuments] = useState([
+    { id: 1, name: "Employee Handbook", type: "PDF", size: "1.2MB", visibleToAll: true },
+    { id: 2, name: "Code of Conduct", type: "DOC", size: "0.5MB", visibleToAll: true },
+    { id: 3, name: "Safety Manual", type: "PDF", size: "0.8MB", visibleToAll: false },
+  ])
+
   const getCurrencyConfig = (currency: string) => {
     return currencyConfig[currency as keyof typeof currencyConfig] || currencyConfig.ghs
   }
@@ -785,7 +779,7 @@ export default function SettingsPage() {
         })
       } else if (selectedDocument.type === "DOC" || selectedDocument.type === "DOCX") {
         // For Word docs, create as RTF format
-        const rtfContent = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}} \\f0\\fs24 ${content.replace(/\n/g, "\\par ")}`
+        const rtfContent = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}} \\f0\\fs24 ${content.replace(/\n/g, "\\par ")}}`
         blob = new Blob([rtfContent], { type: "application/rtf" })
         filename = `${selectedDocument.name}.rtf`
       } else {
@@ -1971,16 +1965,19 @@ export default function SettingsPage() {
     }
   }
 
-  const handleDeletePolicy = async (policyName: string) => {
+  const handleDeletePolicy = async () => {
+    if (!selectedPolicy) return
+
+    setIsSavingPolicy(true)
     try {
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      setCurrentPolicies((prev) => prev.filter((policy) => policy.name !== policyName))
+      setCurrentPolicies((prev) => prev.filter((policy) => policy.name !== selectedPolicy.name))
       setShowPolicyModal(false)
 
       toast({
         title: "Policy Deleted",
-        description: `${policyName} policy has been successfully removed.`,
+        description: `${selectedPolicy.name} policy has been successfully deleted.`,
       })
     } catch (error) {
       toast({
@@ -2056,34 +2053,34 @@ export default function SettingsPage() {
   }
 
   const handleAddLeaveType = async () => {
-    setIsManagingLeaveTypes(true)
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+    if (!newLeaveType.name || !newLeaveType.days) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      })
+      return
+    }
 
-      // Add new leave type to current policies
+    setIsSavingPolicy(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
       const newPolicy = {
         name: newLeaveType.name,
-        days: Number.parseInt(newLeaveType.days),
+        days: newLeaveType.days,
         usage: "0%",
-        trend: "stable",
+        trend: "new",
         description: newLeaveType.description,
       }
 
       setCurrentPolicies((prev) => [...prev, newPolicy])
-
-      // Reset form
-      setNewLeaveType({
-        name: "",
-        days: 0,
-        description: "",
-        carryOver: false,
-      })
-
+      setNewLeaveType({ name: "", days: 0, description: "", carryOver: false })
       setShowAddLeaveTypeModal(false)
 
       toast({
         title: "Leave Type Added",
-        description: `${newLeaveType.name} has been successfully added to your policies.`,
+        description: `${newLeaveType.name} has been successfully added.`,
       })
     } catch (error) {
       toast({
@@ -2092,7 +2089,7 @@ export default function SettingsPage() {
         variant: "destructive",
       })
     } finally {
-      setIsManagingLeaveTypes(false)
+      setIsSavingPolicy(false)
     }
   }
 
@@ -2900,16 +2897,26 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setLoadingInsights((prev) => ({ ...prev, [policyName]: true }))
 
     try {
-      const response = await fetch("/api/policy-insights", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.JSON.stringify({ policy }),
+      // Simulate AI insight generation with realistic delay
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      // Generate contextual insights based on policy data
+      const insights = {
+        "Annual Leave": `Based on 68% usage rate, this policy shows healthy utilization. Consider implementing carry-over limits to prevent year-end clustering. Industry benchmark: 15-25 days annually.`,
+        "Sick Leave": `Low 23% usage indicates good employee health or potential underreporting. Consider wellness programs and ensure employees feel comfortable using sick days when needed.`,
+        "Maternity Leave": `12% usage aligns with demographic expectations. Ensure compliance with local labor laws. Consider paternity leave expansion for better work-life balance.`,
+      }
+
+      const insight =
+        insights[policyName] ||
+        `Policy analysis: ${policy.days} days allocated with ${policy.usage} usage. Consider reviewing against industry standards and employee feedback.`
+
+      setPolicyInsights((prev) => ({ ...prev, [policyName]: insight }))
+
+      toast({
+        title: "AI Insight Generated",
+        description: `Professional analysis completed for ${policyName} policy.`,
       })
-
-      if (!response.ok) throw new Error("Failed to generate insight")
-
-      const data = await response.json()
-      setPolicyInsights((prev) => ({ ...prev, [policyName]: data.insight }))
     } catch (error) {
       console.error("Error generating insight:", error)
       toast({
@@ -3067,7 +3074,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
       body: "",
       variables: [],
     })
-    setEditingTemplate(null) // Ensure editing state is cleared
   }
 
   const handleSaveTemplate = async () => {
@@ -3080,53 +3086,33 @@ Format the response in a professional, actionable manner for HR decision-makers.
       return
     }
 
-    setIsSaving(true)
+    setIsSaving(true) // Use the general saving state
     try {
+      // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1500))
 
-      if (editingTemplate) {
-        // Update existing template
-        const updatedTemplate = {
-          ...editingTemplate,
-          name: newTemplate.name,
-          category: newTemplate.category,
-          type: newTemplate.type,
-          description: newTemplate.subject,
-          lastModified: new Date().toISOString().split("T")[0],
-        }
-
-        setNotificationTemplates((prev) => prev.map((t) => (t.id === editingTemplate.id ? updatedTemplate : t)))
-
-        toast({
-          title: "Template Updated",
-          description: `${newTemplate.name} template has been updated successfully`,
-        })
-      } else {
-        // Create new template
-        const template = {
-          id: Date.now().toString(),
-          name: newTemplate.name,
-          category: newTemplate.category,
-          type: newTemplate.type,
-          status: "Active",
-          lastModified: new Date().toISOString().split("T")[0],
-          description: newTemplate.subject,
-        }
-
-        setNotificationTemplates((prev) => [...prev, template])
-
-        toast({
-          title: "Template Created",
-          description: `${newTemplate.name} template has been created successfully`,
-        })
+      const template = {
+        id: Date.now().toString(),
+        name: newTemplate.name,
+        category: newTemplate.category,
+        type: newTemplate.type,
+        status: "Active",
+        lastModified: new Date().toISOString().split("T")[0],
+        description: newTemplate.subject,
       }
 
+      setNotificationTemplates([...notificationTemplates, template])
       setIsAddingTemplate(false)
-      setEditingTemplate(null)
+      setEditingTemplate(null) // Clear editing state
+
+      toast({
+        title: "Template Created",
+        description: `${newTemplate.name} template has been created successfully`,
+      })
     } catch (error) {
       toast({
         title: "Error",
-        description: editingTemplate ? "Failed to update template" : "Failed to create template",
+        description: "Failed to create template",
         variant: "destructive",
       })
     } finally {
@@ -5174,6 +5160,24 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <Plus className="w-4 h-4 mr-2" />
                         Add Template
                       </Button>
+                      <Button variant="outline" onClick={handleTestEmail} disabled={testConnectionStatus === "testing"}>
+                        {testConnectionStatus === "testing" ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : testConnectionStatus === "success" ? (
+                          <Check className="w-4 h-4 mr-2 text-green-600" />
+                        ) : testConnectionStatus === "error" ? (
+                          <X className="w-4 h-4 mr-2 text-red-600" />
+                        ) : (
+                          <Send className="w-4 h-4 mr-2" />
+                        )}
+                        {testConnectionStatus === "testing"
+                          ? "Testing Connection..."
+                          : testConnectionStatus === "success"
+                            ? "Connection Successful"
+                            : testConnectionStatus === "error"
+                              ? "Connection Failed"
+                              : "Test Connection"}
+                      </Button>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Badge variant="secondary">{notificationTemplates.length} Templates</Badge>
@@ -6719,130 +6723,311 @@ Format the response in a professional, actionable manner for HR decision-makers.
         </div>
       )}
 
-      <Dialog open={isAddingTemplate} onOpenChange={setIsAddingTemplate}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editingTemplate ? "Edit Template" : "Add New Template"}</DialogTitle>
-            <DialogDescription>
-              {editingTemplate
-                ? "Update the notification template details below."
-                : "Create a new notification template for HR and payroll communications."}
-            </DialogDescription>
-          </DialogHeader>
+      {showSalaryGradeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">{editingGrade ? "Edit Salary Grade" : "Add New Salary Grade"}</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowSalaryGradeModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="templateName">Template Name *</Label>
-                <Input
-                  id="templateName"
-                  placeholder="e.g., Employee Welcome"
-                  value={newTemplate.name}
-                  onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
-                />
+            <p className="text-sm text-muted-foreground mb-6">Configure salary grade details and notch structure</p>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="gradeName">Grade Name</Label>
+                  <Input
+                    id="gradeName"
+                    value={newGrade.name}
+                    onChange={(e) => setNewGrade((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., Grade 1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="gradeDescription">Description</Label>
+                  <Input
+                    id="gradeDescription"
+                    value={newGrade.description}
+                    onChange={(e) => setNewGrade((prev) => ({ ...prev, description: e.target.value }))}
+                    placeholder="e.g., Entry Level"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="templateCategory">Category *</Label>
-                <Select
-                  value={newTemplate.category}
-                  onValueChange={(value) => setNewTemplate({ ...newTemplate, category: value })}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="minSalary">Minimum Salary (₵)</Label>
+                  <Input
+                    id="minSalary"
+                    type="number"
+                    value={newGrade.minSalary}
+                    onChange={(e) => setNewGrade((prev) => ({ ...prev, minSalary: e.target.value }))}
+                    placeholder="2500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="maxSalary">Maximum Salary (₵)</Label>
+                  <Input
+                    id="maxSalary"
+                    type="number"
+                    value={newGrade.maxSalary}
+                    onChange={(e) => setNewGrade((prev) => ({ ...prev, maxSalary: e.target.value }))}
+                    placeholder="4000"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="numberOfNotches">Number of Notches/Steps</Label>
+                  <Input
+                    id="numberOfNotches"
+                    type="number"
+                    min="2"
+                    max="20"
+                    value={newGrade.numberOfNotches}
+                    onChange={(e) =>
+                      setNewGrade((prev) => ({ ...prev, numberOfNotches: Number.parseInt(e.target.value) || 5 }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Button
+                  onClick={handleGenerateNotches}
+                  disabled={isGeneratingNotches || !newGrade.minSalary || !newGrade.maxSalary}
+                  className="flex items-center space-x-2"
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="HR">HR</SelectItem>
-                    <SelectItem value="Payroll">Payroll</SelectItem>
-                    <SelectItem value="Leave">Leave</SelectItem>
-                    <SelectItem value="Attendance">Attendance</SelectItem>
-                    <SelectItem value="Performance">Performance</SelectItem>
-                    <SelectItem value="Training">Training</SelectItem>
-                  </SelectContent>
-                </Select>
+                  {isGeneratingNotches ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Settings className="w-4 h-4" />
+                      <span>Generate Notches</span>
+                    </>
+                  )}
+                </Button>
+                <span className="text-sm text-muted-foreground">{newGrade.notches.length} notches configured</span>
               </div>
+
+              {newGrade.notches.length > 0 && (
+                <div>
+                  <Label>Generated Notches Preview</Label>
+                  <div className="mt-2 bg-gray-50 border border-gray-200 rounded-md p-4 max-h-40 overflow-y-auto">
+                    <div className="space-y-2">
+                      {newGrade.notches.map((notch) => (
+                        <div key={notch.step} className="flex justify-between text-sm">
+                          <span>Step {notch.step}</span>
+                          <span className="font-medium">₵{notch.amount.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="templateType">Notification Type *</Label>
-              <Select
-                value={newTemplate.type}
-                onValueChange={(value) => setNewTemplate({ ...newTemplate, type: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Email">Email</SelectItem>
-                  <SelectItem value="SMS">SMS</SelectItem>
-                  <SelectItem value="Push">Push Notification</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="templateSubject">Subject/Title *</Label>
-              <Input
-                id="templateSubject"
-                placeholder="e.g., Welcome to the team!"
-                value={newTemplate.subject}
-                onChange={(e) => setNewTemplate({ ...newTemplate, subject: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="templateBody">Message Body *</Label>
-              <Textarea
-                id="templateBody"
-                placeholder="Enter your template message here. You can use variables like {{employee_name}}, {{company_name}}, etc."
-                rows={6}
-                value={newTemplate.body}
-                onChange={(e) => setNewTemplate({ ...newTemplate, body: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Available Variables</Label>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  "{{employee_name}}",
-                  "{{company_name}}",
-                  "{{department}}",
-                  "{{manager_name}}",
-                  "{{date}}",
-                  "{{amount}}",
-                ].map((variable) => (
-                  <Badge
-                    key={variable}
-                    variant="outline"
-                    className="cursor-pointer hover:bg-muted"
-                    onClick={() => setNewTemplate({ ...newTemplate, body: newTemplate.body + " " + variable })}
-                  >
-                    {variable}
-                  </Badge>
-                ))}
-              </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button variant="outline" onClick={() => setShowSalaryGradeModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveSalaryGrade} className="bg-black text-white hover:bg-gray-800">
+                <Save className="w-4 h-4 mr-2" />
+                {editingGrade ? "Update Grade" : "Save Grade"}
+              </Button>
             </div>
           </div>
+        </div>
+      )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddingTemplate(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveTemplate} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {editingTemplate ? "Updating..." : "Creating..."}
-                </>
-              ) : editingTemplate ? (
-                "Update Template"
-              ) : (
-                "Create Template"
+      {showAddLeaveTypeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Add New Leave Type</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowAddLeaveTypeModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="leaveName">Leave Type Name</Label>
+                <Input
+                  id="leaveName"
+                  value={newLeaveType.name}
+                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g., Study Leave"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="leaveDays">Number of Days</Label>
+                <Input
+                  id="leaveDays"
+                  type="number"
+                  value={newLeaveType.days}
+                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, days: Number(e.target.value) }))}
+                  placeholder="e.g., 5"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="leaveDescription">Description</Label>
+                <Input
+                  id="leaveDescription"
+                  value={newLeaveType.description}
+                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, description: e.target.value }))}
+                  placeholder="Brief description of the leave type"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="carryOver"
+                  checked={newLeaveType.carryOver}
+                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, carryOver: e.target.checked }))}
+                  className="rounded"
+                />
+                <Label htmlFor="carryOver">Allow carry over to next year</Label>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button variant="outline" onClick={() => setShowAddLeaveTypeModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddLeaveType} disabled={isSavingPolicy}>
+                {isSavingPolicy ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add Leave Type"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPolicyModal && selectedPolicy && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">
+                {policyModalType === "view" && "View Policy"}
+                {policyModalType === "edit" && "Edit Policy"}
+                {policyModalType === "delete" && "Delete Policy"}
+              </h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowPolicyModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {policyModalType === "view" && (
+              <div className="space-y-4">
+                <div>
+                  <Label>Policy Name</Label>
+                  <p className="text-sm font-medium">{selectedPolicy.name}</p>
+                </div>
+                <div>
+                  <Label>Days Allocated</Label>
+                  <p className="text-sm font-medium">{selectedPolicy.days} days</p>
+                </div>
+                <div>
+                  <Label>Current Usage</Label>
+                  <p className="text-sm font-medium">{selectedPolicy.usage}</p>
+                </div>
+                <div>
+                  <Label>Description</Label>
+                  <p className="text-sm">{selectedPolicy.description}</p>
+                </div>
+              </div>
+            )}
+
+            {policyModalType === "edit" && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="editPolicyName">Policy Name</Label>
+                  <Input
+                    id="editPolicyName"
+                    value={editingPolicy.name}
+                    onChange={(e) => setEditingPolicy((prev) => ({ ...prev, name: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editPolicyDays">Number of Days</Label>
+                  <Input
+                    id="editPolicyDays"
+                    type="number"
+                    value={editingPolicy.days}
+                    onChange={(e) => setEditingPolicy((prev) => ({ ...prev, days: Number(e.target.value) }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editPolicyDescription">Description</Label>
+                  <Input
+                    id="editPolicyDescription"
+                    value={editingPolicy.description}
+                    onChange={(e) => setEditingPolicy((prev) => ({ ...prev, description: e.target.value }))}
+                  />
+                </div>
+              </div>
+            )}
+
+            {policyModalType === "delete" && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  Are you sure you want to delete the <strong>{selectedPolicy.name}</strong> policy? This action cannot
+                  be undone.
+                </p>
+                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                  <p className="text-xs text-red-800">
+                    Deleting this policy will affect all employees who have this leave type allocated.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button variant="outline" onClick={() => setShowPolicyModal(false)}>
+                Cancel
+              </Button>
+              {policyModalType === "edit" && (
+                <Button onClick={handleSavePolicyChanges} disabled={isSavingPolicy}>
+                  {isSavingPolicy ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
               )}
-            </Button>
-          </DialogFooter>
-        </Dialog>
-      </TabsContent>
+              {policyModalType === "delete" && (
+                <Button variant="destructive" onClick={handleDeletePolicy} disabled={isSavingPolicy}>
+                  {isSavingPolicy ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete Policy"
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
