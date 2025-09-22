@@ -4859,2451 +4859,2447 @@ Format the response in a professional, actionable manner for HR decision-makers.
               </CardContent>
             </Card>
           </div>
-        </div>
-      )}
+        </TabsContent>
 
-      <TabsContent value="payroll">
-        <div className="space-y-6">
-          {/* Payroll Configuration Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Settings className="w-5 h-5" />
-                <span>Payroll Configuration</span>
-              </CardTitle>
-              <CardDescription>Configure basic payroll settings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div>
-                  <Label htmlFor="payFrequency">Pay Frequency</Label>
-                  <Select defaultValue="monthly">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="biweekly">Bi-Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="currency">Currency</Label>
-                  <Select value={selectedCurrency} onValueChange={handleCurrencyChange}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ghs">Ghana Cedis (GHS)</SelectItem>
-                      <SelectItem value="usd">US Dollar (USD)</SelectItem>
-                      <SelectItem value="eur">Euro (EUR)</SelectItem>
-                      <SelectItem value="ngn">Nigerian Naira (NGN)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="minimumWage">Minimum Wage ({getCurrencyConfig(selectedCurrency).symbol})</Label>
-                  <Input type="number" defaultValue="18.15" />
-                </div>
-
-                <div>
-                  <Label htmlFor="weekdayOvertimeRate">Weekday Overtime Rate Multiplier</Label>
-                  <Input type="number" step="0.1" defaultValue="1.5" />
-                </div>
-
-                <div>
-                  <Label htmlFor="weekendOvertimeRate">Weekend Overtime Rate Multiplier</Label>
-                  <Input type="number" step="0.1" defaultValue="2" />
-                </div>
-
-                <div>
-                  <Label htmlFor="payrollCutoffDay">Payroll Cutoff Day</Label>
-                  <Input type="number" min="1" max="31" defaultValue="25" />
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <Switch id="autoCalculatePAYE" defaultChecked />
-                  <Label htmlFor="autoCalculatePAYE">Auto-calculate PAYE</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch id="autoCalculateSSNIT" defaultChecked />
-                  <Label htmlFor="autoCalculateSSNIT">Auto-calculate SSNIT</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch id="autoCalculateProvidentFund" defaultChecked />
-                  <Label htmlFor="autoCalculateProvidentFund">Auto-calculate Provident Fund (Tier 3)</Label>
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button onClick={handleSavePayrollConfig} disabled={isSavingPayroll}>
-                  {isSavingPayroll ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4 mr-2" />
-                  )}
-                  Save Payroll Configuration
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Tax Configuration Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Calculator className="w-5 h-5" />
-                <span>Tax Configuration</span>
-              </CardTitle>
-              <CardDescription>Configure tax bands and SSNIT rates</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <div className="flex items-center justify-between mb-4">
+        <TabsContent value="payroll">
+          <div className="space-y-6">
+            {/* Payroll Configuration Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Settings className="w-5 h-5" />
+                  <span>Payroll Configuration</span>
+                </CardTitle>
+                <CardDescription>Configure basic payroll settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <div>
-                    <h4 className="font-medium">PAYE Tax Bands</h4>
-                    <p className="text-sm text-gray-500">
-                      {getCurrencyConfig(selectedCurrency).country} - Version{" "}
-                      {getCurrencyConfig(selectedCurrency)?.version} - Last Updated:{" "}
-                      {getCurrencyConfig(selectedCurrency)?.lastUpdated}
-                    </p>
+                    <Label htmlFor="payFrequency">Pay Frequency</Label>
+                    <Select defaultValue="monthly">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="biweekly">Bi-Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => syncWithGovernmentAPI(selectedCurrency)}
-                      disabled={!apiStatus[selectedCurrency as keyof typeof apiStatus]?.connected || isSyncing}
-                    >
-                      {isSyncing ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                      )}
-                      Sync API
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleAddTaxBand}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Band
-                    </Button>
+
+                  <div>
+                    <Label htmlFor="currency">Currency</Label>
+                    <Select value={selectedCurrency} onValueChange={handleCurrencyChange}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ghs">Ghana Cedis (GHS)</SelectItem>
+                        <SelectItem value="usd">US Dollar (USD)</SelectItem>
+                        <SelectItem value="eur">Euro (EUR)</SelectItem>
+                        <SelectItem value="ngn">Nigerian Naira (NGN)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="minimumWage">Minimum Wage ({getCurrencyConfig(selectedCurrency).symbol})</Label>
+                    <Input type="number" defaultValue="18.15" />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="weekdayOvertimeRate">Weekday Overtime Rate Multiplier</Label>
+                    <Input type="number" step="0.1" defaultValue="1.5" />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="weekendOvertimeRate">Weekend Overtime Rate Multiplier</Label>
+                    <Input type="number" step="0.1" defaultValue="2" />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="payrollCutoffDay">Payroll Cutoff Day</Label>
+                    <Input type="number" min="1" max="31" defaultValue="25" />
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-200 rounded-lg">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Band</th>
-                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Rate (%)</th>
-                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">
-                          From ({getCurrencyConfig(selectedCurrency).symbol})
-                        </th>
-                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">
-                          To ({getCurrencyConfig(selectedCurrency).symbol})
-                        </th>
-                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">
-                          Cumulative Tax ({getCurrencyConfig(selectedCurrency).symbol})
-                        </th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {getCurrencyConfig(selectedCurrency)?.taxBands.map((band, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="border border-gray-200 px-4 py-3 font-medium">{band.rate}</td>
-                          <td className="border border-gray-200 px-4 py-3">
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              {band.rate}%
-                            </span>
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3">
-                            {band.from ? band.from.toLocaleString() : "0"}
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3">
-                            {band.to ? band.to.toLocaleString() : "∞"}
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 font-medium text-green-600">
-                            {band.cumulativeTax ? band.cumulativeTax.toLocaleString() : "0"}
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                console.log("[v0] Editing tax band:", band)
-                              }}
-                            >
-                              Edit
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch id="autoCalculatePAYE" defaultChecked />
+                    <Label htmlFor="autoCalculatePAYE">Auto-calculate PAYE</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="autoCalculateSSNIT" defaultChecked />
+                    <Label htmlFor="autoCalculateSSNIT">Auto-calculate SSNIT</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="autoCalculateProvidentFund" defaultChecked />
+                    <Label htmlFor="autoCalculateProvidentFund">Auto-calculate Provident Fund (Tier 3)</Label>
+                  </div>
                 </div>
 
-                {/* SSNIT Rates Section */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">SSNIT Rates</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Employee:</span>
-                        <div className="flex items-center space-x-2">
-                          <Input
-                            type="number"
-                            value={ssnitRates.employee}
-                            onChange={(e) => updateSsnitRates("employee", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 text-right"
-                            step="0.1"
-                          />
-                          <span className="text-sm">%</span>
-                          <Badge variant="secondary">Active</Badge>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Employer:</span>
-                        <div className="flex items-center space-x-2">
-                          <Input
-                            type="number"
-                            value={ssnitRates.employer}
-                            onChange={(e) => updateSsnitRates("employer", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 text-right"
-                            step="0.1"
-                          />
-                          <span className="text-sm">%</span>
-                          <Badge variant="secondary">Active</Badge>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between pt-2 border-t">
-                        <span className="font-medium text-blue-600">Total:</span>
-                        <span className="font-medium text-blue-600">{ssnitRates.total}%</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Tier 2 Rates</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Employee:</span>
-                        <div className="flex items-center space-x-2">
-                          <Input
-                            type="number"
-                            value={tier2Rates.employee}
-                            onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 text-right"
-                            step="0.1"
-                          />
-                          <span className="text-sm">%</span>
-                          <Badge variant="secondary">Active</Badge>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Employer:</span>
-                        <div className="flex items-center space-x-2">
-                          <Input
-                            type="number"
-                            value={tier2Rates.employer}
-                            onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 text-right"
-                            step="0.1"
-                          />
-                          <span className="text-sm">%</span>
-                          <Badge variant="secondary">Active</Badge>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between pt-2 border-t">
-                        <span className="font-medium text-blue-600">Total:</span>
-                        <span className="font-medium text-blue-600">{tier2Rates.total}%</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Tier 3 Rates</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Employee:</span>
-                        <div className="flex items-center space-x-2">
-                          <Input
-                            type="number"
-                            value={tier3Rates.employee}
-                            onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 text-right"
-                            step="0.1"
-                          />
-                          <span className="text-sm">%</span>
-                          <Badge variant="secondary">Active</Badge>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Employer:</span>
-                        <div className="flex items-center space-x-2">
-                          <Input
-                            type="number"
-                            value={tier3Rates.employer}
-                            onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value) || 0)}
-                            className="w-20 text-right"
-                            step="0.1"
-                          />
-                          <span className="text-sm">%</span>
-                          <Badge variant="secondary">Active</Badge>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between pt-2 border-t">
-                        <span className="font-medium text-blue-600">Total:</span>
-                        <span className="font-medium text-blue-600">{tier3Rates.total}%</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* API Status and Recent Updates */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center space-x-2">
-                        <Wifi className="w-5 h-5" />
-                        <span>API Status</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span>Ghana</span>
-                        <Badge variant="default" className="bg-green-100 text-green-800">
-                          Connected
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Nigeria</span>
-                        <Badge variant="destructive">Disconnected</Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Usa</span>
-                        <Badge variant="destructive">Disconnected</Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center space-x-2">
-                        <Bell className="w-5 h-5" />
-                        <span>Recent Updates</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex items-start space-x-2">
-                          <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
-                          <div>
-                            <p className="text-sm font-medium">Ghana PAYE Rates Updated</p>
-                            <p className="text-xs text-gray-500">New tax rates effective January 1, 2024</p>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Save Button */}
-                <div className="flex justify-end mt-6">
-                  <Button
-                    className="bg-blue-600 hover:bg-blue-700"
-                    onClick={handleSaveTaxConfig}
-                    disabled={isSavingTax}
-                  >
-                    {isSavingTax ? (
+                <div className="flex justify-end">
+                  <Button onClick={handleSavePayrollConfig} disabled={isSavingPayroll}>
+                    {isSavingPayroll ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     ) : (
                       <Save className="w-4 h-4 mr-2" />
                     )}
-                    Save Tax Configuration
+                    Save Payroll Configuration
                   </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <DollarSign className="w-5 h-5" />
-                <span>Allowances</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-end mb-4">
-                <Button onClick={handleAddAllowance} className="bg-green-600 hover:bg-green-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add
-                </Button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-gray-200 rounded-lg">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="border border-gray-200 px-4 py-3 text-left font-medium">Code</th>
-                      <th className="border border-gray-200 px-4 py-3 text-left font-medium">Description</th>
-                      <th className="border border-gray-200 px-4 py-3 text-center font-medium">Taxable</th>
-                      <th className="border border-gray-200 px-4 py-3 text-center font-medium">Recurring</th>
-                      <th className="border border-gray-200 px-4 py-3 text-center font-medium">AMOUNT</th>
-                      <th className="border border-gray-200 px-4 py-3 text-center font-medium">%</th>
-                      <th className="border border-gray-200 px-4 py-3 text-center font-medium">FIXED/VARIABLE</th>
-                      <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allowances.map((allowance, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="border border-gray-200 px-4 py-3">
-                          <Input
-                            value={allowance.code}
-                            onChange={(e) => handleAllowanceFieldChange(index, "code", e.target.value)}
-                            className="border-0 bg-transparent p-0 font-medium"
-                          />
-                        </td>
-                        <td className="border border-gray-200 px-4 py-3">
-                          <Input
-                            value={allowance.description}
-                            onChange={(e) => handleAllowanceFieldChange(index, "description", e.target.value)}
-                            className="border-0 bg-transparent p-0"
-                          />
-                        </td>
-                        <td className="border border-gray-200 px-4 py-3 text-center">
-                          <Switch
-                            checked={allowance.taxable}
-                            onCheckedChange={(checked) => handleAllowanceFieldChange(index, "taxable", checked)}
-                          />
-                        </td>
-                        <td className="border border-gray-200 px-4 py-3 text-center">
-                          <Switch
-                            checked={allowance.recurring}
-                            onCheckedChange={(checked) => handleAllowanceFieldChange(index, "recurring", checked)}
-                          />
-                        </td>
-                        <td className="border border-gray-200 px-4 py-3 text-center">
-                          <Input
-                            type="number"
-                            value={allowance.amount}
-                            onChange={(e) =>
-                              handleAllowanceFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)
-                            }
-                            className="border-0 bg-transparent p-0 text-center w-20"
-                          />
-                        </td>
-                        <td className="border border-gray-200 px-4 py-3 text-center">
-                          <Input
-                            type="number"
-                            step="0.1"
-                            value={allowance.percentage}
-                            onChange={(e) =>
-                              handleAllowanceFieldChange(index, "percentage", Number.parseFloat(e.target.value) || 0)
-                            }
-                            className="border-0 bg-transparent p-0 text-center w-20"
-                          />
-                        </td>
-                        <td className="border border-gray-200 px-4 py-3 text-center">
-                          <Select
-                            value={allowance.type}
-                            onValueChange={(value) => handleAllowanceFieldChange(index, "type", value)}
-                          >
-                            <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
-                              <Badge variant={allowance.type === "FIXED" ? "default" : "secondary"}>
-                                {allowance.type}
-                              </Badge>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="FIXED">FIXED</SelectItem>
-                              <SelectItem value="VARIABLE">VARIABLE</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        <td className="border border-gray-200 px-4 py-3 text-center">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem onClick={() => handleEditAllowance(index)}>
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDeleteAllowance(index)} className="text-red-600">
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Minus className="w-5 h-5" />
-                <span>Deductions</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-end mb-4">
-                <Button onClick={handleAddDeduction} className="bg-green-600 hover:bg-green-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add
-                </Button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-gray-200 rounded-lg">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="border border-gray-200 px-4 py-3 text-left font-medium">Code</th>
-                      <th className="border border-gray-200 px-4 py-3 text-left font-medium">Description</th>
-                      <th className="border border-gray-200 px-4 py-3 text-center font-medium">Recurring</th>
-                      <th className="border border-gray-200 px-4 py-3 text-center font-medium">AMOUNT</th>
-                      <th className="border border-gray-200 px-4 py-3 text-center font-medium">%</th>
-                      <th className="border border-gray-200 px-4 py-3 text-center font-medium">FIXED/VARIABLE</th>
-                      <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {deductions.map((deduction, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="border border-gray-200 px-4 py-3">
-                          <Input
-                            value={deduction.code}
-                            onChange={(e) => handleDeductionFieldChange(index, "code", e.target.value)}
-                            className="border-0 bg-transparent p-0 font-medium"
-                          />
-                        </td>
-                        <td className="border border-gray-200 px-4 py-3">
-                          <Input
-                            value={deduction.description}
-                            onChange={(e) => handleDeductionFieldChange(index, "description", e.target.value)}
-                            className="border-0 bg-transparent p-0"
-                          />
-                        </td>
-                        <td className="border border-gray-200 px-4 py-3 text-center">
-                          <Switch
-                            checked={deduction.recurring}
-                            onCheckedChange={(checked) => handleDeductionFieldChange(index, "recurring", checked)}
-                          />
-                        </td>
-                        <td className="border border-gray-200 px-4 py-3 text-center">
-                          <Input
-                            type="number"
-                            value={deduction.amount}
-                            onChange={(e) =>
-                              handleDeductionFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)
-                            }
-                            className="border-0 bg-transparent p-0 text-center w-20"
-                          />
-                        </td>
-                        <td className="border border-gray-200 px-4 py-3 text-center">
-                          <Input
-                            type="number"
-                            step="0.1"
-                            value={deduction.percentage}
-                            onChange={(e) =>
-                              handleDeductionFieldChange(index, "percentage", Number.parseFloat(e.target.value) || 0)
-                            }
-                            className="border-0 bg-transparent p-0 text-center w-20"
-                          />
-                        </td>
-                        <td className="border border-gray-200 px-4 py-3 text-center">
-                          <Select
-                            value={deduction.type}
-                            onValueChange={(value) => handleDeductionFieldChange(index, "type", value)}
-                          >
-                            <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
-                              <Badge variant={deduction.type === "FIXED" ? "default" : "secondary"}>
-                                {deduction.type}
-                              </Badge>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="FIXED">FIXED</SelectItem>
-                              <SelectItem value="VARIABLE">VARIABLE</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        <td className="border border-gray-200 px-4 py-3 text-center">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem onClick={() => handleEditDeduction(index)}>
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDeleteDeduction(index)} className="text-red-600">
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Save Button */}
-          <div className="flex justify-end">
-            <Button
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={handleSavePayrollConfig}
-              disabled={isSavingPayroll}
-            >
-              {isSavingPayroll ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4 mr-2" />
-              )}
-              Save Payroll Configuration
-            </Button>
-          </div>
-        </div>
-      </TabsContent>
-
-      <TabsContent value="notifications">
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Bell className="w-5 h-5" />
-                <span>Notification Templates</span>
-              </CardTitle>
-              <CardDescription>Manage email and SMS templates for HR and payroll notifications</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex space-x-2">
-                    <Button onClick={handleAddNotificationTemplate} className="bg-green-600 hover:bg-green-700">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Template
-                    </Button>
-                    <Button variant="outline" onClick={handleTestEmail} disabled={testConnectionStatus === "testing"}>
-                      {testConnectionStatus === "testing" ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : testConnectionStatus === "success" ? (
-                        <Check className="w-4 h-4 mr-2 text-green-600" />
-                      ) : testConnectionStatus === "error" ? (
-                        <X className="w-4 h-4 mr-2 text-red-600" />
-                      ) : (
-                        <Send className="w-4 h-4 mr-2" />
-                      )}
-                      {testConnectionStatus === "testing"
-                        ? "Testing Connection..."
-                        : testConnectionStatus === "success"
-                          ? "Connection Successful"
-                          : testConnectionStatus === "error"
-                            ? "Connection Failed"
-                            : "Test Connection"}
-                    </Button>
+            {/* Tax Configuration Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Calculator className="w-5 h-5" />
+                  <span>Tax Configuration</span>
+                </CardTitle>
+                <CardDescription>Configure tax bands and SSNIT rates</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="font-medium">PAYE Tax Bands</h4>
+                      <p className="text-sm text-gray-500">
+                        {getCurrencyConfig(selectedCurrency).country} - Version{" "}
+                        {getCurrencyConfig(selectedCurrency)?.version} - Last Updated:{" "}
+                        {getCurrencyConfig(selectedCurrency)?.lastUpdated}
+                      </p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => syncWithGovernmentAPI(selectedCurrency)}
+                        disabled={!apiStatus[selectedCurrency as keyof typeof apiStatus]?.connected || isSyncing}
+                      >
+                        {isSyncing ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                        )}
+                        Sync API
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleAddTaxBand}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Band
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="secondary">{notificationTemplates.length} Templates</Badge>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse border border-gray-200 rounded-lg">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">Band</th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">Rate (%)</th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
+                            From ({getCurrencyConfig(selectedCurrency).symbol})
+                          </th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
+                            To ({getCurrencyConfig(selectedCurrency).symbol})
+                          </th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
+                            Cumulative Tax ({getCurrencyConfig(selectedCurrency).symbol})
+                          </th>
+                          <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getCurrencyConfig(selectedCurrency)?.taxBands.map((band, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="border border-gray-200 px-4 py-3 font-medium">{band.rate}</td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {band.rate}%
+                              </span>
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              {band.from ? band.from.toLocaleString() : "0"}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              {band.to ? band.to.toLocaleString() : "∞"}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3 font-medium text-green-600">
+                              {band.cumulativeTax ? band.cumulativeTax.toLocaleString() : "0"}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3 text-center">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  console.log("[v0] Editing tax band:", band)
+                                }}
+                              >
+                                Edit
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* SSNIT Rates Section */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">SSNIT Rates</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employee:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={ssnitRates.employee}
+                              onChange={(e) => updateSsnitRates("employee", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employer:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={ssnitRates.employer}
+                              onChange={(e) => updateSsnitRates("employer", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t">
+                          <span className="font-medium text-blue-600">Total:</span>
+                          <span className="font-medium text-blue-600">{ssnitRates.total}%</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Tier 2 Rates</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employee:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={tier2Rates.employee}
+                              onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employer:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={tier2Rates.employer}
+                              onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t">
+                          <span className="font-medium text-blue-600">Total:</span>
+                          <span className="font-medium text-blue-600">{tier2Rates.total}%</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Tier 3 Rates</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employee:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={tier3Rates.employee}
+                              onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employer:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={tier3Rates.employer}
+                              onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t">
+                          <span className="font-medium text-blue-600">Total:</span>
+                          <span className="font-medium text-blue-600">{tier3Rates.total}%</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* API Status and Recent Updates */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <Wifi className="w-5 h-5" />
+                          <span>API Status</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span>Ghana</span>
+                          <Badge variant="default" className="bg-green-100 text-green-800">
+                            Connected
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Nigeria</span>
+                          <Badge variant="destructive">Disconnected</Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Usa</span>
+                          <Badge variant="destructive">Disconnected</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <Bell className="w-5 h-5" />
+                          <span>Recent Updates</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <div className="flex items-start space-x-2">
+                            <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                            <div>
+                              <p className="text-sm font-medium">Ghana PAYE Rates Updated</p>
+                              <p className="text-xs text-gray-500">New tax rates effective January 1, 2024</p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="flex justify-end mt-6">
+                    <Button
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={handleSaveTaxConfig}
+                      disabled={isSavingTax}
+                    >
+                      {isSavingTax ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      Save Tax Configuration
+                    </Button>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div className="border rounded-lg">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Template Name</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Last Modified</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {notificationTemplates.map((template) => (
-                        <TableRow key={template.id}>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{template.name}</div>
-                              <div className="text-sm text-muted-foreground">{template.description}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{template.category}</Badge>
-                          </TableCell>
-                          <TableCell>{template.type}</TableCell>
-                          <TableCell>
-                            <Badge variant={template.status === "Active" ? "default" : "secondary"}>
-                              {template.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{template.lastModified}</TableCell>
-                          <TableCell>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <DollarSign className="w-5 h-5" />
+                  <span>Allowances</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-end mb-4">
+                  <Button onClick={handleAddAllowance} className="bg-green-600 hover:bg-green-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-200 rounded-lg">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Code</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Description</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Taxable</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Recurring</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">AMOUNT</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">%</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">FIXED/VARIABLE</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allowances.map((allowance, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={allowance.code}
+                              onChange={(e) => handleAllowanceFieldChange(index, "code", e.target.value)}
+                              className="border-0 bg-transparent p-0 font-medium"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={allowance.description}
+                              onChange={(e) => handleAllowanceFieldChange(index, "description", e.target.value)}
+                              className="border-0 bg-transparent p-0"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Switch
+                              checked={allowance.taxable}
+                              onCheckedChange={(checked) => handleAllowanceFieldChange(index, "taxable", checked)}
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Switch
+                              checked={allowance.recurring}
+                              onCheckedChange={(checked) => handleAllowanceFieldChange(index, "recurring", checked)}
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              value={allowance.amount}
+                              onChange={(e) =>
+                                handleAllowanceFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={allowance.percentage}
+                              onChange={(e) =>
+                                handleAllowanceFieldChange(index, "percentage", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Select
+                              value={allowance.type}
+                              onValueChange={(value) => handleAllowanceFieldChange(index, "type", value)}
+                            >
+                              <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
+                                <Badge variant={allowance.type === "FIXED" ? "default" : "secondary"}>
+                                  {allowance.type}
+                                </Badge>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="FIXED">FIXED</SelectItem>
+                                <SelectItem value="VARIABLE">VARIABLE</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm">
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => handleEditAllowance(index)}>
                                   <Edit className="w-4 h-4 mr-2" />
                                   Edit
                                 </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleDeleteTemplate(template.id)}
-                                  className="text-red-600"
-                                >
+                                <DropdownMenuItem onClick={() => handleDeleteAllowance(index)} className="text-red-600">
                                   <Trash2 className="w-4 h-4 mr-2" />
                                   Delete
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
+                          </td>
+                        </tr>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* Email Configuration */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Mail className="w-5 h-5" />
-                <span>Email Configuration</span>
-              </CardTitle>
-              <CardDescription>Configure SMTP settings for sending notifications</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="provider">Email Provider</Label>
-                    <Select
-                      value={emailConfig.provider}
-                      onValueChange={(value) => setEmailConfig({ ...emailConfig, provider: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="smtp">SMTP</SelectItem>
-                        <SelectItem value="sendgrid">SendGrid</SelectItem>
-                        <SelectItem value="mailgun">Mailgun</SelectItem>
-                        <SelectItem value="ses">Amazon SES</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="smtpHost">SMTP Host</Label>
-                    <Input
-                      id="smtpHost"
-                      value={emailConfig.smtpHost}
-                      onChange={(e) => setEmailConfig({ ...emailConfig, smtpHost: e.target.value })}
-                      placeholder="smtp.gmail.com"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="smtpPort">SMTP Port</Label>
-                    <Input
-                      id="smtpPort"
-                      type="number"
-                      value={emailConfig.smtpPort}
-                      onChange={(e) => setEmailConfig({ ...emailConfig, smtpPort: Number.parseInt(e.target.value) })}
-                      placeholder="587"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="smtpUsername">Username</Label>
-                    <Input
-                      id="smtpUsername"
-                      value={emailConfig.smtpUsername}
-                      onChange={(e) => setEmailConfig({ ...emailConfig, smtpUsername: e.target.value })}
-                      placeholder="your-email@company.com"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="fromEmail">From Email</Label>
-                    <Input
-                      id="fromEmail"
-                      value={emailConfig.fromEmail}
-                      onChange={(e) => setEmailConfig({ ...emailConfig, fromEmail: e.target.value })}
-                      placeholder="hr@company.com"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="fromName">From Name</Label>
-                    <Input
-                      id="fromName"
-                      value={emailConfig.fromName}
-                      onChange={(e) => setEmailConfig({ ...emailConfig, fromName: e.target.value })}
-                      placeholder="HR Department"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="replyTo">Reply To</Label>
-                    <Input
-                      id="replyTo"
-                      value={emailConfig.replyTo}
-                      onChange={(e) => setEmailConfig({ ...emailConfig, replyTo: e.target.value })}
-                      placeholder="noreply@company.com"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="enableTLS"
-                        checked={emailConfig.enableTLS}
-                        onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableTLS: checked })}
-                      />
-                      <Label htmlFor="enableTLS">Enable TLS</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="enableSSL"
-                        checked={emailConfig.enableSSL}
-                        onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableSSL: checked })}
-                      />
-                      <Label htmlFor="enableSSL">Enable SSL</Label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="smtpPassword">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="smtpPassword"
-                    type={showPassword ? "text" : "password"}
-                    value={emailConfig.smtpPassword}
-                    onChange={(e) => setEmailConfig({ ...emailConfig, smtpPassword: e.target.value })}
-                    placeholder="Enter your email password"
-                    className="pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
-                    )}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Minus className="w-5 h-5" />
+                  <span>Deductions</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-end mb-4">
+                  <Button onClick={handleAddDeduction} className="bg-green-600 hover:bg-green-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add
                   </Button>
                 </div>
-              </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-200 rounded-lg">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Code</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Description</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Recurring</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">AMOUNT</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">%</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">FIXED/VARIABLE</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deductions.map((deduction, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={deduction.code}
+                              onChange={(e) => handleDeductionFieldChange(index, "code", e.target.value)}
+                              className="border-0 bg-transparent p-0 font-medium"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={deduction.description}
+                              onChange={(e) => handleDeductionFieldChange(index, "description", e.target.value)}
+                              className="border-0 bg-transparent p-0"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Switch
+                              checked={deduction.recurring}
+                              onCheckedChange={(checked) => handleDeductionFieldChange(index, "recurring", checked)}
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              value={deduction.amount}
+                              onChange={(e) =>
+                                handleDeductionFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={deduction.percentage}
+                              onChange={(e) =>
+                                handleDeductionFieldChange(index, "percentage", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Select
+                              value={deduction.type}
+                              onValueChange={(value) => handleDeductionFieldChange(index, "type", value)}
+                            >
+                              <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
+                                <Badge variant={deduction.type === "FIXED" ? "default" : "secondary"}>
+                                  {deduction.type}
+                                </Badge>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="FIXED">FIXED</SelectItem>
+                                <SelectItem value="VARIABLE">VARIABLE</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => handleEditDeduction(index)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteDeduction(index)} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
 
-              <div className="mt-6 flex justify-end space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={handleTestEmail}
-                  disabled={testConnectionStatus === "testing"}
-                  className={`${
-                    testConnectionStatus === "success"
-                      ? "border-green-500 text-green-600"
-                      : testConnectionStatus === "error"
-                        ? "border-red-500 text-red-600"
-                        : ""
-                  }`}
-                >
-                  {testConnectionStatus === "testing" ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : testConnectionStatus === "success" ? (
-                    <Check className="w-4 h-4 mr-2 text-green-600" />
-                  ) : testConnectionStatus === "error" ? (
-                    <X className="w-4 h-4 mr-2 text-red-600" />
-                  ) : (
-                    <Send className="w-4 h-4 mr-2" />
-                  )}
-                  {testConnectionStatus === "testing"
-                    ? "Testing Connection..."
-                    : testConnectionStatus === "success"
-                      ? "Connection Successful"
-                      : testConnectionStatus === "error"
-                        ? "Connection Failed"
-                        : "Test Connection"}
-                </Button>
-                <Button onClick={handleSaveEmailConfig} disabled={isSaving}>
-                  {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                  Save Configuration
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Save Button */}
+            <div className="flex justify-end">
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={handleSavePayrollConfig}
+                disabled={isSavingPayroll}
+              >
+                {isSavingPayroll ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                Save Payroll Configuration
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
 
-          {/* Notification Preferences */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Settings className="w-5 h-5" />
-                <span>Notification Preferences</span>
-              </CardTitle>
-              <CardDescription>Configure default notification settings for all employees</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
+        <TabsContent value="notifications">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Bell className="w-5 h-5" />
+                  <span>Notification Templates</span>
+                </CardTitle>
+                <CardDescription>Manage email and SMS templates for HR and payroll notifications</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div className="flex space-x-2">
+                      <Button onClick={handleAddNotificationTemplate} className="bg-green-600 hover:bg-green-700">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Template
+                      </Button>
+                      <Button variant="outline" onClick={handleTestEmail} disabled={testConnectionStatus === "testing"}>
+                        {testConnectionStatus === "testing" ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : testConnectionStatus === "success" ? (
+                          <Check className="w-4 h-4 mr-2 text-green-600" />
+                        ) : testConnectionStatus === "error" ? (
+                          <X className="w-4 h-4 mr-2 text-red-600" />
+                        ) : (
+                          <Send className="w-4 h-4 mr-2" />
+                        )}
+                        {testConnectionStatus === "testing"
+                          ? "Testing Connection..."
+                          : testConnectionStatus === "success"
+                            ? "Connection Successful"
+                            : testConnectionStatus === "error"
+                              ? "Connection Failed"
+                              : "Test Connection"}
+                      </Button>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary">{notificationTemplates.length} Templates</Badge>
+                    </div>
+                  </div>
+
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Template Name</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Last Modified</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {notificationTemplates.map((template) => (
+                          <TableRow key={template.id}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{template.name}</div>
+                                <div className="text-sm text-muted-foreground">{template.description}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{template.category}</Badge>
+                            </TableCell>
+                            <TableCell>{template.type}</TableCell>
+                            <TableCell>
+                              <Badge variant={template.status === "Active" ? "default" : "secondary"}>
+                                {template.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{template.lastModified}</TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleDeleteTemplate(template.id)}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Email Configuration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Mail className="w-5 h-5" />
+                  <span>Email Configuration</span>
+                </CardTitle>
+                <CardDescription>Configure SMTP settings for sending notifications</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <h4 className="font-medium">HR Notifications</h4>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Employee Welcome</Label>
-                          <p className="text-sm text-muted-foreground">Send welcome email to new employees</p>
-                        </div>
-                        <Switch
-                          checked={notificationSettings.payrollNotifications} // Corrected to use a relevant setting
-                          onCheckedChange={(checked) =>
-                            setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
-                          }
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Leave Notifications</Label>
-                          <p className="text-sm text-muted-foreground">Notify about leave requests and approvals</p>
-                        </div>
-                        <Switch
-                          checked={notificationSettings.leaveNotifications}
-                          onCheckedChange={(checked) =>
-                            setNotificationSettings({ ...notificationSettings, leaveNotifications: checked })
-                          }
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Promotion Notifications</Label>
-                          <p className="text-sm text-muted-foreground">Send promotion and transfer notifications</p>
-                        </div>
-                        <Switch
-                          checked={notificationSettings.promotionNotifications}
-                          onCheckedChange={(checked) =>
-                            setNotificationSettings({ ...notificationSettings, promotionNotifications: checked })
-                          }
-                        />
-                      </div>
+                    <div>
+                      <Label htmlFor="provider">Email Provider</Label>
+                      <Select
+                        value={emailConfig.provider}
+                        onValueChange={(value) => setEmailConfig({ ...emailConfig, provider: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="smtp">SMTP</SelectItem>
+                          <SelectItem value="sendgrid">SendGrid</SelectItem>
+                          <SelectItem value="mailgun">Mailgun</SelectItem>
+                          <SelectItem value="ses">Amazon SES</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="smtpHost">SMTP Host</Label>
+                      <Input
+                        id="smtpHost"
+                        value={emailConfig.smtpHost}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpHost: e.target.value })}
+                        placeholder="smtp.gmail.com"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="smtpPort">SMTP Port</Label>
+                      <Input
+                        id="smtpPort"
+                        type="number"
+                        value={emailConfig.smtpPort}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpPort: Number.parseInt(e.target.value) })}
+                        placeholder="587"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="smtpUsername">Username</Label>
+                      <Input
+                        id="smtpUsername"
+                        value={emailConfig.smtpUsername}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpUsername: e.target.value })}
+                        placeholder="your-email@company.com"
+                      />
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <h4 className="font-medium">Payroll & Attendance</h4>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Payroll Processing</Label>
-                          <p className="text-sm text-muted-foreground">Notify when payroll is processed</p>
-                        </div>
+                    <div>
+                      <Label htmlFor="fromEmail">From Email</Label>
+                      <Input
+                        id="fromEmail"
+                        value={emailConfig.fromEmail}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, fromEmail: e.target.value })}
+                        placeholder="hr@company.com"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="fromName">From Name</Label>
+                      <Input
+                        id="fromName"
+                        value={emailConfig.fromName}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, fromName: e.target.value })}
+                        placeholder="HR Department"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="replyTo">Reply To</Label>
+                      <Input
+                        id="replyTo"
+                        value={emailConfig.replyTo}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, replyTo: e.target.value })}
+                        placeholder="noreply@company.com"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
                         <Switch
-                          checked={notificationSettings.payrollNotifications}
-                          onCheckedChange={(checked) =>
-                            setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
-                          }
+                          id="enableTLS"
+                          checked={emailConfig.enableTLS}
+                          onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableTLS: checked })}
                         />
+                        <Label htmlFor="enableTLS">Enable TLS</Label>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Attendance Alerts</Label>
-                          <p className="text-sm text-muted-foreground">Send alerts for attendance issues</p>
-                        </div>
+                      <div className="flex items-center space-x-2">
                         <Switch
-                          checked={notificationSettings.attendanceAlerts}
-                          onCheckedChange={(checked) =>
-                            setNotificationSettings({ ...notificationSettings, attendanceAlerts: checked })
-                          }
+                          id="enableSSL"
+                          checked={emailConfig.enableSSL}
+                          onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableSSL: checked })}
                         />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>System Maintenance</Label>
-                          <p className="text-sm text-muted-foreground">Notify about system maintenance</p>
-                        </div>
-                        <Switch
-                          checked={notificationSettings.systemMaintenanceAlerts}
-                          onCheckedChange={(checked) =>
-                            setNotificationSettings({ ...notificationSettings, systemMaintenanceAlerts: checked })
-                          }
-                        />
+                        <Label htmlFor="enableSSL">Enable SSL</Label>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <Separator />
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <Label>Email Digest Frequency</Label>
-                    <Select
-                      value={notificationSettings.emailDigest}
-                      onValueChange={(value) =>
-                        setNotificationSettings({ ...notificationSettings, emailDigest: value })
-                      }
+                <div>
+                  <Label htmlFor="smtpPassword">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="smtpPassword"
+                      type={showPassword ? "text" : "password"}
+                      value={emailConfig.smtpPassword}
+                      onChange={(e) => setEmailConfig({ ...emailConfig, smtpPassword: e.target.value })}
+                      placeholder="Enter your email password"
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="immediate">Immediate</SelectItem>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="smsAlerts"
-                      checked={notificationSettings.smsAlerts}
-                      onCheckedChange={(checked) =>
-                        setNotificationSettings({ ...notificationSettings, smsAlerts: checked })
-                      }
-                    />
-                    <div>
-                      <Label htmlFor="smsAlerts">SMS Alerts</Label>
-                      <p className="text-sm text-muted-foreground">Enable SMS notifications</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="pushNotifications"
-                      checked={notificationSettings.pushNotifications}
-                      onCheckedChange={(checked) =>
-                        setNotificationSettings({ ...notificationSettings, pushNotifications: checked })
-                      }
-                    />
-                    <div>
-                      <Label htmlFor="pushNotifications">Push Notifications</Label>
-                      <p className="text-sm text-muted-foreground">Enable browser push notifications</p>
-                    </div>
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </Button>
                   </div>
                 </div>
 
-                <div className="flex justify-end">
+                <div className="mt-6 flex justify-end space-x-2">
                   <Button
-                    onClick={() => {
-                      setIsSaving(true) // Use the general saving state
-                      setTimeout(() => {
-                        setIsSaving(false)
-                        toast({
-                          title: "Preferences Saved",
-                          description: "Notification preferences have been updated successfully",
-                        })
-                      }, 1500)
-                    }}
-                    disabled={isSaving}
+                    variant="outline"
+                    onClick={handleTestEmail}
+                    disabled={testConnectionStatus === "testing"}
+                    className={`${
+                      testConnectionStatus === "success"
+                        ? "border-green-500 text-green-600"
+                        : testConnectionStatus === "error"
+                          ? "border-red-500 text-red-600"
+                          : ""
+                    }`}
                   >
+                    {testConnectionStatus === "testing" ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : testConnectionStatus === "success" ? (
+                      <Check className="w-4 h-4 mr-2 text-green-600" />
+                    ) : testConnectionStatus === "error" ? (
+                      <X className="w-4 h-4 mr-2 text-red-600" />
+                    ) : (
+                      <Send className="w-4 h-4 mr-2" />
+                    )}
+                    {testConnectionStatus === "testing"
+                      ? "Testing Connection..."
+                      : testConnectionStatus === "success"
+                        ? "Connection Successful"
+                        : testConnectionStatus === "error"
+                          ? "Connection Failed"
+                          : "Test Connection"}
+                  </Button>
+                  <Button onClick={handleSaveEmailConfig} disabled={isSaving}>
                     {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                    Save Preferences
+                    Save Configuration
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Notification Preferences */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Settings className="w-5 h-5" />
+                  <span>Notification Preferences</span>
+                </CardTitle>
+                <CardDescription>Configure default notification settings for all employees</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <h4 className="font-medium">HR Notifications</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Employee Welcome</Label>
+                            <p className="text-sm text-muted-foreground">Send welcome email to new employees</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.payrollNotifications} // Corrected to use a relevant setting
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Leave Notifications</Label>
+                            <p className="text-sm text-muted-foreground">Notify about leave requests and approvals</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.leaveNotifications}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, leaveNotifications: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Promotion Notifications</Label>
+                            <p className="text-sm text-muted-foreground">Send promotion and transfer notifications</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.promotionNotifications}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, promotionNotifications: checked })
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="font-medium">Payroll & Attendance</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Payroll Processing</Label>
+                            <p className="text-sm text-muted-foreground">Notify when payroll is processed</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.payrollNotifications}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Attendance Alerts</Label>
+                            <p className="text-sm text-muted-foreground">Send alerts for attendance issues</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.attendanceAlerts}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, attendanceAlerts: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>System Maintenance</Label>
+                            <p className="text-sm text-muted-foreground">Notify about system maintenance</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.systemMaintenanceAlerts}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, systemMaintenanceAlerts: checked })
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <Label>Email Digest Frequency</Label>
+                      <Select
+                        value={notificationSettings.emailDigest}
+                        onValueChange={(value) =>
+                          setNotificationSettings({ ...notificationSettings, emailDigest: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="immediate">Immediate</SelectItem>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="smsAlerts"
+                        checked={notificationSettings.smsAlerts}
+                        onCheckedChange={(checked) =>
+                          setNotificationSettings({ ...notificationSettings, smsAlerts: checked })
+                        }
+                      />
+                      <div>
+                        <Label htmlFor="smsAlerts">SMS Alerts</Label>
+                        <p className="text-sm text-muted-foreground">Enable SMS notifications</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="pushNotifications"
+                        checked={notificationSettings.pushNotifications}
+                        onCheckedChange={(checked) =>
+                          setNotificationSettings({ ...notificationSettings, pushNotifications: checked })
+                        }
+                      />
+                      <div>
+                        <Label htmlFor="pushNotifications">Push Notifications</Label>
+                        <p className="text-sm text-muted-foreground">Enable browser push notifications</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => {
+                        setIsSaving(true) // Use the general saving state
+                        setTimeout(() => {
+                          setIsSaving(false)
+                          toast({
+                            title: "Preferences Saved",
+                            description: "Notification preferences have been updated successfully",
+                          })
+                        }, 1500)
+                      }}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                      Save Preferences
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="roles">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="w-5 h-5" />
+                  <span>Roles & Permissions</span>
+                </CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" onClick={handleAddRoleInner}>
+                    Add Role
                   </Button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
-
-      <TabsContent value="roles">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center space-x-2">
-                <Users className="w-5 h-5" />
-                <span>Roles & Permissions</span>
-              </CardTitle>
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" onClick={handleAddRoleInner}>
-                  Add Role
-                </Button>
-              </div>
-            </div>
-            <CardDescription>Manage user roles and permissions</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-3">
-              {roles.map((role) => (
-                <Card key={role.id} className="border-l-4 border-l-indigo-500">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-base font-semibold">{role.name}</h3>
-                        <p className="text-xs text-gray-600">{role.description}</p>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <span className="text-sm text-gray-500">{role.user_count} Users</span>
-                        <Button variant="outline" size="sm" onClick={() => handleEditRoleInner(role.name)}>
-                          Edit
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      {/* Access Control Tab Content */}
-      <TabsContent value="access">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Shield className="w-5 h-5" />
-              <span>Access Control</span>
-            </CardTitle>
-            <CardDescription>Manage user access and authentication settings</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Authentication Settings */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Authentication Settings</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="twoFactor">Two-Factor Authentication</Label>
-                    <Switch
-                      id="twoFactor"
-                      checked={accessSettings.twoFactorEnabled}
-                      onCheckedChange={(checked) =>
-                        setAccessSettings({ ...accessSettings, twoFactorEnabled: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="ssoEnabled">Single Sign-On (SSO)</Label>
-                    <Switch
-                      id="ssoEnabled"
-                      checked={accessSettings.ssoEnabled}
-                      onCheckedChange={(checked) => setAccessSettings({ ...accessSettings, ssoEnabled: checked })}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="passwordExpiry">Password Expiry</Label>
-                    <Switch
-                      id="passwordExpiry"
-                      checked={accessSettings.passwordExpiryEnabled}
-                      onCheckedChange={(checked) =>
-                        setAccessSettings({ ...accessSettings, passwordExpiryEnabled: checked })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
-                    <Input
-                      id="sessionTimeout"
-                      type="number"
-                      value={accessSettings.sessionTimeout}
-                      onChange={(e) =>
-                        setAccessSettings({ ...accessSettings, sessionTimeout: Number.parseInt(e.target.value) })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
-                    <Input
-                      id="maxLoginAttempts"
-                      type="number"
-                      value={accessSettings.maxLoginAttempts}
-                      onChange={(e) =>
-                        setAccessSettings({ ...accessSettings, maxLoginAttempts: Number.parseInt(e.target.value) })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="passwordMinLength">Minimum Password Length</Label>
-                    <Input
-                      id="passwordMinLength"
-                      type="number"
-                      value={accessSettings.passwordMinLength}
-                      onChange={(e) =>
-                        setAccessSettings({ ...accessSettings, passwordMinLength: Number.parseInt(e.target.value) })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* IP Restrictions */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">IP Access Control</h3>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="ipRestrictions">Enable IP Restrictions</Label>
-                  <Switch
-                    id="ipRestrictions"
-                    checked={accessSettings.ipRestrictionsEnabled}
-                    onCheckedChange={(checked) =>
-                      setAccessSettings({ ...accessSettings, ipRestrictionsEnabled: checked })
-                    }
-                  />
-                </div>
-                {accessSettings.ipRestrictionsEnabled && (
-                  <div className="space-y-2">
-                    <Label>Allowed IP Addresses</Label>
-                    {accessSettings.allowedIPs.map((ip, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <Input
-                          value={ip}
-                          onChange={(e) => {
-                            const newIPs = [...accessSettings.allowedIPs]
-                            newIPs[index] = e.target.value
-                            setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
-                          }}
-                          placeholder="192.168.1.0/24"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const newIPs = accessSettings.allowedIPs.filter((_, i) => i !== index)
-                            setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setAccessSettings({
-                          ...accessSettings,
-                          allowedIPs: [...accessSettings.allowedIPs, ""],
-                        })
-                      }
-                    >
-                      Add IP Range
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Active Sessions */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Active Sessions</h3>
-                <Button variant="outline" onClick={handleRefreshSessions} disabled={isRefreshingSessions}>
-                  {isRefreshingSessions ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                  )}
-                  Refresh
-                </Button>
-              </div>
-              <div className="space-y-2">
-                {activeSessions.map((session) => (
-                  <Card key={session.id}>
+              <CardDescription>Manage user roles and permissions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                {roles.map((role) => (
+                  <Card key={role.id} className="border-l-4 border-l-indigo-500">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium">{session.user_email}</p>
-                          <p className="text-sm text-gray-600">
-                            {session.ip_address} • {session.device} • Last active:{" "}
-                            {new Date(session.last_activity).toLocaleString()}
-                          </p>
+                          <h3 className="text-base font-semibold">{role.name}</h3>
+                          <p className="text-xs text-gray-600">{role.description}</p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => handleTerminateSession(session.id)}>
-                          Terminate
-                        </Button>
+                        <div className="flex items-center space-x-4">
+                          <span className="text-sm text-gray-500">{role.user_count} Users</span>
+                          <Button variant="outline" size="sm" onClick={() => handleEditRoleInner(role.name)}>
+                            Edit
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
                 ))}
               </div>
-            </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <div className="flex justify-end">
-              <Button
-                className="bg-emerald-600 hover:bg-emerald-700"
-                onClick={handleSaveAccessSettings}
-                disabled={isSavingAccessSettings}
-              >
-                {isSavingAccessSettings ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Access Settings
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      {/* Security Tab Content */}
-      <TabsContent value="security">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
+        {/* Access Control Tab Content */}
+        <TabsContent value="access">
+          <Card>
+            <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Shield className="w-5 h-5" />
-                <span>Security Settings</span>
+                <span>Access Control</span>
               </CardTitle>
-              <Button variant="outline" onClick={handleBackupNow} disabled={isBackingUp}>
-                {isBackingUp ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Backing Up...
-                  </>
-                ) : (
-                  <>
-                    <Download className="mr-2 h-4 w-4" />
-                    Backup Now
-                  </>
-                )}
-              </Button>
-            </div>
-            <CardDescription>Manage security settings, backups, and audit logs</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Security Policies */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Security Policies</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="dataEncryption">Data Encryption at Rest</Label>
-                    <Switch
-                      id="dataEncryption"
-                      checked={securitySettings.dataEncryptionEnabled}
-                      onCheckedChange={(checked) =>
-                        setSecuritySettings({ ...securitySettings, dataEncryptionEnabled: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="auditLogging">Audit Logging</Label>
-                    <Switch
-                      id="auditLogging"
-                      checked={securitySettings.auditLoggingEnabled}
-                      onCheckedChange={(checked) =>
-                        setSecuritySettings({ ...securitySettings, auditLoggingEnabled: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="autoBackup">Automatic Backups</Label>
-                    <Switch
-                      id="autoBackup"
-                      checked={securitySettings.autoBackupEnabled}
-                      onCheckedChange={(checked) =>
-                        setSecuritySettings({ ...securitySettings, autoBackupEnabled: checked })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="backupFrequency">Backup Frequency</Label>
-                    <Select
-                      value={securitySettings.backupFrequency}
-                      onValueChange={(value) => setSecuritySettings({ ...securitySettings, backupFrequency: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="retentionPeriod">Data Retention Period (days)</Label>
-                    <Input
-                      id="retentionPeriod"
-                      type="number"
-                      value={securitySettings.dataRetentionDays}
-                      onChange={(e) =>
-                        setSecuritySettings({
-                          ...securitySettings,
-                          dataRetentionDays: Number.parseInt(e.target.value),
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Backup Status */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Backup Status</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="w-5 h-5 text-blue-600" />
-                      <div>
-                        <p className="text-sm font-medium">Last Backup</p>
-                        <p className="text-lg font-bold">
-                          {lastBackupTime ? new Date(lastBackupTime).toLocaleDateString() : "Never"}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <Database className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="text-sm font-medium">Backup Size</p>
-                        <p className="text-lg font-bold">{backupSize || "0 MB"}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <CheckCircle className="w-5 h-5 text-emerald-600" />
-                      <div>
-                        <p className="text-sm font-medium">Status</p>
-                        <p className="text-lg font-bold">{backupStatus || "Ready"}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
-            {/* Audit Logs */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Recent Audit Logs</h3>
-                <Button variant="outline" onClick={handleViewAllLogs}>
-                  <Eye className="w-4 h-4 mr-2" />
-                  View All Logs
-                </Button>
-              </div>
-              <div className="space-y-2">
-                {auditLogs.slice(0, 5).map((log) => (
-                  <Card key={log.id}>
-                    <CardContent className="p-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-sm">{log.action}</p>
-                          <p className="text-xs text-gray-600">
-                            {log.user_email} • {log.ip_address} •{new Date(log.timestamp).toLocaleString()}
-                          </p>
-                        </div>
-                        <Badge variant={log.severity === "high" ? "destructive" : "secondary"}>{log.severity}</Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={handleExportSecurityReport} disabled={isExportingReport}>
-                {isExportingReport ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Exporting...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="w-4 h-4 mr-2" />
-                    Export Security Report
-                  </>
-                )}
-              </Button>
-              <Button
-                className="bg-emerald-600 hover:bg-emerald-700"
-                onClick={handleSaveSecuritySettings}
-                disabled={isSavingSecuritySettings}
-              >
-                {isSavingSecuritySettings ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Security Settings
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
-
-    {/* Add Subsidiary Modal */}
-    {showAddSubsidiary && (
-      <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
-        <div className="relative m-8 md:m-16 lg:m-24">
-          <Card className="max-w-3xl mx-auto">
-            <CardHeader>
-              <CardTitle className="text-xl">Add New Subsidiary</CardTitle>
-              <CardDescription>Enter the details for the new subsidiary company</CardDescription>
+              <CardDescription>Manage user access and authentication settings</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+              {/* Authentication Settings */}
               <div className="space-y-4">
-                <div className="space-y-4">
-                  <Label>Subsidiary Logo</Label>
-                  <div className="flex items-center space-x-4">
-                    {subsidiaryLogoPreview ? (
-                      <div className="relative">
-                        <img
-                          src={subsidiaryLogoPreview || "/placeholder.svg"}
-                          alt="Subsidiary Logo"
-                          className="w-20 h-20 object-cover rounded-lg border"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
-                          onClick={() => setSubsidiaryLogoPreview("")}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                        <ImageIcon className="w-8 h-8 text-gray-400" />
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) {
-                            handleLogoUpload(file, "subsidiary")
-                          }
-                        }}
-                        className="hidden"
-                        id="subsidiary-logo-upload"
+                <h3 className="text-lg font-semibold">Authentication Settings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="twoFactor">Two-Factor Authentication</Label>
+                      <Switch
+                        id="twoFactor"
+                        checked={accessSettings.twoFactorEnabled}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, twoFactorEnabled: checked })
+                        }
                       />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="ssoEnabled">Single Sign-On (SSO)</Label>
+                      <Switch
+                        id="ssoEnabled"
+                        checked={accessSettings.ssoEnabled}
+                        onCheckedChange={(checked) => setAccessSettings({ ...accessSettings, ssoEnabled: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="passwordExpiry">Password Expiry</Label>
+                      <Switch
+                        id="passwordExpiry"
+                        checked={accessSettings.passwordExpiryEnabled}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordExpiryEnabled: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
+                      <Input
+                        id="sessionTimeout"
+                        type="number"
+                        value={accessSettings.sessionTimeout}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, sessionTimeout: Number.parseInt(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
+                      <Input
+                        id="maxLoginAttempts"
+                        type="number"
+                        value={accessSettings.maxLoginAttempts}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, maxLoginAttempts: Number.parseInt(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="passwordMinLength">Minimum Password Length</Label>
+                      <Input
+                        id="passwordMinLength"
+                        type="number"
+                        value={accessSettings.passwordMinLength}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, passwordMinLength: Number.parseInt(e.target.value) })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* IP Restrictions */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">IP Access Control</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="ipRestrictions">Enable IP Restrictions</Label>
+                    <Switch
+                      id="ipRestrictions"
+                      checked={accessSettings.ipRestrictionsEnabled}
+                      onCheckedChange={(checked) =>
+                        setAccessSettings({ ...accessSettings, ipRestrictionsEnabled: checked })
+                      }
+                    />
+                  </div>
+                  {accessSettings.ipRestrictionsEnabled && (
+                    <div className="space-y-2">
+                      <Label>Allowed IP Addresses</Label>
+                      {accessSettings.allowedIPs.map((ip, index) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <Input
+                            value={ip}
+                            onChange={(e) => {
+                              const newIPs = [...accessSettings.allowedIPs]
+                              newIPs[index] = e.target.value
+                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
+                            }}
+                            placeholder="192.168.1.0/24"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const newIPs = accessSettings.allowedIPs.filter((_, i) => i !== index)
+                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
                       <Button
                         variant="outline"
-                        onClick={() => document.getElementById("subsidiary-logo-upload")?.click()}
-                        disabled={isUploadingLogo}
-                        className="flex items-center space-x-2"
+                        size="sm"
+                        onClick={() =>
+                          setAccessSettings({
+                            ...accessSettings,
+                            allowedIPs: [...accessSettings.allowedIPs, ""],
+                          })
+                        }
                       >
-                        {isUploadingLogo ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Uploading...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="w-4 h-4" />
-                            <span>Upload Logo</span>
-                          </>
-                        )}
+                        Add IP Range
                       </Button>
-                      <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
                     </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <Label htmlFor="subsidiaryName">Subsidiary Name</Label>
-                    <Input id="subsidiaryName" placeholder="Enter subsidiary name" />
-                  </div>
-                  <div>
-                    <Label htmlFor="subsidiaryIndustry">Industry</Label>
-                    <Input id="subsidiaryIndustry" placeholder="Enter industry" />
-                  </div>
-                  <div>
-                    <Label htmlFor="subsidiaryTaxId">Tax ID</Label>
-                    <Input id="subsidiaryTaxId" placeholder="Enter tax ID" />
-                  </div>
-                  <div>
-                    <Label htmlFor="subsidiarySsnit">SSNIT Number</Label>
-                    <Input id="subsidiarySsnit" placeholder="Enter SSNIT number" />
-                  </div>
-                  <div>
-                    <Label htmlFor="subsidiaryEmail">Email Address</Label>
-                    <Input id="subsidiaryEmail" type="email" placeholder="Enter email address" />
-                  </div>
-                  <div>
-                    <Label htmlFor="subsidiaryPhone">Phone Number</Label>
-                    <Input id="subsidiaryPhone" placeholder="Enter phone number" />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="subsidiaryAddress">Address</Label>
-                  <Textarea id="subsidiaryAddress" placeholder="Enter address" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Divisions</Label>
-                  <div className="space-y-2">
-                    <Input placeholder="Enter division" />
-                    <Button variant="outline" size="sm">
-                      Add Division
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Departments</Label>
-                  <div className="space-y-2">
-                    <Input placeholder="Enter department" />
-                    <Button variant="outline" size="sm">
-                      Add Department
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Locations</Label>
-                  <div className="space-y-2">
-                    <Input placeholder="Enter location name" />
-                    <Button variant="outline" size="sm">
-                      Add Location
-                    </Button>
-                  </div>
+                  )}
                 </div>
               </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="ghost" onClick={() => setShowAddSubsidiary(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={() => setShowAddSubsidiary(false)}>Add Subsidiary</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )}
 
-    {/* Edit Subsidiary Modal */}
-    {showEditSubsidiary && selectedSubsidiary && (
-      <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
-        <div className="relative m-8 md:m-16 lg:m-24">
-          <Card className="max-w-3xl mx-auto">
-            <CardHeader>
-              <CardTitle className="text-xl">Edit Subsidiary</CardTitle>
-              <CardDescription>Edit the details for the selected subsidiary company</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              {/* Active Sessions */}
               <div className="space-y-4">
-                <div className="space-y-4">
-                  <Label>Subsidiary Logo</Label>
-                  <div className="flex items-center space-x-4">
-                    {subsidiaryLogoPreview || selectedSubsidiary.logo_url ? (
-                      <div className="relative">
-                        <img
-                          src={subsidiaryLogoPreview || selectedSubsidiary.logo_url}
-                          alt="Subsidiary Logo"
-                          className="w-20 h-20 object-cover rounded-lg border"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
-                          onClick={() => setSubsidiaryLogoPreview("")}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Active Sessions</h3>
+                  <Button variant="outline" onClick={handleRefreshSessions} disabled={isRefreshingSessions}>
+                    {isRefreshingSessions ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     ) : (
-                      <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                        <ImageIcon className="w-8 h-8 text-gray-400" />
-                      </div>
+                      <RefreshCw className="w-4 h-4 mr-2" />
                     )}
-                    <div className="space-y-2">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) {
-                            handleLogoUpload(file, "subsidiary")
-                          }
-                        }}
-                        className="hidden"
-                        id="subsidiary-logo-upload-edit"
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={() => document.getElementById("subsidiary-logo-upload-edit")?.click()}
-                        disabled={isUploadingLogo}
-                        className="flex items-center space-x-2"
-                      >
-                        {isUploadingLogo ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Uploading...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="w-4 h-4" />
-                            <span>Upload Logo</span>
-                          </>
-                        )}
-                      </Button>
-                      <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
-                    </div>
-                  </div>
+                    Refresh
+                  </Button>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <Label htmlFor="editSubsidiaryName">Subsidiary Name</Label>
-                    <Input
-                      id="editSubsidiaryName"
-                      placeholder="Enter subsidiary name"
-                      value={selectedSubsidiary.name}
-                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, name: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="editSubsidiaryIndustry">Industry</Label>
-                    <Input
-                      id="editSubsidiaryIndustry"
-                      placeholder="Enter industry"
-                      value={selectedSubsidiary.industry}
-                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, industry: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="editSubsidiaryTaxId">Tax ID</Label>
-                    <Input
-                      id="editSubsidiaryTaxId"
-                      placeholder="Enter tax ID"
-                      value={selectedSubsidiary.tax_id}
-                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, tax_id: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="editSubsidiarySsnit">SSNIT Number</Label>
-                    <Input
-                      id="editSubsidiarySsnit"
-                      placeholder="Enter SSNIT number"
-                      value={selectedSubsidiary.ssnit_number}
-                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, ssnit_number: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="editSubsidiaryEmail">Email Address</Label>
-                    <Input
-                      id="editSubsidiaryEmail"
-                      type="email"
-                      placeholder="Enter email address"
-                      value={selectedSubsidiary.email_address}
-                      onChange={(e) =>
-                        setSelectedSubsidiary({ ...selectedSubsidiary, email_address: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="editSubsidiaryPhone">Phone Number</Label>
-                    <Input
-                      id="editSubsidiaryPhone"
-                      placeholder="Enter phone number"
-                      value={selectedSubsidiary.phone_number}
-                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, phone_number: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="editSubsidiaryAddress">Address</Label>
-                  <Textarea
-                    id="editSubsidiaryAddress"
-                    placeholder="Enter address"
-                    value={selectedSubsidiary.address}
-                    onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, address: e.target.value })}
-                  />
-                </div>
-
                 <div className="space-y-2">
-                  <Label>Divisions</Label>
-                  <div className="space-y-2">
-                    {Array.isArray(selectedSubsidiary.divisions) ? (
-                      selectedSubsidiary.divisions.map((division, index) => (
-                        <div key={index} className="flex items-center space-x-2">
-                          <Input
-                            value={division}
-                            onChange={(e) => {
-                              const newDivisions = [...selectedSubsidiary.divisions]
-                              newDivisions[index] = e.target.value
-                              setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
-                            }}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const newDivisions = selectedSubsidiary.divisions.filter((_, i) => i !== index)
-                              setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))
-                    ) : (
-                      <Input placeholder="No divisions defined" disabled />
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const newDivisions = selectedSubsidiary.divisions
-                          ? [...selectedSubsidiary.divisions, "New Division"]
-                          : ["New Division"]
-                        setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
-                      }}
-                    >
-                      Add Division
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Departments</Label>
-                  <div className="space-y-2">
-                    {Array.isArray(selectedSubsidiary.departments) ? (
-                      selectedSubsidiary.departments.map((department, index) => (
-                        <div key={index} className="flex items-center space-x-2">
-                          <Input
-                            value={department}
-                            onChange={(e) => {
-                              const newDepartments = [...selectedSubsidiary.departments]
-                              newDepartments[index] = e.target.value
-                              setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
-                            }}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const newDepartments = selectedSubsidiary.departments.filter((_, i) => i !== index)
-                              setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))
-                    ) : (
-                      <Input placeholder="No departments defined" disabled />
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const newDepartments = selectedSubsidiary.departments
-                          ? [...selectedSubsidiary.departments, "New Department"]
-                          : ["New Department"]
-                        setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
-                      }}
-                    >
-                      Add Department
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Locations</Label>
-                  <div className="space-y-2">
-                    {Array.isArray(selectedSubsidiary.locations) ? (
-                      selectedSubsidiary.locations.map((location, index) => (
-                        <div key={index} className="flex items-center space-x-2">
-                          <Input
-                            value={location}
-                            onChange={(e) => {
-                              const newLocations = [...selectedSubsidiary.locations]
-                              newLocations[index] = e.target.value
-                              setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
-                            }}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const newLocations = selectedSubsidiary.locations.filter((_, i) => i !== index)
-                              setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))
-                    ) : (
-                      <Input placeholder="No locations defined" disabled />
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const newLocations = selectedSubsidiary.locations
-                          ? [...selectedSubsidiary.locations, "New Location"]
-                          : ["New Location"]
-                        setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
-                      }}
-                    >
-                      Add Location
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="ghost" onClick={() => setShowEditSubsidiary(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={async () => {
-                    if (selectedSubsidiary) {
-                      await updateSubsidiary(selectedSubsidiary.id, {
-                        name: selectedSubsidiary.name,
-                        industry: selectedSubsidiary.industry,
-                        tax_id: selectedSubsidiary.tax_id,
-                        ssnit_number: selectedSubsidiary.ssnit_number,
-                        email_address: selectedSubsidiary.email_address,
-                        phone_number: selectedSubsidiary.phone_number,
-                        address: selectedSubsidiary.address,
-                        divisions: selectedSubsidiary.divisions,
-                        departments: selectedSubsidiary.departments,
-                        locations: selectedSubsidiary.locations,
-                        logo_url: subsidiaryLogoPreview || selectedSubsidiary.logo_url,
-                      })
-                      setShowEditSubsidiary(false)
-                      setSubsidiaryLogoPreview("")
-                    }
-                  }}
-                >
-                  Save Changes
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )}
-
-    {/* Subsidiary Details Modal */}
-    {showSubsidiaryDetails && selectedSubsidiary && (
-      <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
-        <div className="relative m-8 md:m-16 lg:m-24">
-          <Card className="max-w-3xl mx-auto">
-            <CardHeader>
-              <CardTitle className="text-xl">Subsidiary Details</CardTitle>
-              <CardDescription>View the details for the selected subsidiary company</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-4">
-                <div className="space-y-4">
-                  <Label>Subsidiary Logo</Label>
-                  {selectedSubsidiary.logo_url ? (
-                    <img
-                      src={selectedSubsidiary.logo_url || "/placeholder.svg"}
-                      alt="Subsidiary Logo"
-                      className="w-20 h-20 object-cover rounded-lg border"
-                    />
-                  ) : (
-                    <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                      <ImageIcon className="w-8 h-8 text-gray-400" />
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <Label>Subsidiary Name</Label>
-                    <Input value={selectedSubsidiary.name} disabled />
-                  </div>
-                  <div>
-                    <Label>Industry</Label>
-                    <Input value={selectedSubsidiary.industry} disabled />
-                  </div>
-                  <div>
-                    <Label>Tax ID</Label>
-                    <Input value={selectedSubsidiary.tax_id} disabled />
-                  </div>
-                  <div>
-                    <Label>SSNIT Number</Label>
-                    <Input value={selectedSubsidiary.ssnit_number} disabled />
-                  </div>
-                  <div>
-                    <Label>Email Address</Label>
-                    <Input value={selectedSubsidiary.email_address} disabled />
-                  </div>
-                  <div>
-                    <Label>Phone Number</Label>
-                    <Input value={selectedSubsidiary.phone_number} disabled />
-                  </div>
-                </div>
-
-                <div>
-                  <Label>Address</Label>
-                  <Textarea value={selectedSubsidiary.address} disabled />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Divisions</Label>
-                  {Array.isArray(selectedSubsidiary.divisions) ? (
-                    selectedSubsidiary.divisions.map((division, index) => (
-                      <Input key={index} value={division} disabled />
-                    ))
-                  ) : (
-                    <Input placeholder="No divisions defined" disabled />
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Departments</Label>
-                  {Array.isArray(selectedSubsidiary.departments) ? (
-                    selectedSubsidiary.departments.map((department, index) => (
-                      <Input key={index} value={department} disabled />
-                    ))
-                  ) : (
-                    <Input placeholder="No departments defined" disabled />
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Locations</Label>
-                  {Array.isArray(selectedSubsidiary.locations) ? (
-                    selectedSubsidiary.locations.map((location, index) => (
-                      <Input key={index} value={location} disabled />
-                    ))
-                  ) : (
-                    <Input placeholder="No locations defined" disabled />
-                  )}
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <Button variant="ghost" onClick={() => setShowSubsidiaryDetails(false)}>
-                  Close
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )}
-
-    {/* Deactivate Confirmation Modal */}
-    {showDeactivateConfirm && subsidiaryToToggle && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <Card className="max-w-md p-6">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Deactivate Subsidiary</CardTitle>
-            <CardDescription>Are you sure you want to deactivate {subsidiaryToToggle.name}?</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p>Deactivating will prevent further actions on this subsidiary.</p>
-            <div className="flex justify-end space-x-2">
-              <Button variant="ghost" onClick={() => setShowDeactivateConfirm(false)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" onClick={confirmToggleStatus}>
-                Deactivate
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )}
-
-    {/* Reactivate Confirmation Modal */}
-    {showReactivateConfirm && subsidiaryToToggle && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <Card className="max-w-md p-6">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Reactivate Subsidiary</CardTitle>
-            <CardDescription>Are you sure you want to reactivate {subsidiaryToToggle.name}?</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p>Reactivating will allow full access and actions on this subsidiary.</p>
-            <div className="flex justify-end space-x-2">
-              <Button variant="ghost" onClick={() => setShowReactivateConfirm(false)}>
-                Cancel
-              </Button>
-              <Button onClick={confirmToggleStatus}>Reactivate</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )}
-
-    {/* View Employees Modal */}
-    {viewEmployeesModal.isOpen && (
-      <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
-        <div className="relative m-8 md:m-16 lg:m-24">
-          <Card className="max-w-3xl mx-auto">
-            <CardHeader>
-              <CardTitle className="text-xl">Employees of Subsidiary</CardTitle>
-              <CardDescription>View the employees for the selected subsidiary company</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {viewEmployeesModal.employees && viewEmployeesModal.employees.length > 0 ? (
-                <div className="space-y-3">
-                  {viewEmployeesModal.employees.map((employee) => (
-                    <Card key={employee.id} className="border-l-4 border-l-indigo-500">
+                  {activeSessions.map((session) => (
+                    <Card key={session.id}>
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <h3 className="text-base font-semibold">{employee.name}</h3>
-                            <p className="text-sm text-gray-600">{employee.position}</p>
+                            <p className="font-medium">{session.user_email}</p>
+                            <p className="text-sm text-gray-600">
+                              {session.ip_address} • {session.device} • Last active:{" "}
+                              {new Date(session.last_activity).toLocaleString()}
+                            </p>
                           </div>
-                          <div className="flex items-center space-x-4">
-                            <span className="text-sm text-gray-500">{employee.email}</span>
-                          </div>
+                          <Button variant="outline" size="sm" onClick={() => handleTerminateSession(session.id)}>
+                            Terminate
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
-              ) : (
-                <p>No employees found for this subsidiary.</p>
-              )}
+              </div>
+
               <div className="flex justify-end">
-                <Button variant="ghost" onClick={() => setViewEmployeesModal({ isOpen: false, subsidiaryId: "" })}>
-                  Close
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveAccessSettings}
+                  disabled={isSavingAccessSettings}
+                >
+                  {isSavingAccessSettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Access Settings
+                    </>
+                  )}
                 </Button>
               </div>
             </CardContent>
           </Card>
-        </div>
-      </div>
-    )}
+        </TabsContent>
 
-    {/* Import Settings Modal */}
-    {importModal && (
-      <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
-        <div className="relative m-8 md:m-16 lg:m-24">
-          <Card className="max-w-lg mx-auto">
+        {/* Security Tab Content */}
+        <TabsContent value="security">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">Import Settings</CardTitle>
-              <CardDescription>Import settings from a CSV file</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="importFile">Select CSV File</Label>
-                  <Input
-                    id="importFile"
-                    type="file"
-                    accept=".csv"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        handleImportSettings(file)
-                      }
-                    }}
-                  />
-                </div>
-                <p className="text-sm text-gray-600">
-                  Upload a CSV file with subsidiary settings. The file should include columns for name, tax_id,
-                  ssnit_number, industry, etc.
-                </p>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="ghost" onClick={() => setImportModal(false)}>
-                  Cancel
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="w-5 h-5" />
+                  <span>Security Settings</span>
+                </CardTitle>
+                <Button variant="outline" onClick={handleBackupNow} disabled={isBackingUp}>
+                  {isBackingUp ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Backing Up...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" />
+                      Backup Now
+                    </>
+                  )}
                 </Button>
-                <Button onClick={() => setImportModal(false)}>Import</Button>
+              </div>
+              <CardDescription>Manage security settings, backups, and audit logs</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Security Policies */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Security Policies</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="dataEncryption">Data Encryption at Rest</Label>
+                      <Switch
+                        id="dataEncryption"
+                        checked={securitySettings.dataEncryptionEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, dataEncryptionEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="auditLogging">Audit Logging</Label>
+                      <Switch
+                        id="auditLogging"
+                        checked={securitySettings.auditLoggingEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, auditLoggingEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="autoBackup">Automatic Backups</Label>
+                      <Switch
+                        id="autoBackup"
+                        checked={securitySettings.autoBackupEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, autoBackupEnabled: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="backupFrequency">Backup Frequency</Label>
+                      <Select
+                        value={securitySettings.backupFrequency}
+                        onValueChange={(value) => setSecuritySettings({ ...securitySettings, backupFrequency: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="retentionPeriod">Data Retention Period (days)</Label>
+                      <Input
+                        id="retentionPeriod"
+                        type="number"
+                        value={securitySettings.dataRetentionDays}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            dataRetentionDays: Number.parseInt(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Backup Status */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Backup Status</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <p className="text-sm font-medium">Last Backup</p>
+                          <p className="text-lg font-bold">
+                            {lastBackupTime ? new Date(lastBackupTime).toLocaleDateString() : "Never"}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Database className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="text-sm font-medium">Backup Size</p>
+                          <p className="text-lg font-bold">{backupSize || "0 MB"}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="w-5 h-5 text-emerald-600" />
+                        <div>
+                          <p className="text-sm font-medium">Status</p>
+                          <p className="text-lg font-bold">{backupStatus || "Ready"}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Audit Logs */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Recent Audit Logs</h3>
+                  <Button variant="outline" onClick={handleViewAllLogs}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    View All Logs
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {auditLogs.slice(0, 5).map((log) => (
+                    <Card key={log.id}>
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-sm">{log.action}</p>
+                            <p className="text-xs text-gray-600">
+                              {log.user_email} • {log.ip_address} •{new Date(log.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                          <Badge variant={log.severity === "high" ? "destructive" : "secondary"}>{log.severity}</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={handleExportSecurityReport} disabled={isExportingReport}>
+                  {isExportingReport ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4 mr-2" />
+                      Export Security Report
+                    </>
+                  )}
+                </Button>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveSecuritySettings}
+                  disabled={isSavingSecuritySettings}
+                >
+                  {isSavingSecuritySettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Security Settings
+                    </>
+                  )}
+                </Button>
               </div>
             </CardContent>
           </Card>
-        </div>
-      </div>
-    )}
+        </TabsContent>
+      </Tabs>
 
-    {showImportExportModal && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Import/Export Salary Grades</h2>
-            <Button variant="ghost" size="sm" onClick={() => setShowImportExportModal(false)}>
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-
-          <div className="space-y-6">
-            {/* Export Section */}
-            <div>
-              <h3 className="text-lg font-medium mb-3">Export Data</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Download your current salary grades data in CSV or Excel format.
-              </p>
-              <div className="flex space-x-3">
-                <Button
-                  onClick={() => handleExportSalaryGrades("csv")}
-                  disabled={isExporting || salaryGrades.length === 0}
-                  className="flex items-center space-x-2"
-                >
-                  {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                  <span>Export as CSV</span>
-                </Button>
-                <Button
-                  onClick={() => handleExportSalaryGrades("excel")}
-                  disabled={isExporting || salaryGrades.length === 0}
-                  variant="outline"
-                  className="flex items-center space-x-2"
-                >
-                  {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                  <span>Export as Excel</span>
-                </Button>
-              </div>
-            </div>
-
-            <div className="border-t pt-6">
-              {/* Import Section */}
-              <div>
-                <h3 className="text-lg font-medium mb-3">Import Data</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Import salary grades from CSV data. Expected format: Grade Name, Description, Min Salary, Max
-                  Salary, Step, Step Amount
-                </p>
-
+      {/* Add Subsidiary Modal */}
+      {showAddSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Add New Subsidiary</CardTitle>
+                <CardDescription>Enter the details for the new subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    <div className="flex items-center space-x-4">
+                      {subsidiaryLogoPreview ? (
+                        <div className="relative">
+                          <img
+                            src={subsidiaryLogoPreview || "/placeholder.svg"}
+                            alt="Subsidiary Logo"
+                            className="w-20 h-20 object-cover rounded-lg border"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                            onClick={() => setSubsidiaryLogoPreview("")}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                          <ImageIcon className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              handleLogoUpload(file, "subsidiary")
+                            }
+                          }}
+                          className="hidden"
+                          id="subsidiary-logo-upload"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById("subsidiary-logo-upload")?.click()}
+                          disabled={isUploadingLogo}
+                          className="flex items-center space-x-2"
+                        >
+                          {isUploadingLogo ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              <span>Upload Logo</span>
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="subsidiaryName">Subsidiary Name</Label>
+                      <Input id="subsidiaryName" placeholder="Enter subsidiary name" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryIndustry">Industry</Label>
+                      <Input id="subsidiaryIndustry" placeholder="Enter industry" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryTaxId">Tax ID</Label>
+                      <Input id="subsidiaryTaxId" placeholder="Enter tax ID" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiarySsnit">SSNIT Number</Label>
+                      <Input id="subsidiarySsnit" placeholder="Enter SSNIT number" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryEmail">Email Address</Label>
+                      <Input id="subsidiaryEmail" type="email" placeholder="Enter email address" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryPhone">Phone Number</Label>
+                      <Input id="subsidiaryPhone" placeholder="Enter phone number" />
+                    </div>
+                  </div>
+
                   <div>
-                    <Label htmlFor="importData">CSV Data</Label>
-                    <textarea
-                      id="importData"
-                      className="w-full h-32 p-3 border border-gray-300 rounded-md resize-none font-mono text-sm"
-                      placeholder={`Grade Name,Description,Min Salary,Max Salary,Step,Step Amount
-"Grade 1","Entry Level",2500,4000,1,2500
-"Grade 1","Entry Level",2500,4000,2,3000
-"Grade 2","Mid Level",4000,6000,1,4000`}
-                      value={importData}
-                      onChange={(e) => setImportData(e.target.value)}
+                    <Label htmlFor="subsidiaryAddress">Address</Label>
+                    <Textarea id="subsidiaryAddress" placeholder="Enter address" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter division" />
+                      <Button variant="outline" size="sm">
+                        Add Division
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter department" />
+                      <Button variant="outline" size="sm">
+                        Add Department
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter location name" />
+                      <Button variant="outline" size="sm">
+                        Add Location
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setShowAddSubsidiary(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => setShowAddSubsidiary(false)}>Add Subsidiary</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Subsidiary Modal */}
+      {showEditSubsidiary && selectedSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Edit Subsidiary</CardTitle>
+                <CardDescription>Edit the details for the selected subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    <div className="flex items-center space-x-4">
+                      {subsidiaryLogoPreview || selectedSubsidiary.logo_url ? (
+                        <div className="relative">
+                          <img
+                            src={subsidiaryLogoPreview || selectedSubsidiary.logo_url}
+                            alt="Subsidiary Logo"
+                            className="w-20 h-20 object-cover rounded-lg border"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                            onClick={() => setSubsidiaryLogoPreview("")}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                          <ImageIcon className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              handleLogoUpload(file, "subsidiary")
+                            }
+                          }}
+                          className="hidden"
+                          id="subsidiary-logo-upload-edit"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById("subsidiary-logo-upload-edit")?.click()}
+                          disabled={isUploadingLogo}
+                          className="flex items-center space-x-2"
+                        >
+                          {isUploadingLogo ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              <span>Upload Logo</span>
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="editSubsidiaryName">Subsidiary Name</Label>
+                      <Input
+                        id="editSubsidiaryName"
+                        placeholder="Enter subsidiary name"
+                        value={selectedSubsidiary.name}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryIndustry">Industry</Label>
+                      <Input
+                        id="editSubsidiaryIndustry"
+                        placeholder="Enter industry"
+                        value={selectedSubsidiary.industry}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, industry: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryTaxId">Tax ID</Label>
+                      <Input
+                        id="editSubsidiaryTaxId"
+                        placeholder="Enter tax ID"
+                        value={selectedSubsidiary.tax_id}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, tax_id: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiarySsnit">SSNIT Number</Label>
+                      <Input
+                        id="editSubsidiarySsnit"
+                        placeholder="Enter SSNIT number"
+                        value={selectedSubsidiary.ssnit_number}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, ssnit_number: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryEmail">Email Address</Label>
+                      <Input
+                        id="editSubsidiaryEmail"
+                        type="email"
+                        placeholder="Enter email address"
+                        value={selectedSubsidiary.email_address}
+                        onChange={(e) =>
+                          setSelectedSubsidiary({ ...selectedSubsidiary, email_address: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryPhone">Phone Number</Label>
+                      <Input
+                        id="editSubsidiaryPhone"
+                        placeholder="Enter phone number"
+                        value={selectedSubsidiary.phone_number}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, phone_number: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="editSubsidiaryAddress">Address</Label>
+                    <Textarea
+                      id="editSubsidiaryAddress"
+                      placeholder="Enter address"
+                      value={selectedSubsidiary.address}
+                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, address: e.target.value })}
                     />
                   </div>
 
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">
-                      {importData.trim() ? `${importData.trim().split("\n").length - 1} rows to import` : "No data"}
-                    </span>
-                    <Button
-                      onClick={handleImportSalaryGrades}
-                      disabled={isImporting || !importData.trim()}
-                      className="flex items-center space-x-2"
-                    >
-                      {isImporting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Importing...</span>
-                        </>
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.divisions) ? (
+                        selectedSubsidiary.divisions.map((division, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={division}
+                              onChange={(e) => {
+                                const newDivisions = [...selectedSubsidiary.divisions]
+                                newDivisions[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newDivisions = selectedSubsidiary.divisions.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
                       ) : (
-                        <>
-                          <Upload className="w-4 h-4" />
-                          <span>Import Data</span>
-                        </>
+                        <Input placeholder="No divisions defined" disabled />
                       )}
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newDivisions = selectedSubsidiary.divisions
+                            ? [...selectedSubsidiary.divisions, "New Division"]
+                            : ["New Division"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                        }}
+                      >
+                        Add Division
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.departments) ? (
+                        selectedSubsidiary.departments.map((department, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={department}
+                              onChange={(e) => {
+                                const newDepartments = [...selectedSubsidiary.departments]
+                                newDepartments[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newDepartments = selectedSubsidiary.departments.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <Input placeholder="No departments defined" disabled />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newDepartments = selectedSubsidiary.departments
+                            ? [...selectedSubsidiary.departments, "New Department"]
+                            : ["New Department"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                        }}
+                      >
+                        Add Department
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.locations) ? (
+                        selectedSubsidiary.locations.map((location, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={location}
+                              onChange={(e) => {
+                                const newLocations = [...selectedSubsidiary.locations]
+                                newLocations[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newLocations = selectedSubsidiary.locations.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <Input placeholder="No locations defined" disabled />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newLocations = selectedSubsidiary.locations
+                            ? [...selectedSubsidiary.locations, "New Location"]
+                            : ["New Location"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                        }}
+                      >
+                        Add Location
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end mt-6">
-            <Button variant="outline" onClick={() => setShowImportExportModal(false)}>
-              Close
-            </Button>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setShowEditSubsidiary(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (selectedSubsidiary) {
+                        await updateSubsidiary(selectedSubsidiary.id, {
+                          name: selectedSubsidiary.name,
+                          industry: selectedSubsidiary.industry,
+                          tax_id: selectedSubsidiary.tax_id,
+                          ssnit_number: selectedSubsidiary.ssnit_number,
+                          email_address: selectedSubsidiary.email_address,
+                          phone_number: selectedSubsidiary.phone_number,
+                          address: selectedSubsidiary.address,
+                          divisions: selectedSubsidiary.divisions,
+                          departments: selectedSubsidiary.departments,
+                          locations: selectedSubsidiary.locations,
+                          logo_url: subsidiaryLogoPreview || selectedSubsidiary.logo_url,
+                        })
+                        setShowEditSubsidiary(false)
+                        setSubsidiaryLogoPreview("")
+                      }
+                    }}
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
-    {showSalaryGradeModal && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">{editingGrade ? "Edit Salary Grade" : "Add New Salary Grade"}</h2>
-            <Button variant="ghost" size="sm" onClick={() => setShowSalaryGradeModal(false)}>
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-
-          <p className="text-sm text-muted-foreground mb-6">Configure salary grade details and notch structure</p>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="gradeName">Grade Name</Label>
-                <Input
-                  id="gradeName"
-                  value={newGrade.name}
-                  onChange={(e) => setNewGrade((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g., Grade 1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="gradeDescription">Description</Label>
-                <Input
-                  id="gradeDescription"
-                  value={newGrade.description}
-                  onChange={(e) => setNewGrade((prev) => ({ ...prev, description: e.target.value }))}
-                  placeholder="e.g., Entry Level"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="minSalary">Minimum Salary (₵)</Label>
-                <Input
-                  id="minSalary"
-                  type="number"
-                  value={newGrade.minSalary}
-                  onChange={(e) => setNewGrade((prev) => ({ ...prev, minSalary: e.target.value }))}
-                  placeholder="2500"
-                />
-              </div>
-              <div>
-                <Label htmlFor="maxSalary">Maximum Salary (₵)</Label>
-                <Input
-                  id="maxSalary"
-                  type="number"
-                  value={newGrade.maxSalary}
-                  onChange={(e) => setNewGrade((prev) => ({ ...prev, maxSalary: e.target.value }))}
-                  placeholder="4000"
-                />
-              </div>
-              <div>
-                <Label htmlFor="numberOfNotches">Number of Notches/Steps</Label>
-                <Input
-                  id="numberOfNotches"
-                  type="number"
-                  min="2"
-                  max="20"
-                  value={newGrade.numberOfNotches}
-                  onChange={(e) =>
-                    setNewGrade((prev) => ({ ...prev, numberOfNotches: Number.parseInt(e.target.value) || 5 }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Button
-                onClick={handleGenerateNotches}
-                disabled={isGeneratingNotches || !newGrade.minSalary || !newGrade.maxSalary}
-                className="flex items-center space-x-2"
-              >
-                {isGeneratingNotches ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Settings className="w-4 h-4" />
-                    <span>Generate Notches</span>
-                  </>
-                )}
-              </Button>
-              <span className="text-sm text-muted-foreground">{newGrade.notches.length} notches configured</span>
-            </div>
-
-            {newGrade.notches.length > 0 && (
-              <div>
-                <Label>Generated Notches Preview</Label>
-                <div className="mt-2 bg-gray-50 border border-gray-200 rounded-md p-4 max-h-40 overflow-y-auto">
-                  <div className="space-y-2">
-                    {newGrade.notches.map((notch) => (
-                      <div key={notch.step} className="flex justify-between text-sm">
-                        <span>Step {notch.step}</span>
-                        <span className="font-medium">₵{notch.amount.toLocaleString()}</span>
+      {/* Subsidiary Details Modal */}
+      {showSubsidiaryDetails && selectedSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Subsidiary Details</CardTitle>
+                <CardDescription>View the details for the selected subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    {selectedSubsidiary.logo_url ? (
+                      <img
+                        src={selectedSubsidiary.logo_url || "/placeholder.svg"}
+                        alt="Subsidiary Logo"
+                        className="w-20 h-20 object-cover rounded-lg border"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                        <ImageIcon className="w-8 h-8 text-gray-400" />
                       </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label>Subsidiary Name</Label>
+                      <Input value={selectedSubsidiary.name} disabled />
+                    </div>
+                    <div>
+                      <Label>Industry</Label>
+                      <Input value={selectedSubsidiary.industry} disabled />
+                    </div>
+                    <div>
+                      <Label>Tax ID</Label>
+                      <Input value={selectedSubsidiary.tax_id} disabled />
+                    </div>
+                    <div>
+                      <Label>SSNIT Number</Label>
+                      <Input value={selectedSubsidiary.ssnit_number} disabled />
+                    </div>
+                    <div>
+                      <Label>Email Address</Label>
+                      <Input value={selectedSubsidiary.email_address} disabled />
+                    </div>
+                    <div>
+                      <Label>Phone Number</Label>
+                      <Input value={selectedSubsidiary.phone_number} disabled />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Address</Label>
+                    <Textarea value={selectedSubsidiary.address} disabled />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    {Array.isArray(selectedSubsidiary.divisions) ? (
+                      selectedSubsidiary.divisions.map((division, index) => (
+                        <Input key={index} value={division} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No divisions defined" disabled />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    {Array.isArray(selectedSubsidiary.departments) ? (
+                      selectedSubsidiary.departments.map((department, index) => (
+                        <Input key={index} value={department} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No departments defined" disabled />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    {Array.isArray(selectedSubsidiary.locations) ? (
+                      selectedSubsidiary.locations.map((location, index) => (
+                        <Input key={index} value={location} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No locations defined" disabled />
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="ghost" onClick={() => setShowSubsidiaryDetails(false)}>
+                    Close
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate Confirmation Modal */}
+      {showDeactivateConfirm && subsidiaryToToggle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="max-w-md p-6">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Deactivate Subsidiary</CardTitle>
+              <CardDescription>Are you sure you want to deactivate {subsidiaryToToggle.name}?</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p>Deactivating will prevent further actions on this subsidiary.</p>
+              <div className="flex justify-end space-x-2">
+                <Button variant="ghost" onClick={() => setShowDeactivateConfirm(false)}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={confirmToggleStatus}>
+                  Deactivate
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Reactivate Confirmation Modal */}
+      {showReactivateConfirm && subsidiaryToToggle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="max-w-md p-6">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Reactivate Subsidiary</CardTitle>
+              <CardDescription>Are you sure you want to reactivate {subsidiaryToToggle.name}?</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p>Reactivating will allow full access and actions on this subsidiary.</p>
+              <div className="flex justify-end space-x-2">
+                <Button variant="ghost" onClick={() => setShowReactivateConfirm(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={confirmToggleStatus}>Reactivate</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* View Employees Modal */}
+      {viewEmployeesModal.isOpen && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Employees of Subsidiary</CardTitle>
+                <CardDescription>View the employees for the selected subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {viewEmployeesModal.employees && viewEmployeesModal.employees.length > 0 ? (
+                  <div className="space-y-3">
+                    {viewEmployeesModal.employees.map((employee) => (
+                      <Card key={employee.id} className="border-l-4 border-l-indigo-500">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-base font-semibold">{employee.name}</h3>
+                              <p className="text-sm text-gray-600">{employee.position}</p>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              <span className="text-sm text-gray-500">{employee.email}</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
                     ))}
                   </div>
+                ) : (
+                  <p>No employees found for this subsidiary.</p>
+                )}
+                <div className="flex justify-end">
+                  <Button variant="ghost" onClick={() => setViewEmployeesModal({ isOpen: false, subsidiaryId: "" })}>
+                    Close
+                  </Button>
                 </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-end space-x-3 mt-6">
-            <Button variant="outline" onClick={() => setShowSalaryGradeModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveSalaryGrade} className="bg-black text-white hover:bg-gray-800">
-              <Save className="w-4 h-4 mr-2" />
-              {editingGrade ? "Update Grade" : "Save Grade"}
-            </Button>
+              </CardContent>
+            </Card>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
-    {showAddLeaveTypeModal && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-md">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Add New Leave Type</h2>
-            <Button variant="ghost" size="sm" onClick={() => setShowAddLeaveTypeModal(false)}>
-              <X className="w-4 h-4" />
-            </Button>
+      {/* Import Settings Modal */}
+      {importModal && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-lg mx-auto">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">Import Settings</CardTitle>
+                <CardDescription>Import settings from a CSV file</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="importFile">Select CSV File</Label>
+                    <Input
+                      id="importFile"
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleImportSettings(file)
+                        }
+                      }}
+                    />
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Upload a CSV file with subsidiary settings. The file should include columns for name, tax_id,
+                    ssnit_number, industry, etc.
+                  </p>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setImportModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => setImportModal(false)}>Import</Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
+        </div>
+      )}
 
-          <p className="text-sm text-muted-foreground mb-6">
-            Define a new leave type with its allocation and description
-          </p>
+      {showImportExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Import/Export Salary Grades</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowImportExportModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
 
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="leaveTypeName\">Leave Type Name</
+            <div className="space-y-6">
+              {/* Export Section */}
+              <div>
+                <h3 className="text-lg font-medium mb-3">Export Data</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Download your current salary grades data in CSV or Excel format.
+                </p>
+                <div className="flex space-x-3">
+                  <Button
+                    onClick={() => handleExportSalaryGrades("csv")}
+                    disabled={isExporting || salaryGrades.length === 0}
+                    className="flex items-center space-x-2"
+                  >
+                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    <span>Export as CSV</span>
+                  </Button>
+                  <Button
+                    onClick={() => handleExportSalaryGrades("excel")}
+                    disabled={isExporting || salaryGrades.length === 0}
+                    variant="outline"
+                    className="flex items-center space-x-2"
+                  >
+                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    <span>Export as Excel</span>
+                  </Button>
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                {/* Import Section */}
+                <div>
+                  <h3 className="text-lg font-medium mb-3">Import Data</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Import salary grades from CSV data. Expected format: Grade Name, Description, Min Salary, Max
+                    Salary, Step, Step Amount
+                  </p>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="importData">CSV Data</Label>
+                      <textarea
+                        id="importData"
+                        className="w-full h-32 p-3 border border-gray-300 rounded-md resize-none font-mono text-sm"
+                        placeholder={`Grade Name,Description,Min Salary,Max Salary,Step,Step Amount
+"Grade 1","Entry Level",2500,4000,1,2500
+"Grade 1","Entry Level",2500,4000,2,3000
+"Grade 2","Mid Level",4000,6000,1,4000`}
+                        value={importData}
+                        onChange={(e) => setImportData(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">
+                        {importData.trim() ? `${importData.trim().split("\n").length - 1} rows to import` : "No data"}
+                      </span>
+                      <Button
+                        onClick={handleImportSalaryGrades}
+                        disabled={isImporting || !importData.trim()}
+                        className="flex items-center space-x-2"
+                      >
+                        {isImporting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Importing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            <span>Import Data</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <Button variant="outline" onClick={() => setShowImportExportModal(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSalaryGradeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">{editingGrade ? "Edit Salary Grade" : "Add New Salary Grade"}</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowSalaryGradeModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <p className="text-sm text-muted-foreground mb-6">Configure salary grade details and notch structure</p>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="gradeName">Grade Name</Label>
+                  <Input
+                    id="gradeName"
+                    value={newGrade.name}
+                    onChange={(e) => setNewGrade((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., Grade 1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="gradeDescription">Description</Label>
+                  <Input
+                    id="gradeDescription"
+                    value={newGrade.description}
+                    onChange={(e) => setNewGrade((prev) => ({ ...prev, description: e.target.value }))}
+                    placeholder="e.g., Entry Level"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="minSalary">Minimum Salary (₵)</Label>
+                  <Input
+                    id="minSalary"
+                    type="number"
+                    value={newGrade.minSalary}
+                    onChange={(e) => setNewGrade((prev) => ({ ...prev, minSalary: e.target.value }))}
+                    placeholder="2500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="maxSalary">Maximum Salary (₵)</Label>
+                  <Input
+                    id="maxSalary"
+                    type="number"
+                    value={newGrade.maxSalary}
+                    onChange={(e) => setNewGrade((prev) => ({ ...prev, maxSalary: e.target.value }))}
+                    placeholder="4000"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="numberOfNotches">Number of Notches/Steps</Label>
+                  <Input
+                    id="numberOfNotches"
+                    type="number"
+                    min="2"
+                    max="20"
+                    value={newGrade.numberOfNotches}
+                    onChange={(e) =>
+                      setNewGrade((prev) => ({ ...prev, numberOfNotches: Number.parseInt(e.target.value) || 5 }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Button
+                  onClick={handleGenerateNotches}
+                  disabled={isGeneratingNotches || !newGrade.minSalary || !newGrade.maxSalary}
+                  className="flex items-center space-x-2"
+                >
+                  {isGeneratingNotches ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Settings className="w-4 h-4" />
+                      <span>Generate Notches</span>
+                    </>
+                  )}
+                </Button>
+                <span className="text-sm text-muted-foreground">{newGrade.notches.length} notches configured</span>
+              </div>
+
+              {newGrade.notches.length > 0 && (
+                <div>
+                  <Label>Generated Notches Preview</Label>
+                  <div className="mt-2 bg-gray-50 border border-gray-200 rounded-md p-4 max-h-40 overflow-y-auto">
+                    <div className="space-y-2">
+                      {newGrade.notches.map((notch) => (
+                        <div key={notch.step} className="flex justify-between text-sm">
+                          <span>Step {notch.step}</span>
+                          <span className="font-medium">₵{notch.amount.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button variant="outline" onClick={() => setShowSalaryGradeModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveSalaryGrade} className="bg-black text-white hover:bg-gray-800">
+                <Save className="w-4 h-4 mr-2" />
+                {editingGrade ? "Update Grade" : "Save Grade"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddLeaveTypeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Add New Leave Type</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowAddLeaveTypeModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <p className="text-sm text-muted-foreground mb-6">Enter details for the new leave type</p>
+
+            <div className="space-y-4">\
+              <div>
