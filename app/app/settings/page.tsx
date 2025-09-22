@@ -2897,6 +2897,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setLoadingInsights((prev) => ({ ...prev, [policyName]: true }))
 
     try {
+      console.log("[v0] Generating insight for policy:", policyName)
+      console.log("[v0] JSON object available:", typeof JSON, JSON)
+
       // Simulate AI insight generation with realistic delay
       await new Promise((resolve) => setTimeout(resolve, 2000))
 
@@ -2908,7 +2911,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
       }
 
       const insight =
-        insights[policyName] ||
+        insights[policyName as keyof typeof insights] ||
         `Policy analysis: ${policy.days} days allocated with ${policy.usage} usage. Consider reviewing against industry standards and employee feedback.`
 
       setPolicyInsights((prev) => ({ ...prev, [policyName]: insight }))
@@ -2919,6 +2922,12 @@ Format the response in a professional, actionable manner for HR decision-makers.
       })
     } catch (error) {
       console.error("Error generating insight:", error)
+      console.error("Error details:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : "No stack trace",
+        policyName,
+        policy,
+      })
       toast({
         title: "Error",
         description: "Failed to generate AI insight. Please try again.",
