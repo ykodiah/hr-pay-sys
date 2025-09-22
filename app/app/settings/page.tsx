@@ -240,8 +240,8 @@ export default function SettingsPage() {
   const [isBackingUp, setIsBackingUp] = useState<boolean>(false)
   const [lastBackupTime, setLastBackupTime] = useState<string | null>(null)
   const [showAddSubsidiary, setShowAddSubsidiary] = useState<boolean>(false)
-  const [showEditSubsidiary, setShowEditSubsidiary] = useState<boolean>(false)
-  const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState<boolean>(false)
+  const [showEditSubsidiary, setShowEditSubsidiary] = useState(false)
+  const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState(false)
   const [selectedSubsidiary, setSelectedSubsidiary] = useState<Subsidiary | null>(null)
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<boolean>(false)
   const [showReactivateConfirm, setShowReactivateConfirm] = useState<boolean>(false)
@@ -604,6 +604,156 @@ export default function SettingsPage() {
     notches: [],
   })
   const [isGeneratingNotches, setIsGeneratingNotches] = useState(false)
+
+  const [showImportExportModal, setShowImportExportModal] = useState(false)
+  const [importData, setImportData] = useState("")
+  const [isImporting, setIsImporting] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+
+  const handleExportSalaryGrades = async (format: "csv" | "excel") => {
+    setIsExporting(true)
+
+    try {
+      // Prepare data for export
+      const exportData = []
+
+      // Add headers
+      exportData.push(["Grade Name", "Description", "Min Salary", "Max Salary", "Step", "Step Amount"])
+
+      // Add data rows
+      salaryGrades.forEach((grade) => {
+        grade.notches.forEach((notch) => {
+          exportData.push([grade.name, grade.description, grade.minSalary, grade.maxSalary, notch.step, notch.amount])
+        })
+      })
+
+      if (format === "csv") {
+        // Convert to CSV
+        const csvContent = exportData.map((row) => row.map((field) => `"${field}"`).join(",")).join("\n")
+
+        // Download CSV
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+        const link = document.createElement("a")
+        const url = URL.createObjectURL(blob)
+        link.setAttribute("href", url)
+        link.setAttribute("download", `salary_grades_${new Date().toISOString().split("T")[0]}.csv`)
+        link.style.visibility = "hidden"
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      } else {
+        // For Excel format, we'll create a simple tab-separated format
+        const tsvContent = exportData.map((row) => row.join("\t")).join("\n")
+        const blob = new Blob([tsvContent], { type: "application/vnd.ms-excel" })
+        const link = document.createElement("a")
+        const url = URL.createObjectURL(blob)
+        link.setAttribute("href", url)
+        link.setAttribute("download", `salary_grades_${new Date().toISOString().split("T")[0]}.xlsx`)
+        link.style.visibility = "hidden"
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
+
+      toast({
+        title: "Export Successful",
+        description: `Salary grades exported as ${format.toUpperCase()} file.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export salary grades. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleImportSalaryGrades = async () => {
+    if (!importData.trim()) {
+      toast({
+        title: "No Data",
+        description: "Please paste CSV data to import.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsImporting(true)
+
+    try {
+      const lines = importData.trim().split("\n")
+      const headers = lines[0].split(",").map((h) => h.replace(/"/g, "").trim())
+
+      // Validate headers
+      const expectedHeaders = ["Grade Name", "Description", "Min Salary", "Max Salary", "Step", "Step Amount"]
+      const hasValidHeaders = expectedHeaders.every((header) =>
+        headers.some((h) => h.toLowerCase().includes(header.toLowerCase())),
+      )
+
+      if (!hasValidHeaders) {
+        throw new Error("Invalid CSV format. Please ensure headers match the expected format.")
+      }
+
+      // Parse data
+      const gradesMap = new Map()
+
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(",").map((v) => v.replace(/"/g, "").trim())
+
+        if (values.length >= 6) {
+          const gradeName = values[0]
+          const description = values[1]
+          const minSalary = Number.parseFloat(values[2])
+          const maxSalary = Number.parseFloat(values[3])
+          const step = Number.parseInt(values[4])
+          const stepAmount = Number.parseFloat(values[5])
+
+          if (!gradesMap.has(gradeName)) {
+            gradesMap.set(gradeName, {
+              id: Date.now() + Math.random(),
+              name: gradeName,
+              description,
+              minSalary,
+              maxSalary,
+              notches: [],
+            })
+          }
+
+          gradesMap.get(gradeName).notches.push({
+            step,
+            amount: stepAmount,
+          })
+        }
+      }
+
+      // Convert to array and sort notches
+      const importedGrades = Array.from(gradesMap.values()).map((grade) => ({
+        ...grade,
+        notches: grade.notches.sort((a, b) => a.step - b.step),
+      }))
+
+      // Add to existing grades
+      setSalaryGrades((prev) => [...prev, ...importedGrades])
+
+      toast({
+        title: "Import Successful",
+        description: `Successfully imported ${importedGrades.length} salary grades.`,
+      })
+
+      setShowImportExportModal(false)
+      setImportData("")
+    } catch (error) {
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to import salary grades. Please check your data format.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsImporting(false)
+    }
+  }
 
   const [newDivisionName, setNewDivisionName] = useState("")
   const [newDepartmentName, setNewDepartmentName] = useState("")
@@ -1878,7 +2028,7 @@ export default function SettingsPage() {
       const syncOptions = {
         hr_policies: true,
         payroll_configuration: true,
-        leave_types: true,
+        leave_types: false,
         roles_permissions: false,
       }
 
@@ -4464,10 +4614,16 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     <TrendingUp className="w-5 h-5" />
                     <span>Salary Grades & Notches</span>
                   </CardTitle>
-                  <Button variant="outline" onClick={handleAddSalaryGrade}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Salary Grade
-                  </Button>
+                  <div className="flex items-center space-x-2">
+                    <Button variant="outline" onClick={() => setShowImportExportModal(true)}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Import/Export
+                    </Button>
+                    <Button variant="outline" onClick={handleAddSalaryGrade}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Salary Grade
+                    </Button>
+                  </div>
                 </div>
                 <CardDescription>Manage salary grades and notch structure for employee compensation</CardDescription>
               </CardHeader>
@@ -6728,6 +6884,104 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 </div>
               </CardContent>
             </Card>
+          </div>
+        </div>
+      )}
+
+      {showImportExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Import/Export Salary Grades</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowImportExportModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Export Section */}
+              <div>
+                <h3 className="text-lg font-medium mb-3">Export Data</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Download your current salary grades data in CSV or Excel format.
+                </p>
+                <div className="flex space-x-3">
+                  <Button
+                    onClick={() => handleExportSalaryGrades("csv")}
+                    disabled={isExporting || salaryGrades.length === 0}
+                    className="flex items-center space-x-2"
+                  >
+                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    <span>Export as CSV</span>
+                  </Button>
+                  <Button
+                    onClick={() => handleExportSalaryGrades("excel")}
+                    disabled={isExporting || salaryGrades.length === 0}
+                    variant="outline"
+                    className="flex items-center space-x-2"
+                  >
+                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    <span>Export as Excel</span>
+                  </Button>
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                {/* Import Section */}
+                <div>
+                  <h3 className="text-lg font-medium mb-3">Import Data</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Import salary grades from CSV data. Expected format: Grade Name, Description, Min Salary, Max
+                    Salary, Step, Step Amount
+                  </p>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="importData">CSV Data</Label>
+                      <textarea
+                        id="importData"
+                        className="w-full h-32 p-3 border border-gray-300 rounded-md resize-none font-mono text-sm"
+                        placeholder={`Grade Name,Description,Min Salary,Max Salary,Step,Step Amount
+"Grade 1","Entry Level",2500,4000,1,2500
+"Grade 1","Entry Level",2500,4000,2,3000
+"Grade 2","Mid Level",4000,6000,1,4000`}
+                        value={importData}
+                        onChange={(e) => setImportData(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">
+                        {importData.trim() ? `${importData.trim().split("\n").length - 1} rows to import` : "No data"}
+                      </span>
+                      <Button
+                        onClick={handleImportSalaryGrades}
+                        disabled={isImporting || !importData.trim()}
+                        className="flex items-center space-x-2"
+                      >
+                        {isImporting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Importing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            <span>Import Data</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <Button variant="outline" onClick={() => setShowImportExportModal(false)}>
+                Close
+              </Button>
+            </div>
           </div>
         </div>
       )}
