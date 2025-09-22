@@ -2766,6 +2766,15 @@ Next Review Date: January 15, 2025`,
   const handleFileUpload = (event) => {
     const file = event.target.files[0]
     if (file) {
+      if (file.type !== 'application/pdf') {
+        toast({
+          title: "Invalid File Type",
+          description: "Only PDF files are allowed for HR documents.",
+          variant: "destructive",
+        })
+        return
+      }
+      
       setUploadedFile(file)
       if (!documentName) {
         setDocumentName(file.name.replace(/\.[^/.]+$/, ""))
@@ -4673,10 +4682,13 @@ Format the response in a professional, actionable manner for HR decision-makers.
                             </p>
                           </div>
                           <div className="flex items-center space-x-4">
-                            <Switch
-                              checked={doc.visibleToAll}
-                              onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
-                            />
+                            <div className="flex flex-col items-center space-y-1">
+                              <Switch
+                                checked={doc.visibleToAll}
+                                onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
+                              />
+                              <span className="text-xs text-gray-500">Available for employees</span>
+                            </div>
                             <Button variant="outline" size="sm" onClick={() => handleDocumentView(doc)}>
                               View
                             </Button>
@@ -7287,27 +7299,4 @@ Format the response in a professional, actionable manner for HR decision-makers.
       {showAddLeaveTypeModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Add New Leave Type</h2>
-              <Button variant="ghost" size="sm" onClick={() => setShowAddLeaveTypeModal(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="leaveName">Leave Type Name</Label>
-                <Input
-                  id="leaveName"
-                  value={newLeaveType.name}
-                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g., Study Leave"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="leaveDays">Number of Days</Label>
-                <Input
-                  id="leaveDays"
-                  type="number"
-                  value={newLeaveType
+            <div className="flex items-center\
