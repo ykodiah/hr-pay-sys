@@ -575,6 +575,7 @@ export default function SettingsPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [testConnectionStatus, setTestConnectionStatus] = useState<"idle" | "testing" | "success" | "error">("idle")
 
+  // Structured Salary Grades
   const [salaryGrades, setSalaryGrades] = useState([
     {
       id: 1,
@@ -609,6 +610,25 @@ export default function SettingsPage() {
   const [importData, setImportData] = useState("")
   const [isImporting, setIsImporting] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+
+  const [salaryGradeTab, setSalaryGradeTab] = useState("structured")
+  const [unstructuredGrades, setUnstructuredGrades] = useState([
+    {
+      id: 1,
+      name: "Management Level",
+      description: "Senior management positions",
+      generalIncrement: { type: "percentage", value: 5 },
+      performanceIncrement: { type: "percentage", value: 10 },
+    },
+  ])
+  const [showUnstructuredModal, setShowUnstructuredModal] = useState(false)
+  const [editingUnstructured, setEditingUnstructured] = useState(null)
+  const [newUnstructured, setNewUnstructured] = useState({
+    name: "",
+    description: "",
+    generalIncrement: { type: "percentage", value: 0 },
+    performanceIncrement: { type: "percentage", value: 0 },
+  })
 
   const handleExportSalaryGrades = async (format: "csv" | "excel") => {
     setIsExporting(true)
@@ -3628,6 +3648,78 @@ Format the response in a professional, actionable manner for HR decision-makers.
     })
   }
 
+  const handleAddUnstructuredGrade = () => {
+    setEditingUnstructured(null)
+    setNewUnstructured({
+      name: "",
+      description: "",
+      generalIncrement: { type: "percentage", value: 0 },
+      performanceIncrement: { type: "percentage", value: 0 },
+    })
+    setShowUnstructuredModal(true)
+  }
+
+  const handleEditUnstructuredGrade = (grade) => {
+    setEditingUnstructured(grade)
+    setNewUnstructured({
+      name: grade.name,
+      description: grade.description,
+      generalIncrement: grade.generalIncrement,
+      performanceIncrement: grade.performanceIncrement,
+    })
+    setShowUnstructuredModal(true)
+  }
+
+  const handleSaveUnstructuredGrade = () => {
+    if (!newUnstructured.name) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const gradeToAdd = {
+      id: editingUnstructured ? editingUnstructured.id : Date.now(),
+      name: newUnstructured.name,
+      description: newUnstructured.description,
+      generalIncrement: newUnstructured.generalIncrement,
+      performanceIncrement: newUnstructured.performanceIncrement,
+    }
+
+    if (editingUnstructured) {
+      setUnstructuredGrades((prev) => prev.map((grade) => (grade.id === editingUnstructured.id ? gradeToAdd : grade)))
+      toast({
+        title: "Grade Updated",
+        description: "Unstructured salary grade has been updated successfully.",
+      })
+    } else {
+      setUnstructuredGrades((prev) => [...prev, gradeToAdd])
+      toast({
+        title: "Grade Added",
+        description: "New unstructured salary grade has been added successfully.",
+      })
+    }
+
+    setShowUnstructuredModal(false)
+    setEditingUnstructured(null)
+    setNewUnstructured({
+      name: "",
+      description: "",
+      generalIncrement: { type: "percentage", value: 0 },
+      performanceIncrement: { type: "percentage", value: 0 },
+    })
+  }
+
+  const handleDeleteUnstructuredGrade = (gradeId) => {
+    setUnstructuredGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
+    toast({
+      title: "Grade Deleted",
+      description: "Unstructured salary grade has been deleted successfully.",
+    })
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -4619,61 +4711,143 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       <Download className="w-4 h-4 mr-2" />
                       Import/Export
                     </Button>
-                    <Button variant="outline" onClick={handleAddSalaryGrade}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Salary Grade
-                    </Button>
+                    {salaryGradeTab === "structured" ? (
+                      <Button variant="outline" onClick={handleAddSalaryGrade}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Salary Grade
+                      </Button>
+                    ) : (
+                      <Button variant="outline" onClick={handleAddUnstructuredGrade}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Unstructured Grade
+                      </Button>
+                    )}
                   </div>
                 </div>
-                <CardDescription>Manage salary grades and notch structure for employee compensation</CardDescription>
+                <CardDescription>Manage salary grades and compensation structure for employees</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {salaryGrades.map((grade) => (
-                    <Card key={grade.id} className="border-l-4 border-l-purple-500">
-                      <CardHeader>
-                        <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
-                        <CardDescription>{grade.description}</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                          <p className="text-sm">
-                            <span className="font-medium">Range:</span> ₵{grade.minSalary.toLocaleString()} - ₵
-                            {grade.maxSalary.toLocaleString()}
-                          </p>
-                          <p className="text-sm">
-                            <span className="font-medium">Notches:</span> {grade.notches.length} steps
-                          </p>
-                        </div>
+                {/* Tab Navigation */}
+                <div className="flex space-x-1 bg-muted p-1 rounded-lg">
+                  <button
+                    onClick={() => setSalaryGradeTab("structured")}
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                      salaryGradeTab === "structured"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Structured Salary Grade
+                  </button>
+                  <button
+                    onClick={() => setSalaryGradeTab("unstructured")}
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                      salaryGradeTab === "unstructured"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Unstructured Salary Grade
+                  </button>
+                </div>
 
-                        <div className="border-t pt-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-muted-foreground">Salary Steps</span>
+                {/* Structured Salary Grades */}
+                {salaryGradeTab === "structured" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {salaryGrades.map((grade) => (
+                      <Card key={grade.id} className="border-l-4 border-l-purple-500">
+                        <CardHeader>
+                          <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
+                          <CardDescription>{grade.description}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-2">
+                            <p className="text-sm">
+                              <span className="font-medium">Range:</span> ₵{grade.minSalary.toLocaleString()} - ₵
+                              {grade.maxSalary.toLocaleString()}
+                            </p>
+                            <p className="text-sm">
+                              <span className="font-medium">Notches:</span> {grade.notches.length} steps
+                            </p>
                           </div>
-                          <div className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-32 overflow-y-auto">
-                            <div className="space-y-1">
-                              {grade.notches.map((notch) => (
-                                <div key={notch.step} className="flex justify-between text-xs">
-                                  <span>Step {notch.step}</span>
-                                  <span className="font-medium">₵{notch.amount.toLocaleString()}</span>
-                                </div>
-                              ))}
+
+                          <div className="border-t pt-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-muted-foreground">Salary Steps</span>
+                            </div>
+                            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-32 overflow-y-auto">
+                              <div className="space-y-1">
+                                {grade.notches.map((notch) => (
+                                  <div key={notch.step} className="flex justify-between text-xs">
+                                    <span>Step {notch.step}</span>
+                                    <span className="font-medium">₵{notch.amount.toLocaleString()}</span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="flex justify-end space-x-2 pt-2">
-                          <Button variant="outline" size="sm" onClick={() => handleEditSalaryGrade(grade)}>
-                            Edit
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDeleteSalaryGrade(grade.id)}>
-                            Delete
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                          <div className="flex justify-end space-x-2 pt-2">
+                            <Button variant="outline" size="sm" onClick={() => handleEditSalaryGrade(grade)}>
+                              Edit
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteSalaryGrade(grade.id)}>
+                              Delete
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+
+                {/* Unstructured Salary Grades */}
+                {salaryGradeTab === "unstructured" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {unstructuredGrades.map((grade) => (
+                      <Card key={grade.id} className="border-l-4 border-l-blue-500">
+                        <CardHeader>
+                          <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
+                          <CardDescription>{grade.description}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-3">
+                            <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-green-800">General Increment</span>
+                                <span className="text-sm font-semibold text-green-900">
+                                  {grade.generalIncrement.type === "percentage"
+                                    ? `${grade.generalIncrement.value}%`
+                                    : `₵${grade.generalIncrement.value.toLocaleString()}`}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-blue-800">Performance Increment</span>
+                                <span className="text-sm font-semibold text-blue-900">
+                                  {grade.performanceIncrement.type === "percentage"
+                                    ? `${grade.performanceIncrement.value}%`
+                                    : `₵${grade.performanceIncrement.value.toLocaleString()}`}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end space-x-2 pt-2">
+                            <Button variant="outline" size="sm" onClick={() => handleEditUnstructuredGrade(grade)}>
+                              Edit
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteUnstructuredGrade(grade.id)}>
+                              Delete
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -7134,163 +7308,4 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   id="leaveDays"
                   type="number"
                   value={newLeaveType.days}
-                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, days: Number(e.target.value) }))}
-                  placeholder="e.g., 5"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="leaveDescription">Description</Label>
-                <Input
-                  id="leaveDescription"
-                  value={newLeaveType.description}
-                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, description: e.target.value }))}
-                  placeholder="Brief description of the leave type"
-                />
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="carryOver"
-                  checked={newLeaveType.carryOver}
-                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, carryOver: e.target.checked }))}
-                  className="rounded"
-                />
-                <Label htmlFor="carryOver">Allow carry over to next year</Label>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button variant="outline" onClick={() => setShowAddLeaveTypeModal(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddLeaveType} disabled={isSavingPolicy}>
-                {isSavingPolicy ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Adding...
-                  </>
-                ) : (
-                  "Add Leave Type"
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showPolicyModal && selectedPolicy && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">
-                {policyModalType === "view" && "View Policy"}
-                {policyModalType === "edit" && "Edit Policy"}
-                {policyModalType === "delete" && "Delete Policy"}
-              </h2>
-              <Button variant="ghost" size="sm" onClick={() => setShowPolicyModal(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-
-            {policyModalType === "view" && (
-              <div className="space-y-4">
-                <div>
-                  <Label>Policy Name</Label>
-                  <p className="text-sm font-medium">{selectedPolicy.name}</p>
-                </div>
-                <div>
-                  <Label>Days Allocated</Label>
-                  <p className="text-sm font-medium">{selectedPolicy.days} days</p>
-                </div>
-                <div>
-                  <Label>Current Usage</Label>
-                  <p className="text-sm font-medium">{selectedPolicy.usage}</p>
-                </div>
-                <div>
-                  <Label>Description</Label>
-                  <p className="text-sm">{selectedPolicy.description}</p>
-                </div>
-              </div>
-            )}
-
-            {policyModalType === "edit" && (
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="editPolicyName">Policy Name</Label>
-                  <Input
-                    id="editPolicyName"
-                    value={editingPolicy.name}
-                    onChange={(e) => setEditingPolicy((prev) => ({ ...prev, name: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="editPolicyDays">Number of Days</Label>
-                  <Input
-                    id="editPolicyDays"
-                    type="number"
-                    value={editingPolicy.days}
-                    onChange={(e) => setEditingPolicy((prev) => ({ ...prev, days: Number(e.target.value) }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="editPolicyDescription">Description</Label>
-                  <Input
-                    id="editPolicyDescription"
-                    value={editingPolicy.description}
-                    onChange={(e) => setEditingPolicy((prev) => ({ ...prev, description: e.target.value }))}
-                  />
-                </div>
-              </div>
-            )}
-
-            {policyModalType === "delete" && (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600">
-                  Are you sure you want to delete the <strong>{selectedPolicy.name}</strong> policy? This action cannot
-                  be undone.
-                </p>
-                <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                  <p className="text-xs text-red-800">
-                    Deleting this policy will affect all employees who have this leave type allocated.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button variant="outline" onClick={() => setShowPolicyModal(false)}>
-                Cancel
-              </Button>
-              {policyModalType === "edit" && (
-                <Button onClick={handleSavePolicyChanges} disabled={isSavingPolicy}>
-                  {isSavingPolicy ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    "Save Changes"
-                  )}
-                </Button>
-              )}
-              {policyModalType === "delete" && (
-                <Button variant="destructive" onClick={handleDeletePolicy} disabled={isSavingPolicy}>
-                  {isSavingPolicy ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Deleting...
-                    </>
-                  ) : (
-                    "Delete Policy"
-                  )}
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, days: Number(e.target.value)
