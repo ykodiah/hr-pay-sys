@@ -60,7 +60,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator" // Added for Separator
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table" // Added for Table components
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog" // Added for Dialog components
 
 interface Company {
   id: string
@@ -7264,25 +7263,22 @@ Format the response in a professional, actionable manner for HR decision-makers.
           </div>
         </div>
       </div>
-    )showAddLeaveTypeModal && (
-      <Dialog open={showAddLeaveTypeModal} onOpenChange={setShowAddLeaveTypeModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Add Leave Type</DialogTitle>
-            <DialogDescription>
-              Create a new leave type for your organization.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="leaveTypeName" className="text-right">
-                Leave Type Name
-              </Label>
-              <Input
-                id="leaveTypeName"
-                value={newLeaveType.name}
-                onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
-                className="col-span-3"
-              />
-            </div>
-            <div className=\"grid grid-cols-4 items-center gap-
+    )showUnstructuredModal && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">
+              {editingUnstructured ? "Edit Unstructured Grade" : "Add New Unstructured Grade"}
+            </h2>
+            <Button variant="ghost" size="sm" onClick={() => setShowUnstructuredModal(false)}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <p className="text-sm text-muted-foreground mb-6">
+            Configure unstructured salary grade with flexible increment ranges
+          </p>
+
+          <div className="space-y-6">
+            {/* Basic Information */}\
+            <div className
