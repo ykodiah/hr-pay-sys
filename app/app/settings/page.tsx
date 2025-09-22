@@ -7271,7 +7271,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
             <DialogTitle>Add Leave Type</DialogTitle>
             <DialogDescription>
               Create a new leave type for your organization.
-            </DialogDialogDescription>
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
@@ -7284,5 +7284,5 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
                 className="col-span-3"
               />
-            </div>\
-            <div
+            </div>
+            <div className=\"grid grid-cols-4 items-center gap-
