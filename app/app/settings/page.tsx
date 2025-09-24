@@ -1,63 +1,9 @@
 "use client"
 import { useState, useEffect } from "react"
+import type React from "react"
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
-import {
-  Building2,
-  Users,
-  X,
-  Eye,
-  Edit,
-  MoreVertical,
-  Loader2,
-  Brain,
-  Plus,
-  RefreshCw,
-  MapPin,
-  Briefcase,
-  Copy,
-  Download,
-  Upload,
-  ImageIcon,
-  AlertTriangle,
-  CheckCircle,
-  Save,
-  Settings,
-  Calendar,
-  Sparkles,
-  TrendingUp,
-  DollarSign,
-  Minus,
-  Calculator,
-  Wifi,
-  Bell,
-  MoreHorizontal,
-  Trash2,
-  Send,
-  Mail,
-  Shield,
-  EyeOff,
-  Check,
-} from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator" // Added for Separator
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table" // Added for Table components
 
 interface Company {
   id: string
@@ -210,9 +156,15 @@ export default function SettingsPage() {
     description: "",
   })
   const [isSavingPolicy, setIsSavingPolicy] = useState(false)
-  const [isSavingDocument, setIsSavingDocument] = useState(false)
   const [showDocumentPreview, setShowDocumentPreview] = useState(false)
   const [documentPreviewContent, setDocumentPreviewContent] = useState("")
+  const [isSavingDocument, setIsSavingDocument] = useState(false)
+  const [pdfViewerState, setPdfViewerState] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    zoom: 100,
+    isLoading: false
+  })
 
   const [documentZoom, setDocumentZoom] = useState(100)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -1058,6 +1010,7 @@ export default function SettingsPage() {
       setDivisions(["Head Office", "Regional Office"])
       setDepartments(["Technology", "Human Resources", "Finance"])
       setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+      setLogoPreview(data.logo_url || "")
       return
     }
 
@@ -2168,21 +2121,11 @@ export default function SettingsPage() {
     })
   }
 
-  const handleEditDocument = async (docId) => {
-    const doc = hrDocuments.find((d) => d.id === docId)
-    if (doc) {
-      setSelectedDocument(doc)
-      setDocumentName(doc.name)
-      setDocumentModalType("edit")
-      setShowDocumentModal(true)
-    }
-  }
-
-  const handleSaveDocumentEdit = async () => {
-    if (!documentName) {
+  const handleEditDocument = async () => {
+    if (!documentName || !uploadedFile) {
       toast({
         title: "Error",
-        description: "Please provide a document name.",
+        description: "Please provide a document name and upload a file.",
         variant: "destructive",
       })
       return
@@ -2193,17 +2136,10 @@ export default function SettingsPage() {
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
       setHrDocuments((prev) =>
-        prev.map((doc) =>
-          doc.id === selectedDocument.id
-            ? { ...doc, name: documentName }
-            : doc
-        )
+        prev.map((doc) => (doc.id === selectedDocument.id ? { ...doc, name: documentName } : doc)),
       )
 
       setShowDocumentModal(false)
-      setDocumentName("")
-      setSelectedDocument(null)
-
       toast({
         title: "Document Updated",
         description: `${documentName} has been successfully updated.`,
@@ -2219,3423 +2155,5557 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSaveDocument = async () => {
-    if (!documentName || !uploadedFile) {
+  const handleToggleSubsidiaryStatus = (subsidiary: Subsidiary) => {
+    setSubsidiaryToToggle(subsidiary)
+    if (subsidiary.status === "active") {
+      setShowDeactivateConfirm(true)
+    } else {
+      setShowReactivateConfirm(true)
+    }
+  }
+
+  const confirmToggleStatus = async () => {
+    if (!subsidiaryToToggle) return
+
+    await toggleSubsidiaryStatus(subsidiaryToToggle.id, subsidiaryToToggle.status)
+    setShowDeactivateConfirm(false)
+    setShowReactivateConfirm(false)
+    setSubsidiaryToToggle(null)
+  }
+
+  const handleSaveLeaveType = async () => {
+    if (!newLeaveType.name || !newLeaveType.days) {
       toast({
-        title: "Error",
-        description: "Please provide a document name and upload a file.",
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
         variant: "destructive",
       })
       return
     }
 
-    setIsSavingDocument(true)
+    setIsSavingPolicy(true)
     try {
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      const newDoc = {
-        id: Date.now(),
-        name: documentName,
-        type: uploadedFile.type.includes("pdf") ? "PDF" : "DOC",
-        size: `${(uploadedFile.size / (1024 * 1024)).toFixed(1)} MB`,
-        visibleToAll: false,
+      const newPolicy = {
+        name: newLeaveType.name,
+        days: newLeaveType.days,
+        usage: "0%",
+        trend: "new",
+        description: newLeaveType.description,
       }
 
-      setHrDocuments((prev) => [...prev, newDoc])
-      setShowDocumentModal(false)
-      setDocumentName("")
-      setUploadedFile(null)
+      setCurrentPolicies((prev) => [...prev, newPolicy])
+      setNewLeaveType({ name: "", days: 0, description: "", carryOver: false })
+      setShowAddLeaveTypeModal(false)
+
+      toast({
+        title: "Leave Type Added",
+        description: `${newLeaveType.name} has been successfully added.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add leave type. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingPolicy(false)
+    }
+  }
+
+  const handlePolicyAction = (action, policyName) => {
+    const policy = currentPolicies.find((p) => p.name === policyName)
+
+    setSelectedPolicy(policy)
+    setPolicyModalType(action)
+
+    if (action === "edit") {
+      setEditingPolicy({
+        name: policy.name,
+        days: policy.days,
+        description: policy.description,
+      })
+    }
+
+    setShowPolicyModal(true)
+  }
+
+  const handleSavePolicyChanges = async () => {
+    setIsSavingPolicy(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // Update the policy in current policies
+      setCurrentPolicies((prev) =>
+        prev.map((policy) =>
+          policy.name === selectedPolicy.name
+            ? { ...policy, name: editingPolicy.name, days: editingPolicy.days, description: editingPolicy.description }
+            : policy,
+        ),
+      )
+
+      setShowPolicyModal(false)
+      toast({
+        title: "Policy Updated",
+        description: `${editingPolicy.name} policy has been successfully updated.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update policy. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingPolicy(false)
+    }
+  }
+
+  const generateLeaveTypeInsights = (name: string, days: number, description: string) => {
+    const insights = []
+
+    if (days > 30) {
+      insights.push("⚠️ Consider if this extended leave period aligns with industry standards")
+    }
+    if (days < 5) {
+      insights.push("💡 Short leave periods may require frequent approvals - consider automation")
+    }
+    if (name.toLowerCase().includes("sick")) {
+      insights.push("🏥 Recommend integrating with health insurance policies")
+    }
+    if (name.toLowerCase().includes("maternity") || name.toLowerCase().includes("paternity")) {
+      insights.push("👶 Ensure compliance with local family leave regulations")
+    }
+    if (description.length < 20) {
+      insights.push("📝 Consider adding more detailed policy description for clarity")
+    }
+
+    insights.push("✨ AI suggests reviewing similar policies in your industry for benchmarking")
+
+    return insights
+  }
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.2
+APPROVED BY: Executive Leadership Team
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Welcome Message .......................................... 3
+2. Company Overview ......................................... 4
+3. Employment Policies ...................................... 6
+4. Compensation and Benefits ................................ 12
+5. Work Environment and Safety .............................. 18
+6. Professional Development ................................. 22
+7. Technology and Communication ............................. 25
+8. Leave Policies ........................................... 28
+9. Performance Management ................................... 32
+10. Disciplinary Procedures ................................. 35
+11. Employee Resources ...................................... 38
+
+═══════════════════════════════════════════════════════════════
+
+1. WELCOME MESSAGE
+
+Dear Team Member,
+
+Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
+
+This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
+
+Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
+
+If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
+
+Welcome aboard!
+
+Sincerely,
+The Executive Leadership Team
+
+2. COMPANY OVERVIEW
+
+2.1 OUR MISSION
+To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
+
+2.2 OUR VALUES
+- Integrity: We conduct business with honesty and transparency
+- Excellence: We strive for the highest quality in everything we do
+- Innovation: We embrace change and continuously improve
+- Teamwork: We collaborate effectively to achieve common goals
+- Respect: We value diversity and treat everyone with dignity
+
+2.3 ORGANIZATIONAL STRUCTURE
+Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+
+3. EMPLOYMENT POLICIES
+
+3.1 EQUAL EMPLOYMENT OPPORTUNITY
+We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
+
+3.2 AT-WILL EMPLOYMENT
+Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
+
+3.3 BACKGROUND CHECKS
+All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+
+4. COMPENSATION AND BENEFITS
+
+4.1 PAY PERIODS
+Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
+
+4.2 OVERTIME
+Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
+
+4.3 BENEFITS OVERVIEW
+We offer a comprehensive benefits package including:
+- Health insurance
+- Dental and vision coverage
+- Retirement savings plan with company matching
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT AND SAFETY
+
+5.1 WORKPLACE SAFETY
+The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
+
+5.2 DRUG-FREE WORKPLACE
+We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
+
+6. PROFESSIONAL DEVELOPMENT
+
+We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
+
+7. TECHNOLOGY AND COMMUNICATION
+
+7.1 COMPUTER AND INTERNET USE
+Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
+
+7.2 CONFIDENTIALITY
+Employees must protect confidential company information and respect the privacy of customer and employee data.
+
+8. LEAVE POLICIES
+
+8.1 PAID TIME OFF (PTO)
+Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
+
+8.2 FAMILY AND MEDICAL LEAVE
+Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
+
+9. PERFORMANCE MANAGEMENT
+
+Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
+
+10. DISCIPLINARY PROCEDURES
+
+When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
+
+11. EMPLOYEE RESOURCES
+
+11.1 HUMAN RESOURCES DEPARTMENT
+The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
+
+11.2 EMPLOYEE ASSISTANCE PROGRAM
+Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
+
+═══════════════════════════════════════════════════════════════
+
+ACKNOWLEDGMENT
+
+I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+This handbook is subject to change. Updates will be communicated to all employees.
+
+Document Control:
+- Document ID: EH-2024-001
+- Last Review Date: December 1, 2023
+- Next Review Date: December 1, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+SAFETY FIRST - ALWAYS
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.3
+APPROVED BY: Safety Committee
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Safety Policy Statement ................................... 3
+2. General Safety Rules ..................................... 4
+3. Emergency Procedures ..................................... 6
+4. Personal Protective Equipment ............................ 8
+5. Hazard Communication ..................................... 10
+6. Incident Reporting ....................................... 12
+7. Training Requirements .................................... 14
+8. Safety Committee ......................................... 16
+
+═══════════════════════════════════════════════════════════════
+
+1. SAFETY POLICY STATEMENT
+
+The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
+
+Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
+
+2. GENERAL SAFETY RULES
+
+2.1 BASIC SAFETY PRINCIPLES
+- Follow all safety procedures and guidelines
+- Report unsafe conditions immediately
+- Use appropriate personal protective equipment
+- Keep work areas clean and organized
+- Never take shortcuts that compromise safety
+
+2.2 PROHIBITED ACTIVITIES
+- Horseplay or practical jokes
+- Operating equipment without proper training
+- Removing or disabling safety devices
+- Working under the influence of drugs or alcohol
+
+3. EMERGENCY PROCEDURES
+
+3.1 FIRE EMERGENCY
+- Activate the nearest fire alarm
+- Evacuate immediately using designated routes
+- Proceed to assembly areas
+- Do not use elevators
+- Do not re-enter the building until authorized
+
+3.2 MEDICAL EMERGENCY
+- Call 911 immediately for serious injuries
+- Notify your supervisor and security
+- Provide first aid only if trained to do so
+- Do not move seriously injured persons
+
+3.3 SEVERE WEATHER
+- Monitor weather alerts and warnings
+- Follow instructions from management
+- Move to designated shelter areas if required
+- Remain in shelter until all-clear is given
+
+4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
+
+4.1 GENERAL REQUIREMENTS
+Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
+- Safety glasses or goggles
+- Hard hats
+- Safety shoes
+- Gloves
+- Hearing protection
+- Respiratory protection
+
+4.2 PPE MAINTENANCE
+- Inspect PPE before each use
+- Replace damaged or worn equipment
+- Clean and store PPE properly
+- Report defective equipment immediately
+
+5. HAZARD COMMUNICATION
+
+5.1 CHEMICAL SAFETY
+- Read and understand Safety Data Sheets (SDS)
+- Follow proper handling procedures
+- Use appropriate PPE when working with chemicals
+- Store chemicals according to manufacturer instructions
+
+5.2 LABELING REQUIREMENTS
+All hazardous materials must be properly labeled with:
+- Product identification
+- Hazard warnings
+- Precautionary statements
+- Supplier information
+
+6. INCIDENT REPORTING
+
+6.1 REPORTING REQUIREMENTS
+All incidents, including near misses, must be reported immediately to:
+- Your immediate supervisor
+- The Safety Department
+- Human Resources (for injuries)
+
+6.2 INVESTIGATION PROCESS
+All incidents will be thoroughly investigated to:
+- Determine root causes
+- Implement corrective actions
+- Prevent similar occurrences
+- Comply with regulatory requirements
+
+7. TRAINING REQUIREMENTS
+
+7.1 NEW EMPLOYEE ORIENTATION
+All new employees must complete safety orientation training before beginning work assignments.
+
+7.2 ONGOING TRAINING
+Regular safety training is provided on topics including:
+- Job-specific safety procedures
+- Emergency response
+- Hazard recognition
+- PPE use and maintenance
+
+8. SAFETY COMMITTEE
+
+Our Safety Committee meets monthly to:
+- Review incident reports and trends
+- Evaluate safety procedures
+- Recommend improvements
+- Promote safety awareness
+
+Committee members represent all departments and levels of the organization.
+
+═══════════════════════════════════════════════════════════════
+
+SAFETY CONTACTS
+
+Emergency: 911
+Security: Extension 2911
+Safety Department: Extension 2500
+Human Resources: Extension 2100
+
+═══════════════════════════════════════════════════════════════
+
+Remember: Safety is everyone's responsibility!
+
+Document Control:
+- Document ID: SM-2024-001
+- Last Review Date: November 15, 2023
+- Next Review Date: November 15, 2024
+- Document Owner: Safety Committee`
+      }
+    };
+
+    return documentTemplates[document.name as keyof typeof documentTemplates] || {
+      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
+    };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
 
       toast({
         title: "Document Added",
-        description: `${documentName} has been successfully uploaded.`,
-      })
+        description: `${newDocumentName} has been successfully added.`,
+      });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to upload document. Please try again.",
+        description: "Failed to add document. Please try again.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsSavingDocument(false)
+      setIsSavingDocument(false);
     }
-  }
+  };
 
-  const handleDeleteDocument = async (docId) => {
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId))
-      setShowDocumentModal(false)
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
       toast({
         title: "Document Deleted",
-        description: "Document has been successfully removed.",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete document. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSavingDocument(false)
+        description: "The document has been successfully deleted.",
+      });
     }
-  }
+  };
 
-  const handleSaveSubsidiaries = async () => {
-    console.log("[v0] Saving subsidiaries changes")
-    setIsSavingSubsidiaries(true)
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
 
-    try {
-      if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
-        toast({
-          title: "Changes Saved",
-          description: "All subsidiary changes have been saved successfully (Demo Mode)",
-        })
-        setIsSavingSubsidiaries(false)
-        return
-      }
-
-      // Save any pending changes to the database
-      // This could include updated subsidiary information, organizational changes, etc.
-
-      // For now, we'll refresh the data to ensure consistency
-      await loadSubsidiaries()
-
-      toast({
-        title: "Changes Saved",
-        description: "All subsidiary changes have been saved successfully",
-      })
-    } catch (error) {
-      console.error("Save error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to save changes",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSavingSubsidiaries(false)
-    }
-  }
-
-  const handleSaveHRConfig = async () => {
-    setIsSaving(true)
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      if (isDemoMode) {
-        toast({
-          title: "HR Configuration Saved",
-          description: "HR settings updated successfully (Demo Mode)",
-        })
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
       } else {
-        // Real database update would go here
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.2
+APPROVED BY: Executive Leadership Team
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Welcome Message .......................................... 3
+2. Company Overview ......................................... 4
+3. Employment Policies ...................................... 6
+4. Compensation and Benefits ................................ 12
+5. Work Environment and Safety .............................. 18
+6. Professional Development ................................. 22
+7. Technology and Communication ............................. 25
+8. Leave Policies ........................................... 28
+9. Performance Management ................................... 32
+10. Disciplinary Procedures ................................. 35
+11. Employee Resources ...................................... 38
+
+═══════════════════════════════════════════════════════════════
+
+1. WELCOME MESSAGE
+
+Dear Team Member,
+
+Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
+
+This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
+
+Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
+
+If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
+
+Welcome aboard!
+
+Sincerely,
+The Executive Leadership Team
+
+2. COMPANY OVERVIEW
+
+2.1 OUR MISSION
+To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
+
+2.2 OUR VALUES
+- Integrity: We conduct business with honesty and transparency
+- Excellence: We strive for the highest quality in everything we do
+- Innovation: We embrace change and continuously improve
+- Teamwork: We collaborate effectively to achieve common goals
+- Respect: We value diversity and treat everyone with dignity
+
+2.3 ORGANIZATIONAL STRUCTURE
+Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+
+3. EMPLOYMENT POLICIES
+
+3.1 EQUAL EMPLOYMENT OPPORTUNITY
+We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
+
+3.2 AT-WILL EMPLOYMENT
+Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
+
+3.3 BACKGROUND CHECKS
+All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+
+4. COMPENSATION AND BENEFITS
+
+4.1 PAY PERIODS
+Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
+
+4.2 OVERTIME
+Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
+
+4.3 BENEFITS OVERVIEW
+We offer a comprehensive benefits package including:
+- Health insurance
+- Dental and vision coverage
+- Retirement savings plan with company matching
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT AND SAFETY
+
+5.1 WORKPLACE SAFETY
+The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
+
+5.2 DRUG-FREE WORKPLACE
+We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
+
+6. PROFESSIONAL DEVELOPMENT
+
+We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
+
+7. TECHNOLOGY AND COMMUNICATION
+
+7.1 COMPUTER AND INTERNET USE
+Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
+
+7.2 CONFIDENTIALITY
+Employees must protect confidential company information and respect the privacy of customer and employee data.
+
+8. LEAVE POLICIES
+
+8.1 PAID TIME OFF (PTO)
+Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
+
+8.2 FAMILY AND MEDICAL LEAVE
+Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
+
+9. PERFORMANCE MANAGEMENT
+
+Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
+
+10. DISCIPLINARY PROCEDURES
+
+When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
+
+11. EMPLOYEE RESOURCES
+
+11.1 HUMAN RESOURCES DEPARTMENT
+The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
+
+11.2 EMPLOYEE ASSISTANCE PROGRAM
+Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
+
+═══════════════════════════════════════════════════════════════
+
+ACKNOWLEDGMENT
+
+I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+This handbook is subject to change. Updates will be communicated to all employees.
+
+Document Control:
+- Document ID: EH-2024-001
+- Last Review Date: December 1, 2023
+- Next Review Date: December 1, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+SAFETY FIRST - ALWAYS
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.3
+APPROVED BY: Safety Committee
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Safety Policy Statement ................................... 3
+2. General Safety Rules ..................................... 4
+3. Emergency Procedures ..................................... 6
+4. Personal Protective Equipment ............................ 8
+5. Hazard Communication ..................................... 10
+6. Incident Reporting ....................................... 12
+7. Training Requirements .................................... 14
+8. Safety Committee ......................................... 16
+
+═══════════════════════════════════════════════════════════════
+
+1. SAFETY POLICY STATEMENT
+
+The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
+
+Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
+
+2. GENERAL SAFETY RULES
+
+2.1 BASIC SAFETY PRINCIPLES
+- Follow all safety procedures and guidelines
+- Report unsafe conditions immediately
+- Use appropriate personal protective equipment
+- Keep work areas clean and organized
+- Never take shortcuts that compromise safety
+
+2.2 PROHIBITED ACTIVITIES
+- Horseplay or practical jokes
+- Operating equipment without proper training
+- Removing or disabling safety devices
+- Working under the influence of drugs or alcohol
+
+3. EMERGENCY PROCEDURES
+
+3.1 FIRE EMERGENCY
+- Activate the nearest fire alarm
+- Evacuate immediately using designated routes
+- Proceed to assembly areas
+- Do not use elevators
+- Do not re-enter the building until authorized
+
+3.2 MEDICAL EMERGENCY
+- Call 911 immediately for serious injuries
+- Notify your supervisor and security
+- Provide first aid only if trained to do so
+- Do not move seriously injured persons
+
+3.3 SEVERE WEATHER
+- Monitor weather alerts and warnings
+- Follow instructions from management
+- Move to designated shelter areas if required
+- Remain in shelter until all-clear is given
+
+4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
+
+4.1 GENERAL REQUIREMENTS
+Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
+- Safety glasses or goggles
+- Hard hats
+- Safety shoes
+- Gloves
+- Hearing protection
+- Respiratory protection
+
+4.2 PPE MAINTENANCE
+- Inspect PPE before each use
+- Replace damaged or worn equipment
+- Clean and store PPE properly
+- Report defective equipment immediately
+
+5. HAZARD COMMUNICATION
+
+5.1 CHEMICAL SAFETY
+- Read and understand Safety Data Sheets (SDS)
+- Follow proper handling procedures
+- Use appropriate PPE when working with chemicals
+- Store chemicals according to manufacturer instructions
+
+5.2 LABELING REQUIREMENTS
+All hazardous materials must be properly labeled with:
+- Product identification
+- Hazard warnings
+- Precautionary statements
+- Supplier information
+
+6. INCIDENT REPORTING
+
+6.1 REPORTING REQUIREMENTS
+All incidents, including near misses, must be reported immediately to:
+- Your immediate supervisor
+- The Safety Department
+- Human Resources (for injuries)
+
+6.2 INVESTIGATION PROCESS
+All incidents will be thoroughly investigated to:
+- Determine root causes
+- Implement corrective actions
+- Prevent similar occurrences
+- Comply with regulatory requirements
+
+7. TRAINING REQUIREMENTS
+
+7.1 NEW EMPLOYEE ORIENTATION
+All new employees must complete safety orientation training before beginning work assignments.
+
+7.2 ONGOING TRAINING
+Regular safety training is provided on topics including:
+- Job-specific safety procedures
+- Emergency response
+- Hazard recognition
+- PPE use and maintenance
+
+8. SAFETY COMMITTEE
+
+Our Safety Committee meets monthly to:
+- Review incident reports and trends
+- Evaluate safety procedures
+- Recommend improvements
+- Promote safety awareness
+
+Committee members represent all departments and levels of the organization.
+
+═══════════════════════════════════════════════════════════════
+
+SAFETY CONTACTS
+
+Emergency: 911
+Security: Extension 2911
+Safety Department: Extension 2500
+Human Resources: Extension 2100
+
+═══════════════════════════════════════════════════════════════
+
+Remember: Safety is everyone's responsibility!
+
+Document Control:
+- Document ID: SM-2024-001
+- Last Review Date: November 15, 2023
+- Next Review Date: November 15, 2024
+- Document Owner: Safety Committee`
+      }
+    };
+
+    return documentTemplates[document.name as keyof typeof documentTemplates] || {
+      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
+    };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
         toast({
-          title: "HR Configuration Saved",
-          description: "HR settings updated successfully",
-        })
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
       }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save HR configuration",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSaving(false)
     }
-  }
+  };
 
-  const confirmDeactivateSubsidiary = (subsidiaryId: string) => {
-    setSubsidiaryToToggle(subsidiaries.find((s) => s.id === subsidiaryId) || null)
-    setShowDeactivateConfirm(true)
-  }
-
-  const confirmReactivateSubsidiary = (subsidiaryId: string) => {
-    setSubsidiaryToToggle(subsidiaries.find((s) => s.id === subsidiaryId) || null)
-    setShowReactivateConfirm(true)
-  }
-
-  const handleManageLeaveTypes = () => {
-    setShowAddLeaveTypeModal(true)
-  }
-
-  const handleManageAllowances = () => {
-    toast({
-      title: "Allowances Management",
-      description: "Opening allowances configuration...",
-    })
-  }
-
-  const handleManageDeductions = () => {
-    toast({
-      title: "Deductions Management",
-      description: "Opening deductions configuration...",
-    })
-  }
-
-  const handleManageSalaryGrades = () => {
-    toast({
-      title: "Salary Grades Management",
-      description: "Opening salary grades configuration...",
-    })
-  }
-
-  const handleEditEmailTemplate = (templateName: string) => {
-    toast({
-      title: "Edit Email Template",
-      description: `Editing ${templateName} template...`,
-    })
-  }
-
-  const handleAddEmailTemplate = () => {
-    toast({
-      title: "Add Email Template",
-      description: "Opening email template editor...",
-    })
-  }
-
-  const handleAddRole = () => {
-    toast({
-      title: "Add Role",
-      description: "Opening role creation form...",
-    })
-  }
-
-  const handleEditRole = (roleName: string) => {
-    toast({
-      title: "Edit Role",
-      description: `Editing ${roleName} role...`,
-    })
-  }
-
-  const handleBackupNow = async () => {
-    setIsBackingUp(true)
-    console.log("[v0] Initiating manual backup...")
-    try {
-      // Simulate backup process
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-      setLastBackupTime(new Date().toISOString())
-      setBackupSize("55 MB") // Simulate updated size
-      setBackupStatus("Completed")
-      toast({
-        title: "Backup Successful",
-        description: "Manual backup completed successfully.",
-      })
-    } catch (error) {
-      toast({
-        title: "Backup Failed",
-        description: "Failed to complete system backup.",
-      })
-    } finally {
-      setIsBackingUp(false)
-    }
-  }
-
-  const handleGenerateAIInsights = async () => {
-    setIsGeneratingInsights(true)
-    setShowAIInsightsModal(true)
-
-    try {
-      // Prepare leave policies data for AI analysis
-      const policiesData = currentPolicies.map((policy) => ({
-        name: policy.name,
-        days: policy.days,
-        usage: policy.usage,
-        trend: policy.trend,
-        description: policy.description,
-      }))
-
-      const prompt = `Analyze the following leave policies and provide professional HR insights:
-
-${policiesData
-  .map(
-    (policy) =>
-      `- ${policy.name}: ${policy.days} days allocated, ${policy.usage} usage rate, trend: ${policy.trend}
-    Description: ${policy.description}`,
-  )
-  .join("\n")}
-
-Please provide:
-1. Usage pattern analysis
-2. Policy optimization recommendations
-3. Compliance considerations
-4. Industry benchmarking insights
-5. Cost impact analysis
-6. Employee satisfaction implications
-
-Format the response in a professional, actionable manner for HR decision-makers.`
-
-      const response = await fetch("/api/ai-insights", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ prompt }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to generate insights")
-      }
-
-      const data = await response.json()
-      setAiInsights(data.insights)
-
-      toast({
-        title: "AI Insights Generated",
-        description: "Professional leave policy analysis completed successfully.",
-      })
-    } catch (error) {
-      console.error("Error generating AI insights:", error)
-      toast({
-        title: "Error",
-        description: "Failed to generate AI insights. Please try again.",
-        variant: "destructive",
-      })
-      setShowAIInsightsModal(false)
-    } finally {
-      setIsGeneratingInsights(false)
-    }
-  }
-
-  const handleGeneratePolicyInsight = async (policyName: string) => {
-    const policy = currentPolicies.find((p) => p.name === policyName)
-    if (!policy) return
-
-    setLoadingInsights((prev) => ({ ...prev, [policyName]: true }))
-
-    try {
-      console.log("[v0] Generating insight for policy:", policyName)
-      console.log("[v0] JSON object available:", typeof JSON, JSON)
-
-      // Simulate AI insight generation with realistic delay
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Generate contextual insights based on policy data
-      const insights = {
-        "Annual Leave": `Based on 68% usage rate, this policy shows healthy utilization. Consider implementing carry-over limits to prevent year-end clustering. Industry benchmark: 15-25 days annually.`,
-        "Sick Leave": `Low 23% usage indicates good employee health or potential underreporting. Consider wellness programs and ensure employees feel comfortable using sick days when needed.`,
-        "Maternity Leave": `12% usage aligns with demographic expectations. Ensure compliance with local labor laws. Consider paternity leave expansion for better work-life balance.`,
-      }
-
-      const insight =
-        insights[policyName as keyof typeof insights] ||
-        `Policy analysis: ${policy.days} days allocated with ${policy.usage} usage. Consider reviewing against industry standards and employee feedback.`
-
-      setPolicyInsights((prev) => ({ ...prev, [policyName]: insight }))
-
-      toast({
-        title: "AI Insight Generated",
-        description: `Professional analysis completed for ${policyName} policy.`,
-      })
-    } catch (error) {
-      console.error("Error generating insight:", error)
-      console.error("Error details:", {
-        message: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : "No stack trace",
-        policyName,
-        policy,
-      })
-      toast({
-        title: "Error",
-        description: "Failed to generate AI insight. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoadingInsights((prev) => ({ ...prev, [policyName]: false }))
-    }
-  }
-
-  const [showAIInsights, setShowAIInsights] = useState(false)
-  const [aiInsightsLoading, setAiInsightsLoading] = useState(false)
-
-  const handleAddTaxBand = () => {
-    console.log("[v0] Adding new tax band...")
-    const currentConfig = getCurrencyConfig(selectedCurrency)
-    const newBand = {
-      rate: 0,
-      from: 0,
-      to: 0,
-      cumulativeTax: 0,
-    }
-
-    // Update the currency config with new band
-    const updatedBands = [...currentConfig.taxBands, newBand]
-    // This would typically update the state or database
-    toast({
-      title: "Success",
-      description: "New tax band added successfully",
-    })
-  }
-
-  const handleSavePayrollConfig = async () => {
-    setIsSavingPayroll(true)
-    console.log("[v0] Saving payroll configuration...")
-
-    try {
-      // Simulate save operation
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      toast({
-        title: "Success",
-        description: "Payroll configuration saved successfully",
-      })
-    } catch (error) {
-      console.error("Error saving payroll config:", error)
-      toast({
-        title: "Error",
-        description: "Failed to save payroll configuration",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSavingPayroll(false)
-    }
-  }
-
-  const handleSaveTaxConfig = async () => {
-    setIsSavingTax(true)
-    console.log("[v0] Saving tax configuration...")
-
-    try {
-      // Simulate save operation
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      toast({
-        title: "Success",
-        description: "Tax configuration saved successfully",
-      })
-    } catch (error) {
-      console.error("Error saving tax config:", error)
-      toast({
-        title: "Error",
-        description: "Failed to save tax configuration",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSavingTax(false)
-    }
-  }
-
-  const handleAllowanceFieldChange = (index: number, field: string, value: any) => {
-    const updatedAllowances = [...allowances]
-    updatedAllowances[index] = { ...updatedAllowances[index], [field]: value }
-    setAllowances(updatedAllowances)
-  }
-
-  const handleDeductionFieldChange = (index: number, field: string, value: any) => {
-    const updatedDeductions = [...deductions]
-    updatedDeductions[index] = { ...updatedDeductions[index], [field]: value }
-    setDeductions(updatedDeductions)
-  }
-
-  const handleAddAllowance = () => {
-    const newAllowance = {
-      code: "",
-      description: "",
-      taxable: false,
-      recurring: false,
-      amount: 0,
-      percentage: 0,
-      type: "FIXED",
-    }
-    setAllowances([...allowances, newAllowance])
-  }
-
-  const handleAddDeduction = () => {
-    const newDeduction = {
-      code: "",
-      description: "",
-      recurring: false,
-      amount: 0,
-      percentage: 0,
-      type: "FIXED",
-    }
-    setDeductions([...deductions, newDeduction])
-  }
-
-  const handleEditAllowance = (index: number) => {
-    console.log(`[v0] Editing allowance at index ${index}`)
-    setEditingAllowance(index)
-  }
-
-  const handleDeleteAllowance = (index: number) => {
-    const updatedAllowances = allowances.filter((_, i) => i !== index)
-    setAllowances(updatedAllowances)
-    toast({
-      title: "Success",
-      description: "Allowance deleted successfully",
-    })
-  }
-
-  const handleEditDeduction = (index: number) => {
-    console.log(`[v0] Editing deduction at index ${index}`)
-    setEditingDeduction(index)
-  }
-
-  const handleDeleteDeduction = (index: number) => {
-    const updatedDeductions = deductions.filter((_, i) => i !== index)
-    setDeductions(updatedDeductions)
-    toast({
-      title: "Success",
-      description: "Deduction deleted successfully",
-    })
-  }
-
-  const handleAddNotificationTemplate = () => {
-    setIsAddingTemplate(true)
-    setNewTemplate({
-      name: "",
-      category: "HR",
-      type: "Email",
-      subject: "",
-      body: "",
-      variables: [],
-    })
-  }
-
-  const handleSaveTemplate = async () => {
-    if (!newTemplate.name || !newTemplate.subject || !newTemplate.body) {
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields",
+        description: "Please provide a document name and upload a PDF file.",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    setIsSaving(true) // Use the general saving state
+    setIsSavingDocument(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      const template = {
-        id: Date.now().toString(),
-        name: newTemplate.name,
-        category: newTemplate.category,
-        type: newTemplate.type,
-        status: "Active",
-        lastModified: new Date().toISOString().split("T")[0],
-        description: newTemplate.subject,
-      }
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
 
-      setNotificationTemplates([...notificationTemplates, template])
-      setIsAddingTemplate(false)
-      setEditingTemplate(null) // Clear editing state
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
 
       toast({
-        title: "Template Created",
-        description: `${newTemplate.name} template has been created successfully`,
-      })
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to create template",
+        description: "Failed to add document. Please try again.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsSaving(false)
+      setIsSavingDocument(false);
     }
-  }
+  };
 
-  const handleEditTemplate = (template) => {
-    setEditingTemplate(template)
-    setNewTemplate({
-      name: template.name,
-      category: template.category,
-      type: template.type,
-      subject: template.description, // Assuming description holds the subject for editing
-      body: `Dear {{employee_name}},\n\nThis is a sample template for ${template.name}.\n\nBest regards,\nHR Team`, // Placeholder body
-      variables: ["employee_name", "company_name"], // Placeholder variables
-    })
-    setIsAddingTemplate(true)
-  }
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
 
-  const handleDeleteTemplate = async (templateId) => {
-    setIsSaving(true) // Use the general saving state
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      setNotificationTemplates(notificationTemplates.filter((t) => t.id !== templateId))
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
       toast({
-        title: "Template Deleted",
-        description: "Template has been deleted successfully",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete template",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSaving(false)
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
     }
-  }
+  };
 
-  const handleTestEmail = async () => {
-    setTestConnectionStatus("testing")
-    try {
-      // Simulate API call to test SMTP connection
-      await new Promise((resolve) => setTimeout(resolve, 3000))
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
 
-      // Simulate random success/failure for demo
-      const isSuccess = Math.random() > 0.3
-
-      if (isSuccess) {
-        setTestConnectionStatus("success")
-        toast({
-          title: "Connection Successful! ✅",
-          description: "SMTP connection established successfully. Email configuration is working properly.",
-        })
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
       } else {
-        throw new Error("Connection failed")
+        return Math.max(1, prev - 1);
       }
-    } catch (error) {
-      setTestConnectionStatus("error")
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.2
+APPROVED BY: Executive Leadership Team
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Welcome Message .......................................... 3
+2. Company Overview ......................................... 4
+3. Employment Policies ...................................... 6
+4. Compensation and Benefits ................................ 12
+5. Work Environment and Safety .............................. 18
+6. Professional Development ................................. 22
+7. Technology and Communication ............................. 25
+8. Leave Policies ........................................... 28
+9. Performance Management ................................... 32
+10. Disciplinary Procedures ................................. 35
+11. Employee Resources ...................................... 38
+
+═══════════════════════════════════════════════════════════════
+
+1. WELCOME MESSAGE
+
+Dear Team Member,
+
+Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
+
+This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
+
+Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
+
+If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
+
+Welcome aboard!
+
+Sincerely,
+The Executive Leadership Team
+
+2. COMPANY OVERVIEW
+
+2.1 OUR MISSION
+To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
+
+2.2 OUR VALUES
+- Integrity: We conduct business with honesty and transparency
+- Excellence: We strive for the highest quality in everything we do
+- Innovation: We embrace change and continuously improve
+- Teamwork: We collaborate effectively to achieve common goals
+- Respect: We value diversity and treat everyone with dignity
+
+2.3 ORGANIZATIONAL STRUCTURE
+Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+
+3. EMPLOYMENT POLICIES
+
+3.1 EQUAL EMPLOYMENT OPPORTUNITY
+We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
+
+3.2 AT-WILL EMPLOYMENT
+Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
+
+3.3 BACKGROUND CHECKS
+All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+
+4. COMPENSATION AND BENEFITS
+
+4.1 PAY PERIODS
+Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
+
+4.2 OVERTIME
+Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
+
+4.3 BENEFITS OVERVIEW
+We offer a comprehensive benefits package including:
+- Health insurance
+- Dental and vision coverage
+- Retirement savings plan with company matching
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT AND SAFETY
+
+5.1 WORKPLACE SAFETY
+The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
+
+5.2 DRUG-FREE WORKPLACE
+We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
+
+6. PROFESSIONAL DEVELOPMENT
+
+We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
+
+7. TECHNOLOGY AND COMMUNICATION
+
+7.1 COMPUTER AND INTERNET USE
+Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
+
+7.2 CONFIDENTIALITY
+Employees must protect confidential company information and respect the privacy of customer and employee data.
+
+8. LEAVE POLICIES
+
+8.1 PAID TIME OFF (PTO)
+Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
+
+8.2 FAMILY AND MEDICAL LEAVE
+Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
+
+9. PERFORMANCE MANAGEMENT
+
+Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
+
+10. DISCIPLINARY PROCEDURES
+
+When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
+
+11. EMPLOYEE RESOURCES
+
+11.1 HUMAN RESOURCES DEPARTMENT
+The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
+
+11.2 EMPLOYEE ASSISTANCE PROGRAM
+Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
+
+═══════════════════════════════════════════════════════════════
+
+ACKNOWLEDGMENT
+
+I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+This handbook is subject to change. Updates will be communicated to all employees.
+
+Document Control:
+- Document ID: EH-2024-001
+- Last Review Date: December 1, 2023
+- Next Review Date: December 1, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+SAFETY FIRST - ALWAYS
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.3
+APPROVED BY: Safety Committee
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Safety Policy Statement ................................... 3
+2. General Safety Rules ..................................... 4
+3. Emergency Procedures ..................................... 6
+4. Personal Protective Equipment ............................ 8
+5. Hazard Communication ..................................... 10
+6. Incident Reporting ....................................... 12
+7. Training Requirements .................................... 14
+8. Safety Committee ......................................... 16
+
+═══════════════════════════════════════════════════════════════
+
+1. SAFETY POLICY STATEMENT
+
+The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
+
+Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
+
+2. GENERAL SAFETY RULES
+
+2.1 BASIC SAFETY PRINCIPLES
+- Follow all safety procedures and guidelines
+- Report unsafe conditions immediately
+- Use appropriate personal protective equipment
+- Keep work areas clean and organized
+- Never take shortcuts that compromise safety
+
+2.2 PROHIBITED ACTIVITIES
+- Horseplay or practical jokes
+- Operating equipment without proper training
+- Removing or disabling safety devices
+- Working under the influence of drugs or alcohol
+
+3. EMERGENCY PROCEDURES
+
+3.1 FIRE EMERGENCY
+- Activate the nearest fire alarm
+- Evacuate immediately using designated routes
+- Proceed to assembly areas
+- Do not use elevators
+- Do not re-enter the building until authorized
+
+3.2 MEDICAL EMERGENCY
+- Call 911 immediately for serious injuries
+- Notify your supervisor and security
+- Provide first aid only if trained to do so
+- Do not move seriously injured persons
+
+3.3 SEVERE WEATHER
+- Monitor weather alerts and warnings
+- Follow instructions from management
+- Move to designated shelter areas if required
+- Remain in shelter until all-clear is given
+
+4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
+
+4.1 GENERAL REQUIREMENTS
+Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
+- Safety glasses or goggles
+- Hard hats
+- Safety shoes
+- Gloves
+- Hearing protection
+- Respiratory protection
+
+4.2 PPE MAINTENANCE
+- Inspect PPE before each use
+- Replace damaged or worn equipment
+- Clean and store PPE properly
+- Report defective equipment immediately
+
+5. HAZARD COMMUNICATION
+
+5.1 CHEMICAL SAFETY
+- Read and understand Safety Data Sheets (SDS)
+- Follow proper handling procedures
+- Use appropriate PPE when working with chemicals
+- Store chemicals according to manufacturer instructions
+
+5.2 LABELING REQUIREMENTS
+All hazardous materials must be properly labeled with:
+- Product identification
+- Hazard warnings
+- Precautionary statements
+- Supplier information
+
+6. INCIDENT REPORTING
+
+6.1 REPORTING REQUIREMENTS
+All incidents, including near misses, must be reported immediately to:
+- Your immediate supervisor
+- The Safety Department
+- Human Resources (for injuries)
+
+6.2 INVESTIGATION PROCESS
+All incidents will be thoroughly investigated to:
+- Determine root causes
+- Implement corrective actions
+- Prevent similar occurrences
+- Comply with regulatory requirements
+
+7. TRAINING REQUIREMENTS
+
+7.1 NEW EMPLOYEE ORIENTATION
+All new employees must complete safety orientation training before beginning work assignments.
+
+7.2 ONGOING TRAINING
+Regular safety training is provided on topics including:
+- Job-specific safety procedures
+- Emergency response
+- Hazard recognition
+- PPE use and maintenance
+
+8. SAFETY COMMITTEE
+
+Our Safety Committee meets monthly to:
+- Review incident reports and trends
+- Evaluate safety procedures
+- Recommend improvements
+- Promote safety awareness
+
+Committee members represent all departments and levels of the organization.
+
+═══════════════════════════════════════════════════════════════
+
+SAFETY CONTACTS
+
+Emergency: 911
+Security: Extension 2911
+Safety Department: Extension 2500
+Human Resources: Extension 2100
+
+═══════════════════════════════════════════════════════════════
+
+Remember: Safety is everyone's responsibility!
+
+Document Control:
+- Document ID: SM-2024-001
+- Last Review Date: November 15, 2023
+- Next Review Date: November 15, 2024
+- Document Owner: Safety Committee`
+      }
+    };
+
+    return documentTemplates[document.name as keyof typeof documentTemplates] || {
+      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
+    };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
       toast({
-        title: "Connection Failed ❌",
-        description: "Unable to connect to SMTP server. Please check your credentials and settings.",
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
         variant: "destructive",
-      })
+      });
+      return;
     }
 
-    // Reset status after 5 seconds
-    setTimeout(() => setTestConnectionStatus("idle"), 5000)
-  }
-
-  const handleSaveEmailConfig = async () => {
-    setIsSaving(true) // Use the general saving state
+    setIsSavingDocument(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
       toast({
-        title: "Email Configuration Saved",
-        description: "Email settings have been updated successfully",
-      })
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to save email configuration",
+        description: "Failed to add document. Please try again.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsSaving(false)
+      setIsSavingDocument(false);
     }
-  }
+  };
 
-  // Added for Access Control
-  const handleRefreshSessions = async () => {
-    setIsRefreshingSessions(true)
-    console.log("[v0] Refreshing active sessions...")
-    await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate API call
-    // Mock data update
-    setActiveSessions([
-      {
-        id: "session-001",
-        user_email: "admin@example.com",
-        ip_address: "192.168.1.10",
-        device: "Desktop",
-        last_activity: new Date().toISOString(),
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
       },
-      {
-        id: "session-003",
-        user_email: "newuser@example.com",
-        ip_address: "192.168.1.15",
-        device: "Laptop",
-        last_activity: new Date().toISOString(),
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.2
+APPROVED BY: Executive Leadership Team
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Welcome Message .......................................... 3
+2. Company Overview ......................................... 4
+3. Employment Policies ...................................... 6
+4. Compensation and Benefits ................................ 12
+5. Work Environment and Safety .............................. 18
+6. Professional Development ................................. 22
+7. Technology and Communication ............................. 25
+8. Leave Policies ........................................... 28
+9. Performance Management ................................... 32
+10. Disciplinary Procedures ................................. 35
+11. Employee Resources ...................................... 38
+
+═══════════════════════════════════════════════════════════════
+
+1. WELCOME MESSAGE
+
+Dear Team Member,
+
+Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
+
+This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
+
+Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
+
+If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
+
+Welcome aboard!
+
+Sincerely,
+The Executive Leadership Team
+
+2. COMPANY OVERVIEW
+
+2.1 OUR MISSION
+To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
+
+2.2 OUR VALUES
+- Integrity: We conduct business with honesty and transparency
+- Excellence: We strive for the highest quality in everything we do
+- Innovation: We embrace change and continuously improve
+- Teamwork: We collaborate effectively to achieve common goals
+- Respect: We value diversity and treat everyone with dignity
+
+2.3 ORGANIZATIONAL STRUCTURE
+Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+
+3. EMPLOYMENT POLICIES
+
+3.1 EQUAL EMPLOYMENT OPPORTUNITY
+We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
+
+3.2 AT-WILL EMPLOYMENT
+Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
+
+3.3 BACKGROUND CHECKS
+All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+
+4. COMPENSATION AND BENEFITS
+
+4.1 PAY PERIODS
+Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
+
+4.2 OVERTIME
+Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
+
+4.3 BENEFITS OVERVIEW
+We offer a comprehensive benefits package including:
+- Health insurance
+- Dental and vision coverage
+- Retirement savings plan with company matching
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT AND SAFETY
+
+5.1 WORKPLACE SAFETY
+The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
+
+5.2 DRUG-FREE WORKPLACE
+We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
+
+6. PROFESSIONAL DEVELOPMENT
+
+We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
+
+7. TECHNOLOGY AND COMMUNICATION
+
+7.1 COMPUTER AND INTERNET USE
+Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
+
+7.2 CONFIDENTIALITY
+Employees must protect confidential company information and respect the privacy of customer and employee data.
+
+8. LEAVE POLICIES
+
+8.1 PAID TIME OFF (PTO)
+Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
+
+8.2 FAMILY AND MEDICAL LEAVE
+Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
+
+9. PERFORMANCE MANAGEMENT
+
+Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
+
+10. DISCIPLINARY PROCEDURES
+
+When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
+
+11. EMPLOYEE RESOURCES
+
+11.1 HUMAN RESOURCES DEPARTMENT
+The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
+
+11.2 EMPLOYEE ASSISTANCE PROGRAM
+Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
+
+═══════════════════════════════════════════════════════════════
+
+ACKNOWLEDGMENT
+
+I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+This handbook is subject to change. Updates will be communicated to all employees.
+
+Document Control:
+- Document ID: EH-2024-001
+- Last Review Date: December 1, 2023
+- Next Review Date: December 1, 2024
+- Document Owner: Human Resources Department`
       },
-    ])
-    setIsRefreshingSessions(false)
-    toast({ title: "Sessions Refreshed", description: "Active sessions have been updated." })
-  }
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
 
-  const handleTerminateSession = async (sessionId: string) => {
-    console.log(`[v0] Terminating session: ${sessionId}`)
-    if (!confirm("Are you sure you want to terminate this session?")) return
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    setActiveSessions((prev) => prev.filter((session) => session.id !== sessionId))
-    toast({ title: "Session Terminated", description: "The selected session has been terminated." })
-  }
+SAFETY FIRST - ALWAYS
 
-  const handleSaveAccessSettings = async () => {
-    setIsSavingAccessSettings(true)
-    console.log("[v0] Saving access settings...")
-    await new Promise((resolve) => setTimeout(resolve, 1500)) // Simulate API call
-    setIsSavingAccessSettings(false)
-    toast({ title: "Access Settings Saved", description: "Access control settings have been updated." })
-  }
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.3
+APPROVED BY: Safety Committee
 
-  // Added for Security
-  // const handleBackupNow = async () => { // This function was duplicated and is now removed.
-  //   setIsBackingUp(true)
-  //   console.log("[v0] Initiating manual backup...")
-  //   await new Promise((resolve) => setTimeout(resolve, 3000)) // Simulate backup process
-  //   setLastBackupTime(new Date().toISOString())
-  //   setBackupSize("55 MB") // Simulate updated size
-  //   setBackupStatus("Completed")
-  //   toast({ title: "Backup Successful", description: "Manual backup completed." })
-  //   setIsBackingUp(false)
-  // }
+═══════════════════════════════════════════════════════════════
 
-  const handleSaveSecuritySettings = async () => {
-    setIsSavingSecuritySettings(true)
-    console.log("[v0] Saving security settings...")
-    await new Promise((resolve) => setTimeout(resolve, 1500)) // Simulate API call
-    setIsSavingSecuritySettings(false)
-    toast({ title: "Security Settings Saved", description: "Security configurations have been updated." })
-  }
+TABLE OF CONTENTS
 
-  const handleViewAllLogs = () => {
-    console.log("[v0] Navigating to Audit Logs page...")
-    // In a real app, this would navigate to a dedicated audit logs page
-    toast({ title: "View All Logs", description: "Navigating to the full audit log history." })
-  }
+1. Safety Policy Statement ................................... 3
+2. General Safety Rules ..................................... 4
+3. Emergency Procedures ..................................... 6
+4. Personal Protective Equipment ............................ 8
+5. Hazard Communication ..................................... 10
+6. Incident Reporting ....................................... 12
+7. Training Requirements .................................... 14
+8. Safety Committee ......................................... 16
 
-  const handleExportSecurityReport = async () => {
-    setIsExportingReport(true)
-    console.log("[v0] Exporting security report...")
-    await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate export process
-    setIsExportingReport(false)
-    toast({ title: "Report Exported", description: "Security report generated and downloaded." })
-  }
+═══════════════════════════════════════════════════════════════
 
-  const handleAddSalaryGrade = () => {
-    setEditingGrade(null)
-    setNewGrade({
-      name: "",
-      description: "",
-      minSalary: "",
-      maxSalary: "",
-      numberOfNotches: 5,
-      notches: [],
-    })
-    setShowSalaryGradeModal(true)
-  }
+1. SAFETY POLICY STATEMENT
 
-  const handleEditSalaryGrade = (grade) => {
-    setEditingGrade(grade)
-    setNewGrade({
-      name: grade.name,
-      description: grade.description,
-      minSalary: grade.minSalary.toString(),
-      maxSalary: grade.maxSalary.toString(),
-      numberOfNotches: grade.notches.length,
-      notches: grade.notches,
-    })
-    setShowSalaryGradeModal(true)
-  }
+The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
 
-  const handleGenerateNotches = async () => {
-    const minSalary = Number.parseFloat(newGrade.minSalary)
-    const maxSalary = Number.parseFloat(newGrade.maxSalary)
-    const numberOfNotches = newGrade.numberOfNotches
+Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
 
-    if (!minSalary || !maxSalary || minSalary >= maxSalary) {
+2. GENERAL SAFETY RULES
+
+2.1 BASIC SAFETY PRINCIPLES
+- Follow all safety procedures and guidelines
+- Report unsafe conditions immediately
+- Use appropriate personal protective equipment
+- Keep work areas clean and organized
+- Never take shortcuts that compromise safety
+
+2.2 PROHIBITED ACTIVITIES
+- Horseplay or practical jokes
+- Operating equipment without proper training
+- Removing or disabling safety devices
+- Working under the influence of drugs or alcohol
+
+3. EMERGENCY PROCEDURES
+
+3.1 FIRE EMERGENCY
+- Activate the nearest fire alarm
+- Evacuate immediately using designated routes
+- Proceed to assembly areas
+- Do not use elevators
+- Do not re-enter the building until authorized
+
+3.2 MEDICAL EMERGENCY
+- Call 911 immediately for serious injuries
+- Notify your supervisor and security
+- Provide first aid only if trained to do so
+- Do not move seriously injured persons
+
+3.3 SEVERE WEATHER
+- Monitor weather alerts and warnings
+- Follow instructions from management
+- Move to designated shelter areas if required
+- Remain in shelter until all-clear is given
+
+4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
+
+4.1 GENERAL REQUIREMENTS
+Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
+- Safety glasses or goggles
+- Hard hats
+- Safety shoes
+- Gloves
+- Hearing protection
+- Respiratory protection
+
+4.2 PPE MAINTENANCE
+- Inspect PPE before each use
+- Replace damaged or worn equipment
+- Clean and store PPE properly
+- Report defective equipment immediately
+
+5. HAZARD COMMUNICATION
+
+5.1 CHEMICAL SAFETY
+- Read and understand Safety Data Sheets (SDS)
+- Follow proper handling procedures
+- Use appropriate PPE when working with chemicals
+- Store chemicals according to manufacturer instructions
+
+5.2 LABELING REQUIREMENTS
+All hazardous materials must be properly labeled with:
+- Product identification
+- Hazard warnings
+- Precautionary statements
+- Supplier information
+
+6. INCIDENT REPORTING
+
+6.1 REPORTING REQUIREMENTS
+All incidents, including near misses, must be reported immediately to:
+- Your immediate supervisor
+- The Safety Department
+- Human Resources (for injuries)
+
+6.2 INVESTIGATION PROCESS
+All incidents will be thoroughly investigated to:
+- Determine root causes
+- Implement corrective actions
+- Prevent similar occurrences
+- Comply with regulatory requirements
+
+7. TRAINING REQUIREMENTS
+
+7.1 NEW EMPLOYEE ORIENTATION
+All new employees must complete safety orientation training before beginning work assignments.
+
+7.2 ONGOING TRAINING
+Regular safety training is provided on topics including:
+- Job-specific safety procedures
+- Emergency response
+- Hazard recognition
+- PPE use and maintenance
+
+8. SAFETY COMMITTEE
+
+Our Safety Committee meets monthly to:
+- Review incident reports and trends
+- Evaluate safety procedures
+- Recommend improvements
+- Promote safety awareness
+
+Committee members represent all departments and levels of the organization.
+
+═══════════════════════════════════════════════════════════════
+
+SAFETY CONTACTS
+
+Emergency: 911
+Security: Extension 2911
+Safety Department: Extension 2500
+Human Resources: Extension 2100
+
+═══════════════════════════════════════════════════════════════
+
+Remember: Safety is everyone's responsibility!
+
+Document Control:
+- Document ID: SM-2024-001
+- Last Review Date: November 15, 2023
+- Next Review Date: November 15, 2024
+- Document Owner: Safety Committee`
+      }
+    };
+
+    return documentTemplates[document.name as keyof typeof documentTemplates] || {
+      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
+    };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
       toast({
-        title: "Invalid Salary Range",
-        description: "Please enter valid minimum and maximum salary values.",
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    setIsGeneratingNotches(true)
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
 
-    const increment = (maxSalary - minSalary) / (numberOfNotches - 1)
-    const generatedNotches = []
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
 
-    for (let i = 0; i < numberOfNotches; i++) {
-      generatedNotches.push({
-        step: i + 1,
-        amount: Math.round(minSalary + increment * i),
-      })
-    }
-
-    setNewGrade((prev) => ({ ...prev, notches: generatedNotches }))
-    setIsGeneratingNotches(false)
-
-    toast({
-      title: "Notches Generated",
-      description: `Successfully generated ${numberOfNotches} salary notches.`,
-    })
-  }
-
-  const handleSaveSalaryGrade = () => {
-    if (!newGrade.name || !newGrade.minSalary || !newGrade.maxSalary) {
       toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
         variant: "destructive",
-      })
-      return
+      });
+    } finally {
+      setIsSavingDocument(false);
     }
+  };
 
-    const gradeToAdd = {
-      id: editingGrade ? editingGrade.id : Date.now(),
-      name: newGrade.name,
-      description: newGrade.description,
-      minSalary: Number.parseFloat(newGrade.minSalary),
-      maxSalary: Number.parseFloat(newGrade.maxSalary),
-      notches: newGrade.notches,
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
     }
+  };
 
-    if (editingGrade) {
-      setSalaryGrades((prev) => prev.map((grade) => (grade.id === editingGrade.id ? gradeToAdd : grade)))
-      toast({
-        title: "Grade Updated",
-        description: "Salary grade has been updated successfully.",
-      })
-    } else {
-      setSalaryGrades((prev) => [...prev, gradeToAdd])
-      toast({
-        title: "Grade Added",
-        description: "New salary grade has been added successfully.",
-      })
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.2
+APPROVED BY: Executive Leadership Team
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Welcome Message .......................................... 3
+2. Company Overview ......................................... 4
+3. Employment Policies ...................................... 6
+4. Compensation and Benefits ................................ 12
+5. Work Environment and Safety .............................. 18
+6. Professional Development ................................. 22
+7. Technology and Communication ............................. 25
+8. Leave Policies ........................................... 28
+9. Performance Management ................................... 32
+10. Disciplinary Procedures ................................. 35
+11. Employee Resources ...................................... 38
+
+═══════════════════════════════════════════════════════════════
+
+1. WELCOME MESSAGE
+
+Dear Team Member,
+
+Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
+
+This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
+
+Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
+
+If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
+
+Welcome aboard!
+
+Sincerely,
+The Executive Leadership Team
+
+2. COMPANY OVERVIEW
+
+2.1 OUR MISSION
+To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
+
+2.2 OUR VALUES
+- Integrity: We conduct business with honesty and transparency
+- Excellence: We strive for the highest quality in everything we do
+- Innovation: We embrace change and continuously improve
+- Teamwork: We collaborate effectively to achieve common goals
+- Respect: We value diversity and treat everyone with dignity
+
+2.3 ORGANIZATIONAL STRUCTURE
+Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+
+3. EMPLOYMENT POLICIES
+
+3.1 EQUAL EMPLOYMENT OPPORTUNITY
+We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
+
+3.2 AT-WILL EMPLOYMENT
+Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
+
+3.3 BACKGROUND CHECKS
+All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+
+4. COMPENSATION AND BENEFITS
+
+4.1 PAY PERIODS
+Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
+
+4.2 OVERTIME
+Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
+
+4.3 BENEFITS OVERVIEW
+We offer a comprehensive benefits package including:
+- Health insurance
+- Dental and vision coverage
+- Retirement savings plan with company matching
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT AND SAFETY
+
+5.1 WORKPLACE SAFETY
+The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
+
+5.2 DRUG-FREE WORKPLACE
+We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
+
+6. PROFESSIONAL DEVELOPMENT
+
+We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
+
+7. TECHNOLOGY AND COMMUNICATION
+
+7.1 COMPUTER AND INTERNET USE
+Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
+
+7.2 CONFIDENTIALITY
+Employees must protect confidential company information and respect the privacy of customer and employee data.
+
+8. LEAVE POLICIES
+
+8.1 PAID TIME OFF (PTO)
+Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
+
+8.2 FAMILY AND MEDICAL LEAVE
+Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
+
+9. PERFORMANCE MANAGEMENT
+
+Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
+
+10. DISCIPLINARY PROCEDURES
+
+When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
+
+11. EMPLOYEE RESOURCES
+
+11.1 HUMAN RESOURCES DEPARTMENT
+The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
+
+11.2 EMPLOYEE ASSISTANCE PROGRAM
+Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
+
+═══════════════════════════════════════════════════════════════
+
+ACKNOWLEDGMENT
+
+I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+This handbook is subject to change. Updates will be communicated to all employees.
+
+Document Control:
+- Document ID: EH-2024-001
+- Last Review Date: December 1, 2023
+- Next Review Date: December 1, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+SAFETY FIRST - ALWAYS
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.3
+APPROVED BY: Safety Committee
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Safety Policy Statement ................................... 3
+2. General Safety Rules ..................................... 4
+3. Emergency Procedures ..................................... 6
+4. Personal Protective Equipment ............................ 8
+5. Hazard Communication ..................................... 10
+6. Incident Reporting ....................................... 12
+7. Training Requirements .................................... 14
+8. Safety Committee ......................................... 16
+
+═══════════════════════════════════════════════════════════════
+
+1. SAFETY POLICY STATEMENT
+
+The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
+
+Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
+
+2. GENERAL SAFETY RULES
+
+2.1 BASIC SAFETY PRINCIPLES
+- Follow all safety procedures and guidelines
+- Report unsafe conditions immediately
+- Use appropriate personal protective equipment
+- Keep work areas clean and organized
+- Never take shortcuts that compromise safety
+
+2.2 PROHIBITED ACTIVITIES
+- Horseplay or practical jokes
+- Operating equipment without proper training
+- Removing or disabling safety devices
+- Working under the influence of drugs or alcohol
+
+3. EMERGENCY PROCEDURES
+
+3.1 FIRE EMERGENCY
+- Activate the nearest fire alarm
+- Evacuate immediately using designated routes
+- Proceed to assembly areas
+- Do not use elevators
+- Do not re-enter the building until authorized
+
+3.2 MEDICAL EMERGENCY
+- Call 911 immediately for serious injuries
+- Notify your supervisor and security
+- Provide first aid only if trained to do so
+- Do not move seriously injured persons
+
+3.3 SEVERE WEATHER
+- Monitor weather alerts and warnings
+- Follow instructions from management
+- Move to designated shelter areas if required
+- Remain in shelter until all-clear is given
+
+4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
+
+4.1 GENERAL REQUIREMENTS
+Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
+- Safety glasses or goggles
+- Hard hats
+- Safety shoes
+- Gloves
+- Hearing protection
+- Respiratory protection
+
+4.2 PPE MAINTENANCE
+- Inspect PPE before each use
+- Replace damaged or worn equipment
+- Clean and store PPE properly
+- Report defective equipment immediately
+
+5. HAZARD COMMUNICATION
+
+5.1 CHEMICAL SAFETY
+- Read and understand Safety Data Sheets (SDS)
+- Follow proper handling procedures
+- Use appropriate PPE when working with chemicals
+- Store chemicals according to manufacturer instructions
+
+5.2 LABELING REQUIREMENTS
+All hazardous materials must be properly labeled with:
+- Product identification
+- Hazard warnings
+- Precautionary statements
+- Supplier information
+
+6. INCIDENT REPORTING
+
+6.1 REPORTING REQUIREMENTS
+All incidents, including near misses, must be reported immediately to:
+- Your immediate supervisor
+- The Safety Department
+- Human Resources (for injuries)
+
+6.2 INVESTIGATION PROCESS
+All incidents will be thoroughly investigated to:
+- Determine root causes
+- Implement corrective actions
+- Prevent similar occurrences
+- Comply with regulatory requirements
+
+7. TRAINING REQUIREMENTS
+
+7.1 NEW EMPLOYEE ORIENTATION
+All new employees must complete safety orientation training before beginning work assignments.
+
+7.2 ONGOING TRAINING
+Regular safety training is provided on topics including:
+- Job-specific safety procedures
+- Emergency response
+- Hazard recognition
+- PPE use and maintenance
+
+8. SAFETY COMMITTEE
+
+Our Safety Committee meets monthly to:
+- Review incident reports and trends
+- Evaluate safety procedures
+- Recommend improvements
+- Promote safety awareness
+
+Committee members represent all departments and levels of the organization.
+
+═══════════════════════════════════════════════════════════════
+
+SAFETY CONTACTS
+
+Emergency: 911
+Security: Extension 2911
+Safety Department: Extension 2500
+Human Resources: Extension 2100
+
+═══════════════════════════════════════════════════════════════
+
+Remember: Safety is everyone's responsibility!
+
+Document Control:
+- Document ID: SM-2024-001
+- Last Review Date: November 15, 2023
+- Next Review Date: November 15, 2024
+- Document Owner: Safety Committee`
+      }
+    };
+
+    return documentTemplates[document.name as keyof typeof documentTemplates] || {
+      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
+    };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
     }
+  };
 
-    setShowSalaryGradeModal(false)
-    setEditingGrade(null)
-    setNewGrade({
-      name: "",
-      description: "",
-      minSalary: "",
-      maxSalary: "",
-      numberOfNotches: 5,
-      notches: [],
-    })
-  }
-
-  const handleDeleteSalaryGrade = (gradeId) => {
-    setSalaryGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
-    toast({
-      title: "Grade Deleted",
-      description: "Salary grade has been deleted successfully.",
-    })
-  }
-
-  const handleAddDivision = () => {
-    const newDivision = newDivisionName.trim()
-    if (newDivision && !divisions.includes(newDivision)) {
-      const updatedDivisions = [...divisions, newDivision]
-      setDivisions(updatedDivisions)
-      setCompanyData({ ...companyData, divisions: updatedDivisions })
-      setNewDivisionName("")
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
       toast({
-        title: "Success",
-        description: "Division added successfully",
-      })
-    }
-  }
-
-  const handleRemoveDivision = (divisionToRemove: string) => {
-    const updatedDivisions = divisions.filter((division) => division !== divisionToRemove)
-    setDivisions(updatedDivisions)
-    setCompanyData({ ...companyData, divisions: updatedDivisions })
-    toast({
-      title: "Success",
-      description: "Division removed successfully",
-    })
-  }
-
-  const handleAddDepartment = () => {
-    const newDept = newDepartmentName.trim()
-    if (newDept && !departments.includes(newDept)) {
-      const updatedDepartments = [...departments, newDept]
-      setDepartments(updatedDepartments)
-      setCompanyData({ ...companyData, departments: updatedDepartments })
-      setNewDepartmentName("")
-      toast({
-        title: "Success",
-        description: "Department added successfully",
-      })
-    }
-  }
-
-  const handleRemoveDepartment = (departmentToRemove: string) => {
-    const updatedDepartments = departments.filter((dept) => dept !== departmentToRemove)
-    setDepartments(updatedDepartments)
-    setCompanyData({ ...companyData, departments: updatedDepartments })
-    toast({
-      title: "Success",
-      description: "Department removed successfully",
-    })
-  }
-
-  const handleAddLocation = () => {
-    const newLoc = newLocationName.trim()
-    if (newLoc && !locations.includes(newLoc)) {
-      const updatedLocations = [...locations, newLoc]
-      setLocations(updatedLocations)
-      setCompanyData({ ...companyData, locations: updatedLocations })
-      setNewLocationName("")
-      toast({
-        title: "Success",
-        description: "Location added successfully",
-      })
-    }
-  }
-
-  const handleRemoveLocation = (locationToRemove: string) => {
-    const updatedLocations = locations.filter((loc) => loc !== locationToRemove)
-    setLocations(updatedLocations)
-    setCompanyData({ ...companyData, locations: updatedLocations })
-    toast({
-      title: "Success",
-      description: "Location removed successfully",
-    })
-  }
-
-  const handleAddUnstructuredGrade = () => {
-    setEditingUnstructured(null)
-    setNewUnstructured({
-      name: "",
-      description: "",
-      generalIncrement: { type: "percentage", value: 0, min: 0, max: 0 },
-      performanceIncrement: { type: "percentage", value: 0, min: 0, max: 0 },
-    })
-    setShowUnstructuredModal(true)
-  }
-
-  const handleEditUnstructuredGrade = (grade) => {
-    setEditingUnstructured(grade)
-    setNewUnstructured({
-      name: grade.name,
-      description: grade.description,
-      generalIncrement: grade.generalIncrement,
-      performanceIncrement: grade.performanceIncrement,
-    })
-    setShowUnstructuredModal(true)
-  }
-
-  const handleSaveUnstructuredGrade = () => {
-    if (!newUnstructured.name) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    const gradeToAdd = {
-      id: editingUnstructured ? editingUnstructured.id : Date.now(),
-      name: newUnstructured.name,
-      description: newUnstructured.description,
-      generalIncrement: newUnstructured.generalIncrement,
-      performanceIncrement: newUnstructured.performanceIncrement,
-    }
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    if (editingUnstructured) {
-      setUnstructuredGrades((prev) => prev.map((grade) => (grade.id === editingUnstructured.id ? gradeToAdd : grade)))
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
       toast({
-        title: "Grade Updated",
-        description: "Unstructured salary grade has been updated successfully.",
-      })
-    } else {
-      setUnstructuredGrades((prev) => [...prev, gradeToAdd])
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
       toast({
-        title: "Grade Added",
-        description: "New unstructured salary grade has been added successfully.",
-      })
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.2
+APPROVED BY: Executive Leadership Team
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Welcome Message .......................................... 3
+2. Company Overview ......................................... 4
+3. Employment Policies ...................................... 6
+4. Compensation and Benefits ................................ 12
+5. Work Environment and Safety .............................. 18
+6. Professional Development ................................. 22
+7. Technology and Communication ............................. 25
+8. Leave Policies ........................................... 28
+9. Performance Management ................................... 32
+10. Disciplinary Procedures ................................. 35
+11. Employee Resources ...................................... 38
+
+═══════════════════════════════════════════════════════════════
+
+1. WELCOME MESSAGE
+
+Dear Team Member,
+
+Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
+
+This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
+
+Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
+
+If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
+
+Welcome aboard!
+
+Sincerely,
+The Executive Leadership Team
+
+2. COMPANY OVERVIEW
+
+2.1 OUR MISSION
+To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
+
+2.2 OUR VALUES
+- Integrity: We conduct business with honesty and transparency
+- Excellence: We strive for the highest quality in everything we do
+- Innovation: We embrace change and continuously improve
+- Teamwork: We collaborate effectively to achieve common goals
+- Respect: We value diversity and treat everyone with dignity
+
+2.3 ORGANIZATIONAL STRUCTURE
+Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+
+3. EMPLOYMENT POLICIES
+
+3.1 EQUAL EMPLOYMENT OPPORTUNITY
+We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
+
+3.2 AT-WILL EMPLOYMENT
+Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
+
+3.3 BACKGROUND CHECKS
+All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+
+4. COMPENSATION AND BENEFITS
+
+4.1 PAY PERIODS
+Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
+
+4.2 OVERTIME
+Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
+
+4.3 BENEFITS OVERVIEW
+We offer a comprehensive benefits package including:
+- Health insurance
+- Dental and vision coverage
+- Retirement savings plan with company matching
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT AND SAFETY
+
+5.1 WORKPLACE SAFETY
+The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
+
+5.2 DRUG-FREE WORKPLACE
+We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
+
+6. PROFESSIONAL DEVELOPMENT
+
+We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
+
+7. TECHNOLOGY AND COMMUNICATION
+
+7.1 COMPUTER AND INTERNET USE
+Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
+
+7.2 CONFIDENTIALITY
+Employees must protect confidential company information and respect the privacy of customer and employee data.
+
+8. LEAVE POLICIES
+
+8.1 PAID TIME OFF (PTO)
+Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
+
+8.2 FAMILY AND MEDICAL LEAVE
+Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
+
+9. PERFORMANCE MANAGEMENT
+
+Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
+
+10. DISCIPLINARY PROCEDURES
+
+When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
+
+11. EMPLOYEE RESOURCES
+
+11.1 HUMAN RESOURCES DEPARTMENT
+The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
+
+11.2 EMPLOYEE ASSISTANCE PROGRAM
+Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
+
+═══════════════════════════════════════════════════════════════
+
+ACKNOWLEDGMENT
+
+I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+This handbook is subject to change. Updates will be communicated to all employees.
+
+Document Control:
+- Document ID: EH-2024-001
+- Last Review Date: December 1, 2023
+- Next Review Date: December 1, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+SAFETY FIRST - ALWAYS
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.3
+APPROVED BY: Safety Committee
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Safety Policy Statement ................................... 3
+2. General Safety Rules ..................................... 4
+3. Emergency Procedures ..................................... 6
+4. Personal Protective Equipment ............................ 8
+5. Hazard Communication ..................................... 10
+6. Incident Reporting ....................................... 12
+7. Training Requirements .................................... 14
+8. Safety Committee ......................................... 16
+
+═══════════════════════════════════════════════════════════════
+
+1. SAFETY POLICY STATEMENT
+
+The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
+
+Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
+
+2. GENERAL SAFETY RULES
+
+2.1 BASIC SAFETY PRINCIPLES
+- Follow all safety procedures and guidelines
+- Report unsafe conditions immediately
+- Use appropriate personal protective equipment
+- Keep work areas clean and organized
+- Never take shortcuts that compromise safety
+
+2.2 PROHIBITED ACTIVITIES
+- Horseplay or practical jokes
+- Operating equipment without proper training
+- Removing or disabling safety devices
+- Working under the influence of drugs or alcohol
+
+3. EMERGENCY PROCEDURES
+
+3.1 FIRE EMERGENCY
+- Activate the nearest fire alarm
+- Evacuate immediately using designated routes
+- Proceed to assembly areas
+- Do not use elevators
+- Do not re-enter the building until authorized
+
+3.2 MEDICAL EMERGENCY
+- Call 911 immediately for serious injuries
+- Notify your supervisor and security
+- Provide first aid only if trained to do so
+- Do not move seriously injured persons
+
+3.3 SEVERE WEATHER
+- Monitor weather alerts and warnings
+- Follow instructions from management
+- Move to designated shelter areas if required
+- Remain in shelter until all-clear is given
+
+4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
+
+4.1 GENERAL REQUIREMENTS
+Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
+- Safety glasses or goggles
+- Hard hats
+- Safety shoes
+- Gloves
+- Hearing protection
+- Respiratory protection
+
+4.2 PPE MAINTENANCE
+- Inspect PPE before each use
+- Replace damaged or worn equipment
+- Clean and store PPE properly
+- Report defective equipment immediately
+
+5. HAZARD COMMUNICATION
+
+5.1 CHEMICAL SAFETY
+- Read and understand Safety Data Sheets (SDS)
+- Follow proper handling procedures
+- Use appropriate PPE when working with chemicals
+- Store chemicals according to manufacturer instructions
+
+5.2 LABELING REQUIREMENTS
+All hazardous materials must be properly labeled with:
+- Product identification
+- Hazard warnings
+- Precautionary statements
+- Supplier information
+
+6. INCIDENT REPORTING
+
+6.1 REPORTING REQUIREMENTS
+All incidents, including near misses, must be reported immediately to:
+- Your immediate supervisor
+- The Safety Department
+- Human Resources (for injuries)
+
+6.2 INVESTIGATION PROCESS
+All incidents will be thoroughly investigated to:
+- Determine root causes
+- Implement corrective actions
+- Prevent similar occurrences
+- Comply with regulatory requirements
+
+7. TRAINING REQUIREMENTS
+
+7.1 NEW EMPLOYEE ORIENTATION
+All new employees must complete safety orientation training before beginning work assignments.
+
+7.2 ONGOING TRAINING
+Regular safety training is provided on topics including:
+- Job-specific safety procedures
+- Emergency response
+- Hazard recognition
+- PPE use and maintenance
+
+8. SAFETY COMMITTEE
+
+Our Safety Committee meets monthly to:
+- Review incident reports and trends
+- Evaluate safety procedures
+- Recommend improvements
+- Promote safety awareness
+
+Committee members represent all departments and levels of the organization.
+
+═══════════════════════════════════════════════════════════════
+
+SAFETY CONTACTS
+
+Emergency: 911
+Security: Extension 2911
+Safety Department: Extension 2500
+Human Resources: Extension 2100
+
+═══════════════════════════════════════════════════════════════
+
+Remember: Safety is everyone's responsibility!
+
+Document Control:
+- Document ID: SM-2024-001
+- Last Review Date: November 15, 2023
+- Next Review Date: November 15, 2024
+- Document Owner: Safety Committee`
+      }
+    };
+
+    return documentTemplates[document.name as keyof typeof documentTemplates] || {
+      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
+    };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
     }
 
-    setShowUnstructuredModal(false)
-    setEditingUnstructured(null)
-    setNewUnstructured({
-      name: "",
-      description: "",
-      generalIncrement: { type: "percentage", value: 0, min: 0, max: 0 },
-      performanceIncrement: { type: "percentage", value: 0, min: 0, max: 0 },
-    })
-  }
-
-  const handleDeleteUnstructuredGrade = (gradeId) => {
-    setUnstructuredGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
-    toast({
-      title: "Grade Deleted",
-      description: "Unstructured salary grade has been deleted successfully.",
-    })
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-600">Manage your organization settings and configurations</p>
-        </div>
-      </div>
-
-      <Tabs defaultValue="company" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-8">
-          <TabsTrigger value="company">Company</TabsTrigger>
-          <TabsTrigger value="subsidiaries">Multi-Company</TabsTrigger>
-          <TabsTrigger value="hr">HR</TabsTrigger>
-          <TabsTrigger value="payroll">Payroll</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="roles">Roles</TabsTrigger>
-          <TabsTrigger value="access">Access</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-        </TabsList>
-
-        {/* Company Settings */}
-        <TabsContent value="company">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Building2 className="w-5 h-5" />
-                <span>Company Settings</span>
-              </CardTitle>
-              <CardDescription>Manage your company information and organizational structure</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <Label>Company Logo</Label>
-                <div className="flex items-center space-x-4">
-                  {companyLogoPreview || companyData.logo_url ? (
-                    <div className="relative">
-                      <img
-                        src={companyLogoPreview || companyData.logo_url}
-                        alt="Company Logo"
-                        className="w-20 h-20 object-cover rounded-lg border"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
-                        onClick={() => {
-                          setCompanyLogoPreview("")
-                          setCompanyData({ ...companyData, logo_url: "" })
-                        }}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                      <ImageIcon className="w-8 h-8 text-gray-400" />
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) {
-                          handleLogoUpload(file, "company")
-                        }
-                      }}
-                      className="hidden"
-                      id="company-logo-upload"
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={() => document.getElementById("company-logo-upload")?.click()}
-                      disabled={isUploadingLogo}
-                      className="flex items-center space-x-2"
-                    >
-                      {isUploadingLogo ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Uploading...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-4 h-4" />
-                          <span>Upload Logo</span>
-                        </>
-                      )}
-                    </Button>
-                    <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="companyName">Company Name</Label>
-                  <Input
-                    id="companyName"
-                    value={companyData.name}
-                    onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="industry">Industry</Label>
-                  <Input
-                    id="industry"
-                    value={companyData.industry}
-                    onChange={(e) => setCompanyData({ ...companyData, industry: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="taxId">Tax ID</Label>
-                  <Input
-                    id="taxId"
-                    value={companyData.tax_id}
-                    onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="ssnitNumber">SSNIT Number</Label>
-                  <Input
-                    id="ssnitNumber"
-                    value={companyData.ssnit_number}
-                    onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={companyData.email_address}
-                    onChange={(e) => setCompanyData({ ...companyData, email_address: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    value={companyData.phone_number}
-                    onChange={(e) => setCompanyData({ ...companyData, phone_number: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="address">Address</Label>
-                <Textarea
-                  id="address"
-                  value={companyData.address}
-                  onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-4">
-                <Label className="text-base font-semibold">Divisions</Label>
-                <div className="space-y-3">
-                  {divisions.length > 0 ? (
-                    <div className="space-y-2">
-                      {divisions.map((division, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <span className="font-medium">{division}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveDivision(division)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">No divisions added yet</p>
-                  )}
-                  <div className="flex space-x-2">
-                    <Input
-                      placeholder="Enter division name"
-                      value={newDivisionName}
-                      onChange={(e) => setNewDivisionName(e.target.value)}
-                      onKeyPress={(e) => e.key === "Enter" && handleAddDivision()}
-                    />
-                    <Button variant="outline" size="sm" onClick={handleAddDivision} disabled={!newDivisionName.trim()}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Division
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <Label className="text-base font-semibold">Departments</Label>
-                <div className="space-y-3">
-                  {departments.length > 0 ? (
-                    <div className="space-y-2">
-                      {departments.map((department, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <span className="font-medium">{department}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveDepartment(department)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">No departments added yet</p>
-                  )}
-                  <div className="flex space-x-2">
-                    <Input
-                      placeholder="Enter department name"
-                      value={newDepartmentName}
-                      onChange={(e) => setNewDepartmentName(e.target.value)}
-                      onKeyPress={(e) => e.key === "Enter" && handleAddDepartment()}
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAddDepartment}
-                      disabled={!newDepartmentName.trim()}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Department
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <Label className="text-base font-semibold">Locations</Label>
-                <div className="space-y-3">
-                  {locations.length > 0 ? (
-                    <div className="space-y-2">
-                      {locations.map((location, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <span className="font-medium">{location}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveLocation(location)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">No locations added yet</p>
-                  )}
-                  <div className="flex space-x-2">
-                    <Input
-                      placeholder="Enter location name"
-                      value={newLocationName}
-                      onChange={(e) => setNewLocationName(e.target.value)}
-                      onKeyPress={(e) => e.key === "Enter" && handleAddLocation()}
-                    />
-                    <Button variant="outline" size="sm" onClick={handleAddLocation} disabled={!newLocationName.trim()}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Location
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                  onClick={handleSaveSettings}
-                  disabled={isSavingSettings}
-                >
-                  {isSavingSettings ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Company Settings
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="subsidiaries">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Building2 className="w-5 h-5" />
-                  <span>Multi-Company Management</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button onClick={() => setShowAddSubsidiary(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Subsidiary
-                  </Button>
-                  <Button variant="outline" onClick={handleSaveSubsidiaryChanges} disabled={isSavingSubsidiary}>
-                    {isSavingSubsidiary ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4 mr-2" />
-                        Save
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardTitle>
-              <CardDescription>
-                Manage subsidiary companies, their organizational structure, and synchronize settings across entities
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {/* Company Overview Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-2">
-                        <Building2 className="w-5 h-5 text-blue-600" />
-                        <div>
-                          <p className="text-sm font-medium">Total Subsidiaries</p>
-                          <p className="text-2xl font-bold">{subsidiaries.length}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-2">
-                        <Users className="w-5 h-5 text-green-600" />
-                        <div>
-                          <p className="text-sm font-medium">Active Companies</p>
-                          <p className="text-2xl font-bold">
-                            {subsidiaries.filter((s) => s.status === "active").length}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-2">
-                        <MapPin className="w-5 h-5 text-purple-600" />
-                        <div>
-                          <p className="text-sm font-medium">Total Locations</p>
-                          <p className="text-2xl font-bold">
-                            {subsidiaries.reduce((acc, s) => acc + (s.locations?.length || 0), 0)}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-2">
-                        <Briefcase className="w-5 h-5 text-orange-600" />
-                        <div>
-                          <p className="text-sm font-medium">Total Departments</p>
-                          <p className="text-2xl font-bold">
-                            {subsidiaries.reduce((acc, s) => acc + (s.departments?.length || 0), 0)}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Subsidiaries List */}
-                <div className="space-y-3">
-                  {subsidiaries.map((subsidiary) => (
-                    // Updated subsidiary card to show logo and removed Edit button
-                    <Card key={subsidiary.id} className="border-l-4 border-l-blue-500">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-2">
-                              <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
-                                {subsidiary.logo_url ? (
-                                  <img
-                                    src={subsidiary.logo_url || "/placeholder.svg"}
-                                    alt={`${subsidiary.name} logo`}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                                    {subsidiary.name.charAt(0)}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <h3 className="text-base font-semibold">{subsidiary.name}</h3>
-                                    <p className="text-xs text-gray-600">{subsidiary.industry}</p>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <Badge
-                                      variant={subsidiary.status === "active" ? "default" : "secondary"}
-                                      className="text-xs"
-                                    >
-                                      {subsidiary.status}
-                                    </Badge>
-                                    <span className="text-xs text-gray-500">Tax ID: {subsidiary.tax_id}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                              <div>
-                                <p className="text-xs font-medium text-gray-700 mb-1">Contact Information</p>
-                                <div className="space-y-0.5">
-                                  <p className="text-xs text-gray-600">{subsidiary.email_address}</p>
-                                  <p className="text-xs text-gray-600">{subsidiary.phone_number}</p>
-                                  <p className="text-xs text-gray-600 truncate">{subsidiary.address}</p>
-                                </div>
-                              </div>
-                              <div>
-                                <p className="text-xs font-medium text-gray-700 mb-1">Organizational Structure</p>
-                                <div className="flex items-center space-x-3 text-xs text-gray-600">
-                                  <span>
-                                    {subsidiary.divisions_count || subsidiary.divisions?.length || 0} Divisions
-                                  </span>
-                                  <span>
-                                    {subsidiary.departments_count || subsidiary.departments?.length || 0} Departments
-                                  </span>
-                                  <span>
-                                    {subsidiary.locations_count || subsidiary.locations?.length || 0} Locations
-                                  </span>
-                                </div>
-                              </div>
-                              <div>
-                                <p className="text-xs font-medium text-gray-700 mb-1">Registration Details</p>
-                                <div className="space-y-0.5">
-                                  <p className="text-xs text-gray-600">SSNIT: {subsidiary.ssnit_number}</p>
-                                  <p className="text-xs text-gray-600">
-                                    Created:{" "}
-                                    {subsidiary.created_at
-                                      ? new Date(subsidiary.created_at).toLocaleDateString()
-                                      : "N/A"}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-1.5">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-2 text-xs bg-transparent"
-                                onClick={() => {
-                                  setSelectedSubsidiary(subsidiary)
-                                  setShowSubsidiaryDetails(true)
-                                }}
-                              >
-                                <Eye className="w-3 h-3 mr-1" />
-                                View Details
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-2 text-xs bg-transparent"
-                                onClick={() => {
-                                  setSelectedSubsidiary(subsidiary)
-                                  setShowEditSubsidiary(true)
-                                }}
-                              >
-                                <Edit className="w-3 h-3 mr-1" />
-                                Edit
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-2 text-xs bg-transparent"
-                                onClick={() => syncSubsidiarySettings(subsidiary.id)}
-                              >
-                                <RefreshCw className="w-3 h-3 mr-1" />
-                                Sync Settings
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-2 text-xs bg-transparent"
-                                onClick={() => viewSubsidiaryEmployees(subsidiary.id)}
-                              >
-                                <Users className="w-3 h-3 mr-1" />
-                                View Employees ({subsidiary.employee_count || 0})
-                              </Button>
-                            </div>
-                          </div>
-
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                                <MoreVertical className="h-3 w-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedSubsidiary(subsidiary)
-                                  setShowSubsidiaryDetails(true)
-                                }}
-                              >
-                                <Eye className="w-4 h-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedSubsidiary(subsidiary)
-                                  setShowEditSubsidiary(true)
-                                }}
-                              >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit Subsidiary
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => syncSubsidiarySettings(subsidiary.id)}>
-                                <RefreshCw className="w-4 h-4 mr-2" />
-                                Sync Settings
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => duplicateSubsidiary(subsidiary)}>
-                                <Copy className="w-4 h-4 mr-2" />
-                                Duplicate
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              {subsidiary.status === "active" ? (
-                                <DropdownMenuItem
-                                  onClick={() => confirmDeactivateSubsidiary(subsidiary.id)}
-                                  className="text-orange-600"
-                                >
-                                  <AlertTriangle className="w-4 h-4 mr-2" />
-                                  Deactivate
-                                </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem
-                                  onClick={() => confirmReactivateSubsidiary(subsidiary.id)}
-                                  className="text-green-600"
-                                >
-                                  <CheckCircle className="w-4 h-4 mr-2" />
-                                  Reactivate
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-
-                  {subsidiaries.length === 0 && (
-                    <Card>
-                      <CardContent className="p-8 text-center">
-                        <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Subsidiaries Found</h3>
-                        <p className="text-gray-600 mb-4">
-                          Get started by adding your first subsidiary company to manage multiple entities.
-                        </p>
-                        <Button onClick={() => setShowAddSubsidiary(true)}>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add First Subsidiary
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                {/* Settings Synchronization Panel */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <RefreshCw className="w-5 h-5" />
-                      <span>Settings Synchronization</span>
-                    </CardTitle>
-                    <CardDescription>Synchronize settings across all subsidiary companies</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="font-medium mb-2">Sync Options</h4>
-                        <div className="space-y-2">
-                          <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" defaultChecked />
-                            <span className="text-sm">HR Policies</span>
-                          </label>
-                          <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" defaultChecked />
-                            <span className="text-sm">Payroll Configuration</span>
-                          </label>
-                          <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" />
-                            <span className="text-sm">Leave Types</span>
-                          </label>
-                          <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" />
-                            <span className="text-sm">Roles & Permissions</span>
-                          </label>
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="font-medium mb-2">Sync Actions</h4>
-
-                        <div className="space-y-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full justify-start bg-transparent"
-                            onClick={handleSaveSettings}
-                            disabled={isSavingSettings}
-                          >
-                            {isSavingSettings ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Saving...
-                              </>
-                            ) : (
-                              <>
-                                <Save className="w-4 h-4 mr-2" />
-                                Save Settings
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full justify-start bg-transparent"
-                            onClick={handleExportSettingsTemplate}
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Export Settings Template
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full justify-start bg-transparent"
-                            onClick={() => setImportModal(true)}
-                          >
-                            <Upload className="w-4 h-4 mr-2" />
-                            Import Settings
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="hr">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Settings className="w-5 h-5" />
-                      <span>HR Configuration</span>
-                    </CardTitle>
-                    <CardDescription>Configure core HR settings and policies</CardDescription>
-                  </div>
-                  <Button
-                    onClick={handleSaveHRConfig}
-                    disabled={isSaving}
-                    className="bg-black text-white hover:bg-gray-800"
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save HR Configuration
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="leaveYearStart">Leave Year Start</Label>
-                      <Select
-                        value={hrConfig.leaveYearStart}
-                        onValueChange={(value) => setHrConfig({ ...hrConfig, leaveYearStart: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="January">January</SelectItem>
-                          <SelectItem value="February">February</SelectItem>
-                          <SelectItem value="March">March</SelectItem>
-                          <SelectItem value="April">April</SelectItem>
-                          <SelectItem value="May">May</SelectItem>
-                          <SelectItem value="June">June</SelectItem>
-                          <SelectItem value="July">July</SelectItem>
-                          <SelectItem value="August">August</SelectItem>
-                          <SelectItem value="September">September</SelectItem>
-                          <SelectItem value="October">October</SelectItem>
-                          <SelectItem value="November">November</SelectItem>
-                          <SelectItem value="December">December</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="workingHours">Working Hours/Day</Label>
-                      <Input
-                        id="workingHours"
-                        type="number"
-                        value={hrConfig.workingHoursPerDay}
-                        onChange={(e) =>
-                          setHrConfig({ ...hrConfig, workingHoursPerDay: Number.parseInt(e.target.value) })
-                        }
-                        min="1"
-                        max="24"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="probationPeriod">Probation Period (months)</Label>
-                      <Input
-                        id="probationPeriod"
-                        type="number"
-                        value={hrConfig.probationPeriod}
-                        onChange={(e) => setHrConfig({ ...hrConfig, probationPeriod: Number.parseInt(e.target.value) })}
-                        min="0"
-                        max="12"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="workingDays">Working Days/Week</Label>
-                      <Input
-                        id="workingDays"
-                        type="number"
-                        value={hrConfig.workingDaysPerWeek}
-                        onChange={(e) =>
-                          setHrConfig({ ...hrConfig, workingDaysPerWeek: Number.parseInt(e.target.value) })
-                        }
-                        min="1"
-                        max="7"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Auto-approve leave requests</Label>
-                      <p className="text-sm text-muted-foreground">Automatically approve requests within policy</p>
-                    </div>
-                    <Switch
-                      checked={hrConfig.autoApproveLeave}
-                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, autoApproveLeave: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Email notifications</Label>
-                      <p className="text-sm text-muted-foreground">Send email updates for HR activities</p>
-                    </div>
-                    <Switch
-                      checked={hrConfig.emailNotifications}
-                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, emailNotifications: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="flex items-center space-x-2">
-                        <Sparkles className="w-4 h-4 text-purple-500" />
-                        <span>AI Recommendations</span>
-                      </Label>
-                      <p className="text-sm text-muted-foreground">Enable AI-driven insights for HR processes</p>
-                    </div>
-                    <Switch
-                      checked={hrConfig.aiRecommendations}
-                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, aiRecommendations: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="flex items-center space-x-2">
-                        <TrendingUp className="w-4 h-4 text-blue-500" />
-                        <span>Smart Scheduling</span>
-                      </Label>
-                      <p className="text-sm text-muted-foreground">Optimize schedules based on employee availability</p>
-                    </div>
-                    <Switch
-                      checked={hrConfig.smartScheduling}
-                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, smartScheduling: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="flex items-center space-x-2">
-                        <Calendar className="w-4 h-4 text-green-500" />
-                        <span>Performance Tracking</span>
-                      </Label>
-                      <p className="text-sm text-muted-foreground">Track employee performance metrics and goals</p>
-                    </div>
-                    <Switch
-                      checked={hrConfig.performanceTracking}
-                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, performanceTracking: checked })}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Leave Policies Management */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center space-x-2">
-                    <Calendar className="w-5 h-5" />
-                    <span>Leave Policies</span>
-                  </CardTitle>
-                  <div className="flex items-center space-x-2">
-                    <Button variant="outline" onClick={handleManageLeaveTypes}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Leave Type
-                    </Button>
-                  </div>
-                </div>
-                <CardDescription>Manage leave policies and generate AI insights</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {currentPolicies.map((policy) => (
-                    <Card key={policy.name} className="border-l-4 border-l-blue-500">
-                      <CardHeader>
-                        <CardTitle className="text-lg font-semibold">{policy.name}</CardTitle>
-                        <CardDescription>{policy.description}</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                          <p className="text-sm">
-                            <span className="font-medium">Days:</span> {policy.days}
-                          </p>
-                          <p className="text-sm">
-                            <span className="font-medium">Usage:</span> {policy.usage}
-                          </p>
-                        </div>
-
-                        <div className="border-t pt-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-muted-foreground">AI Insight</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleGeneratePolicyInsight(policy.name)}
-                              disabled={loadingInsights[policy.name]}
-                              className="h-6 px-2 text-xs"
-                            >
-                              {loadingInsights[policy.name] ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <Brain className="w-3 h-3" />
-                              )}
-                              <span className="ml-1">Generate</span>
-                            </Button>
-                          </div>
-
-                          {policyInsights[policy.name] ? (
-                            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                              <p className="text-xs text-blue-800 leading-relaxed">{policyInsights[policy.name]}</p>
-                            </div>
-                          ) : (
-                            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 text-center">
-                              <p className="text-xs text-gray-500">Click Generate to get AI insights for this policy</p>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex justify-end space-x-2 pt-2">
-                          <Button variant="outline" size="sm" onClick={() => handlePolicyAction("view", policy.name)}>
-                            View
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => handlePolicyAction("edit", policy.name)}>
-                            Edit
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handlePolicyAction("delete", policy.name)}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* HR Documents Management */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center space-x-2">
-                    <ImageIcon className="w-5 h-5" />
-                    <span>HR Documents</span>
-                  </CardTitle>
-                  <Button variant="outline" onClick={handleAddDocument}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Document
-                  </Button>
-                </div>
-                <CardDescription>Manage HR documents and visibility settings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  {hrDocuments.map((doc) => (
-                    <Card key={doc.id} className="border-l-4 border-l-green-500">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="text-base font-semibold">{doc.name}</h3>
-                            <p className="text-xs text-gray-600">
-                              {doc.type} - {doc.size}
-                            </p>
-                          </div>
-                          <div className="flex items-center space-x-4">
-                            <div className="flex flex-col items-center space-y-1">
-                              <Switch
-                                checked={doc.visibleToAll}
-                                onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
-                              />
-                              <span className="text-xs text-gray-500">available for employees</span>
-                            </div>
-                            <Button variant="outline" size="sm" onClick={() => handleDocumentView(doc)}>
-                              View
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleEditDocument(doc.id)}>
-                              Edit
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleDocumentAction("delete", doc.id)}
-                            >
-                              Delete
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center space-x-2">
-                    <TrendingUp className="w-5 h-5" />
-                    <span>Salary Grades & Notches</span>
-                  </CardTitle>
-                  <div className="flex items-center space-x-2">
-                    <Button variant="outline" onClick={() => setShowImportExportModal(true)}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Import/Export
-                    </Button>
-                    {salaryGradeTab === "structured" ? (
-                      <Button variant="outline" onClick={handleAddSalaryGrade}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Salary Grade
-                      </Button>
-                    ) : (
-                      <Button variant="outline" onClick={handleAddUnstructuredGrade}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Unstructured Grade
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                <CardDescription>Manage salary grades and compensation structure for employees</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Tab Navigation */}
-                <div className="flex space-x-1 bg-muted p-1 rounded-lg">
-                  <button
-                    onClick={() => setSalaryGradeTab("structured")}
-                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                      salaryGradeTab === "structured"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Structured Salary Grade
-                  </button>
-                  <button
-                    onClick={() => setSalaryGradeTab("unstructured")}
-                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                      salaryGradeTab === "unstructured"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Unstructured Salary Grade
-                  </button>
-                </div>
-
-                {/* Structured Salary Grades */}
-                {salaryGradeTab === "structured" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {salaryGrades.map((grade) => (
-                      <Card key={grade.id} className="border-l-4 border-l-purple-500">
-                        <CardHeader>
-                          <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
-                          <CardDescription>{grade.description}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="space-y-2">
-                            <p className="text-sm">
-                              <span className="font-medium">Range:</span> ₵{grade.minSalary.toLocaleString()} - ₵
-                              {grade.maxSalary.toLocaleString()}
-                            </p>
-                            <p className="text-sm">
-                              <span className="font-medium">Notches:</span> {grade.notches.length} steps
-                            </p>
-                          </div>
-
-                          <div className="border-t pt-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium text-muted-foreground">Salary Steps</span>
-                            </div>
-                            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-32 overflow-y-auto">
-                              <div className="space-y-1">
-                                {grade.notches.map((notch) => (
-                                  <div key={notch.step} className="flex justify-between text-xs">
-                                    <span>Step {notch.step}</span>
-                                    <span className="font-medium">₵{notch.amount.toLocaleString()}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex justify-end space-x-2 pt-2">
-                            <Button variant="outline" size="sm" onClick={() => handleEditSalaryGrade(grade)}>
-                              Edit
-                            </Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleDeleteSalaryGrade(grade.id)}>
-                              Delete
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-
-                {/* Unstructured Salary Grades */}
-                {salaryGradeTab === "unstructured" && (
-                  <div className="space-y-6">
-                    {/* Unstructured Salary Grades Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {unstructuredGrades.map((grade) => (
-                        <Card key={grade.id} className="border-l-4 border-l-blue-500">
-                          <CardHeader>
-                            <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
-                            <CardDescription>{grade.description}</CardDescription>
-                          </CardHeader>
-                          <CardContent className="space-y-4">
-                            <div className="space-y-3">
-                              <div className="bg-green-50 border border-green-200 rounded-md p-3">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm font-medium text-green-800">General Increment</span>
-                                  <span className="text-sm font-semibold text-green-900">
-                                    {grade.generalIncrement.type === "percentage"
-                                      ? `${grade.generalIncrement.value}%`
-                                      : `₵${grade.generalIncrement.value.toLocaleString()}`}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm font-medium text-blue-800">Performance Increment</span>
-                                  <span className="text-sm font-semibold text-blue-900">
-                                    {grade.performanceIncrement.type === "percentage"
-                                      ? `${grade.performanceIncrement.value}%`
-                                      : `₵${grade.performanceIncrement.value.toLocaleString()}`}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex justify-end space-x-2 pt-2">
-                              <Button variant="outline" size="sm" onClick={() => handleEditUnstructuredGrade(grade)}>
-                                Edit
-                              </Button>
-                              <Button variant="destructive" size="sm" onClick={() => handleDeleteUnstructuredGrade(grade.id)}>
-                                Delete
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="payroll">
-          <div className="space-y-6">
-            {/* Payroll Configuration Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Settings className="w-5 h-5" />
-                  <span>Payroll Configuration</span>
-                </CardTitle>
-                <CardDescription>Configure basic payroll settings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div>
-                    <Label htmlFor="payFrequency">Pay Frequency</Label>
-                    <Select defaultValue="monthly">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="biweekly">Bi-Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="currency">Currency</Label>
-                    <Select value={selectedCurrency} onValueChange={handleCurrencyChange}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ghs">Ghana Cedis (GHS)</SelectItem>
-                        <SelectItem value="usd">US Dollar (USD)</SelectItem>
-                        <SelectItem value="eur">Euro (EUR)</SelectItem>
-                        <SelectItem value="ngn">Nigerian Naira (NGN)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="minimumWage">Minimum Wage ({getCurrencyConfig(selectedCurrency).symbol})</Label>
-                    <Input type="number" defaultValue="18.15" />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="weekdayOvertimeRate">Weekday Overtime Rate Multiplier</Label>
-                    <Input type="number" step="0.1" defaultValue="1.5" />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="weekendOvertimeRate">Weekend Overtime Rate Multiplier</Label>
-                    <Input type="number" step="0.1" defaultValue="2" />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="payrollCutoffDay">Payroll Cutoff Day</Label>
-                    <Input type="number" min="1" max="31" defaultValue="25" />
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch id="autoCalculatePAYE" defaultChecked />
-                    <Label htmlFor="autoCalculatePAYE">Auto-calculate PAYE</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="autoCalculateSSNIT" defaultChecked />
-                    <Label htmlFor="autoCalculateSSNIT">Auto-calculate SSNIT</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="autoCalculateProvidentFund" defaultChecked />
-                    <Label htmlFor="autoCalculateProvidentFund">Auto-calculate Provident Fund (Tier 3)</Label>
-                  </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button onClick={handleSavePayrollConfig} disabled={isSavingPayroll}>
-                    {isSavingPayroll ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="w-4 h-4 mr-2" />
-                    )}
-                    Save Payroll Configuration
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Tax Configuration Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Calculator className="w-5 h-5" />
-                  <span>Tax Configuration</span>
-                </CardTitle>
-                <CardDescription>Configure tax bands and SSNIT rates</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h4 className="font-medium">PAYE Tax Bands</h4>
-                      <p className="text-sm text-gray-500">
-                        {getCurrencyConfig(selectedCurrency).country} - Version{" "}
-                        {getCurrencyConfig(selectedCurrency)?.version} - Last Updated:{" "}
-                        {getCurrencyConfig(selectedCurrency)?.lastUpdated}
-                      </p>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => syncWithGovernmentAPI(selectedCurrency)}
-                        disabled={!apiStatus[selectedCurrency as keyof typeof apiStatus]?.connected || isSyncing}
-                      >
-                        {isSyncing ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <RefreshCw className="w-4 h-4 mr-2" />
-                        )}
-                        Sync API
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={handleAddTaxBand}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Band
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border border-gray-200 rounded-lg">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">Band</th>
-                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">Rate (%)</th>
-                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
-                            From ({getCurrencyConfig(selectedCurrency).symbol})
-                          </th>
-                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
-                            To ({getCurrencyConfig(selectedCurrency).symbol})
-                          </th>
-                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
-                            Cumulative Tax ({getCurrencyConfig(selectedCurrency).symbol})
-                          </th>
-                          <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {getCurrencyConfig(selectedCurrency)?.taxBands.map((band, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="border border-gray-200 px-4 py-3 font-medium">{band.rate}</td>
-                            <td className="border border-gray-200 px-4 py-3">
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                {band.rate}%
-                              </span>
-                            </td>
-                            <td className="border border-gray-200 px-4 py-3">
-                              {band.from ? band.from.toLocaleString() : "0"}
-                            </td>
-                            <td className="border border-gray-200 px-4 py-3">
-                              {band.to ? band.to.toLocaleString() : "∞"}
-                            </td>
-                            <td className="border border-gray-200 px-4 py-3 font-medium text-green-600">
-                              {band.cumulativeTax ? band.cumulativeTax.toLocaleString() : "0"}
-                            </td>
-                            <td className="border border-gray-200 px-4 py-3 text-center">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  console.log("[v0] Editing tax band:", band)
-                                }}
-                              >
-                                Edit
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* SSNIT Rates Section */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">SSNIT Rates</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Employee:</span>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              type="number"
-                              value={ssnitRates.employee}
-                              onChange={(e) => updateSsnitRates("employee", Number.parseFloat(e.target.value) || 0)}
-                              className="w-20 text-right"
-                              step="0.1"
-                            />
-                            <span className="text-sm">%</span>
-                            <Badge variant="secondary">Active</Badge>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Employer:</span>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              type="number"
-                              value={ssnitRates.employer}
-                              onChange={(e) => updateSsnitRates("employer", Number.parseFloat(e.target.value) || 0)}
-                              className="w-20 text-right"
-                              step="0.1"
-                            />
-                            <span className="text-sm">%</span>
-                            <Badge variant="secondary">Active</Badge>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between pt-2 border-t">
-                          <span className="font-medium text-blue-600">Total:</span>
-                          <span className="font-medium text-blue-600">{ssnitRates.total}%</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Tier 2 Rates</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Employee:</span>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              type="number"
-                              value={tier2Rates.employee}
-                              onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value) || 0)}
-                              className="w-20 text-right"
-                              step="0.1"
-                            />
-                            <span className="text-sm">%</span>
-                            <Badge variant="secondary">Active</Badge>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Employer:</span>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              type="number"
-                              value={tier2Rates.employer}
-                              onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value) || 0)}
-                              className="w-20 text-right"
-                              step="0.1"
-                            />
-                            <span className="text-sm">%</span>
-                            <Badge variant="secondary">Active</Badge>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between pt-2 border-t">
-                          <span className="font-medium text-blue-600">Total:</span>
-                          <span className="font-medium text-blue-600">{tier2Rates.total}%</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Tier 3 Rates</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Employee:</span>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              type="number"
-                              value={tier3Rates.employee}
-                              onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value) || 0)}
-                              className="w-20 text-right"
-                              step="0.1"
-                            />
-                            <span className="text-sm">%</span>
-                            <Badge variant="secondary">Active</Badge>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Employer:</span>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              type="number"
-                              value={tier3Rates.employer}
-                              onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value) || 0)}
-                              className="w-20 text-right"
-                              step="0.1"
-                            />
-                            <span className="text-sm">%</span>
-                            <Badge variant="secondary">Active</Badge>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between pt-2 border-t">
-                          <span className="font-medium text-blue-600">Total:</span>
-                          <span className="font-medium text-blue-600">{tier3Rates.total}%</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* API Status and Recent Updates */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center space-x-2">
-                          <Wifi className="w-5 h-5" />
-                          <span>API Status</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span>Ghana</span>
-                          <Badge variant="default" className="bg-green-100 text-green-800">
-                            Connected
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Nigeria</span>
-                          <Badge variant="destructive">Disconnected</Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Usa</span>
-                          <Badge variant="destructive">Disconnected</Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center space-x-2">
-                          <Bell className="w-5 h-5" />
-                          <span>Recent Updates</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          <div className="flex items-start space-x-2">
-                            <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
-                            <div>
-                              <p className="text-sm font-medium">Ghana PAYE Rates Updated</p>
-                              <p className="text-xs text-gray-500">New tax rates effective January 1, 2024</p>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Save Button */}
-                  <div className="flex justify-end mt-6">
-                    <Button
-                      className="bg-blue-600 hover:bg-blue-700"
-                      onClick={handleSaveTaxConfig}
-                      disabled={isSavingTax}
-                    >
-                      {isSavingTax ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Save className="w-4 h-4 mr-2" />
-                      )}
-                      Save Tax Configuration
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <DollarSign className="w-5 h-5" />
-                  <span>Allowances</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-end mb-4">
-                  <Button onClick={handleAddAllowance} className="bg-green-600 hover:bg-green-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add
-                  </Button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-200 rounded-lg">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Code</th>
-                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Description</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Taxable</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Recurring</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">AMOUNT</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">%</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">FIXED/VARIABLE</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allowances.map((allowance, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="border border-gray-200 px-4 py-3">
-                            <Input
-                              value={allowance.code}
-                              onChange={(e) => handleAllowanceFieldChange(index, "code", e.target.value)}
-                              className="border-0 bg-transparent p-0 font-medium"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3">
-                            <Input
-                              value={allowance.description}
-                              onChange={(e) => handleAllowanceFieldChange(index, "description", e.target.value)}
-                              className="border-0 bg-transparent p-0"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Switch
-                              checked={allowance.taxable}
-                              onCheckedChange={(checked) => handleAllowanceFieldChange(index, "taxable", checked)}
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Switch
-                              checked={allowance.recurring}
-                              onCheckedChange={(checked) => handleAllowanceFieldChange(index, "recurring", checked)}
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Input
-                              type="number"
-                              value={allowance.amount}
-                              onChange={(e) =>
-                                handleAllowanceFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)
-                              }
-                              className="border-0 bg-transparent p-0 text-center w-20"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Input
-                              type="number"
-                              step="0.1"
-                              value={allowance.percentage}
-                              onChange={(e) =>
-                                handleAllowanceFieldChange(index, "percentage", Number.parseFloat(e.target.value) || 0)
-                              }
-                              className="border-0 bg-transparent p-0 text-center w-20"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Select
-                              value={allowance.type}
-                              onValueChange={(value) => handleAllowanceFieldChange(index, "type", value)}
-                            >
-                              <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
-                                <Badge variant={allowance.type === "FIXED" ? "default" : "secondary"}>
-                                  {allowance.type}
-                                </Badge>
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="FIXED">FIXED</SelectItem>
-                                <SelectItem value="VARIABLE">VARIABLE</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => handleEditAllowance(index)}>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteAllowance(index)} className="text-red-600">
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Minus className="w-5 h-5" />
-                  <span>Deductions</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-end mb-4">
-                  <Button onClick={handleAddDeduction} className="bg-green-600 hover:bg-green-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add
-                  </Button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-200 rounded-lg">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Code</th>
-                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Description</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Recurring</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">AMOUNT</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">%</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">FIXED/VARIABLE</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {deductions.map((deduction, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="border border-gray-200 px-4 py-3">
-                            <Input
-                              value={deduction.code}
-                              onChange={(e) => handleDeductionFieldChange(index, "code", e.target.value)}
-                              className="border-0 bg-transparent p-0 font-medium"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3">
-                            <Input
-                              value={deduction.description}
-                              onChange={(e) => handleDeductionFieldChange(index, "description", e.target.value)}
-                              className="border-0 bg-transparent p-0"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Switch
-                              checked={deduction.recurring}
-                              onCheckedChange={(checked) => handleDeductionFieldChange(index, "recurring", checked)}
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Input
-                              type="number"
-                              value={deduction.amount}
-                              onChange={(e) =>
-                                handleDeductionFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)
-                              }
-                              className="border-0 bg-transparent p-0 text-center w-20"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Input
-                              type="number"
-                              step="0.1"
-                              value={deduction.percentage}
-                              onChange={(e) =>
-                                handleDeductionFieldChange(index, "percentage", Number.parseFloat(e.target.value) || 0)
-                              }
-                              className="border-0 bg-transparent p-0 text-center w-20"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Select
-                              value={deduction.type}
-                              onValueChange={(value) => handleDeductionFieldChange(index, "type", value)}
-                            >
-                              <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
-                                <Badge variant={deduction.type === "FIXED" ? "default" : "secondary"}>
-                                  {deduction.type}
-                                </Badge>
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="FIXED">FIXED</SelectItem>
-                                <SelectItem value="VARIABLE">VARIABLE</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => handleEditDeduction(index)}>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteDeduction(index)} className="text-red-600">
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Save Button */}
-            <div className="flex justify-end">
-              <Button
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={handleSavePayrollConfig}
-                disabled={isSavingPayroll}
-              >
-                {isSavingPayroll ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4 mr-2" />
-                )}
-                Save Payroll Configuration
-              </Button>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="notifications">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Bell className="w-5 h-5" />
-                  <span>Notification Templates</span>
-                </CardTitle>
-                <CardDescription>Manage email and SMS templates for HR and payroll notifications</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div className="flex space-x-2">
-                      <Button onClick={handleAddNotificationTemplate} className="bg-green-600 hover:bg-green-700">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Template
-                      </Button>
-                      <Button variant="outline" onClick={handleTestEmail} disabled={testConnectionStatus === "testing"}>
-                        {testConnectionStatus === "testing" ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : testConnectionStatus === "success" ? (
-                          <Check className="w-4 h-4 mr-2 text-green-600" />
-                        ) : testConnectionStatus === "error" ? (
-                          <X className="w-4 h-4 mr-2 text-red-600" />
-                        ) : (
-                          <Send className="w-4 h-4 mr-2" />
-                        )}
-                        {testConnectionStatus === "testing"
-                          ? "Testing Connection..."
-                          : testConnectionStatus === "success"
-                            ? "Connection Successful"
-                            : testConnectionStatus === "error"
-                              ? "Connection Failed"
-                              : "Test Connection"}
-                      </Button>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="secondary">{notificationTemplates.length} Templates</Badge>
-                    </div>
-                  </div>
-
-                  <div className="border rounded-lg">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Template Name</TableHead>
-                          <TableHead>Category</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Last Modified</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {notificationTemplates.map((template) => (
-                          <TableRow key={template.id}>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{template.name}</div>
-                                <div className="text-sm text-muted-foreground">{template.description}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{template.category}</Badge>
-                            </TableCell>
-                            <TableCell>{template.type}</TableCell>
-                            <TableCell>
-                              <Badge variant={template.status === "Active" ? "default" : "secondary"}>
-                                {template.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{template.lastModified}</TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreHorizontal className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
-                                    <Edit className="w-4 h-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleDeleteTemplate(template.id)}
-                                    className="text-red-600"
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Email Configuration */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Mail className="w-5 h-5" />
-                  <span>Email Configuration</span>
-                </CardTitle>
-                <CardDescription>Configure SMTP settings for sending notifications</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="provider">Email Provider</Label>
-                      <Select
-                        value={emailConfig.provider}
-                        onValueChange={(value) => setEmailConfig({ ...emailConfig, provider: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="smtp">SMTP</SelectItem>
-                          <SelectItem value="sendgrid">SendGrid</SelectItem>
-                          <SelectItem value="mailgun">Mailgun</SelectItem>
-                          <SelectItem value="ses">Amazon SES</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="smtpHost">SMTP Host</Label>
-                      <Input
-                        id="smtpHost"
-                        value={emailConfig.smtpHost}
-                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpHost: e.target.value })}
-                        placeholder="smtp.gmail.com"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="smtpPort">SMTP Port</Label>
-                      <Input
-                        id="smtpPort"
-                        type="number"
-                        value={emailConfig.smtpPort}
-                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpPort: Number.parseInt(e.target.value) })}
-                        placeholder="587"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="smtpUsername">Username</Label>
-                      <Input
-                        id="smtpUsername"
-                        value={emailConfig.smtpUsername}
-                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpUsername: e.target.value })}
-                        placeholder="your-email@company.com"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="fromEmail">From Email</Label>
-                      <Input
-                        id="fromEmail"
-                        value={emailConfig.fromEmail}
-                        onChange={(e) => setEmailConfig({ ...emailConfig, fromEmail: e.target.value })}
-                        placeholder="hr@company.com"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="fromName">From Name</Label>
-                      <Input
-                        id="fromName"
-                        value={emailConfig.fromName}
-                        onChange={(e) => setEmailConfig({ ...emailConfig, fromName: e.target.value })}
-                        placeholder="HR Department"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="replyTo">Reply To</Label>
-                      <Input
-                        id="replyTo"
-                        value={emailConfig.replyTo}
-                        onChange={(e) => setEmailConfig({ ...emailConfig, replyTo: e.target.value })}
-                        placeholder="noreply@company.com"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="enableTLS"
-                          checked={emailConfig.enableTLS}
-                          onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableTLS: checked })}
-                        />
-                        <Label htmlFor="enableTLS">Enable TLS</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="enableSSL"
-                          checked={emailConfig.enableSSL}
-                          onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableSSL: checked })}
-                        />
-                        <Label htmlFor="enableSSL">Enable SSL</Label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="smtpPassword">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="smtpPassword"
-                      type={showPassword ? "text" : "password"}
-                      value={emailConfig.smtpPassword}
-                      onChange={(e) => setEmailConfig({ ...emailConfig, smtpPassword: e.target.value })}
-                      placeholder="Enter your email password"
-                      className="pr-10"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4 text-gray-400" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-gray-400" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="mt-6 flex justify-end space-x-2">
-                  <Button
-                    variant="outline"
-                    onClick={handleTestEmail}
-                    disabled={testConnectionStatus === "testing"}
-                    className={`${
-                      testConnectionStatus === "success"
-                        ? "border-green-500 text-green-600"
-                        : testConnectionStatus === "error"
-                          ? "border-red-500 text-red-600"
-                          : ""
-                    }`}
-                  >
-                    {testConnectionStatus === "testing" ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : testConnectionStatus === "success" ? (
-                      <Check className="w-4 h-4 mr-2 text-green-600" />
-                    ) : testConnectionStatus === "error" ? (
-                      <X className="w-4 h-4 mr-2 text-red-600" />
-                    ) : (
-                      <Send className="w-4 h-4 mr-2" />
-                    )}
-                    {testConnectionStatus === "testing"
-                      ? "Testing Connection..."
-                      : testConnectionStatus === "success"
-                        ? "Connection Successful"
-                        : testConnectionStatus === "error"
-                          ? "Connection Failed"
-                          : "Test Connection"}
-                  </Button>
-                  <Button onClick={handleSaveEmailConfig} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                    Save Configuration
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Notification Preferences */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Settings className="w-5 h-5" />
-                  <span>Notification Preferences</span>
-                </CardTitle>
-                <CardDescription>Configure default notification settings for all employees</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <h4 className="font-medium">HR Notifications</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Employee Welcome</Label>
-                            <p className="text-sm text-muted-foreground">Send welcome email to new employees</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.payrollNotifications} // Corrected to use a relevant setting
-                            onCheckedChange={(checked) =>
-                              setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Leave Notifications</Label>
-                            <p className="text-sm text-muted-foreground">Notify about leave requests and approvals</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.leaveNotifications}
-                            onCheckedChange={(checked) =>
-                              setNotificationSettings({ ...notificationSettings, leaveNotifications: checked })
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Promotion Notifications</Label>
-                            <p className="text-sm text-muted-foreground">Send promotion and transfer notifications</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.promotionNotifications}
-                            onCheckedChange={(checked) =>
-                              setNotificationSettings({ ...notificationSettings, promotionNotifications: checked })
-                            }
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h4 className="font-medium">Payroll & Attendance</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Payroll Processing</Label>
-                            <p className="text-sm text-muted-foreground">Notify when payroll is processed</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.payrollNotifications}
-                            onCheckedChange={(checked) =>
-                              setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Attendance Alerts</Label>
-                            <p className="text-sm text-muted-foreground">Send alerts for attendance issues</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.attendanceAlerts}
-                            onCheckedChange={(checked) =>
-                              setNotificationSettings({ ...notificationSettings, attendanceAlerts: checked })
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>System Maintenance</Label>
-                            <p className="text-sm text-muted-foreground">Notify about system maintenance</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.systemMaintenanceAlerts}
-                            onCheckedChange={(checked) =>
-                              setNotificationSettings({ ...notificationSettings, systemMaintenanceAlerts: checked })
-                            }
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                      <Label>Email Digest Frequency</Label>
-                      <Select
-                        value={notificationSettings.emailDigest}
-                        onValueChange={(value) =>
-                          setNotificationSettings({ ...notificationSettings, emailDigest: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="immediate">Immediate</SelectItem>
-                          <SelectItem value="daily">Daily</SelectItem>
-                          <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="smsAlerts"
-                        checked={notificationSettings.smsAlerts}
-                        onCheckedChange={(checked) =>
-                          setNotificationSettings({ ...notificationSettings, smsAlerts: checked })
-                        }
-                      />
-                      <div>
-                        <Label htmlFor="smsAlerts">SMS Alerts</Label>
-                        <p className="text-sm text-muted-foreground">Enable SMS notifications</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="pushNotifications"
-                        checked={notificationSettings.pushNotifications}
-                        onCheckedChange={(checked) =>
-                          setNotificationSettings({ ...notificationSettings, pushNotifications: checked })
-                        }
-                      />
-                      <div>
-                        <Label htmlFor="pushNotifications">Push Notifications</Label>
-                        <p className="text-sm text-muted-foreground">Enable browser push notifications</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={() => {
-                        setIsSaving(true) // Use the general saving state
-                        setTimeout(() => {
-                          setIsSaving(false)
-                          toast({
-                            title: "Preferences Saved",
-                            description: "Notification preferences have been updated successfully",
-                          })
-                        }, 1500)
-                      }}
-                      disabled={isSaving}
-                    >
-                      {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                      Save Preferences
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="roles">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center space-x-2">
-                  <Users className="w-5 h-5" />
-                  <span>Roles & Permissions</span>
-                </CardTitle>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" onClick={handleAddRoleInner}>
-                    Add Role
-                  </Button>
-                </div>
-              </div>
-              <CardDescription>Manage user roles and permissions</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-3">
-                {roles.map((role) => (
-                  <Card key={role.id} className="border-l-4 border-l-indigo-500">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-base font-semibold">{role.name}</h3>
-                          <p className="text-xs text-gray-600">{role.description}</p>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <span className="text-sm text-gray-500">{role.user_count} Users</span>
-                          <Button variant="outline" size="sm" onClick={() => handleEditRoleInner(role.name)}>
-                            Edit
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Access Control Tab Content */}
-        <TabsContent value="access">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Shield className="w-5 h-5" />
-                <span>Access Control</span>
-              </CardTitle>
-              <CardDescription>Manage user access and authentication settings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Authentication Settings */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Authentication Settings</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="twoFactor">Two-Factor Authentication</Label>
-                      <Switch
-                        id="twoFactor"
-                        checked={accessSettings.twoFactorEnabled}
-                        onCheckedChange={(checked) =>
-                          setAccessSettings({ ...accessSettings, twoFactorEnabled: checked })
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="ssoEnabled">Single Sign-On (SSO)</Label>
-                      <Switch
-                        id="ssoEnabled"
-                        checked={accessSettings.ssoEnabled}
-                        onCheckedChange={(checked) => setAccessSettings({ ...accessSettings, ssoEnabled: checked })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="passwordExpiry">Password Expiry</Label>
-                      <Switch
-                        id="passwordExpiry"
-                        checked={accessSettings.passwordExpiryEnabled}
-                        onCheckedChange={(checked) =>
-                          setAccessSettings({ ...accessSettings, passwordExpiryEnabled: checked })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
-                      <Input
-                        id="sessionTimeout"
-                        type="number"
-                        value={accessSettings.sessionTimeout}
-                        onChange={(e) =>
-                          setAccessSettings({ ...accessSettings, sessionTimeout: Number.parseInt(e.target.value) })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
-                      <Input
-                        id="maxLoginAttempts"
-                        type="number"
-                        value={accessSettings.maxLoginAttempts}
-                        onChange={(e) =>
-                          setAccessSettings({ ...accessSettings, maxLoginAttempts: Number.parseInt(e.target.value) })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="passwordMinLength">Minimum Password Length</Label>
-                      <Input
-                        id="passwordMinLength"
-                        type="number"
-                        value={accessSettings.passwordMinLength}
-                        onChange={(e) =>
-                          setAccessSettings({ ...accessSettings, passwordMinLength: Number.parseInt(e.target.value) })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* IP Restrictions */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">IP Access Control</h3>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="ipRestrictions">Enable IP Restrictions</Label>
-                    <Switch
-                      id="ipRestrictions"
-                      checked={accessSettings.ipRestrictionsEnabled}
-                      onCheckedChange={(checked) =>
-                        setAccessSettings({ ...accessSettings, ipRestrictionsEnabled: checked })
-                      }
-                    />
-                  </div>
-                  {accessSettings.ipRestrictionsEnabled && (
-                    <div className="space-y-2">
-                      <Label>Allowed IP Addresses</Label>
-                      {accessSettings.allowedIPs.map((ip, index) => (
-                        <div key={index} className="flex items-center space-x-2">
-                          <Input
-                            value={ip}
-                            onChange={(e) => {
-                              const newIPs = [...accessSettings.allowedIPs]
-                              newIPs[index] = e.target.value
-                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
-                            }}
-                            placeholder="192.168.1.0/24"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const newIPs = accessSettings.allowedIPs.filter((_, i) => i !== index)
-                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setAccessSettings({
-                            ...accessSettings,
-                            allowedIPs: [...accessSettings.allowedIPs, ""],
-                          })
-                        }
-                      >
-                        Add IP Range
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Active Sessions */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Active Sessions</h3>
-                  <Button variant="outline" onClick={handleRefreshSessions} disabled={isRefreshingSessions}>
-                    {isRefreshingSessions ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                    )}
-                    Refresh
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {activeSessions.map((session) => (
-                    <Card key={session.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{session.user_email}</p>
-                            <p className="text-sm text-gray-600">
-                              {session.ip_address} • {session.device} • Last active:{" "}
-                              {new Date(session.last_activity).toLocaleString()}
-                            </p>
-                          </div>
-                          <Button variant="outline" size="sm" onClick={() => handleTerminateSession(session.id)}>
-                            Terminate
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                  onClick={handleSaveAccessSettings}
-                  disabled={isSavingAccessSettings}
-                >
-                  {isSavingAccessSettings ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Access Settings
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Security Tab Content */}
-        <TabsContent value="security">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5" />
-                  <span>Security Settings</span>
-                </CardTitle>
-                <Button variant="outline" onClick={handleBackupNow} disabled={isBackingUp}>
-                  {isBackingUp ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Backing Up...
-                    </>
-                  ) : (
-\
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.2
+APPROVED BY: Executive Leadership Team
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Welcome Message .......................................... 3
+2. Company Overview ......................................... 4
+3. Employment Policies ...................................... 6
+4. Compensation and Benefits ................................ 12
+5. Work Environment and Safety .............................. 18
+6. Professional Development ................................. 22
+7. Technology and Communication ............................. 25
+8. Leave Policies ........................................... 28
+9. Performance Management ................................... 32
+10. Disciplinary Procedures ................................. 35
+11. Employee Resources ...................................... 38
+
+═══════════════════════════════════════════════════════════════
+
+1. WELCOME MESSAGE
+
+Dear Team Member,
+
+Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
+
+This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
+
+Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
+
+If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
+
+Welcome aboard!
+
+Sincerely,
+The Executive Leadership Team
+
+2. COMPANY OVERVIEW
+
+2.1 OUR MISSION
+To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
+
+2.2 OUR VALUES
+- Integrity: We conduct business with honesty and transparency
+- Excellence: We strive for the highest quality in everything we do
+- Innovation: We embrace change and continuously improve
+- Teamwork: We collaborate effectively to achieve common goals
+- Respect: We value diversity and treat everyone with dignity
+
+2.3 ORGANIZATIONAL STRUCTURE
+Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+
+3. EMPLOYMENT POLICIES
+
+3.1 EQUAL EMPLOYMENT OPPORTUNITY
+We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
+
+3.2 AT-WILL EMPLOYMENT
+Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
+
+3.3 BACKGROUND CHECKS
+All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+
+4. COMPENSATION AND BENEFITS
+
+4.1 PAY PERIODS
+Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
+
+4.2 OVERTIME
+Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
+
+4.3 BENEFITS OVERVIEW
+We offer a comprehensive benefits package including:
+- Health insurance
+- Dental and vision coverage
+- Retirement savings plan with company matching
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT AND SAFETY
+
+5.1 WORKPLACE SAFETY
+The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
+
+5.2 DRUG-FREE WORKPLACE
+We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
+
+6. PROFESSIONAL DEVELOPMENT
+
+We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
+
+7. TECHNOLOGY AND COMMUNICATION
+
+7.1 COMPUTER AND INTERNET USE
+Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
+
+7.2 CONFIDENTIALITY
+Employees must protect confidential company information and respect the privacy of customer and employee data.
+
+8. LEAVE POLICIES
+
+8.1 PAID TIME OFF (PTO)
+Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
+
+8.2 FAMILY AND MEDICAL LEAVE
+Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
+
+9. PERFORMANCE MANAGEMENT
+
+Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
+
+10. DISCIPLINARY PROCEDURES
+
+When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
+
+11. EMPLOYEE RESOURCES
+
+11.1 HUMAN RESOURCES DEPARTMENT
+The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
+
+11.2 EMPLOYEE ASSISTANCE PROGRAM
+Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
+
+═══════════════════════════════════════════════════════════════
+
+ACKNOWLEDGMENT
+
+I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+This handbook is subject to change. Updates will be communicated to all employees.
+
+Document Control:
+- Document ID: EH-2024-001
+- Last Review Date: December 1, 2023
+- Next Review Date: December 1, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+SAFETY FIRST - ALWAYS
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.3
+APPROVED BY: Safety Committee
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Safety Policy Statement ................................... 3
+2. General Safety Rules ..................................... 4
+3. Emergency Procedures ..................................... 6
+4. Personal Protective Equipment ............................ 8
+5. Hazard Communication ..................................... 10
+6. Incident Reporting ....................................... 12
+7. Training Requirements .................................... 14
+8. Safety Committee ......................................... 16
+
+═══════════════════════════════════════════════════════════════
+
+1. SAFETY POLICY STATEMENT
+
+The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
+
+Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
+
+2. GENERAL SAFETY RULES
+
+2.1 BASIC SAFETY PRINCIPLES
+- Follow all safety procedures and guidelines
+- Report unsafe conditions immediately
+- Use appropriate personal protective equipment
+- Keep work areas clean and organized
+- Never take shortcuts that compromise safety
+
+2.2 PROHIBITED ACTIVITIES
+- Horseplay or practical jokes
+- Operating equipment without proper training
+- Removing or disabling safety devices
+- Working under the influence of drugs or alcohol
+
+3. EMERGENCY PROCEDURES
+
+3.1 FIRE EMERGENCY
+- Activate the nearest fire alarm
+- Evacuate immediately using designated routes
+- Proceed to assembly areas
+- Do not use elevators
+- Do not re-enter the building until authorized
+
+3.2 MEDICAL EMERGENCY
+- Call 911 immediately for serious injuries
+- Notify your supervisor and security
+- Provide first aid only if trained to do so
+- Do not move seriously injured persons
+
+3.3 SEVERE WEATHER
+- Monitor weather alerts and warnings
+- Follow instructions from management
+- Move to designated shelter areas if required
+- Remain in shelter until all-clear is given
+
+4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
+
+4.1 GENERAL REQUIREMENTS
+Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
+- Safety glasses or goggles
+- Hard hats
+- Safety shoes
+- Gloves
+- Hearing protection
+- Respiratory protection
+
+4.2 PPE MAINTENANCE
+- Inspect PPE before each use
+- Replace damaged or worn equipment
+- Clean and store PPE properly
+- Report defective equipment immediately
+
+5. HAZARD COMMUNICATION
+
+5.1 CHEMICAL SAFETY
+- Read and understand Safety Data Sheets (SDS)
+- Follow proper handling procedures
+- Use appropriate PPE when working with chemicals
+- Store chemicals according to manufacturer instructions
+
+5.2 LABELING REQUIREMENTS
+All hazardous materials must be properly labeled with:
+- Product identification
+- Hazard warnings
+- Precautionary statements
+- Supplier information
+
+6. INCIDENT REPORTING
+
+6.1 REPORTING REQUIREMENTS
+All incidents, including near misses, must be reported immediately to:
+- Your immediate supervisor
+- The Safety Department
+- Human Resources (for injuries)
+
+6.2 INVESTIGATION PROCESS
+All incidents will be thoroughly investigated to:
+- Determine root causes
+- Implement corrective actions
+- Prevent similar occurrences
+- Comply with regulatory requirements
+
+7. TRAINING REQUIREMENTS
+
+7.1 NEW EMPLOYEE ORIENTATION
+All new employees must complete safety orientation training before beginning work assignments.
+
+7.2 ONGOING TRAINING
+Regular safety training is provided on topics including:
+- Job-specific safety procedures
+- Emergency response
+- Hazard recognition
+- PPE use and maintenance
+
+8. SAFETY COMMITTEE
+
+Our Safety Committee meets monthly to:
+- Review incident reports and trends
+- Evaluate safety procedures
+- Recommend improvements
+- Promote safety awareness
+
+Committee members represent all departments and levels of the organization.
+
+═══════════════════════════════════════════════════════════════
+
+SAFETY CONTACTS
+
+Emergency: 911
+Security: Extension 2911
+Safety Department: Extension 2500
+Human Resources: Extension 2100
+
+═══════════════════════════════════════════════════════════════
+
+Remember: Safety is everyone's responsibility!
+
+Document Control:
+- Document ID: SM-2024-001
+- Last Review Date: November 15, 2023
+- Next Review Date: November 15, 2024
+- Document Owner: Safety Committee`
+      }
+    };
+
+    return documentTemplates[document.name as keyof typeof documentTemplates] || {
+      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
+    };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.2
+APPROVED BY: Executive Leadership Team
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Welcome Message .......................................... 3
+2. Company Overview ......................................... 4
+3. Employment Policies ...................................... 6
+4. Compensation and Benefits ................................ 12
+5. Work Environment and Safety .............................. 18
+6. Professional Development ................................. 22
+7. Technology and Communication ............................. 25
+8. Leave Policies ........................................... 28
+9. Performance Management ................................... 32
+10. Disciplinary Procedures ................................. 35
+11. Employee Resources ...................................... 38
+
+═══════════════════════════════════════════════════════════════
+
+1. WELCOME MESSAGE
+
+Dear Team Member,
+
+Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
+
+This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
+
+Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
+
+If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
+
+Welcome aboard!
+
+Sincerely,
+The Executive Leadership Team
+
+2. COMPANY OVERVIEW
+
+2.1 OUR MISSION
+To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
+
+2.2 OUR VALUES
+- Integrity: We conduct business with honesty and transparency
+- Excellence: We strive for the highest quality in everything we do
+- Innovation: We embrace change and continuously improve
+- Teamwork: We collaborate effectively to achieve common goals
+- Respect: We value diversity and treat everyone with dignity
+
+2.3 ORGANIZATIONAL STRUCTURE
+Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+
+3. EMPLOYMENT POLICIES
+
+3.1 EQUAL EMPLOYMENT OPPORTUNITY
+We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
+
+3.2 AT-WILL EMPLOYMENT
+Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
+
+3.3 BACKGROUND CHECKS
+All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+
+4. COMPENSATION AND BENEFITS
+
+4.1 PAY PERIODS
+Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
+
+4.2 OVERTIME
+Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
+
+4.3 BENEFITS OVERVIEW
+We offer a comprehensive benefits package including:
+- Health insurance
+- Dental and vision coverage
+- Retirement savings plan with company matching
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT AND SAFETY
+
+5.1 WORKPLACE SAFETY
+The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
+
+5.2 DRUG-FREE WORKPLACE
+We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
+
+6. PROFESSIONAL DEVELOPMENT
+
+We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
+
+7. TECHNOLOGY AND COMMUNICATION
+
+7.1 COMPUTER AND INTERNET USE
+Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
+
+7.2 CONFIDENTIALITY
+Employees must protect confidential company information and respect the privacy of customer and employee data.
+
+8. LEAVE POLICIES
+
+8.1 PAID TIME OFF (PTO)
+Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
+
+8.2 FAMILY AND MEDICAL LEAVE
+Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
+
+9. PERFORMANCE MANAGEMENT
+
+Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
+
+10. DISCIPLINARY PROCEDURES
+
+When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
+
+11. EMPLOYEE RESOURCES
+
+11.1 HUMAN RESOURCES DEPARTMENT
+The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
+
+11.2 EMPLOYEE ASSISTANCE PROGRAM
+Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
+
+═══════════════════════════════════════════════════════════════
+
+ACKNOWLEDGMENT
+
+I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+This handbook is subject to change. Updates will be communicated to all employees.
+
+Document Control:
+- Document ID: EH-2024-001
+- Last Review Date: December 1, 2023
+- Next Review Date: December 1, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+SAFETY FIRST - ALWAYS
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.3
+APPROVED BY: Safety Committee
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Safety Policy Statement ................................... 3
+2. General Safety Rules ..................................... 4
+3. Emergency Procedures ..................................... 6
+4. Personal Protective Equipment ............................ 8
+5. Hazard Communication ..................................... 10
+6. Incident Reporting ....................................... 12
+7. Training Requirements .................................... 14
+8. Safety Committee ......................................... 16
+
+═══════════════════════════════════════════════════════════════
+
+1. SAFETY POLICY STATEMENT
+
+The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
+
+Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
+
+2. GENERAL SAFETY RULES
+
+2.1 BASIC SAFETY PRINCIPLES
+- Follow all safety procedures and guidelines
+- Report unsafe conditions immediately
+- Use appropriate personal protective equipment
+- Keep work areas clean and organized
+- Never take shortcuts that compromise safety
+
+2.2 PROHIBITED ACTIVITIES
+- Horseplay or practical jokes
+- Operating equipment without proper training
+- Removing or disabling safety devices
+- Working under the influence of drugs or alcohol
+
+3. EMERGENCY PROCEDURES
+
+3.1 FIRE EMERGENCY
+- Activate the nearest fire alarm
+- Evacuate immediately using designated routes
+- Proceed to assembly areas
+- Do not use elevators
+- Do not re-enter the building until authorized
+
+3.2 MEDICAL EMERGENCY
+- Call 911 immediately for serious injuries
+- Notify your supervisor and security
+- Provide first aid only if trained to do so
+- Do not move seriously injured persons
+
+3.3 SEVERE WEATHER
+- Monitor weather alerts and warnings
+- Follow instructions from management
+- Move to designated shelter areas if required
+- Remain in shelter until all-clear is given
+
+4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
+
+4.1 GENERAL REQUIREMENTS
+Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
+- Safety glasses or goggles
+- Hard hats
+- Safety shoes
+- Gloves
+- Hearing protection
+- Respiratory protection
+
+4.2 PPE MAINTENANCE
+- Inspect PPE before each use
+- Replace damaged or worn equipment
+- Clean and store PPE properly
+- Report defective equipment immediately
+
+5. HAZARD COMMUNICATION
+
+5.1 CHEMICAL SAFETY
+- Read and understand Safety Data Sheets (SDS)
+- Follow proper handling procedures
+- Use appropriate PPE when working with chemicals
+- Store chemicals according to manufacturer instructions
+
+5.2 LABELING REQUIREMENTS
+All hazardous materials must be properly labeled with:
+- Product identification
+- Hazard warnings
+- Precautionary statements
+- Supplier information
+
+6. INCIDENT REPORTING
+
+6.1 REPORTING REQUIREMENTS
+All incidents, including near misses, must be reported immediately to:
+- Your immediate supervisor
+- The Safety Department
+- Human Resources (for injuries)
+
+6.2 INVESTIGATION PROCESS
+All incidents will be thoroughly investigated to:
+- Determine root causes
+- Implement corrective actions
+- Prevent similar occurrences
+- Comply with regulatory requirements
+
+7. TRAINING REQUIREMENTS
+
+7.1 NEW EMPLOYEE ORIENTATION
+All new employees must complete safety orientation training before beginning work assignments.
+
+7.2 ONGOING TRAINING
+Regular safety training is provided on topics including:
+- Job-specific safety procedures
+- Emergency response
+- Hazard recognition
+- PPE use and maintenance
+
+8. SAFETY COMMITTEE
+
+Our Safety Committee meets monthly to:
+- Review incident reports and trends
+- Evaluate safety procedures
+- Recommend improvements
+- Promote safety awareness
+
+Committee members represent all departments and levels of the organization.
+
+═══════════════════════════════════════════════════════════════
+
+SAFETY CONTACTS
+
+Emergency: 911
+Security: Extension 2911
+Safety Department: Extension 2500
+Human Resources: Extension 2100
+
+═══════════════════════════════════════════════════════════════
+
+Remember: Safety is everyone's responsibility!
+
+Document Control:
+- Document ID: SM-2024-001
+- Last Review Date: November 15, 2023
+- Next Review Date: November 15, 2024
+- Document Owner: Safety Committee`
+      }
+    };
+
+    return documentTemplates[document.name as keyof typeof documentTemplates] || {
+      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
+    };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.2
+APPROVED BY: Executive Leadership Team
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Welcome Message .......................................... 3
+2. Company Overview ......................................... 4
+3. Employment Policies ...................................... 6
+4. Compensation and Benefits ................................ 12
+5. Work Environment and Safety .............................. 18
+6. Professional Development ................................. 22
+7. Technology and Communication ............................. 25
+8. Leave Policies ........................................... 28
+9. Performance Management ................................... 32
+10. Disciplinary Procedures ................................. 35
+11. Employee Resources ...................................... 38
+
+═══════════════════════════════════════════════════════════════
+
+1. WELCOME MESSAGE
+
+Dear Team Member,
+
+Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
+
+This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
+
+Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
+
+If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
+
+Welcome aboard!
+
+Sincerely,
+The Executive Leadership Team
+
+2. COMPANY OVERVIEW
+
+2.1 OUR MISSION
+To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
+
+2.2 OUR VALUES
+- Integrity: We conduct business with honesty and transparency
+- Excellence: We strive for the highest quality in everything we do
+- Innovation: We embrace change and continuously improve
+- Teamwork: We collaborate effectively to achieve common goals
+- Respect: We value diversity and treat everyone with dignity
+
+2.3 ORGANIZATIONAL STRUCTURE
+Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+
+3. EMPLOYMENT POLICIES
+
+3.1 EQUAL EMPLOYMENT OPPORTUNITY
+We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
+
+3.2 AT-WILL EMPLOYMENT
+Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
+
+3.3 BACKGROUND CHECKS
+All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+
+4. COMPENSATION AND BENEFITS
+
+4.1 PAY PERIODS
+Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
+
+4.2 OVERTIME
+Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
+
+4.3 BENEFITS OVERVIEW
+We offer a comprehensive benefits package including:
+- Health insurance
+- Dental and vision coverage
+- Retirement savings plan with company matching
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT AND SAFETY
+
+5.1 WORKPLACE SAFETY
+The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
+
+5.2 DRUG-FREE WORKPLACE
+We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
+
+6. PROFESSIONAL DEVELOPMENT
+
+We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
+
+7. TECHNOLOGY AND COMMUNICATION
+
+7.1 COMPUTER AND INTERNET USE
+Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
+
+7.2 CONFIDENTIALITY
+Employees must protect confidential company information and respect the privacy of customer and employee data.
+
+8. LEAVE POLICIES
+
+8.1 PAID TIME OFF (PTO)
+Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
+
+8.2 FAMILY AND MEDICAL LEAVE
+Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
+
+9. PERFORMANCE MANAGEMENT
+
+Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
+
+10. DISCIPLINARY PROCEDURES
+
+When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
+
+11. EMPLOYEE RESOURCES
+
+11.1 HUMAN RESOURCES DEPARTMENT
+The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
+
+11.2 EMPLOYEE ASSISTANCE PROGRAM
+Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
+
+═══════════════════════════════════════════════════════════════
+
+ACKNOWLEDGMENT
+
+I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+This handbook is subject to change. Updates will be communicated to all employees.
+
+Document Control:
+- Document ID: EH-2024-001
+- Last Review Date: December 1, 2023
+- Next Review Date: December 1, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+SAFETY FIRST - ALWAYS
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.3
+APPROVED BY: Safety Committee
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Safety Policy Statement ................................... 3
+2. General Safety Rules ..................................... 4
+3. Emergency Procedures ..................................... 6
+4. Personal Protective Equipment ............................ 8
+5. Hazard Communication ..................................... 10
+6. Incident Reporting ....................................... 12
+7. Training Requirements .................................... 14
+8. Safety Committee ......................................... 16
+
+═══════════════════════════════════════════════════════════════
+
+1. SAFETY POLICY STATEMENT
+
+The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
+
+Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
+
+2. GENERAL SAFETY RULES
+
+2.1 BASIC SAFETY PRINCIPLES
+- Follow all safety procedures and guidelines
+- Report unsafe conditions immediately
+- Use appropriate personal protective equipment
+- Keep work areas clean and organized
+- Never take shortcuts that compromise safety
+
+2.2 PROHIBITED ACTIVITIES
+- Horseplay or practical jokes
+- Operating equipment without proper training
+- Removing or disabling safety devices
+- Working under the influence of drugs or alcohol
+
+3. EMERGENCY PROCEDURES
+
+3.1 FIRE EMERGENCY
+- Activate the nearest fire alarm
+- Evacuate immediately using designated routes
+- Proceed to assembly areas
+- Do not use elevators
+- Do not re-enter the building until authorized
+
+3.2 MEDICAL EMERGENCY
+- Call 911 immediately for serious injuries
+- Notify your supervisor and security
+- Provide first aid only if trained to do so
+- Do not move seriously injured persons
+
+3.3 SEVERE WEATHER
+- Monitor weather alerts and warnings
+- Follow instructions from management
+- Move to designated shelter areas if required
+- Remain in shelter until all-clear is given
+
+4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
+
+4.1 GENERAL REQUIREMENTS
+Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
+- Safety glasses or goggles
+- Hard hats
+- Safety shoes
+- Gloves
+- Hearing protection
+- Respiratory protection
+
+4.2 PPE MAINTENANCE
+- Inspect PPE before each use
+- Replace damaged or worn equipment
+- Clean and store PPE properly
+- Report defective equipment immediately
+
+5. HAZARD COMMUNICATION
+
+5.1 CHEMICAL SAFETY
+- Read and understand Safety Data Sheets (SDS)
+- Follow proper handling procedures
+- Use appropriate PPE when working with chemicals
+- Store chemicals according to manufacturer instructions
+
+5.2 LABELING REQUIREMENTS
+All hazardous materials must be properly labeled with:
+- Product identification
+- Hazard warnings
+- Precautionary statements
+- Supplier information
+
+6. INCIDENT REPORTING
+
+6.1 REPORTING REQUIREMENTS
+All incidents, including near misses, must be reported immediately to:
+- Your immediate supervisor
+- The Safety Department
+- Human Resources (for injuries)
+
+6.2 INVESTIGATION PROCESS
+All incidents will be thoroughly investigated to:
+- Determine root causes
+- Implement corrective actions
+- Prevent similar occurrences
+- Comply with regulatory requirements
+
+7. TRAINING REQUIREMENTS
+
+7.1 NEW EMPLOYEE ORIENTATION
+All new employees must complete safety orientation training before beginning work assignments.
+
+7.2 ONGOING TRAINING
+Regular safety training is provided on topics including:
+- Job-specific safety procedures
+- Emergency response
+- Hazard recognition
+- PPE use and maintenance
+
+8. SAFETY COMMITTEE
+
+Our Safety Committee meets monthly to:
+- Review incident reports and trends
+- Evaluate safety procedures
+- Recommend improvements
+- Promote safety awareness
+
+Committee members represent all departments and levels of the organization.
+
+═══════════════════════════════════════════════════════════════
+
+SAFETY CONTACTS
+
+Emergency: 911
+Security: Extension 2911
+Safety Department: Extension 2500
+Human Resources: Extension 2100
+
+═══════════════════════════════════════════════════════════════
+
+Remember: Safety is everyone's responsibility!
+
+Document Control:
+- Document ID: SM-2024-001
+- Last Review Date: November 15, 2023
+- Next Review Date: November 15, 2024
+- Document Owner: Safety Committee`
+      }
+    };
+
+    return documentTemplates[document.name as keyof typeof documentTemplates] || {
+      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
+    };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.2
+APPROVED BY: Executive Leadership Team
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Welcome Message .......................................... 3
+2. Company Overview ......................................... 4
+3. Employment Policies ...................................... 6
+4. Compensation and Benefits ................................ 12
+5. Work Environment and Safety .............................. 18
+6. Professional Development ................................. 22
+7. Technology and Communication ............................. 25
+8. Leave Policies ........................................... 28
+9. Performance Management ................................... 32
+10. Disciplinary Procedures ................................. 35
+11. Employee Resources ...................................... 38
+
+═══════════════════════════════════════════════════════════════
+
+1. WELCOME MESSAGE
+
+Dear Team Member,
+
+Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
+
+This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
+
+Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
+
+If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
+
+Welcome aboard!
+
+Sincerely,
+The Executive Leadership Team
+
+2. COMPANY OVERVIEW
+
+2.1 OUR MISSION
+To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
+
+2.2 OUR VALUES
+- Integrity: We conduct business with honesty and transparency
+- Excellence: We strive for the highest quality in everything we do
+- Innovation: We embrace change and continuously improve
+- Teamwork: We collaborate effectively to achieve common goals
+- Respect: We value diversity and treat everyone with dignity
+
+2.3 ORGANIZATIONAL STRUCTURE
+Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+
+3. EMPLOYMENT POLICIES
+
+3.1 EQUAL EMPLOYMENT OPPORTUNITY
+We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
+
+3.2 AT-WILL EMPLOYMENT
+Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
+
+3.3 BACKGROUND CHECKS
+All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+
+4. COMPENSATION AND BENEFITS
+
+4.1 PAY PERIODS
+Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
+
+4.2 OVERTIME
+Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
+
+4.3 BENEFITS OVERVIEW
+We offer a comprehensive benefits package including:
+- Health insurance
+- Dental and vision coverage
+- Retirement savings plan with company matching
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT AND SAFETY
+
+5.1 WORKPLACE SAFETY
+The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
+
+5.2 DRUG-FREE WORKPLACE
+We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
+
+6. PROFESSIONAL DEVELOPMENT
+
+We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
+
+7. TECHNOLOGY AND COMMUNICATION
+
+7.1 COMPUTER AND INTERNET USE
+Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
+
+7.2 CONFIDENTIALITY
+Employees must protect confidential company information and respect the privacy of customer and employee data.
+
+8. LEAVE POLICIES
+
+8.1 PAID TIME OFF (PTO)
+Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
+
+8.2 FAMILY AND MEDICAL LEAVE
+Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
+
+9. PERFORMANCE MANAGEMENT
+
+Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
+
+10. DISCIPLINARY PROCEDURES
+
+When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
+
+11. EMPLOYEE RESOURCES
+
+11.1 HUMAN RESOURCES DEPARTMENT
+The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
+
+11.2 EMPLOYEE ASSISTANCE PROGRAM
+Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
+
+═══════════════════════════════════════════════════════════════
+
+ACKNOWLEDGMENT
+
+I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+This handbook is subject to change. Updates will be communicated to all employees.
+
+Document Control:
+- Document ID: EH-2024-001
+- Last Review Date: December 1, 2023
+- Next Review Date: December 1, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+SAFETY FIRST - ALWAYS
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.3
+APPROVED BY: Safety Committee
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Safety Policy Statement ................................... 3
+2. General Safety Rules ..................................... 4
+3. Emergency Procedures ..................................... 6
+4. Personal Protective Equipment ............................ 8
+5. Hazard Communication ..................................... 10
+6. Incident Reporting ....................................... 12
+7. Training Requirements .................................... 14
+8. Safety Committee ......................................... 16
+
+═══════════════════════════════════════════════════════════════
+
+1. SAFETY POLICY STATEMENT
+
+The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
+
+Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
+
+2. GENERAL SAFETY RULES
+
+2.1 BASIC SAFETY PRINCIPLES
+- Follow all safety procedures and guidelines
+- Report unsafe conditions immediately
+- Use appropriate personal protective equipment
+- Keep work areas clean and organized
+- Never take shortcuts that compromise safety
+
+2.2 PROHIBITED ACTIVITIES
+- Horseplay or practical jokes
+- Operating equipment without proper training
+- Removing or disabling safety devices
+- Working under the influence of drugs or alcohol
+
+3. EMERGENCY PROCEDURES
+
+3.1 FIRE EMERGENCY
+- Activate the nearest fire alarm
+- Evacuate immediately using designated routes
+- Proceed to assembly areas
+- Do not use elevators
+- Do not re-enter the building until authorized
+
+3.2 MEDICAL EMERGENCY
+- Call 911 immediately for serious injuries
+- Notify your supervisor and security
+- Provide first aid only if trained to do so
+- Do not move seriously injured persons
+
+3.3 SEVERE WEATHER
+- Monitor weather alerts and warnings
+- Follow instructions from management
+- Move to designated shelter areas if required
+- Remain in shelter until all-clear is given
+
+4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
+
+4.1 GENERAL REQUIREMENTS
+Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
+- Safety glasses or goggles
+- Hard hats
+- Safety shoes
+- Gloves
+- Hearing protection
+- Respiratory protection
+
+4.2 PPE MAINTENANCE
+- Inspect PPE before each use
+- Replace damaged or worn equipment
+- Clean and store PPE properly
+- Report defective equipment immediately
+
+5. HAZARD COMMUNICATION
+
+5.1 CHEMICAL SAFETY
+- Read and understand Safety Data Sheets (SDS)
+- Follow proper handling procedures
+- Use appropriate PPE when working with chemicals
+- Store chemicals according to manufacturer instructions
+
+5.2 LABELING REQUIREMENTS
+All hazardous materials must be properly labeled with:
+- Product identification
+- Hazard warnings
+- Precautionary statements
+- Supplier information
+
+6. INCIDENT REPORTING
+
+6.1 REPORTING REQUIREMENTS
+All incidents, including near misses, must be reported immediately to:
+- Your immediate supervisor
+- The Safety Department
+- Human Resources (for injuries)
+
+6.2 INVESTIGATION PROCESS
+All incidents will be thoroughly investigated to:
+- Determine root causes
+- Implement corrective actions
+- Prevent similar occurrences
+- Comply with regulatory requirements
+
+7. TRAINING REQUIREMENTS
+
+7.1 NEW EMPLOYEE ORIENTATION
+All new employees must complete safety orientation training before beginning work assignments.
+
+7.2 ONGOING TRAINING
+Regular safety training is provided on topics including:
+- Job-specific safety procedures
+- Emergency response
+- Hazard recognition
+- PPE use and maintenance
+
+8. SAFETY COMMITTEE
+
+Our Safety Committee meets monthly to:
+- Review incident reports and trends
+- Evaluate safety procedures
+- Recommend improvements
+- Promote safety awareness
+
+Committee members represent all departments and levels of the organization.
+
+═══════════════════════════════════════════════════════════════
+
+SAFETY CONTACTS
+
+Emergency: 911
+Security: Extension 2911
+Safety Department: Extension 2500
+Human Resources: Extension 2100
+
+═══════════════════════════════════════════════════════════════
+
+Remember: Safety is everyone's responsibility!
+
+Document Control:
+- Document ID: SM-2024-001
+- Last Review Date: November 15, 2023
+- Next Review Date: November 15, 2024
+- Document Owner: Safety Committee`
+      }
+    };
+
+    return documentTemplates[document.name as keyof typeof documentTemplates] || {
+      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
+    };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.2
+APPROVED BY: Executive Leadership Team
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Welcome Message .......................................... 3
+2. Company Overview ......................................... 4
+3. Employment Policies ...................................... 6
+4. Compensation and Benefits ................................ 12
+5. Work Environment and Safety .............................. 18
+6. Professional Development ................................. 22
+7. Technology and Communication ............................. 25
+8. Leave Policies ........................................... 28
+9. Performance Management ................................... 32
+10. Disciplinary Procedures ................................. 35
+11. Employee Resources ...................................... 38
+
+═══════════════════════════════════════════════════════════════
+
+1. WELCOME MESSAGE
+
+Dear Team Member,
+
+Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
+
+This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
+
+Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
+
+If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
+
+Welcome aboard!
+
+Sincerely,
+The Executive Leadership Team
+
+2. COMPANY OVERVIEW
+
+2.1 OUR MISSION
+To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
+
+2.2 OUR VALUES
+- Integrity: We conduct business with honesty and transparency
+- Excellence: We strive for the highest quality in everything we do
+- Innovation: We embrace change and continuously improve
+- Teamwork: We collaborate effectively to achieve common goals
+- Respect: We value diversity and treat everyone with dignity
+
+2.3 ORGANIZATIONAL STRUCTURE
+Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+
+3. EMPLOYMENT POLICIES
+
+3.1 EQUAL EMPLOYMENT OPPORTUNITY
+We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
+
+3.2 AT-WILL EMPLOYMENT
+Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
+
+3.3 BACKGROUND CHECKS
+All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+
+4. COMPENSATION AND BENEFITS
+
+4.1 PAY PERIODS
+Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
+
+4.2 OVERTIME
+Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
+
+4.3 BENEFITS OVERVIEW
+We offer a comprehensive benefits package including:
+- Health insurance
+- Dental and vision coverage
+- Retirement savings plan with company matching
+- Paid time off
+- Professional development opportunities
+
+5. WORK
