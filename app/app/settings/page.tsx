@@ -245,6 +245,8 @@ export default function SettingsPage() {
   const [showAddSubsidiary, setShowAddSubsidiary] = useState<boolean>(false)
   const [showEditSubsidiary, setShowEditSubsidiary] = useState(false)
   const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState(false)
+  const [showSubsidiaryModal, setShowSubsidiaryModal] = useState<boolean>(false)
+  const [editingSubsidiary, setEditingSubsidiary] = useState<Subsidiary | null>(null)
   const [selectedSubsidiary, setSelectedSubsidiary] = useState<Subsidiary | null>(null)
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<boolean>(false)
   const [showReactivateConfirm, setShowReactivateConfirm] = useState(false)
@@ -600,7 +602,9 @@ export default function SettingsPage() {
     },
   ])
   const [showSalaryGradeModal, setShowSalaryGradeModal] = useState(false)
-  const [editingGrade, setEditingGrade] = useState(null)
+  const [showStructuredGradeModal, setShowStructuredGradeModal] = useState(false)
+  const [showUnstructuredGradeModal, setShowUnstructuredGradeModal] = useState(false)
+  const [editingGrade, setEditingGrade] = useState<any>(null) // Changed to any to match usage
   const [newGrade, setNewGrade] = useState({
     name: "",
     description: "",
@@ -626,8 +630,7 @@ export default function SettingsPage() {
       performanceIncrement: { type: "percentage", value: 10 },
     },
   ])
-  const [showUnstructuredModal, setShowUnstructuredModal] = useState(false)
-  const [editingUnstructured, setEditingUnstructured] = useState(null)
+  const [editingUnstructured, setEditingUnstructured] = useState<any>(null) // Changed to any to match usage
   const [newUnstructured, setNewUnstructured] = useState({
     name: "",
     description: "",
