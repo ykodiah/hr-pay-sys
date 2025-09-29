@@ -163,7 +163,7 @@ export default function SettingsPage() {
     currentPage: 1,
     totalPages: 1,
     zoom: 100,
-    isLoading: false
+    isLoading: false,
   })
 
   const [documentZoom, setDocumentZoom] = useState(100)
@@ -874,11 +874,17 @@ export default function SettingsPage() {
   }
 
   const handleZoomIn = () => {
-    setDocumentZoom((prev) => Math.min(prev + 25, 200))
+    setPdfViewerState((prev) => ({
+      ...prev,
+      zoom: Math.min(prev.zoom + 25, 200),
+    }))
   }
 
   const handleZoomOut = () => {
-    setDocumentZoom((prev) => Math.max(prev - 25, 50))
+    setPdfViewerState((prev) => ({
+      ...prev,
+      zoom: Math.max(prev.zoom - 25, 50),
+    }))
   }
 
   const handleDownload = () => {
@@ -1010,7 +1016,7 @@ export default function SettingsPage() {
       setDivisions(["Head Office", "Regional Office"])
       setDepartments(["Technology", "Human Resources", "Finance"])
       setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-      setLogoPreview(data.logo_url || "")
+      setLogoPreview(companyData.logo_url || "") // Corrected to use companyData.logo_url
       return
     }
 
@@ -2121,11 +2127,13 @@ export default function SettingsPage() {
     })
   }
 
-  const handleEditDocument = async () => {
-    if (!documentName || !uploadedFile) {
+  const handleEditDocumentSave = async () => {
+    // Renamed from handleEditDocument to avoid redeclaration
+    if (!documentName || (!uploadedFile && !selectedDocument?.name)) {
+      // Check if a new file is uploaded or if the name is changed without file
       toast({
         title: "Error",
-        description: "Please provide a document name and upload a file.",
+        description: "Please provide a document name and upload a file if you are changing it.",
         variant: "destructive",
       })
       return
@@ -2286,274 +2294,6 @@ export default function SettingsPage() {
   }
 
   const parseDocumentContent = (document: any) => {
-    const templates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
     const documentTemplates = {
       "Code of Conduct": {
         content: `COMPANY CODE OF CONDUCT
@@ -2566,5169 +2306,2793 @@ APPROVED BY: Board of Directors
 
 TABLE OF CONTENTS
 
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
+1. Introduction ............................................. 3
+2. Our Core Values .......................................... 4
+3. Professional Conduct ..................................... 6
+4. Workplace Behavior ....................................... 8
+5. Conflicts of Interest .................................... 10
+6. Reporting Violations ..................................... 12
+7. Disciplinary Actions ..................................... 14
 
 ═══════════════════════════════════════════════════════════════
 
-1. INTRODUCTION AND PURPOSE
+1. INTRODUCTION
 
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+This Code of Conduct outlines the principles and standards that guide our organization's operations and the behavior expected of all employees, contractors, and representatives.
 
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+2. OUR CORE VALUES
 
-2. PROFESSIONAL CONDUCT STANDARDS
+- Integrity: We conduct business honestly and ethically
+- Respect: We treat everyone with dignity and fairness
+- Accountability: We take responsibility for our actions
+- Excellence: We strive for the highest quality in our work
 
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+3. PROFESSIONAL CONDUCT
 
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+All employees are expected to:
+- Perform duties with competence and diligence
+- Maintain professional relationships with colleagues and clients
+- Protect confidential information
+- Comply with all applicable laws and regulations
 
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+4. WORKPLACE BEHAVIOR
 
-3. CONFIDENTIALITY AND INFORMATION SECURITY
+We are committed to providing a safe, respectful, and inclusive workplace. Harassment, discrimination, and bullying of any kind will not be tolerated.
 
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+5. CONFLICTS OF INTEREST
 
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+Employees must avoid situations where personal interests conflict with the organization's interests. Any potential conflicts must be disclosed immediately.
 
 6. REPORTING VIOLATIONS
 
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+Employees are encouraged to report suspected violations through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
 
 7. DISCIPLINARY ACTIONS
 
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
+Violations may result in disciplinary action, up to and including termination of employment.`,
       },
       "Employee Handbook": {
         content: `EMPLOYEE HANDBOOK
 
 WELCOME TO OUR ORGANIZATION
 
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return documentTemplates[document.name as keyof typeof documentTemplates] || {
-      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
-    };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
 EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
+VERSION: 3.2
+APPROVED BY: Executive Leadership Team
 
 ═══════════════════════════════════════════════════════════════
 
 TABLE OF CONTENTS
 
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
+1. Welcome Message .......................................... 3
+2. Company Overview ......................................... 4
+3. Employment Policies ...................................... 6
+4. Compensation and Benefits ................................ 12
+5. Work Environment and Safety .............................. 18
+6. Professional Development ................................. 22
+7. Technology and Communication ............................. 25
+8. Leave Policies ........................................... 28
+9. Performance Management ................................... 32
+10. Disciplinary Procedures ................................. 35
 
 ═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
 
 1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
+
+Dear Team Member,
+
+Welcome to our organization! We are delighted to have you join our team and look forward to your contributions.
 
 2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
+
+Our mission is to deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
 
 3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
+
+We are committed to providing equal employment opportunities to all qualified individuals.
 
 4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
 
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
+Employees are paid bi-weekly. We offer a comprehensive benefits package including health insurance, retirement plans, and paid time off.
 
-For questions, please contact the Human Resources Department.`
+5. WORK ENVIRONMENT AND SAFETY
+
+We are committed to providing a safe and healthy work environment for all employees.`,
       },
       "Safety Manual": {
         content: `WORKPLACE SAFETY MANUAL
 
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
 EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
+VERSION: 4.0
+APPROVED BY: Safety Committee
 
 ═══════════════════════════════════════════════════════════════
 
 TABLE OF CONTENTS
 
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
+1. Safety Policy Statement ................................... 3
+2. Emergency Procedures ...................................... 5
+3. Workplace Hazards ......................................... 8
+4. Personal Protective Equipment ............................. 12
+5. Incident Reporting ........................................ 15
+6. Safety Training ........................................... 18
 
 ═══════════════════════════════════════════════════════════════
 
-1. INTRODUCTION AND PURPOSE
+1. SAFETY POLICY STATEMENT
 
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
+The safety and health of our employees is our top priority. We are committed to providing a safe work environment and preventing workplace injuries.
 
 2. EMERGENCY PROCEDURES
-- Know emergency exits
+
+In case of emergency:
+- Remain calm
 - Follow evacuation procedures
-- Report all incidents immediately
+- Report to designated assembly points
+- Do not re-enter the building until cleared by authorities
 
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
+3. WORKPLACE HAZARDS
 
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
+Common workplace hazards include slips, trips, falls, and ergonomic issues. Employees should report any hazards immediately.
 
-For safety concerns, contact the Safety Department.`
+4. PERSONAL PROTECTIVE EQUIPMENT
+
+Appropriate PPE must be worn when required. This includes safety glasses, gloves, and protective footwear.
+
+5. INCIDENT REPORTING
+
+All incidents, injuries, and near-misses must be reported immediately to your supervisor.`,
+      },
+    }
+
+    return (
+      documentTemplates[document.name as keyof typeof documentTemplates] || {
+        content: "Document content not available.",
       }
-    };
+    )
+  }
 
-    return templates[documentName] || { content: "Document content not available." };
-  };
+  const handleAddDocument = () => {
+    setDocumentModalType("add")
+    setSelectedDocument(null)
+    setDocumentName("")
+    setUploadedFile(null)
+    setShowDocumentModal(true)
+  }
 
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const handleViewDocument = (doc: any) => {
+    setDocumentModalType("view")
+    setSelectedDocument(doc)
+    const parsed = parseDocumentContent(doc)
+    setDocumentPreviewContent(parsed.content)
+    setPdfViewerState({ currentPage: 1, totalPages: 5, zoom: 100, isLoading: false })
+    setShowDocumentModal(true)
+  }
 
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
+  const handleEditDocument = (doc: any) => {
+    setDocumentModalType("edit")
+    setSelectedDocument(doc)
+    setDocumentName(doc.name)
+    setShowDocumentModal(true)
+  }
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
+  const handleDocumentDelete = (docId: number) => {
+    // Corrected function name to match undeclared variable
+    const docToDelete = hrDocuments.find((doc) => doc.id === docId)
+    if (docToDelete) {
+      setDocumentModalType("delete")
+      setSelectedDocument(docToDelete)
+      setShowDocumentModal(true)
+    }
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.type !== "application/pdf") {
         toast({
           title: "Invalid File Type",
-          description: "Please upload a PDF file.",
+          description: "Please upload a PDF file only.",
           variant: "destructive",
-        });
-        setSelectedFile(null);
+        })
+        return
+      }
+      setUploadedFile(file)
+      if (!documentName) {
+        setDocumentName(file.name.replace(".pdf", ""))
       }
     }
-  };
+  }
 
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
+  const handleSaveDocument = async () => {
+    if (!uploadedFile && documentModalType === "add") {
       toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
+        title: "No File Selected",
+        description: "Please select a PDF file to upload.",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
-    setIsSavingDocument(true);
+    setIsSavingDocument(true)
     try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
+      await new Promise((resolve) => setTimeout(resolve, 1500))
 
       toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
+        title: documentModalType === "add" ? "Document Added" : "Document Updated",
+        description: `${documentName} has been successfully ${documentModalType === "add" ? "added" : "updated"}.`,
+      })
+
+      setShowDocumentModal(false)
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to add document. Please try again.",
+        description: "Failed to save document. Please try again.",
         variant: "destructive",
-      });
+      })
     } finally {
-      setIsSavingDocument(false);
+      setIsSavingDocument(false)
     }
-  };
+  }
 
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
+  const handleConfirmDelete = async () => {
+    setIsSavingDocument(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
       toast({
         title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
+        description: `${selectedDocument?.name} has been successfully deleted.`,
+      })
 
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
+      setShowDocumentModal(false)
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to add document. Please try again.",
+        description: "Failed to delete document. Please try again.",
         variant: "destructive",
-      });
+      })
     } finally {
-      setIsSavingDocument(false);
+      setIsSavingDocument(false)
     }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next Review Date: December 15, 2024
-- Document Owner: Human Resources Department`
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-This handbook provides important information about company policies, procedures, and benefits.
-
-1. WELCOME MESSAGE
-Welcome to our organization! We are committed to providing a positive work environment.
-
-2. COMPANY OVERVIEW
-Our mission is to deliver exceptional products and services with integrity and innovation.
-
-3. EMPLOYMENT POLICIES
-We provide equal employment opportunities and maintain fair employment practices.
-
-4. COMPENSATION AND BENEFITS
-- Competitive salary packages
-- Health insurance coverage
-- Retirement savings plans
-- Paid time off
-- Professional development opportunities
-
-5. WORK ENVIRONMENT
-We maintain a safe, respectful, and productive workplace for all employees.
-
-For questions, please contact the Human Resources Department.`
-      },
-      "Safety Manual": {
-        content: `WORKPLACE SAFETY MANUAL
-
-1. SAFETY POLICY
-Employee safety is our top priority. All employees must follow safety guidelines.
-
-2. EMERGENCY PROCEDURES
-- Know emergency exits
-- Follow evacuation procedures
-- Report all incidents immediately
-
-3. WORKPLACE SAFETY
-- Use proper equipment
-- Report hazards
-- Follow safety protocols
-
-4. INCIDENT REPORTING
-Report all accidents and near-misses to your supervisor immediately.
-
-For safety concerns, contact the Safety Department.`
-      }
-    };
-
-    return templates[documentName] || { content: "Document content not available." };
-  };
-
-  // State for document modals
-  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
-  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
-  const [newDocumentName, setNewDocumentName] = useState('');
-  const [editDocumentName, setEditDocumentName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // PDF Viewer State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation for PDF files
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setUploadProgress(0); // Reset progress on new file selection
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 100);
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a PDF file.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!newDocumentName.trim() || !selectedFile) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a document name and upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSavingDocument(true);
-    try {
-      // Simulate saving the document
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const newDoc = {
-        id: hrDocuments.length + 1,
-        name: newDocumentName,
-        type: "PDF", // Assuming PDF for now
-        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
-        visibleToAll: true, // Default visibility
-      };
-
-      setHrDocuments((prev) => [...prev, newDoc]);
-      setShowAddDocumentModal(false);
-      setNewDocumentName('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-
-      toast({
-        title: "Document Added",
-        description: `${newDocumentName} has been successfully added.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add document. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  const handleEditDocumentModal = (document: any) => {
-    setSelectedDocument(document);
-    setEditDocumentName(document.name);
-    setShowEditDocumentModal(true);
-    setSelectedFile(null); // Reset selected file for editing
-    setUploadProgress(0);
-  };
-
-  const handleDocumentDelete = (docId: number) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
-      toast({
-        title: "Document Deleted",
-        description: "The document has been successfully deleted.",
-      });
-    }
-  };
-
-  const handleDocumentView = (document: any) => {
-    setSelectedDocument(document);
-    setDocumentModalType("view");
-    setShowDocumentModal(true);
-    // Simulate setting total pages for PDF viewer
-    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
-    setCurrentPage(1);
-    setZoomLevel(1);
-  };
-
-  const handlePdfNavigation = (direction: 'prev' | 'next') => {
-    setCurrentPage(prev => {
-      if (direction === 'next') {
-        return Math.min(prev + 1, totalPages);
-      } else {
-        return Math.max(1, prev - 1);
-      }
-    });
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoomLevel(newZoom);
-  };
-
-  const parseDocumentContent = (document: any) => {
-    const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
-
-Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 RESPECT AND DIGNITY
-All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
-
-2.2 HONESTY AND INTEGRITY
-Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
-
-2.3 PROFESSIONAL COMPETENCE
-Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 CONFIDENTIAL INFORMATION
-Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
-
-3.2 DATA PROTECTION
-All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 IDENTIFICATION OF CONFLICTS
-Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
-
-4.2 OUTSIDE ACTIVITIES
-Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
-
-6. REPORTING VIOLATIONS
-
-Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
-
-8. ACKNOWLEDGMENT
-
-By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
-
-Document Control:
-- Document ID: COC-2024-001
-- Last Review Date: December 15, 2023
-- Next
+  }
+
+  const handleNextPage = () => {
+    setPdfViewerState((prev) => ({
+      ...prev,
+      currentPage: Math.min(prev.currentPage + 1, prev.totalPages),
+    }))
+  }
+
+  const handlePrevPage = () => {
+    setPdfViewerState((prev) => ({
+      ...prev,
+      currentPage: Math.max(1, prev.currentPage - 1),
+    }))
+  }
+
+  const toggleDocumentVisibility = (docName: string) => {
+    // Toggle document visibility for employees
+    toast({
+      title: "Visibility Updated",
+      description: `${docName} visibility has been updated.`,
+    })
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-6">Settings</h1>
+
+      {/* Company Information */}
+      <section className="mb-8 p-6 border rounded-lg shadow-sm">
+        <h2 className="text-2xl font-semibold mb-4">Company Information</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
+              Company Name
+            </label>
+            <input
+              type="text"
+              id="companyName"
+              value={companyData.name}
+              onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="companyEmail" className="block text-sm font-medium text-gray-700">
+              Company Email
+            </label>
+            <input
+              type="email"
+              id="companyEmail"
+              value={companyData.email_address}
+              onChange={(e) => setCompanyData({ ...companyData, email_address: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="companyPhone" className="block text-sm font-medium text-gray-700">
+              Company Phone
+            </label>
+            <input
+              type="tel"
+              id="companyPhone"
+              value={companyData.phone_number}
+              onChange={(e) => setCompanyData({ ...companyData, phone_number: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="companyTaxId" className="block text-sm font-medium text-gray-700">
+              Tax ID
+            </label>
+            <input
+              type="text"
+              id="companyTaxId"
+              value={companyData.tax_id}
+              onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="companySsnit" className="block text-sm font-medium text-gray-700">
+              SSNIT Number
+            </label>
+            <input
+              type="text"
+              id="companySsnit"
+              value={companyData.ssnit_number}
+              onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="companyIndustry" className="block text-sm font-medium text-gray-700">
+              Industry
+            </label>
+            <input
+              type="text"
+              id="companyIndustry"
+              value={companyData.industry}
+              onChange={(e) => setCompanyData({ ...companyData, industry: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div className="col-span-1 md:col-span-2">
+            <label htmlFor="companyAddress" className="block text-sm font-medium text-gray-700">
+              Address
+            </label>
+            <textarea
+              id="companyAddress"
+              value={companyData.address}
+              onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
+              rows={3}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div className="col-span-1 md:col-span-2">
+            <label htmlFor="companyLogo" className="block text-sm font-medium text-gray-700">
+              Company Logo
+            </label>
+            <div className="mt-1 flex items-center">
+              {companyLogoPreview && (
+                <img
+                  src={companyLogoPreview || "/placeholder.svg"}
+                  alt="Company Logo Preview"
+                  className="h-16 w-16 rounded-full mr-4 object-cover"
+                />
+              )}
+              <input
+                type="file"
+                id="companyLogo"
+                accept="image/*"
+                onChange={(e) => handleLogoUpload(e.target.files![0], "company")}
+                className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 border-gray-300 rounded-md"
+              />
+              {isUploadingLogo && <p className="ml-4">Uploading...</p>}
+            </div>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={() => {
+              /* Save company info */
+            }}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Save Company Info
+          </button>
+        </div>
+      </section>
+
+      {/* HR Configuration */}
+      <section className="mb-8 p-6 border rounded-lg shadow-sm">
+        <h2 className="text-2xl font-semibold mb-4">HR Configuration</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="leaveYearStart" className="block text-sm font-medium text-gray-700">
+              Leave Year Start
+            </label>
+            <select
+              id="leaveYearStart"
+              value={hrConfig.leaveYearStart}
+              onChange={(e) => setHrConfig({ ...hrConfig, leaveYearStart: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            >
+              <option>January</option>
+              <option>February</option>
+              <option>March</option>
+              <option>April</option>
+              <option>May</option>
+              <option>June</option>
+              <option>July</option>
+              <option>August</option>
+              <option>September</option>
+              <option>October</option>
+              <option>November</option>
+              <option>December</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="probationPeriod" className="block text-sm font-medium text-gray-700">
+              Probation Period (Months)
+            </label>
+            <input
+              type="number"
+              id="probationPeriod"
+              value={hrConfig.probationPeriod}
+              onChange={(e) => setHrConfig({ ...hrConfig, probationPeriod: Number.parseInt(e.target.value) })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="workingHours" className="block text-sm font-medium text-gray-700">
+              Working Hours per Day
+            </label>
+            <input
+              type="number"
+              id="workingHours"
+              value={hrConfig.workingHoursPerDay}
+              onChange={(e) => setHrConfig({ ...hrConfig, workingHoursPerDay: Number.parseInt(e.target.value) })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="workingDays" className="block text-sm font-medium text-gray-700">
+              Working Days per Week
+            </label>
+            <input
+              type="number"
+              id="workingDays"
+              value={hrConfig.workingDaysPerWeek}
+              onChange={(e) => setHrConfig({ ...hrConfig, workingDaysPerWeek: Number.parseInt(e.target.value) })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+        </div>
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="autoApproveLeave"
+              checked={hrConfig.autoApproveLeave}
+              onChange={(e) => setHrConfig({ ...hrConfig, autoApproveLeave: e.target.checked })}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="autoApproveLeave" className="ml-2 block text-sm text-gray-900">
+              Auto-Approve Leave Requests
+            </label>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="emailNotifications"
+              checked={hrConfig.emailNotifications}
+              onChange={(e) => setHrConfig({ ...hrConfig, emailNotifications: e.target.checked })}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="emailNotifications" className="ml-2 block text-sm text-gray-900">
+              Email Notifications
+            </label>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="aiRecommendations"
+              checked={hrConfig.aiRecommendations}
+              onChange={(e) => setHrConfig({ ...hrConfig, aiRecommendations: e.target.checked })}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="aiRecommendations" className="ml-2 block text-sm text-gray-900">
+              AI Recommendations
+            </label>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="smartScheduling"
+              checked={hrConfig.smartScheduling}
+              onChange={(e) => setHrConfig({ ...hrConfig, smartScheduling: e.target.checked })}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="smartScheduling" className="ml-2 block text-sm text-gray-900">
+              Smart Scheduling
+            </label>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="performanceTracking"
+              checked={hrConfig.performanceTracking}
+              onChange={(e) => setHrConfig({ ...hrConfig, performanceTracking: e.target.checked })}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="performanceTracking" className="ml-2 block text-sm text-gray-900">
+              Performance Tracking
+            </label>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={() => {
+              /* Save HR config */
+            }}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Save HR Configuration
+          </button>
+        </div>
+      </section>
+
+      {/* Divisions, Departments, Locations */}
+      <section className="mb-8 p-6 border rounded-lg shadow-sm">
+        <h2 className="text-2xl font-semibold mb-4">Organizational Structure</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div>
+            <label htmlFor="newDivision" className="block text-sm font-medium text-gray-700">
+              New Division
+            </label>
+            <div className="flex">
+              <input
+                type="text"
+                id="newDivision"
+                value={newDivisionName}
+                onChange={(e) => setNewDivisionName(e.target.value)}
+                className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+              <button
+                onClick={() => {
+                  if (newDivisionName.trim()) {
+                    setDivisions([...divisions, newDivisionName.trim()])
+                    setNewDivisionName("")
+                  }
+                }}
+                className="ml-2 inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="newDepartment" className="block text-sm font-medium text-gray-700">
+              New Department
+            </label>
+            <div className="flex">
+              <input
+                type="text"
+                id="newDepartment"
+                value={newDepartmentName}
+                onChange={(e) => setNewDepartmentName(e.target.value)}
+                className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+              <button
+                onClick={() => {
+                  if (newDepartmentName.trim()) {
+                    setDepartments([...departments, newDepartmentName.trim()])
+                    setNewDepartmentName("")
+                  }
+                }}
+                className="ml-2 inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="newLocation" className="block text-sm font-medium text-gray-700">
+              New Location
+            </label>
+            <div className="flex">
+              <input
+                type="text"
+                id="newLocation"
+                value={newLocationName}
+                onChange={(e) => setNewLocationName(e.target.value)}
+                className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              />
+              <button
+                onClick={() => {
+                  if (newLocationName.trim()) {
+                    setLocations([...locations, newLocationName.trim()])
+                    setNewLocationName("")
+                  }
+                }}
+                className="ml-2 inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Divisions</label>
+            <ul className="mt-1 p-2 border border-gray-300 rounded-md min-h-[100px] bg-gray-50">
+              {divisions.length > 0 ? (
+                divisions.map((div, index) => (
+                  <li key={index} className="flex justify-between items-center text-sm py-1">
+                    {div}
+                    <button
+                      onClick={() => setDivisions(divisions.filter((_, i) => i !== index))}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      X
+                    </button>
+                  </li>
+                ))
+              ) : (
+                <li className="text-sm text-gray-500">No divisions added</li>
+              )}
+            </ul>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Departments</label>
+            <ul className="mt-1 p-2 border border-gray-300 rounded-md min-h-[100px] bg-gray-50">
+              {departments.length > 0 ? (
+                departments.map((dept, index) => (
+                  <li key={index} className="flex justify-between items-center text-sm py-1">
+                    {dept}
+                    <button
+                      onClick={() => setDepartments(departments.filter((_, i) => i !== index))}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      X
+                    </button>
+                  </li>
+                ))
+              ) : (
+                <li className="text-sm text-gray-500">No departments added</li>
+              )}
+            </ul>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Locations</label>
+            <ul className="mt-1 p-2 border border-gray-300 rounded-md min-h-[100px] bg-gray-50">
+              {locations.length > 0 ? (
+                locations.map((loc, index) => (
+                  <li key={index} className="flex justify-between items-center text-sm py-1">
+                    {loc}
+                    <button
+                      onClick={() => setLocations(locations.filter((_, i) => i !== index))}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      X
+                    </button>
+                  </li>
+                ))
+              ) : (
+                <li className="text-sm text-gray-500">No locations added</li>
+              )}
+            </ul>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={() => {
+              updateSubsidiary(companyData.id, { divisions, departments, locations })
+            }}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Save Structure
+          </button>
+        </div>
+      </section>
+
+      {/* Subsidiaries Management */}
+      <section className="mb-8 p-6 border rounded-lg shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-semibold">Subsidiaries</h2>
+          <button
+            onClick={() => setShowAddSubsidiary(true)}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Add New Subsidiary
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Name
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Industry
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Employees
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Status
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {subsidiaries.map((sub) => (
+                <tr key={sub.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sub.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sub.industry}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sub.employee_count}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${sub.status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                    >
+                      {sub.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                    <button
+                      onClick={() => viewSubsidiaryEmployees(sub.id)}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      View Employees
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedSubsidiary(sub)
+                        setShowEditSubsidiary(true)
+                      }}
+                      className="text-indigo-600 hover:text-indigo-900"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleToggleSubsidiaryStatus(sub)}
+                      className={`text-sm ${sub.status === "active" ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900"}`}
+                    >
+                      {sub.status === "active" ? "Deactivate" : "Reactivate"}
+                    </button>
+                    <button onClick={() => duplicateSubsidiary(sub)} className="text-gray-600 hover:text-gray-900">
+                      Duplicate
+                    </button>
+                    <button onClick={() => deleteSubsidiary(sub.id)} className="text-red-600 hover:text-red-900">
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-6 flex justify-end space-x-2">
+          <button
+            onClick={handleRefreshSubsidiaries}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            Refresh
+          </button>
+          <button
+            onClick={handleSaveSubsidiaryChanges}
+            disabled={isSavingSubsidiary}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+          >
+            {isSavingSubsidiary ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
+      </section>
+
+      {/* Leave Policies */}
+      <section className="mb-8 p-6 border rounded-lg shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-semibold">Leave Policies</h2>
+          <button
+            onClick={() => {
+              setNewLeaveType({ name: "", days: 0, description: "", carryOver: false })
+              setShowAddLeaveTypeModal(true)
+            }}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Add Leave Type
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Policy Name
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Days Allowed
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Usage
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Trend
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Description
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {currentPolicies.map((policy, index) => (
+                <tr key={index}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{policy.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{policy.days}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{policy.usage}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        policy.trend === "up"
+                          ? "bg-green-100 text-green-800"
+                          : policy.trend === "down"
+                            ? "bg-red-100 text-red-800"
+                            : "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      {policy.trend}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{policy.description}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                    <button
+                      onClick={() => handlePolicyAction("view", policy.name)}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => handlePolicyAction("edit", policy.name)}
+                      className="text-indigo-600 hover:text-indigo-900"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handlePolicyAction("delete", policy.name)}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={() => {
+                        const insights = generateLeaveTypeInsights(policy.name, policy.days, policy.description)
+                        setLeaveTypeAIInsights(insights)
+                        setAiInsights(insights.join("\n")) // Set AI insights for display
+                        setShowAIInsightsModal(true)
+                      }}
+                      className="text-purple-600 hover:text-purple-900"
+                    >
+                      AI Insights
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Payroll Settings */}
+      <section className="mb-8 p-6 border rounded-lg shadow-sm">
+        <h2 className="text-2xl font-semibold mb-4">Payroll Settings</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="currency" className="block text-sm font-medium text-gray-700">
+              Currency
+            </label>
+            <select
+              id="currency"
+              value={selectedCurrency}
+              onChange={(e) => handleCurrencyChange(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            >
+              {Object.keys(currencyConfig).map((key) => (
+                <option key={key} value={key}>
+                  {currencyConfig[key as keyof typeof currencyConfig].name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="ssnitEmployee" className="block text-sm font-medium text-gray-700">
+              SSNIT Employee Rate (%)
+            </label>
+            <input
+              type="number"
+              id="ssnitEmployee"
+              value={ssnitRates.employee}
+              onChange={(e) => updateSsnitRates("employee", Number.parseFloat(e.target.value))}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="ssnitEmployer" className="block text-sm font-medium text-gray-700">
+              SSNIT Employer Rate (%)
+            </label>
+            <input
+              type="number"
+              id="ssnitEmployer"
+              value={ssnitRates.employer}
+              onChange={(e) => updateSsnitRates("employer", Number.parseFloat(e.target.value))}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="ssnitTotal" className="block text-sm font-medium text-gray-700">
+              SSNIT Total Rate (%)
+            </label>
+            <input
+              type="number"
+              id="ssnitTotal"
+              value={ssnitRates.total}
+              readOnly
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            />
+          </div>
+        </div>
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="tier2Employee" className="block text-sm font-medium text-gray-700">
+              Tier 2 Employee Rate (%)
+            </label>
+            <input
+              type="number"
+              id="tier2Employee"
+              value={tier2Rates.employee}
+              onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value))}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="tier2Employer" className="block text-sm font-medium text-gray-700">
+              Tier 2 Employer Rate (%)
+            </label>
+            <input
+              type="number"
+              id="tier2Employer"
+              value={tier2Rates.employer}
+              onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value))}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="tier2Total" className="block text-sm font-medium text-gray-700">
+              Tier 2 Total Rate (%)
+            </label>
+            <input
+              type="number"
+              id="tier2Total"
+              value={tier2Rates.total}
+              readOnly
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="tier3Employee" className="block text-sm font-medium text-gray-700">
+              Tier 3 Employee Rate (%)
+            </label>
+            <input
+              type="number"
+              id="tier3Employee"
+              value={tier3Rates.employee}
+              onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value))}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="tier3Employer" className="block text-sm font-medium text-gray-700">
+              Tier 3 Employer Rate (%)
+            </label>
+            <input
+              type="number"
+              id="tier3Employer"
+              value={tier3Rates.employer}
+              onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value))}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="tier3Total" className="block text-sm font-medium text-gray-700">
+              Tier 3 Total Rate (%)
+            </label>
+            <input
+              type="number"
+              id="tier3Total"
+              value={tier3Rates.total}
+              readOnly
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            />
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={() => {
+              /* Save payroll settings */
+            }}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Save Payroll Settings
+          </button>
+        </div>
+      </section>
+
+      {/* Tax Settings */}
+      <section className="mb-8 p-6 border rounded-lg shadow-sm">
+        <h2 className="text-2xl font-semibold mb-4">Tax Settings</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="taxVersion" className="block text-sm font-medium text-gray-700">
+              Tax Version
+            </label>
+            <select
+              id="taxVersion"
+              value={taxVersions[0]?.id} // Assuming the first one is active
+              onChange={(e) => {
+                /* Handle tax version change */
+              }}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            >
+              {taxVersions.map((version) => (
+                <option key={version.id} value={version.id}>
+                  {version.version} ({version.status})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center justify-end">
+            <button
+              onClick={() => syncWithGovernmentAPI(selectedCurrency)}
+              disabled={isSyncing}
+              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              {isSyncing ? "Syncing..." : `Sync ${selectedCurrency.toUpperCase()} Rates`}
+            </button>
+          </div>
+        </div>
+        <div className="mt-4">
+          <h3 className="text-lg font-medium mb-2">PAYE Tax Bands ({selectedCurrency.toUpperCase()})</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Rate (%)
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    From
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    To
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Cumulative Tax
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {payeTaxBands.map((band, index) => (
+                  <tr key={index}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{band.rate}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{band.from}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {band.to === Number.POSITIVE_INFINITY ? "∞" : band.to}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{band.cumulativeTax}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={() => {
+              /* Save tax settings */
+            }}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Save Tax Settings
+          </button>
+        </div>
+      </section>
+
+      {/* Notification Settings */}
+      <section className="mb-8 p-6 border rounded-lg shadow-sm">
+        <h2 className="text-2xl font-semibold mb-4">Notification Settings</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="payrollNotifications"
+              checked={notificationSettings.payrollNotifications}
+              onChange={(e) =>
+                setNotificationSettings({ ...notificationSettings, payrollNotifications: e.target.checked })
+              }
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="payrollNotifications" className="ml-2 block text-sm text-gray-900">
+              Payroll Notifications
+            </label>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="leaveNotifications"
+              checked={notificationSettings.leaveNotifications}
+              onChange={(e) =>
+                setNotificationSettings({ ...notificationSettings, leaveNotifications: e.target.checked })
+              }
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="leaveNotifications" className="ml-2 block text-sm text-gray-900">
+              Leave Notifications
+            </label>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="attendanceAlerts"
+              checked={notificationSettings.attendanceAlerts}
+              onChange={(e) => setNotificationSettings({ ...notificationSettings, attendanceAlerts: e.target.checked })}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="attendanceAlerts" className="ml-2 block text-sm text-gray-900">
+              Attendance Alerts
+            </label>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="promotionNotifications"
+              checked={notificationSettings.promotionNotifications}
+              onChange={(e) =>
+                setNotificationSettings({ ...notificationSettings, promotionNotifications: e.target.checked })
+              }
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="promotionNotifications" className="ml-2 block text-sm text-gray-900">
+              Promotion Notifications
+            </label>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="systemMaintenanceAlerts"
+              checked={notificationSettings.systemMaintenanceAlerts}
+              onChange={(e) =>
+                setNotificationSettings({ ...notificationSettings, systemMaintenanceAlerts: e.target.checked })
+              }
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="systemMaintenanceAlerts" className="ml-2 block text-sm text-gray-900">
+              System Maintenance Alerts
+            </label>
+          </div>
+          <div>
+            <label htmlFor="emailDigest" className="block text-sm font-medium text-gray-700">
+              Email Digest
+            </label>
+            <select
+              id="emailDigest"
+              value={notificationSettings.emailDigest}
+              onChange={(e) => setNotificationSettings({ ...notificationSettings, emailDigest: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            >
+              <option>Daily</option>
+              <option>Weekly</option>
+              <option>Monthly</option>
+              <option>None</option>
+            </select>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="smsAlerts"
+              checked={notificationSettings.smsAlerts}
+              onChange={(e) => setNotificationSettings({ ...notificationSettings, smsAlerts: e.target.checked })}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="smsAlerts" className="ml-2 block text-sm text-gray-900">
+              SMS Alerts
+            </label>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="pushNotifications"
+              checked={notificationSettings.pushNotifications}
+              onChange={(e) =>
+                setNotificationSettings({ ...notificationSettings, pushNotifications: e.target.checked })
+              }
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="pushNotifications" className="ml-2 block text-sm text-gray-900">
+              Push Notifications
+            </label>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={() => {
+              /* Save notification settings */
+            }}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Save Notification Settings
+          </button>
+        </div>
+      </section>
+
+      {/* Email Templates */}
+      <section className="mb-8 p-6 border rounded-lg shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-semibold">Email Templates</h2>
+          <button
+            onClick={handleAddEmailTemplateInner}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Add New Template
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Template Name
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Category
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Type
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Status
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Last Modified
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {notificationTemplates.map((template) => (
+                <tr key={template.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{template.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{template.category}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{template.type}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${template.status === "Active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                    >
+                      {template.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{template.lastModified}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                    <button
+                      onClick={() => handleEditEmailTemplateInner(template.name)}
+                      className="text-indigo-600 hover:text-indigo-900"
+                    >
+                      Edit
+                    </button>
+                    <button className="text-red-600 hover:text-red-900">Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Access Control */}
+      <section className="mb-8 p-6 border rounded-lg shadow-sm">
+        <h2 className="text-2xl font-semibold mb-4">Access Control</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="twoFactorEnabled"
+              checked={accessSettings.twoFactorEnabled}
+              onChange={(e) => setAccessSettings({ ...accessSettings, twoFactorEnabled: e.target.checked })}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="twoFactorEnabled" className="ml-2 block text-sm text-gray-900">
+              Two-Factor Authentication
+            </label>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="ssoEnabled"
+              checked={accessSettings.ssoEnabled}
+              onChange={(e) => setAccessSettings({ ...accessSettings, ssoEnabled: e.target.checked })}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="ssoEnabled" className="ml-2 block text-sm text-gray-900">
+              Single Sign-On (SSO)
+            </label>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="passwordExpiryEnabled"
+              checked={accessSettings.passwordExpiryEnabled}
+              onChange={(e) => setAccessSettings({ ...accessSettings, passwordExpiryEnabled: e.target.checked })}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="passwordExpiryEnabled" className="ml-2 block text-sm text-gray-900">
+              Password Expiry
+            </label>
+          </div>
+          <div>
+            <label htmlFor="sessionTimeout" className="block text-sm font-medium text-gray-700">
+              Session Timeout (Minutes)
+            </label>
+            <input
+              type="number"
+              id="sessionTimeout"
+              value={accessSettings.sessionTimeout}
+              onChange={(e) =>
+                setAccessSettings({ ...accessSettings, sessionTimeout: Number.parseInt(e.target.value) })
+              }
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="maxLoginAttempts" className="block text-sm font-medium text-gray-700">
+              Max Login Attempts
+            </label>
+            <input
+              type="number"
+              id="maxLoginAttempts"
+              value={accessSettings.maxLoginAttempts}
+              onChange={(e) =>
+                setAccessSettings({ ...accessSettings, maxLoginAttempts: Number.parseInt(e.target.value) })
+              }
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="passwordMinLength" className="block text-sm font-medium text-gray-700">
+              Password Minimum Length
+            </label>
+            <input
+              type="number"
+              id="passwordMinLength"
+              value={accessSettings.passwordMinLength}
+              onChange={(e) =>
+                setAccessSettings({ ...accessSettings, passwordMinLength: Number.parseInt(e.target.value) })
+              }
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="ipRestrictionsEnabled"
+              checked={accessSettings.ipRestrictionsEnabled}
+              onChange={(e) => setAccessSettings({ ...accessSettings, ipRestrictionsEnabled: e.target.checked })}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="ipRestrictionsEnabled" className="ml-2 block text-sm text-gray-900">
+              IP Address Restrictions
+            </label>
+          </div>
+          <div className="col-span-1 md:col-span-2">
+            <label htmlFor="allowedIPs" className="block text-sm font-medium text-gray-700">
+              Allowed IP Addresses
+            </label>
+            <textarea
+              id="allowedIPs"
+              value={accessSettings.allowedIPs.join("\n")}
+              onChange={(e) =>
+                setAccessSettings({
+                  ...accessSettings,
+                  allowedIPs: e.target.value.split("\n").filter((ip) => ip.trim() !== ""),
+                })
+              }
+              rows={3}
+              placeholder="Enter one IP address or range per line (e.g., 192.168.1.0/24)"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={() => setIsSavingAccessSettings(true)}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            {isSavingAccessSettings ? "Saving..." : "Save Access Settings"}
+          </button>
+        </div>
+      </section>
+
+      {/* Security Settings */}
+      <section className="mb-8 p-6 border rounded-lg shadow-sm">
+        <h2 className="text-2xl font-semibold mb-4">Security Settings</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="dataEncryptionEnabled"
+              checked={securitySettings.dataEncryptionEnabled}
+              onChange={(e) => setSecuritySettings({ ...securitySettings, dataEncryptionEnabled: e.target.checked })}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="dataEncryptionEnabled" className="ml-2 block text-sm text-gray-900">
+              Data Encryption
+            </label>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="auditLoggingEnabled"
+              checked={securitySettings.auditLoggingEnabled}
+              onChange={(e) => setSecuritySettings({ ...securitySettings, auditLoggingEnabled: e.target.checked })}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="auditLoggingEnabled" className="ml-2 block text-sm text-gray-900">
+              Audit Logging
+            </label>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="autoBackupEnabled"
+              checked={securitySettings.autoBackupEnabled}
+              onChange={(e) => setSecuritySettings({ ...securitySettings, autoBackupEnabled: e.target.checked })}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label htmlFor="autoBackupEnabled" className="ml-2 block text-sm text-gray-900">
+              Automatic Backups
+            </label>
+          </div>
+          <div>
+            <label htmlFor="backupFrequency" className="block text-sm font-medium text-gray-700">
+              Backup Frequency
+            </label>
+            <select
+              id="backupFrequency"
+              value={securitySettings.backupFrequency}
+              onChange={(e) => setSecuritySettings({ ...securitySettings, backupFrequency: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            >
+              <option>Daily</option>
+              <option>Weekly</option>
+              <option>Monthly</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="dataRetentionDays" className="block text-sm font-medium text-gray-700">
+              Data Retention (Days)
+            </label>
+            <input
+              type="number"
+              id="dataRetentionDays"
+              value={securitySettings.dataRetentionDays}
+              onChange={(e) =>
+                setSecuritySettings({ ...securitySettings, dataRetentionDays: Number.parseInt(e.target.value) })
+              }
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+        </div>
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <p className="text-sm font-medium text-gray-700">Last Backup:</p>
+            <p className="text-sm text-gray-500">
+              {lastBackupTime ? new Date(lastBackupTime).toLocaleString() : "N/A"}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-700">Backup Size:</p>
+            <p className="text-sm text-gray-500">{backupSize || "N/A"}</p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-700">Backup Status:</p>
+            <p className="text-sm text-gray-500">{backupStatus || "N/A"}</p>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={handleBackupNowInner}
+            disabled={isBackingUp}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 mr-2"
+          >
+            {isBackingUp ? "Backing Up..." : "Backup Now"}
+          </button>
+          <button
+            onClick={() => setIsSavingSecuritySettings(true)}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            {isSavingSecuritySettings ? "Saving..." : "Save Security Settings"}
+          </button>
+        </div>
+      </section>
+
+      {/* Audit Logs & Active Sessions */}
+      <section className="mb-8 p-6 border rounded-lg shadow-sm">
+        <h2 className="text-2xl font-semibold mb-4">Audit Logs & Active Sessions</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-medium">Audit Logs</h3>
+              <button
+                onClick={() => setIsExportingReport(true)}
+                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              >
+                {isExportingReport ? "Exporting..." : "Export Logs"}
+              </button>
+            </div>
+            <div className="h-64 overflow-y-auto border rounded p-4 bg-gray-50">
+              {auditLogs.length > 0 ? (
+                auditLogs.map((log) => (
+                  <div key={log.id} className="mb-3 pb-3 border-b border-gray-200 last:border-b-0">
+                    <p className="text-sm font-medium text-gray-900">{log.action}</p>
+                    <p className="text-xs text-gray-500">
+                      User: {log.user_email} | IP: {log.ip_address} | {new Date(log.timestamp).toLocaleString()}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">No audit logs found.</p>
+              )}
+            </div>
+          </div>
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-medium">Active Sessions</h3>
+              <button
+                onClick={() => setIsRefreshingSessions(true)}
+                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                {isRefreshingSessions ? "Refreshing..." : "Refresh Sessions"}
+              </button>
+            </div>
+            <div className="h-64 overflow-y-auto border rounded p-4 bg-gray-50">
+              {activeSessions.length > 0 ? (
+                activeSessions.map((session) => (
+                  <div key={session.id} className="mb-3 pb-3 border-b border-gray-200 last:border-b-0">
+                    <p className="text-sm font-medium text-gray-900">User: {session.user_email}</p>
+                    <p className="text-xs text-gray-500">
+                      Device: {session.device} | IP: {session.ip_address} | Last Activity:{" "}
+                      {new Date(session.last_activity).toLocaleString()}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">No active sessions found.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Salary Grades */}
+      <section className="mb-8 p-6 border rounded-lg shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-semibold">Salary Grades</h2>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setShowImportExportModal(true)}
+              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+            >
+              Import/Export
+            </button>
+            <button
+              onClick={() => {
+                setNewGrade({
+                  name: "",
+                  description: "",
+                  minSalary: "",
+                  maxSalary: "",
+                  numberOfNotches: 5,
+                  notches: [],
+                })
+                setShowSalaryGradeModal(true)
+              }}
+              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Add New Grade
+            </button>
+          </div>
+        </div>
+        <div className="mb-4 border-b pb-4">
+          <nav className="flex space-x-4">
+            <button
+              onClick={() => setSalaryGradeTab("structured")}
+              className={`text-sm font-medium ${salaryGradeTab === "structured" ? "text-indigo-600 border-b-2 border-indigo-600" : "text-gray-500"}`}
+            >
+              Structured Grades
+            </button>
+            <button
+              onClick={() => setSalaryGradeTab("unstructured")}
+              className={`text-sm font-medium ${salaryGradeTab === "unstructured" ? "text-indigo-600 border-b-2 border-indigo-600" : "text-gray-500"}`}
+            >
+              Unstructured Grades
+            </button>
+          </nav>
+        </div>
+
+        {salaryGradeTab === "structured" && (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Grade Name
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Description
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Min Salary
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Max Salary
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Notches
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {salaryGrades.map((grade) => (
+                  <tr key={grade.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{grade.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.description}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.minSalary}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.maxSalary}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.notches.length}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                      <button
+                        onClick={() => {
+                          setEditingGrade(grade)
+                          setShowSalaryGradeModal(true)
+                        }}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => {
+                          /* Delete grade */
+                        }}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {salaryGradeTab === "unstructured" && (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Grade Name
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Description
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    General Increment
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Performance Increment
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {unstructuredGrades.map((grade) => (
+                  <tr key={grade.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{grade.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.description}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {grade.generalIncrement.type} ({grade.generalIncrement.value}%)
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {grade.performanceIncrement.type} ({grade.performanceIncrement.value}%)
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                      <button
+                        onClick={() => {
+                          setEditingUnstructured(grade)
+                          setShowUnstructuredModal(true)
+                        }}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => {
+                          /* Delete grade */
+                        }}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={() => handleExportSalaryGrades("csv")}
+            disabled={isExporting}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 mr-2"
+          >
+            {isExporting ? "Exporting..." : "Export Grades"}
+          </button>
+        </div>
+      </section>
+
+      {/* HR Documents */}
+      <section className="mb-8 p-6 border rounded-lg shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-semibold">HR Documents</h2>
+          <button
+            onClick={handleAddDocument}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Upload Document
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Document Name
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Type
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Size
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Visible to All
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {hrDocuments.map((doc) => (
+                <tr key={doc.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{doc.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doc.type}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doc.size}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <button
+                      onClick={() => handleToggleDocumentVisibility(doc.id)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${doc.visibleToAll ? "bg-green-500" : "bg-gray-200"}`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${doc.visibleToAll ? "translate-x-5" : "translate-x-1"}`}
+                      />
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                    <button onClick={() => handleViewDocument(doc)} className="text-blue-600 hover:text-blue-900">
+                      View
+                    </button>
+                    <button onClick={() => handleEditDocument(doc)} className="text-indigo-600 hover:text-indigo-900">
+                      Edit
+                    </button>
+                    <button onClick={() => handleDocumentDelete(doc.id)} className="text-red-600 hover:text-red-900">
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Modals */}
+      {showAddSubsidiary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden outline-none focus:outline-none bg-black bg-opacity-50">
+          <div className="relative w-auto my-6 mx-auto max-w-3xl">
+            <div className="border-0 rounded-lg shadow-lg relative flex flex-col w-full bg-white outline-none focus:outline-none">
+              <div className="flex items-start justify-between p-5 border-b border-solid border-blueGray-200 rounded-t">
+                <h3 className="text-2xl font-semibold">Add New Subsidiary</h3>
+                <button
+                  className="p-1 ml-auto bg-transparent border-0 text-black opacity-5 float-right text-3xl leading-none font-semibold outline-none focus:outline-none"
+                  onClick={() => setShowAddSubsidiary(false)}
+                >
+                  <span className="bg-transparent text-black opacity-5 h-6 w-6 text-2xl block outline-none focus:outline-none">
+                    ×
+                  </span>
+                </button>
+              </div>
+              <div className="relative p-6 flex-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="subsidiaryName" className="block text-sm font-medium text-gray-700">
+                      Subsidiary Name
+                    </label>
+                    <input
+                      type="text"
+                      id="subsidiaryName"
+                      value={""}
+                      onChange={(e) => {
+                        /* update state */
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="subsidiaryEmail" className="block text-sm font-medium text-gray-700">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      id="subsidiaryEmail"
+                      value={""}
+                      onChange={(e) => {
+                        /* update state */
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="subsidiaryPhone" className="block text-sm font-medium text-gray-700">
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      id="subsidiaryPhone"
+                      value={""}
+                      onChange={(e) => {
+                        /* update state */
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="subsidiaryTaxId" className="block text-sm font-medium text-gray-700">
+                      Tax ID
+                    </label>
+                    <input
+                      type="text"
+                      id="subsidiaryTaxId"
+                      value={""}
+                      onChange={(e) => {
+                        /* update state */
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="subsidiarySsnit" className="block text-sm font-medium text-gray-700">
+                      SSNIT Number
+                    </label>
+                    <input
+                      type="text"
+                      id="subsidiarySsnit"
+                      value={""}
+                      onChange={(e) => {
+                        /* update state */
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="subsidiaryIndustry" className="block text-sm font-medium text-gray-700">
+                      Industry
+                    </label>
+                    <input
+                      type="text"
+                      id="subsidiaryIndustry"
+                      value={""}
+                      onChange={(e) => {
+                        /* update state */
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div className="col-span-1 md:col-span-2">
+                    <label htmlFor="subsidiaryAddress" className="block text-sm font-medium text-gray-700">
+                      Address
+                    </label>
+                    <textarea
+                      id="subsidiaryAddress"
+                      rows={3}
+                      value={""}
+                      onChange={(e) => {
+                        /* update state */
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    ></textarea>
+                  </div>
+                  <div className="col-span-1 md:col-span-2">
+                    <label htmlFor="subsidiaryLogo" className="block text-sm font-medium text-gray-700">
+                      Subsidiary Logo
+                    </label>
+                    <div className="mt-1 flex items-center">
+                      {subsidiaryLogoPreview && (
+                        <img
+                          src={subsidiaryLogoPreview || "/placeholder.svg"}
+                          alt="Subsidiary Logo Preview"
+                          className="h-16 w-16 rounded-full mr-4 object-cover"
+                        />
+                      )}
+                      <input
+                        type="file"
+                        id="subsidiaryLogo"
+                        accept="image/*"
+                        onChange={(e) => handleLogoUpload(e.target.files![0], "subsidiary")}
+                        className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 border-gray-300 rounded-md"
+                      />
+                      {isUploadingLogo && <p className="ml-4">Uploading...</p>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-end p-6 border-t border-solid border-blueGray-200 rounded-b">
+                <button
+                  className="text-red-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                  type="button"
+                  onClick={() => setShowAddSubsidiary(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="text-white bg-blue-500 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                  type="button"
+                  onClick={() => {
+                    /* handle add subsidiary */
+                  }}
+                >
+                  Add Subsidiary
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditSubsidiary && selectedSubsidiary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden outline-none focus:outline-none bg-black bg-opacity-50">
+          <div className="relative w-auto my-6 mx-auto max-w-3xl">
+            <div className="border-0 rounded-lg shadow-lg relative flex flex-col w-full bg-white outline-none focus:outline-none">
+              <div className="flex items-start justify-between p-5 border-b border-solid border-blueGray-200 rounded-t">
+                <h3 className="text-2xl font-semibold">Edit Subsidiary: {selectedSubsidiary.name}</h3>
+                <button
+                  className="p-1 ml-auto bg-transparent border-0 text-black opacity-5 float-right text-3xl leading-none font-semibold outline-none focus:outline-none"
+                  onClick={() => {
+                    setShowEditSubsidiary(false)
+                    setSelectedSubsidiary(null)
+                  }}
+                >
+                  <span className="bg-transparent text-black opacity-5 h-6 w-6 text-2xl block outline-none focus:outline-none">
+                    ×
+                  </span>
+                </button>
+              </div>
+              <div className="relative p-6 flex-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="editSubsidiaryName" className="block text-sm font-medium text-gray-700">
+                      Subsidiary Name
+                    </label>
+                    <input
+                      type="text"
+                      id="editSubsidiaryName"
+                      value={selectedSubsidiary.name}
+                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, name: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="editSubsidiaryEmail" className="block text-sm font-medium text-gray-700">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      id="editSubsidiaryEmail"
+                      value={selectedSubsidiary.email_address}
+                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, email_address: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="editSubsidiaryPhone" className="block text-sm font-medium text-gray-700">
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      id="editSubsidiaryPhone"
+                      value={selectedSubsidiary.phone_number}
+                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, phone_number: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="editSubsidiaryTaxId" className="block text-sm font-medium text-gray-700">
+                      Tax ID
+                    </label>
+                    <input
+                      type="text"
+                      id="editSubsidiaryTaxId"
+                      value={selectedSubsidiary.tax_id}
+                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, tax_id: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="editSubsidiarySsnit" className="block text-sm font-medium text-gray-700">
+                      SSNIT Number
+                    </label>
+                    <input
+                      type="text"
+                      id="editSubsidiarySsnit"
+                      value={selectedSubsidiary.ssnit_number}
+                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, ssnit_number: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="editSubsidiaryIndustry" className="block text-sm font-medium text-gray-700">
+                      Industry
+                    </label>
+                    <input
+                      type="text"
+                      id="editSubsidiaryIndustry"
+                      value={selectedSubsidiary.industry}
+                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, industry: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div className="col-span-1 md:col-span-2">
+                    <label htmlFor="editSubsidiaryAddress" className="block text-sm font-medium text-gray-700">
+                      Address
+                    </label>
+                    <textarea
+                      id="editSubsidiaryAddress"
+                      rows={3}
+                      value={selectedSubsidiary.address}
+                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, address: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    ></textarea>
+                  </div>
+                  <div className="col-span-1 md:col-span-2">
+                    <label htmlFor="editSubsidiaryLogo" className="block text-sm font-medium text-gray-700">
+                      Subsidiary Logo
+                    </label>
+                    <div className="mt-1 flex items-center">
+                      {selectedSubsidiary.logo_url && (
+                        <img
+                          src={selectedSubsidiary.logo_url || "/placeholder.svg"}
+                          alt="Subsidiary Logo Preview"
+                          className="h-16 w-16 rounded-full mr-4 object-cover"
+                        />
+                      )}
+                      <input
+                        type="file"
+                        id="editSubsidiaryLogo"
+                        accept="image/*"
+                        onChange={(e) => handleLogoUpload(e.target.files![0], "subsidiary")}
+                        className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 border-gray-300 rounded-md"
+                      />
+                      {isUploadingLogo && <p className="ml-4">Uploading...</p>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-end p-6 border-t border-solid border-blueGray-200 rounded-b">
+                <button
+                  className="text-red-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                  type="button"
+                  onClick={() => {
+                    setShowEditSubsidiary(false)
+                    setSelectedSubsidiary(null)
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="text-white bg-blue-500 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                  type="button"
+                  onClick={() => {
+                    if (selectedSubsidiary) updateSubsidiary(selectedSubsidiary.id, selectedSubsidiary)
+                    setShowEditSubsidiary(false)
+                    setSelectedSubsidiary(null)
+                  }}
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeactivateConfirm && subsidiaryToToggle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden outline-none focus:outline-none bg-black bg-opacity-50">
+          <div className="relative w-auto my-6 mx-auto max-w-sm">
+            <div className="border-0 rounded-lg shadow-lg relative flex flex-col w-full bg-white outline-none focus:outline-none">
+              <div className="flex items-start justify-between p-5 border-b border-solid border-blueGray-200 rounded-t">
+                <h3 className="text-2xl font-semibold">Confirm Deactivation</h3>
+                <button
+                  className="p-1 ml-auto bg-transparent border-0 text-black opacity-5 float-right text-3xl leading-none font-semibold outline-none focus:outline-none"
+                  onClick={() => setShowDeactivateConfirm(false)}
+                >
+                  <span className="bg-transparent text-black opacity-5 h-6 w-6 text-2xl block outline-none focus:outline-none">
+                    ×
+                  </span>
+                </button>
+              </div>
+              <div className="relative p-6 flex-auto">
+                <p className="my-4 text-blueGray-500 text-lg leading-relaxed">
+                  Are you sure you want to deactivate "{subsidiaryToToggle.name}"?
+                </p>
+              </div>
+              <div className="flex items-center justify-end p-6 border-t border-solid border-blueGray-200 rounded-b">
+                <button
+                  className="text-red-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                  type="button"
+                  onClick={() => setShowDeactivateConfirm(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="text-white bg-red-500 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                  type="button"
+                  onClick={confirmToggleStatusInner}
+                >
+                  Deactivate
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReactivateConfirm && subsidiaryToToggle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden outline-none focus:outline-none bg-black bg-opacity-50">
+          <div className="relative w-auto my-6 mx-auto max-w-sm">
+            <div className="border-0 rounded-lg shadow-lg relative flex flex-col w-full bg-white outline-none focus:outline-none">
+              <div className="flex items-start justify-between p-5 border-b border-solid border-blueGray-200 rounded-t">
+                <h3 className="text-2xl font-semibold">Confirm Reactivation</h3>
+                <button
+                  className="p-1 ml-auto bg-transparent border-0 text-black opacity-5 float-right text-3xl leading-none font-semibold outline-none focus:outline-none"
+                  onClick={() => setShowReactivateConfirm(false)}
+                >
+                  <span className="bg-transparent text-black opacity-5 h-6 w-6 text-2xl block outline-none focus:outline-none">
+                    ×
+                  </span>
+                </button>
+              </div>
+              <div className="relative p-6 flex-auto">
+                <p className="my-4 text-blueGray-500 text-lg leading-relaxed">
+                  Are you sure you want to reactivate "{subsidiaryToToggle.name}"?
+                </p>
+              </div>
+              <div className="flex items-center justify-end p-6 border-t border-solid border-blueGray-200 rounded-b">
+                <button
+                  className="text-red-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                  type="button"
+                  onClick={() => setShowReactivateConfirm(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="text-white bg-green-500 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                  type="button"
+                  onClick={confirmToggleStatusInner}
+                >
+                  Reactivate
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddLeaveTypeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden outline-none focus:outline-none bg-black bg-opacity-50">
+          <div className="relative w-auto my-6 mx-auto max-w-2xl">
+            <div className="border-0 rounded-lg shadow-lg relative flex flex-col w-full bg-white outline-none focus:outline-none">
+              <div className="flex items-start justify-between p-5 border-b border-solid border-blueGray-200 rounded-t">
+                <h3 className="text-2xl font-semibold">Add New Leave Type</h3>
+                <button
+                  className="p-1 ml-auto bg-transparent border-0 text-black opacity-5 float-right text-3xl leading-none font-semibold outline-none focus:outline-none"
+                  onClick={() => setShowAddLeaveTypeModal(false)}
+                >
+                  <span className="bg-transparent text-black opacity-5 h-6 w-6 text-2xl block outline-none focus:outline-none">
+                    ×
+                  </span>
+                </button>
+              </div>
+              <div className="relative p-6 flex-auto">
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label htmlFor="leaveName" className="block text-sm font-medium text-gray-700">
+                      Leave Type Name
+                    </label>
+                    <input
+                      type="text"
+                      id="leaveName"
+                      value={newLeaveType.name}
+                      onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="leaveDays" className="block text-sm font-medium text-gray-700">
+                      Days Allowed
+                    </label>
+                    <input
+                      type="number"
+                      id="leaveDays"
+                      value={newLeaveType.days}
+                      onChange={(e) => setNewLeaveType({ ...newLeaveType, days: Number.parseInt(e.target.value) })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="leaveDescription" className="block text-sm font-medium text-gray-700">
+                      Description
+                    </label>
+                    <textarea
+                      id="leaveDescription"
+                      rows={3}
+                      value={newLeaveType.description}
+                      onChange={(e) => setNewLeaveType({ ...newLeaveType, description: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    ></textarea>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="leaveCarryOver"
+                      checked={newLeaveType.carryOver}
+                      onChange={(e) => setNewLeaveType({ ...newLeaveType, carryOver: e.target.checked })}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="leaveCarryOver" className="ml-2 block text-sm text-gray-900">
+                      Carry Over Allowed
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-end p-6 border-t border-solid border-blueGray-200 rounded-b">
+                <button
+                  className="text-red-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                  type="button"
+                  onClick={() => setShowAddLeaveTypeModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="text-white bg-blue-500 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                  type="button"
+                  onClick={handleSaveLeaveType}
+                >
+                  {isSavingPolicy ? "Saving..." : "Add Leave Type"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPolicyModal && selectedPolicy && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden outline-none focus:outline-none bg-black bg-opacity-50">
+          <div className="relative w-auto my-6 mx-auto max-w-2xl">
+            <div className="border-0 rounded-lg shadow-lg relative flex flex-col w-full bg-white outline-none focus:outline-none">
+              <div className="flex items-start justify-between p-5 border-b border-solid border-blueGray-200 rounded-t">
+                <h3 className="text-2xl font-semibold">
+                  {policyModalType === "view"
+                    ? "View Policy"
+                    : policyModalType === "edit"
+                      ? "Edit Policy"
+                      : "Delete Policy"}
+                </h3>
+                <button
+                  className="p-1 ml-auto bg-transparent border-0 text-black opacity-5 float-right text-3xl leading-none font-semibold outline-none focus:outline-none"
+                  onClick={() => setShowPolicyModal(false)}
+                >
+                  <span className="bg-transparent text-black opacity-5 h-6 w-6 text-2xl block outline-none focus:outline-none">
+                    ×
+                  </span>
+                </button>
+              </div>
+              <div className="relative p-6 flex-auto">
+                {policyModalType === "view" && (
+                  <>
+                    <p className="text-lg font-medium mb-2">Policy Name: {selectedPolicy.name}</p>
+                    <p className="text-lg font-medium mb-2">Days Allowed: {selectedPolicy.days}</p>
+                    <p className="text-lg font-medium mb-2">Description: {selectedPolicy.description}</p>
+                  </>
+                )}
+                {policyModalType === "edit" && (
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label htmlFor="editPolicyName" className="block text-sm font-medium text-gray-700">
+                        Policy Name
+                      </label>
+                      <input
+                        type="text"
+                        id="editPolicyName"
+                        value={editingPolicy.name}
+                        onChange={(e) => setEditingPolicy({ ...editingPolicy, name: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="editPolicyDays" className="block text-sm font-medium text-gray-700">
+                        Days Allowed
+                      </label>
+                      <input
+                        type="number"
+                        id="editPolicyDays"
+                        value={editingPolicy.days}
+                        onChange={(e) => setEditingPolicy({ ...editingPolicy, days: Number.parseInt(e.target.value) })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="editPolicyDescription" className="block text-sm font-medium text-gray-700">
+                        Description
+                      </label>
+                      <textarea
+                        id="editPolicyDescription"
+                        rows={3}
+                        value={editingPolicy.description}
+                        onChange={(e) => setEditingPolicy({ ...editingPolicy, description: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      ></textarea>
+                    </div>
+                  </div>
+                )}
+                {policyModalType === "delete" && (
+                  <p className="text-lg text-red-600">
+                    Are you sure you want to delete the policy "{selectedPolicy.name}"?
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center justify-end p-6 border-t border-solid border-blueGray-200 rounded-b">
+                <button
+                  className="text-red-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                  type="button"
+                  onClick={() => setShowPolicyModal(false)}
+                >
+                  {policyModalType === "delete" ? "No" : "Cancel"}
+                </button>
+                {policyModalType === "edit" && (
+                  <button
+                    className="text-white bg-blue-500 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                    type="button"
+                    onClick={handleSavePolicyChanges}
+                  >
+                    {isSavingPolicy ? "Saving..." : "Save Changes"}
+                  </button>
+                )}
+                {policyModalType === "delete" && (
+                  <button
+                    className="text-white bg-red-500 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                    type="button"
+                    onClick={handleDeletePolicy}
+                  >
+                    {isSavingPolicy ? "Deleting..." : "Delete"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAIInsightsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden outline-none focus:outline-none bg-black bg-opacity-50">
+          <div className="relative w-auto my-6 mx-auto max-w-2xl">
+            <div className="border-0 rounded-lg shadow-lg relative flex flex-col w-full bg-white outline-none focus:outline-none">
+              <div className="flex items-start justify-between p-5 border-b border-solid border-blueGray-200 rounded-t">
+                <h3 className="text-2xl font-semibold">AI Insights for Leave Type</h3>
+                <button
+                  className="p-1 ml-auto bg-transparent border-0 text-black opacity-5 float-right text-3xl leading-none font-semibold outline-none focus:outline-none"
+                  onClick={() => setShowAIInsightsModal(false)}
+                >
+                  <span className="bg-transparent text-black opacity-5 h-6 w-6 text-2xl block outline-none focus:outline-none">
+                    ×
+                  </span>
+                </button>
+              </div>
+              <div className="relative p-6 flex-auto">
+                <pre className="text-sm text-gray-700 whitespace-pre-wrap">{aiInsights}</pre>
+              </div>
+              <div className="flex items-center justify-end p-6 border-t border-solid border-blueGray-200 rounded-b">
+                <button
+                  className="text-blue-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                  type="button"
+                  onClick={() => setShowAIInsightsModal(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDocumentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden outline-none focus:outline-none bg-black bg-opacity-50">
+          <div className="relative w-auto my-6 mx-auto max-w-4xl">
+            <div className="border-0 rounded-lg shadow-lg relative flex flex-col w-full bg-white outline-none focus:outline-none">
+              <div className="flex items-start justify-between p-5 border-b border-solid border-blueGray-200 rounded-t">
+                <h3 className="text-2xl font-semibold">
+                  {documentModalType === "add"
+                    ? "Upload New Document"
+                    : documentModalType === "view"
+                      ? "View Document"
+                      : documentModalType === "edit"
+                        ? "Edit Document"
+                        : "Delete Document"}
+                </h3>
+                <button
+                  className="p-1 ml-auto bg-transparent border-0 text-black opacity-5 float-right text-3xl leading-none font-semibold outline-none focus:outline-none"
+                  onClick={() => setShowDocumentModal(false)}
+                >
+                  <span className="bg-transparent text-black opacity-5 h-6 w-6 text-2xl block outline-none focus:outline-none">
+                    ×
+                  </span>
+                </button>
+              </div>
+              <div className="relative p-6 flex-auto">
+                {documentModalType === "add" && (
+                  <>
+                    <div className="mb-4">
+                      <label htmlFor="newDocumentName" className="block text-sm font-medium text-gray-700">
+                        Document Name
+                      </label>
+                      <input
+                        type="text"
+                        id="newDocumentName"
+                        value={documentName}
+                        onChange={(e) => setDocumentName(e.target.value)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="documentFile" className="block text-sm font-medium text-gray-700">
+                        Upload PDF File
+                      </label>
+                      <input
+                        type="file"
+                        id="documentFile"
+                        accept=".pdf"
+                        onChange={handleFileUpload}
+                        className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600"
+                      />
+                      {uploadedFile && (
+                        <p className="mt-2 text-sm text-gray-600">
+                          Selected: {uploadedFile.name} ({(uploadedFile.size / 1024 / 1024).toFixed(2)} MB)
+                        </p>
+                      )}
+                      {uploadProgress > 0 && uploadProgress < 100 && (
+                        <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-2">
+                          <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+                {documentModalType === "view" && selectedDocument && (
+                  <>
+                    <h4 className="text-xl font-semibold mb-2">{selectedDocument.name}</h4>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Type: {selectedDocument.type} | Size: {selectedDocument.size}
+                    </p>
+                    <div className="border rounded p-4 bg-gray-50 h-[500px] overflow-auto">
+                      <pre className="text-sm text-gray-700 whitespace-pre-wrap">{documentPreviewContent}</pre>
+                    </div>
+                    {/* PDF Viewer Controls (simplified for demo) */}
+                    <div className="mt-4 flex justify-center items-center space-x-4">
+                      <button
+                        onClick={handleZoomOut}
+                        className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                      <span>Zoom: {pdfViewerState.zoom}%</span>
+                      <button
+                        onClick={handleZoomIn}
+                        className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={handlePrevPage}
+                        className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                      <span>
+                        Page {pdfViewerState.currentPage} of {pdfViewerState.totalPages}
+                      </span>
+                      <button
+                        onClick={handleNextPage}
+                        className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </>
+                )}
+                {documentModalType === "edit" && selectedDocument && (
+                  <>
+                    <div className="mb-4">
+                      <label htmlFor="editDocumentName" className="block text-sm font-medium text-gray-700">
+                        Document Name
+                      </label>
+                      <input
+                        type="text"
+                        id="editDocumentName"
+                        value={documentName}
+                        onChange={(e) => setDocumentName(e.target.value)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="editDocumentFile" className="block text-sm font-medium text-gray-700">
+                        Replace PDF File (Optional)
+                      </label>
+                      <input
+                        type="file"
+                        id="editDocumentFile"
+                        accept=".pdf"
+                        onChange={handleFileUpload}
+                        className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600"
+                      />
+                      {uploadedFile && (
+                        <p className="mt-2 text-sm text-gray-600">
+                          Selected: {uploadedFile.name} ({(uploadedFile.size / 1024 / 1024).toFixed(2)} MB)
+                        </p>
+                      )}
+                      {uploadProgress > 0 && uploadProgress < 100 && (
+                        <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-2">
+                          <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+                {documentModalType === "delete" && selectedDocument && (
+                  <p className="text-lg text-red-600">
+                    Are you sure you want to delete the document "{selectedDocument.name}"?
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center justify-end p-6 border-t border-solid border-blueGray-200 rounded-b">
+                <button
+                  className="text-red-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                  type="button"
+                  onClick={() => setShowDocumentModal(false)}
+                >
+                  {documentModalType === "delete" ? "No" : "Cancel"}
+                </button>
+                {(documentModalType === "add" || documentModalType === "edit") && (
+                  <button
+                    className="text-white bg-blue-500 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                    type="button"
+                    onClick={handleSaveDocument}
+                  >
+                    {isSavingDocument ? "Saving..." : "Save Document"}
+                  </button>
+                )}
+                {documentModalType === "delete" && (
+                  <button
+                    className="text-white bg-red-500 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                    type="button"
+                    onClick={handleConfirmDelete}
+                  >
+                    {isSavingDocument ? "Deleting..." : "Delete"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
