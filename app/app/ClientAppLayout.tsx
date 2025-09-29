@@ -597,6 +597,21 @@ export default function ClientAppLayout({
                     <span className="font-sans">Payroll Processing</span>
                   </a>
                   <a
+                    href="/payroll-history"
+                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
+                      e.currentTarget.style.color = "white"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = ""
+                      e.currentTarget.style.color = ""
+                    }}
+                  >
+                    <FileText className="w-5 h-5" />
+                    <span className="font-sans">Payroll History</span>
+                  </a>
+                  <a
                     href="/app/loans"
                     className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
                     onMouseEnter={(e) => {

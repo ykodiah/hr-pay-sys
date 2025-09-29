@@ -2286,6 +2286,274 @@ export default function SettingsPage() {
   }
 
   const parseDocumentContent = (document: any) => {
+    const templates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+This handbook provides important information about company policies, procedures, and benefits.
+
+1. WELCOME MESSAGE
+Welcome to our organization! We are committed to providing a positive work environment.
+
+2. COMPANY OVERVIEW
+Our mission is to deliver exceptional products and services with integrity and innovation.
+
+3. EMPLOYMENT POLICIES
+We provide equal employment opportunities and maintain fair employment practices.
+
+4. COMPENSATION AND BENEFITS
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
+
+For questions, please contact the Human Resources Department.`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
+
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
+
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
+
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
+
+For safety concerns, contact the Safety Department.`
+      }
+    };
+
+    return templates[documentName] || { content: "Document content not available." };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
     const documentTemplates = {
       "Code of Conduct": {
         content: `COMPANY CODE OF CONDUCT
@@ -2377,304 +2645,49 @@ Document Control:
 
 WELCOME TO OUR ORGANIZATION
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 3.2
-APPROVED BY: Executive Leadership Team
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Welcome Message .......................................... 3
-2. Company Overview ......................................... 4
-3. Employment Policies ...................................... 6
-4. Compensation and Benefits ................................ 12
-5. Work Environment and Safety .............................. 18
-6. Professional Development ................................. 22
-7. Technology and Communication ............................. 25
-8. Leave Policies ........................................... 28
-9. Performance Management ................................... 32
-10. Disciplinary Procedures ................................. 35
-11. Employee Resources ...................................... 38
-
-═══════════════════════════════════════════════════════════════
+This handbook provides important information about company policies, procedures, and benefits.
 
 1. WELCOME MESSAGE
-
-Dear Team Member,
-
-Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
-
-This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
-
-Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
-
-If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
-
-Welcome aboard!
-
-Sincerely,
-The Executive Leadership Team
+Welcome to our organization! We are committed to providing a positive work environment.
 
 2. COMPANY OVERVIEW
-
-2.1 OUR MISSION
-To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
-
-2.2 OUR VALUES
-- Integrity: We conduct business with honesty and transparency
-- Excellence: We strive for the highest quality in everything we do
-- Innovation: We embrace change and continuously improve
-- Teamwork: We collaborate effectively to achieve common goals
-- Respect: We value diversity and treat everyone with dignity
-
-2.3 ORGANIZATIONAL STRUCTURE
-Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+Our mission is to deliver exceptional products and services with integrity and innovation.
 
 3. EMPLOYMENT POLICIES
-
-3.1 EQUAL EMPLOYMENT OPPORTUNITY
-We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
-
-3.2 AT-WILL EMPLOYMENT
-Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
-
-3.3 BACKGROUND CHECKS
-All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+We provide equal employment opportunities and maintain fair employment practices.
 
 4. COMPENSATION AND BENEFITS
-
-4.1 PAY PERIODS
-Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
-
-4.2 OVERTIME
-Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
-
-4.3 BENEFITS OVERVIEW
-We offer a comprehensive benefits package including:
-- Health insurance
-- Dental and vision coverage
-- Retirement savings plan with company matching
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
 - Paid time off
 - Professional development opportunities
 
-5. WORK ENVIRONMENT AND SAFETY
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
 
-5.1 WORKPLACE SAFETY
-The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
-
-5.2 DRUG-FREE WORKPLACE
-We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
-
-6. PROFESSIONAL DEVELOPMENT
-
-We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
-
-7. TECHNOLOGY AND COMMUNICATION
-
-7.1 COMPUTER AND INTERNET USE
-Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
-
-7.2 CONFIDENTIALITY
-Employees must protect confidential company information and respect the privacy of customer and employee data.
-
-8. LEAVE POLICIES
-
-8.1 PAID TIME OFF (PTO)
-Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
-
-8.2 FAMILY AND MEDICAL LEAVE
-Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
-
-9. PERFORMANCE MANAGEMENT
-
-Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
-
-10. DISCIPLINARY PROCEDURES
-
-When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
-
-11. EMPLOYEE RESOURCES
-
-11.1 HUMAN RESOURCES DEPARTMENT
-The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
-
-11.2 EMPLOYEE ASSISTANCE PROGRAM
-Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
-
-═══════════════════════════════════════════════════════════════
-
-ACKNOWLEDGMENT
-
-I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-This handbook is subject to change. Updates will be communicated to all employees.
-
-Document Control:
-- Document ID: EH-2024-001
-- Last Review Date: December 1, 2023
-- Next Review Date: December 1, 2024
-- Document Owner: Human Resources Department`
+For questions, please contact the Human Resources Department.`
       },
       "Safety Manual": {
         content: `WORKPLACE SAFETY MANUAL
 
-SAFETY FIRST - ALWAYS
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.3
-APPROVED BY: Safety Committee
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
 
-═══════════════════════════════════════════════════════════════
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
 
-TABLE OF CONTENTS
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
 
-1. Safety Policy Statement ................................... 3
-2. General Safety Rules ..................................... 4
-3. Emergency Procedures ..................................... 6
-4. Personal Protective Equipment ............................ 8
-5. Hazard Communication ..................................... 10
-6. Incident Reporting ....................................... 12
-7. Training Requirements .................................... 14
-8. Safety Committee ......................................... 16
-
-═══════════════════════════════════════════════════════════════
-
-1. SAFETY POLICY STATEMENT
-
-The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
-
-Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
-
-2. GENERAL SAFETY RULES
-
-2.1 BASIC SAFETY PRINCIPLES
-- Follow all safety procedures and guidelines
-- Report unsafe conditions immediately
-- Use appropriate personal protective equipment
-- Keep work areas clean and organized
-- Never take shortcuts that compromise safety
-
-2.2 PROHIBITED ACTIVITIES
-- Horseplay or practical jokes
-- Operating equipment without proper training
-- Removing or disabling safety devices
-- Working under the influence of drugs or alcohol
-
-3. EMERGENCY PROCEDURES
-
-3.1 FIRE EMERGENCY
-- Activate the nearest fire alarm
-- Evacuate immediately using designated routes
-- Proceed to assembly areas
-- Do not use elevators
-- Do not re-enter the building until authorized
-
-3.2 MEDICAL EMERGENCY
-- Call 911 immediately for serious injuries
-- Notify your supervisor and security
-- Provide first aid only if trained to do so
-- Do not move seriously injured persons
-
-3.3 SEVERE WEATHER
-- Monitor weather alerts and warnings
-- Follow instructions from management
-- Move to designated shelter areas if required
-- Remain in shelter until all-clear is given
-
-4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
-
-4.1 GENERAL REQUIREMENTS
-Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
-- Safety glasses or goggles
-- Hard hats
-- Safety shoes
-- Gloves
-- Hearing protection
-- Respiratory protection
-
-4.2 PPE MAINTENANCE
-- Inspect PPE before each use
-- Replace damaged or worn equipment
-- Clean and store PPE properly
-- Report defective equipment immediately
-
-5. HAZARD COMMUNICATION
-
-5.1 CHEMICAL SAFETY
-- Read and understand Safety Data Sheets (SDS)
-- Follow proper handling procedures
-- Use appropriate PPE when working with chemicals
-- Store chemicals according to manufacturer instructions
-
-5.2 LABELING REQUIREMENTS
-All hazardous materials must be properly labeled with:
-- Product identification
-- Hazard warnings
-- Precautionary statements
-- Supplier information
-
-6. INCIDENT REPORTING
-
-6.1 REPORTING REQUIREMENTS
-All incidents, including near misses, must be reported immediately to:
-- Your immediate supervisor
-- The Safety Department
-- Human Resources (for injuries)
-
-6.2 INVESTIGATION PROCESS
-All incidents will be thoroughly investigated to:
-- Determine root causes
-- Implement corrective actions
-- Prevent similar occurrences
-- Comply with regulatory requirements
-
-7. TRAINING REQUIREMENTS
-
-7.1 NEW EMPLOYEE ORIENTATION
-All new employees must complete safety orientation training before beginning work assignments.
-
-7.2 ONGOING TRAINING
-Regular safety training is provided on topics including:
-- Job-specific safety procedures
-- Emergency response
-- Hazard recognition
-- PPE use and maintenance
-
-8. SAFETY COMMITTEE
-
-Our Safety Committee meets monthly to:
-- Review incident reports and trends
-- Evaluate safety procedures
-- Recommend improvements
-- Promote safety awareness
-
-Committee members represent all departments and levels of the organization.
-
-═══════════════════════════════════════════════════════════════
-
-SAFETY CONTACTS
-
-Emergency: 911
-Security: Extension 2911
-Safety Department: Extension 2500
-Human Resources: Extension 2100
-
-═══════════════════════════════════════════════════════════════
-
-Remember: Safety is everyone's responsibility!
-
-Document Control:
-- Document ID: SM-2024-001
-- Last Review Date: November 15, 2023
-- Next Review Date: November 15, 2024
-- Document Owner: Safety Committee`
+For safety concerns, contact the Safety Department.`
       }
     };
 
@@ -2902,310 +2915,53 @@ Document Control:
 
 WELCOME TO OUR ORGANIZATION
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 3.2
-APPROVED BY: Executive Leadership Team
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Welcome Message .......................................... 3
-2. Company Overview ......................................... 4
-3. Employment Policies ...................................... 6
-4. Compensation and Benefits ................................ 12
-5. Work Environment and Safety .............................. 18
-6. Professional Development ................................. 22
-7. Technology and Communication ............................. 25
-8. Leave Policies ........................................... 28
-9. Performance Management ................................... 32
-10. Disciplinary Procedures ................................. 35
-11. Employee Resources ...................................... 38
-
-═══════════════════════════════════════════════════════════════
+This handbook provides important information about company policies, procedures, and benefits.
 
 1. WELCOME MESSAGE
-
-Dear Team Member,
-
-Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
-
-This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
-
-Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
-
-If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
-
-Welcome aboard!
-
-Sincerely,
-The Executive Leadership Team
+Welcome to our organization! We are committed to providing a positive work environment.
 
 2. COMPANY OVERVIEW
-
-2.1 OUR MISSION
-To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
-
-2.2 OUR VALUES
-- Integrity: We conduct business with honesty and transparency
-- Excellence: We strive for the highest quality in everything we do
-- Innovation: We embrace change and continuously improve
-- Teamwork: We collaborate effectively to achieve common goals
-- Respect: We value diversity and treat everyone with dignity
-
-2.3 ORGANIZATIONAL STRUCTURE
-Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+Our mission is to deliver exceptional products and services with integrity and innovation.
 
 3. EMPLOYMENT POLICIES
-
-3.1 EQUAL EMPLOYMENT OPPORTUNITY
-We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
-
-3.2 AT-WILL EMPLOYMENT
-Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
-
-3.3 BACKGROUND CHECKS
-All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+We provide equal employment opportunities and maintain fair employment practices.
 
 4. COMPENSATION AND BENEFITS
-
-4.1 PAY PERIODS
-Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
-
-4.2 OVERTIME
-Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
-
-4.3 BENEFITS OVERVIEW
-We offer a comprehensive benefits package including:
-- Health insurance
-- Dental and vision coverage
-- Retirement savings plan with company matching
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
 - Paid time off
 - Professional development opportunities
 
-5. WORK ENVIRONMENT AND SAFETY
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
 
-5.1 WORKPLACE SAFETY
-The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
-
-5.2 DRUG-FREE WORKPLACE
-We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
-
-6. PROFESSIONAL DEVELOPMENT
-
-We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
-
-7. TECHNOLOGY AND COMMUNICATION
-
-7.1 COMPUTER AND INTERNET USE
-Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
-
-7.2 CONFIDENTIALITY
-Employees must protect confidential company information and respect the privacy of customer and employee data.
-
-8. LEAVE POLICIES
-
-8.1 PAID TIME OFF (PTO)
-Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
-
-8.2 FAMILY AND MEDICAL LEAVE
-Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
-
-9. PERFORMANCE MANAGEMENT
-
-Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
-
-10. DISCIPLINARY PROCEDURES
-
-When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
-
-11. EMPLOYEE RESOURCES
-
-11.1 HUMAN RESOURCES DEPARTMENT
-The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
-
-11.2 EMPLOYEE ASSISTANCE PROGRAM
-Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
-
-═══════════════════════════════════════════════════════════════
-
-ACKNOWLEDGMENT
-
-I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-This handbook is subject to change. Updates will be communicated to all employees.
-
-Document Control:
-- Document ID: EH-2024-001
-- Last Review Date: December 1, 2023
-- Next Review Date: December 1, 2024
-- Document Owner: Human Resources Department`
+For questions, please contact the Human Resources Department.`
       },
       "Safety Manual": {
         content: `WORKPLACE SAFETY MANUAL
 
-SAFETY FIRST - ALWAYS
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.3
-APPROVED BY: Safety Committee
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
 
-═══════════════════════════════════════════════════════════════
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
 
-TABLE OF CONTENTS
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
 
-1. Safety Policy Statement ................................... 3
-2. General Safety Rules ..................................... 4
-3. Emergency Procedures ..................................... 6
-4. Personal Protective Equipment ............................ 8
-5. Hazard Communication ..................................... 10
-6. Incident Reporting ....................................... 12
-7. Training Requirements .................................... 14
-8. Safety Committee ......................................... 16
-
-═══════════════════════════════════════════════════════════════
-
-1. SAFETY POLICY STATEMENT
-
-The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
-
-Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
-
-2. GENERAL SAFETY RULES
-
-2.1 BASIC SAFETY PRINCIPLES
-- Follow all safety procedures and guidelines
-- Report unsafe conditions immediately
-- Use appropriate personal protective equipment
-- Keep work areas clean and organized
-- Never take shortcuts that compromise safety
-
-2.2 PROHIBITED ACTIVITIES
-- Horseplay or practical jokes
-- Operating equipment without proper training
-- Removing or disabling safety devices
-- Working under the influence of drugs or alcohol
-
-3. EMERGENCY PROCEDURES
-
-3.1 FIRE EMERGENCY
-- Activate the nearest fire alarm
-- Evacuate immediately using designated routes
-- Proceed to assembly areas
-- Do not use elevators
-- Do not re-enter the building until authorized
-
-3.2 MEDICAL EMERGENCY
-- Call 911 immediately for serious injuries
-- Notify your supervisor and security
-- Provide first aid only if trained to do so
-- Do not move seriously injured persons
-
-3.3 SEVERE WEATHER
-- Monitor weather alerts and warnings
-- Follow instructions from management
-- Move to designated shelter areas if required
-- Remain in shelter until all-clear is given
-
-4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
-
-4.1 GENERAL REQUIREMENTS
-Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
-- Safety glasses or goggles
-- Hard hats
-- Safety shoes
-- Gloves
-- Hearing protection
-- Respiratory protection
-
-4.2 PPE MAINTENANCE
-- Inspect PPE before each use
-- Replace damaged or worn equipment
-- Clean and store PPE properly
-- Report defective equipment immediately
-
-5. HAZARD COMMUNICATION
-
-5.1 CHEMICAL SAFETY
-- Read and understand Safety Data Sheets (SDS)
-- Follow proper handling procedures
-- Use appropriate PPE when working with chemicals
-- Store chemicals according to manufacturer instructions
-
-5.2 LABELING REQUIREMENTS
-All hazardous materials must be properly labeled with:
-- Product identification
-- Hazard warnings
-- Precautionary statements
-- Supplier information
-
-6. INCIDENT REPORTING
-
-6.1 REPORTING REQUIREMENTS
-All incidents, including near misses, must be reported immediately to:
-- Your immediate supervisor
-- The Safety Department
-- Human Resources (for injuries)
-
-6.2 INVESTIGATION PROCESS
-All incidents will be thoroughly investigated to:
-- Determine root causes
-- Implement corrective actions
-- Prevent similar occurrences
-- Comply with regulatory requirements
-
-7. TRAINING REQUIREMENTS
-
-7.1 NEW EMPLOYEE ORIENTATION
-All new employees must complete safety orientation training before beginning work assignments.
-
-7.2 ONGOING TRAINING
-Regular safety training is provided on topics including:
-- Job-specific safety procedures
-- Emergency response
-- Hazard recognition
-- PPE use and maintenance
-
-8. SAFETY COMMITTEE
-
-Our Safety Committee meets monthly to:
-- Review incident reports and trends
-- Evaluate safety procedures
-- Recommend improvements
-- Promote safety awareness
-
-Committee members represent all departments and levels of the organization.
-
-═══════════════════════════════════════════════════════════════
-
-SAFETY CONTACTS
-
-Emergency: 911
-Security: Extension 2911
-Safety Department: Extension 2500
-Human Resources: Extension 2100
-
-═══════════════════════════════════════════════════════════════
-
-Remember: Safety is everyone's responsibility!
-
-Document Control:
-- Document ID: SM-2024-001
-- Last Review Date: November 15, 2023
-- Next Review Date: November 15, 2024
-- Document Owner: Safety Committee`
+For safety concerns, contact the Safety Department.`
       }
     };
 
-    return documentTemplates[document.name as keyof typeof documentTemplates] || {
-      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
-    };
+    return templates[documentName] || { content: "Document content not available." };
   };
 
   // State for document modals
@@ -3427,310 +3183,53 @@ Document Control:
 
 WELCOME TO OUR ORGANIZATION
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 3.2
-APPROVED BY: Executive Leadership Team
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Welcome Message .......................................... 3
-2. Company Overview ......................................... 4
-3. Employment Policies ...................................... 6
-4. Compensation and Benefits ................................ 12
-5. Work Environment and Safety .............................. 18
-6. Professional Development ................................. 22
-7. Technology and Communication ............................. 25
-8. Leave Policies ........................................... 28
-9. Performance Management ................................... 32
-10. Disciplinary Procedures ................................. 35
-11. Employee Resources ...................................... 38
-
-═══════════════════════════════════════════════════════════════
+This handbook provides important information about company policies, procedures, and benefits.
 
 1. WELCOME MESSAGE
-
-Dear Team Member,
-
-Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
-
-This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
-
-Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
-
-If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
-
-Welcome aboard!
-
-Sincerely,
-The Executive Leadership Team
+Welcome to our organization! We are committed to providing a positive work environment.
 
 2. COMPANY OVERVIEW
-
-2.1 OUR MISSION
-To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
-
-2.2 OUR VALUES
-- Integrity: We conduct business with honesty and transparency
-- Excellence: We strive for the highest quality in everything we do
-- Innovation: We embrace change and continuously improve
-- Teamwork: We collaborate effectively to achieve common goals
-- Respect: We value diversity and treat everyone with dignity
-
-2.3 ORGANIZATIONAL STRUCTURE
-Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+Our mission is to deliver exceptional products and services with integrity and innovation.
 
 3. EMPLOYMENT POLICIES
-
-3.1 EQUAL EMPLOYMENT OPPORTUNITY
-We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
-
-3.2 AT-WILL EMPLOYMENT
-Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
-
-3.3 BACKGROUND CHECKS
-All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+We provide equal employment opportunities and maintain fair employment practices.
 
 4. COMPENSATION AND BENEFITS
-
-4.1 PAY PERIODS
-Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
-
-4.2 OVERTIME
-Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
-
-4.3 BENEFITS OVERVIEW
-We offer a comprehensive benefits package including:
-- Health insurance
-- Dental and vision coverage
-- Retirement savings plan with company matching
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
 - Paid time off
 - Professional development opportunities
 
-5. WORK ENVIRONMENT AND SAFETY
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
 
-5.1 WORKPLACE SAFETY
-The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
-
-5.2 DRUG-FREE WORKPLACE
-We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
-
-6. PROFESSIONAL DEVELOPMENT
-
-We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
-
-7. TECHNOLOGY AND COMMUNICATION
-
-7.1 COMPUTER AND INTERNET USE
-Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
-
-7.2 CONFIDENTIALITY
-Employees must protect confidential company information and respect the privacy of customer and employee data.
-
-8. LEAVE POLICIES
-
-8.1 PAID TIME OFF (PTO)
-Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
-
-8.2 FAMILY AND MEDICAL LEAVE
-Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
-
-9. PERFORMANCE MANAGEMENT
-
-Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
-
-10. DISCIPLINARY PROCEDURES
-
-When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
-
-11. EMPLOYEE RESOURCES
-
-11.1 HUMAN RESOURCES DEPARTMENT
-The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
-
-11.2 EMPLOYEE ASSISTANCE PROGRAM
-Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
-
-═══════════════════════════════════════════════════════════════
-
-ACKNOWLEDGMENT
-
-I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-This handbook is subject to change. Updates will be communicated to all employees.
-
-Document Control:
-- Document ID: EH-2024-001
-- Last Review Date: December 1, 2023
-- Next Review Date: December 1, 2024
-- Document Owner: Human Resources Department`
+For questions, please contact the Human Resources Department.`
       },
       "Safety Manual": {
         content: `WORKPLACE SAFETY MANUAL
 
-SAFETY FIRST - ALWAYS
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.3
-APPROVED BY: Safety Committee
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
 
-═══════════════════════════════════════════════════════════════
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
 
-TABLE OF CONTENTS
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
 
-1. Safety Policy Statement ................................... 3
-2. General Safety Rules ..................................... 4
-3. Emergency Procedures ..................................... 6
-4. Personal Protective Equipment ............................ 8
-5. Hazard Communication ..................................... 10
-6. Incident Reporting ....................................... 12
-7. Training Requirements .................................... 14
-8. Safety Committee ......................................... 16
-
-═══════════════════════════════════════════════════════════════
-
-1. SAFETY POLICY STATEMENT
-
-The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
-
-Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
-
-2. GENERAL SAFETY RULES
-
-2.1 BASIC SAFETY PRINCIPLES
-- Follow all safety procedures and guidelines
-- Report unsafe conditions immediately
-- Use appropriate personal protective equipment
-- Keep work areas clean and organized
-- Never take shortcuts that compromise safety
-
-2.2 PROHIBITED ACTIVITIES
-- Horseplay or practical jokes
-- Operating equipment without proper training
-- Removing or disabling safety devices
-- Working under the influence of drugs or alcohol
-
-3. EMERGENCY PROCEDURES
-
-3.1 FIRE EMERGENCY
-- Activate the nearest fire alarm
-- Evacuate immediately using designated routes
-- Proceed to assembly areas
-- Do not use elevators
-- Do not re-enter the building until authorized
-
-3.2 MEDICAL EMERGENCY
-- Call 911 immediately for serious injuries
-- Notify your supervisor and security
-- Provide first aid only if trained to do so
-- Do not move seriously injured persons
-
-3.3 SEVERE WEATHER
-- Monitor weather alerts and warnings
-- Follow instructions from management
-- Move to designated shelter areas if required
-- Remain in shelter until all-clear is given
-
-4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
-
-4.1 GENERAL REQUIREMENTS
-Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
-- Safety glasses or goggles
-- Hard hats
-- Safety shoes
-- Gloves
-- Hearing protection
-- Respiratory protection
-
-4.2 PPE MAINTENANCE
-- Inspect PPE before each use
-- Replace damaged or worn equipment
-- Clean and store PPE properly
-- Report defective equipment immediately
-
-5. HAZARD COMMUNICATION
-
-5.1 CHEMICAL SAFETY
-- Read and understand Safety Data Sheets (SDS)
-- Follow proper handling procedures
-- Use appropriate PPE when working with chemicals
-- Store chemicals according to manufacturer instructions
-
-5.2 LABELING REQUIREMENTS
-All hazardous materials must be properly labeled with:
-- Product identification
-- Hazard warnings
-- Precautionary statements
-- Supplier information
-
-6. INCIDENT REPORTING
-
-6.1 REPORTING REQUIREMENTS
-All incidents, including near misses, must be reported immediately to:
-- Your immediate supervisor
-- The Safety Department
-- Human Resources (for injuries)
-
-6.2 INVESTIGATION PROCESS
-All incidents will be thoroughly investigated to:
-- Determine root causes
-- Implement corrective actions
-- Prevent similar occurrences
-- Comply with regulatory requirements
-
-7. TRAINING REQUIREMENTS
-
-7.1 NEW EMPLOYEE ORIENTATION
-All new employees must complete safety orientation training before beginning work assignments.
-
-7.2 ONGOING TRAINING
-Regular safety training is provided on topics including:
-- Job-specific safety procedures
-- Emergency response
-- Hazard recognition
-- PPE use and maintenance
-
-8. SAFETY COMMITTEE
-
-Our Safety Committee meets monthly to:
-- Review incident reports and trends
-- Evaluate safety procedures
-- Recommend improvements
-- Promote safety awareness
-
-Committee members represent all departments and levels of the organization.
-
-═══════════════════════════════════════════════════════════════
-
-SAFETY CONTACTS
-
-Emergency: 911
-Security: Extension 2911
-Safety Department: Extension 2500
-Human Resources: Extension 2100
-
-═══════════════════════════════════════════════════════════════
-
-Remember: Safety is everyone's responsibility!
-
-Document Control:
-- Document ID: SM-2024-001
-- Last Review Date: November 15, 2023
-- Next Review Date: November 15, 2024
-- Document Owner: Safety Committee`
+For safety concerns, contact the Safety Department.`
       }
     };
 
-    return documentTemplates[document.name as keyof typeof documentTemplates] || {
-      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
-    };
+    return templates[documentName] || { content: "Document content not available." };
   };
 
   // State for document modals
@@ -3952,310 +3451,53 @@ Document Control:
 
 WELCOME TO OUR ORGANIZATION
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 3.2
-APPROVED BY: Executive Leadership Team
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Welcome Message .......................................... 3
-2. Company Overview ......................................... 4
-3. Employment Policies ...................................... 6
-4. Compensation and Benefits ................................ 12
-5. Work Environment and Safety .............................. 18
-6. Professional Development ................................. 22
-7. Technology and Communication ............................. 25
-8. Leave Policies ........................................... 28
-9. Performance Management ................................... 32
-10. Disciplinary Procedures ................................. 35
-11. Employee Resources ...................................... 38
-
-═══════════════════════════════════════════════════════════════
+This handbook provides important information about company policies, procedures, and benefits.
 
 1. WELCOME MESSAGE
-
-Dear Team Member,
-
-Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
-
-This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
-
-Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
-
-If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
-
-Welcome aboard!
-
-Sincerely,
-The Executive Leadership Team
+Welcome to our organization! We are committed to providing a positive work environment.
 
 2. COMPANY OVERVIEW
-
-2.1 OUR MISSION
-To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
-
-2.2 OUR VALUES
-- Integrity: We conduct business with honesty and transparency
-- Excellence: We strive for the highest quality in everything we do
-- Innovation: We embrace change and continuously improve
-- Teamwork: We collaborate effectively to achieve common goals
-- Respect: We value diversity and treat everyone with dignity
-
-2.3 ORGANIZATIONAL STRUCTURE
-Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+Our mission is to deliver exceptional products and services with integrity and innovation.
 
 3. EMPLOYMENT POLICIES
-
-3.1 EQUAL EMPLOYMENT OPPORTUNITY
-We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
-
-3.2 AT-WILL EMPLOYMENT
-Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
-
-3.3 BACKGROUND CHECKS
-All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+We provide equal employment opportunities and maintain fair employment practices.
 
 4. COMPENSATION AND BENEFITS
-
-4.1 PAY PERIODS
-Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
-
-4.2 OVERTIME
-Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
-
-4.3 BENEFITS OVERVIEW
-We offer a comprehensive benefits package including:
-- Health insurance
-- Dental and vision coverage
-- Retirement savings plan with company matching
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
 - Paid time off
 - Professional development opportunities
 
-5. WORK ENVIRONMENT AND SAFETY
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
 
-5.1 WORKPLACE SAFETY
-The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
-
-5.2 DRUG-FREE WORKPLACE
-We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
-
-6. PROFESSIONAL DEVELOPMENT
-
-We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
-
-7. TECHNOLOGY AND COMMUNICATION
-
-7.1 COMPUTER AND INTERNET USE
-Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
-
-7.2 CONFIDENTIALITY
-Employees must protect confidential company information and respect the privacy of customer and employee data.
-
-8. LEAVE POLICIES
-
-8.1 PAID TIME OFF (PTO)
-Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
-
-8.2 FAMILY AND MEDICAL LEAVE
-Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
-
-9. PERFORMANCE MANAGEMENT
-
-Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
-
-10. DISCIPLINARY PROCEDURES
-
-When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
-
-11. EMPLOYEE RESOURCES
-
-11.1 HUMAN RESOURCES DEPARTMENT
-The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
-
-11.2 EMPLOYEE ASSISTANCE PROGRAM
-Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
-
-═══════════════════════════════════════════════════════════════
-
-ACKNOWLEDGMENT
-
-I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-This handbook is subject to change. Updates will be communicated to all employees.
-
-Document Control:
-- Document ID: EH-2024-001
-- Last Review Date: December 1, 2023
-- Next Review Date: December 1, 2024
-- Document Owner: Human Resources Department`
+For questions, please contact the Human Resources Department.`
       },
       "Safety Manual": {
         content: `WORKPLACE SAFETY MANUAL
 
-SAFETY FIRST - ALWAYS
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.3
-APPROVED BY: Safety Committee
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
 
-═══════════════════════════════════════════════════════════════
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
 
-TABLE OF CONTENTS
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
 
-1. Safety Policy Statement ................................... 3
-2. General Safety Rules ..................................... 4
-3. Emergency Procedures ..................................... 6
-4. Personal Protective Equipment ............................ 8
-5. Hazard Communication ..................................... 10
-6. Incident Reporting ....................................... 12
-7. Training Requirements .................................... 14
-8. Safety Committee ......................................... 16
-
-═══════════════════════════════════════════════════════════════
-
-1. SAFETY POLICY STATEMENT
-
-The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
-
-Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
-
-2. GENERAL SAFETY RULES
-
-2.1 BASIC SAFETY PRINCIPLES
-- Follow all safety procedures and guidelines
-- Report unsafe conditions immediately
-- Use appropriate personal protective equipment
-- Keep work areas clean and organized
-- Never take shortcuts that compromise safety
-
-2.2 PROHIBITED ACTIVITIES
-- Horseplay or practical jokes
-- Operating equipment without proper training
-- Removing or disabling safety devices
-- Working under the influence of drugs or alcohol
-
-3. EMERGENCY PROCEDURES
-
-3.1 FIRE EMERGENCY
-- Activate the nearest fire alarm
-- Evacuate immediately using designated routes
-- Proceed to assembly areas
-- Do not use elevators
-- Do not re-enter the building until authorized
-
-3.2 MEDICAL EMERGENCY
-- Call 911 immediately for serious injuries
-- Notify your supervisor and security
-- Provide first aid only if trained to do so
-- Do not move seriously injured persons
-
-3.3 SEVERE WEATHER
-- Monitor weather alerts and warnings
-- Follow instructions from management
-- Move to designated shelter areas if required
-- Remain in shelter until all-clear is given
-
-4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
-
-4.1 GENERAL REQUIREMENTS
-Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
-- Safety glasses or goggles
-- Hard hats
-- Safety shoes
-- Gloves
-- Hearing protection
-- Respiratory protection
-
-4.2 PPE MAINTENANCE
-- Inspect PPE before each use
-- Replace damaged or worn equipment
-- Clean and store PPE properly
-- Report defective equipment immediately
-
-5. HAZARD COMMUNICATION
-
-5.1 CHEMICAL SAFETY
-- Read and understand Safety Data Sheets (SDS)
-- Follow proper handling procedures
-- Use appropriate PPE when working with chemicals
-- Store chemicals according to manufacturer instructions
-
-5.2 LABELING REQUIREMENTS
-All hazardous materials must be properly labeled with:
-- Product identification
-- Hazard warnings
-- Precautionary statements
-- Supplier information
-
-6. INCIDENT REPORTING
-
-6.1 REPORTING REQUIREMENTS
-All incidents, including near misses, must be reported immediately to:
-- Your immediate supervisor
-- The Safety Department
-- Human Resources (for injuries)
-
-6.2 INVESTIGATION PROCESS
-All incidents will be thoroughly investigated to:
-- Determine root causes
-- Implement corrective actions
-- Prevent similar occurrences
-- Comply with regulatory requirements
-
-7. TRAINING REQUIREMENTS
-
-7.1 NEW EMPLOYEE ORIENTATION
-All new employees must complete safety orientation training before beginning work assignments.
-
-7.2 ONGOING TRAINING
-Regular safety training is provided on topics including:
-- Job-specific safety procedures
-- Emergency response
-- Hazard recognition
-- PPE use and maintenance
-
-8. SAFETY COMMITTEE
-
-Our Safety Committee meets monthly to:
-- Review incident reports and trends
-- Evaluate safety procedures
-- Recommend improvements
-- Promote safety awareness
-
-Committee members represent all departments and levels of the organization.
-
-═══════════════════════════════════════════════════════════════
-
-SAFETY CONTACTS
-
-Emergency: 911
-Security: Extension 2911
-Safety Department: Extension 2500
-Human Resources: Extension 2100
-
-═══════════════════════════════════════════════════════════════
-
-Remember: Safety is everyone's responsibility!
-
-Document Control:
-- Document ID: SM-2024-001
-- Last Review Date: November 15, 2023
-- Next Review Date: November 15, 2024
-- Document Owner: Safety Committee`
+For safety concerns, contact the Safety Department.`
       }
     };
 
-    return documentTemplates[document.name as keyof typeof documentTemplates] || {
-      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
-    };
+    return templates[documentName] || { content: "Document content not available." };
   };
 
   // State for document modals
@@ -4477,310 +3719,53 @@ Document Control:
 
 WELCOME TO OUR ORGANIZATION
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 3.2
-APPROVED BY: Executive Leadership Team
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Welcome Message .......................................... 3
-2. Company Overview ......................................... 4
-3. Employment Policies ...................................... 6
-4. Compensation and Benefits ................................ 12
-5. Work Environment and Safety .............................. 18
-6. Professional Development ................................. 22
-7. Technology and Communication ............................. 25
-8. Leave Policies ........................................... 28
-9. Performance Management ................................... 32
-10. Disciplinary Procedures ................................. 35
-11. Employee Resources ...................................... 38
-
-═══════════════════════════════════════════════════════════════
+This handbook provides important information about company policies, procedures, and benefits.
 
 1. WELCOME MESSAGE
-
-Dear Team Member,
-
-Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
-
-This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
-
-Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
-
-If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
-
-Welcome aboard!
-
-Sincerely,
-The Executive Leadership Team
+Welcome to our organization! We are committed to providing a positive work environment.
 
 2. COMPANY OVERVIEW
-
-2.1 OUR MISSION
-To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
-
-2.2 OUR VALUES
-- Integrity: We conduct business with honesty and transparency
-- Excellence: We strive for the highest quality in everything we do
-- Innovation: We embrace change and continuously improve
-- Teamwork: We collaborate effectively to achieve common goals
-- Respect: We value diversity and treat everyone with dignity
-
-2.3 ORGANIZATIONAL STRUCTURE
-Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+Our mission is to deliver exceptional products and services with integrity and innovation.
 
 3. EMPLOYMENT POLICIES
-
-3.1 EQUAL EMPLOYMENT OPPORTUNITY
-We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
-
-3.2 AT-WILL EMPLOYMENT
-Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
-
-3.3 BACKGROUND CHECKS
-All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+We provide equal employment opportunities and maintain fair employment practices.
 
 4. COMPENSATION AND BENEFITS
-
-4.1 PAY PERIODS
-Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
-
-4.2 OVERTIME
-Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
-
-4.3 BENEFITS OVERVIEW
-We offer a comprehensive benefits package including:
-- Health insurance
-- Dental and vision coverage
-- Retirement savings plan with company matching
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
 - Paid time off
 - Professional development opportunities
 
-5. WORK ENVIRONMENT AND SAFETY
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
 
-5.1 WORKPLACE SAFETY
-The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
-
-5.2 DRUG-FREE WORKPLACE
-We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
-
-6. PROFESSIONAL DEVELOPMENT
-
-We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
-
-7. TECHNOLOGY AND COMMUNICATION
-
-7.1 COMPUTER AND INTERNET USE
-Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
-
-7.2 CONFIDENTIALITY
-Employees must protect confidential company information and respect the privacy of customer and employee data.
-
-8. LEAVE POLICIES
-
-8.1 PAID TIME OFF (PTO)
-Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
-
-8.2 FAMILY AND MEDICAL LEAVE
-Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
-
-9. PERFORMANCE MANAGEMENT
-
-Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
-
-10. DISCIPLINARY PROCEDURES
-
-When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
-
-11. EMPLOYEE RESOURCES
-
-11.1 HUMAN RESOURCES DEPARTMENT
-The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
-
-11.2 EMPLOYEE ASSISTANCE PROGRAM
-Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
-
-═══════════════════════════════════════════════════════════════
-
-ACKNOWLEDGMENT
-
-I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-This handbook is subject to change. Updates will be communicated to all employees.
-
-Document Control:
-- Document ID: EH-2024-001
-- Last Review Date: December 1, 2023
-- Next Review Date: December 1, 2024
-- Document Owner: Human Resources Department`
+For questions, please contact the Human Resources Department.`
       },
       "Safety Manual": {
         content: `WORKPLACE SAFETY MANUAL
 
-SAFETY FIRST - ALWAYS
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.3
-APPROVED BY: Safety Committee
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
 
-═══════════════════════════════════════════════════════════════
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
 
-TABLE OF CONTENTS
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
 
-1. Safety Policy Statement ................................... 3
-2. General Safety Rules ..................................... 4
-3. Emergency Procedures ..................................... 6
-4. Personal Protective Equipment ............................ 8
-5. Hazard Communication ..................................... 10
-6. Incident Reporting ....................................... 12
-7. Training Requirements .................................... 14
-8. Safety Committee ......................................... 16
-
-═══════════════════════════════════════════════════════════════
-
-1. SAFETY POLICY STATEMENT
-
-The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
-
-Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
-
-2. GENERAL SAFETY RULES
-
-2.1 BASIC SAFETY PRINCIPLES
-- Follow all safety procedures and guidelines
-- Report unsafe conditions immediately
-- Use appropriate personal protective equipment
-- Keep work areas clean and organized
-- Never take shortcuts that compromise safety
-
-2.2 PROHIBITED ACTIVITIES
-- Horseplay or practical jokes
-- Operating equipment without proper training
-- Removing or disabling safety devices
-- Working under the influence of drugs or alcohol
-
-3. EMERGENCY PROCEDURES
-
-3.1 FIRE EMERGENCY
-- Activate the nearest fire alarm
-- Evacuate immediately using designated routes
-- Proceed to assembly areas
-- Do not use elevators
-- Do not re-enter the building until authorized
-
-3.2 MEDICAL EMERGENCY
-- Call 911 immediately for serious injuries
-- Notify your supervisor and security
-- Provide first aid only if trained to do so
-- Do not move seriously injured persons
-
-3.3 SEVERE WEATHER
-- Monitor weather alerts and warnings
-- Follow instructions from management
-- Move to designated shelter areas if required
-- Remain in shelter until all-clear is given
-
-4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
-
-4.1 GENERAL REQUIREMENTS
-Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
-- Safety glasses or goggles
-- Hard hats
-- Safety shoes
-- Gloves
-- Hearing protection
-- Respiratory protection
-
-4.2 PPE MAINTENANCE
-- Inspect PPE before each use
-- Replace damaged or worn equipment
-- Clean and store PPE properly
-- Report defective equipment immediately
-
-5. HAZARD COMMUNICATION
-
-5.1 CHEMICAL SAFETY
-- Read and understand Safety Data Sheets (SDS)
-- Follow proper handling procedures
-- Use appropriate PPE when working with chemicals
-- Store chemicals according to manufacturer instructions
-
-5.2 LABELING REQUIREMENTS
-All hazardous materials must be properly labeled with:
-- Product identification
-- Hazard warnings
-- Precautionary statements
-- Supplier information
-
-6. INCIDENT REPORTING
-
-6.1 REPORTING REQUIREMENTS
-All incidents, including near misses, must be reported immediately to:
-- Your immediate supervisor
-- The Safety Department
-- Human Resources (for injuries)
-
-6.2 INVESTIGATION PROCESS
-All incidents will be thoroughly investigated to:
-- Determine root causes
-- Implement corrective actions
-- Prevent similar occurrences
-- Comply with regulatory requirements
-
-7. TRAINING REQUIREMENTS
-
-7.1 NEW EMPLOYEE ORIENTATION
-All new employees must complete safety orientation training before beginning work assignments.
-
-7.2 ONGOING TRAINING
-Regular safety training is provided on topics including:
-- Job-specific safety procedures
-- Emergency response
-- Hazard recognition
-- PPE use and maintenance
-
-8. SAFETY COMMITTEE
-
-Our Safety Committee meets monthly to:
-- Review incident reports and trends
-- Evaluate safety procedures
-- Recommend improvements
-- Promote safety awareness
-
-Committee members represent all departments and levels of the organization.
-
-═══════════════════════════════════════════════════════════════
-
-SAFETY CONTACTS
-
-Emergency: 911
-Security: Extension 2911
-Safety Department: Extension 2500
-Human Resources: Extension 2100
-
-═══════════════════════════════════════════════════════════════
-
-Remember: Safety is everyone's responsibility!
-
-Document Control:
-- Document ID: SM-2024-001
-- Last Review Date: November 15, 2023
-- Next Review Date: November 15, 2024
-- Document Owner: Safety Committee`
+For safety concerns, contact the Safety Department.`
       }
     };
 
-    return documentTemplates[document.name as keyof typeof documentTemplates] || {
-      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
-    };
+    return templates[documentName] || { content: "Document content not available." };
   };
 
   // State for document modals
@@ -5002,310 +3987,53 @@ Document Control:
 
 WELCOME TO OUR ORGANIZATION
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 3.2
-APPROVED BY: Executive Leadership Team
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Welcome Message .......................................... 3
-2. Company Overview ......................................... 4
-3. Employment Policies ...................................... 6
-4. Compensation and Benefits ................................ 12
-5. Work Environment and Safety .............................. 18
-6. Professional Development ................................. 22
-7. Technology and Communication ............................. 25
-8. Leave Policies ........................................... 28
-9. Performance Management ................................... 32
-10. Disciplinary Procedures ................................. 35
-11. Employee Resources ...................................... 38
-
-═══════════════════════════════════════════════════════════════
+This handbook provides important information about company policies, procedures, and benefits.
 
 1. WELCOME MESSAGE
-
-Dear Team Member,
-
-Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
-
-This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
-
-Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
-
-If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
-
-Welcome aboard!
-
-Sincerely,
-The Executive Leadership Team
+Welcome to our organization! We are committed to providing a positive work environment.
 
 2. COMPANY OVERVIEW
-
-2.1 OUR MISSION
-To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
-
-2.2 OUR VALUES
-- Integrity: We conduct business with honesty and transparency
-- Excellence: We strive for the highest quality in everything we do
-- Innovation: We embrace change and continuously improve
-- Teamwork: We collaborate effectively to achieve common goals
-- Respect: We value diversity and treat everyone with dignity
-
-2.3 ORGANIZATIONAL STRUCTURE
-Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+Our mission is to deliver exceptional products and services with integrity and innovation.
 
 3. EMPLOYMENT POLICIES
-
-3.1 EQUAL EMPLOYMENT OPPORTUNITY
-We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
-
-3.2 AT-WILL EMPLOYMENT
-Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
-
-3.3 BACKGROUND CHECKS
-All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+We provide equal employment opportunities and maintain fair employment practices.
 
 4. COMPENSATION AND BENEFITS
-
-4.1 PAY PERIODS
-Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
-
-4.2 OVERTIME
-Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
-
-4.3 BENEFITS OVERVIEW
-We offer a comprehensive benefits package including:
-- Health insurance
-- Dental and vision coverage
-- Retirement savings plan with company matching
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
 - Paid time off
 - Professional development opportunities
 
-5. WORK ENVIRONMENT AND SAFETY
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
 
-5.1 WORKPLACE SAFETY
-The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
-
-5.2 DRUG-FREE WORKPLACE
-We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
-
-6. PROFESSIONAL DEVELOPMENT
-
-We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
-
-7. TECHNOLOGY AND COMMUNICATION
-
-7.1 COMPUTER AND INTERNET USE
-Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
-
-7.2 CONFIDENTIALITY
-Employees must protect confidential company information and respect the privacy of customer and employee data.
-
-8. LEAVE POLICIES
-
-8.1 PAID TIME OFF (PTO)
-Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
-
-8.2 FAMILY AND MEDICAL LEAVE
-Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
-
-9. PERFORMANCE MANAGEMENT
-
-Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
-
-10. DISCIPLINARY PROCEDURES
-
-When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
-
-11. EMPLOYEE RESOURCES
-
-11.1 HUMAN RESOURCES DEPARTMENT
-The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
-
-11.2 EMPLOYEE ASSISTANCE PROGRAM
-Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
-
-═══════════════════════════════════════════════════════════════
-
-ACKNOWLEDGMENT
-
-I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-This handbook is subject to change. Updates will be communicated to all employees.
-
-Document Control:
-- Document ID: EH-2024-001
-- Last Review Date: December 1, 2023
-- Next Review Date: December 1, 2024
-- Document Owner: Human Resources Department`
+For questions, please contact the Human Resources Department.`
       },
       "Safety Manual": {
         content: `WORKPLACE SAFETY MANUAL
 
-SAFETY FIRST - ALWAYS
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.3
-APPROVED BY: Safety Committee
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
 
-═══════════════════════════════════════════════════════════════
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
 
-TABLE OF CONTENTS
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
 
-1. Safety Policy Statement ................................... 3
-2. General Safety Rules ..................................... 4
-3. Emergency Procedures ..................................... 6
-4. Personal Protective Equipment ............................ 8
-5. Hazard Communication ..................................... 10
-6. Incident Reporting ....................................... 12
-7. Training Requirements .................................... 14
-8. Safety Committee ......................................... 16
-
-═══════════════════════════════════════════════════════════════
-
-1. SAFETY POLICY STATEMENT
-
-The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
-
-Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
-
-2. GENERAL SAFETY RULES
-
-2.1 BASIC SAFETY PRINCIPLES
-- Follow all safety procedures and guidelines
-- Report unsafe conditions immediately
-- Use appropriate personal protective equipment
-- Keep work areas clean and organized
-- Never take shortcuts that compromise safety
-
-2.2 PROHIBITED ACTIVITIES
-- Horseplay or practical jokes
-- Operating equipment without proper training
-- Removing or disabling safety devices
-- Working under the influence of drugs or alcohol
-
-3. EMERGENCY PROCEDURES
-
-3.1 FIRE EMERGENCY
-- Activate the nearest fire alarm
-- Evacuate immediately using designated routes
-- Proceed to assembly areas
-- Do not use elevators
-- Do not re-enter the building until authorized
-
-3.2 MEDICAL EMERGENCY
-- Call 911 immediately for serious injuries
-- Notify your supervisor and security
-- Provide first aid only if trained to do so
-- Do not move seriously injured persons
-
-3.3 SEVERE WEATHER
-- Monitor weather alerts and warnings
-- Follow instructions from management
-- Move to designated shelter areas if required
-- Remain in shelter until all-clear is given
-
-4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
-
-4.1 GENERAL REQUIREMENTS
-Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
-- Safety glasses or goggles
-- Hard hats
-- Safety shoes
-- Gloves
-- Hearing protection
-- Respiratory protection
-
-4.2 PPE MAINTENANCE
-- Inspect PPE before each use
-- Replace damaged or worn equipment
-- Clean and store PPE properly
-- Report defective equipment immediately
-
-5. HAZARD COMMUNICATION
-
-5.1 CHEMICAL SAFETY
-- Read and understand Safety Data Sheets (SDS)
-- Follow proper handling procedures
-- Use appropriate PPE when working with chemicals
-- Store chemicals according to manufacturer instructions
-
-5.2 LABELING REQUIREMENTS
-All hazardous materials must be properly labeled with:
-- Product identification
-- Hazard warnings
-- Precautionary statements
-- Supplier information
-
-6. INCIDENT REPORTING
-
-6.1 REPORTING REQUIREMENTS
-All incidents, including near misses, must be reported immediately to:
-- Your immediate supervisor
-- The Safety Department
-- Human Resources (for injuries)
-
-6.2 INVESTIGATION PROCESS
-All incidents will be thoroughly investigated to:
-- Determine root causes
-- Implement corrective actions
-- Prevent similar occurrences
-- Comply with regulatory requirements
-
-7. TRAINING REQUIREMENTS
-
-7.1 NEW EMPLOYEE ORIENTATION
-All new employees must complete safety orientation training before beginning work assignments.
-
-7.2 ONGOING TRAINING
-Regular safety training is provided on topics including:
-- Job-specific safety procedures
-- Emergency response
-- Hazard recognition
-- PPE use and maintenance
-
-8. SAFETY COMMITTEE
-
-Our Safety Committee meets monthly to:
-- Review incident reports and trends
-- Evaluate safety procedures
-- Recommend improvements
-- Promote safety awareness
-
-Committee members represent all departments and levels of the organization.
-
-═══════════════════════════════════════════════════════════════
-
-SAFETY CONTACTS
-
-Emergency: 911
-Security: Extension 2911
-Safety Department: Extension 2500
-Human Resources: Extension 2100
-
-═══════════════════════════════════════════════════════════════
-
-Remember: Safety is everyone's responsibility!
-
-Document Control:
-- Document ID: SM-2024-001
-- Last Review Date: November 15, 2023
-- Next Review Date: November 15, 2024
-- Document Owner: Safety Committee`
+For safety concerns, contact the Safety Department.`
       }
     };
 
-    return documentTemplates[document.name as keyof typeof documentTemplates] || {
-      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
-    };
+    return templates[documentName] || { content: "Document content not available." };
   };
 
   // State for document modals
@@ -5527,310 +4255,53 @@ Document Control:
 
 WELCOME TO OUR ORGANIZATION
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 3.2
-APPROVED BY: Executive Leadership Team
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Welcome Message .......................................... 3
-2. Company Overview ......................................... 4
-3. Employment Policies ...................................... 6
-4. Compensation and Benefits ................................ 12
-5. Work Environment and Safety .............................. 18
-6. Professional Development ................................. 22
-7. Technology and Communication ............................. 25
-8. Leave Policies ........................................... 28
-9. Performance Management ................................... 32
-10. Disciplinary Procedures ................................. 35
-11. Employee Resources ...................................... 38
-
-═══════════════════════════════════════════════════════════════
+This handbook provides important information about company policies, procedures, and benefits.
 
 1. WELCOME MESSAGE
-
-Dear Team Member,
-
-Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
-
-This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
-
-Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
-
-If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
-
-Welcome aboard!
-
-Sincerely,
-The Executive Leadership Team
+Welcome to our organization! We are committed to providing a positive work environment.
 
 2. COMPANY OVERVIEW
-
-2.1 OUR MISSION
-To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
-
-2.2 OUR VALUES
-- Integrity: We conduct business with honesty and transparency
-- Excellence: We strive for the highest quality in everything we do
-- Innovation: We embrace change and continuously improve
-- Teamwork: We collaborate effectively to achieve common goals
-- Respect: We value diversity and treat everyone with dignity
-
-2.3 ORGANIZATIONAL STRUCTURE
-Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+Our mission is to deliver exceptional products and services with integrity and innovation.
 
 3. EMPLOYMENT POLICIES
-
-3.1 EQUAL EMPLOYMENT OPPORTUNITY
-We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
-
-3.2 AT-WILL EMPLOYMENT
-Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
-
-3.3 BACKGROUND CHECKS
-All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+We provide equal employment opportunities and maintain fair employment practices.
 
 4. COMPENSATION AND BENEFITS
-
-4.1 PAY PERIODS
-Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
-
-4.2 OVERTIME
-Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
-
-4.3 BENEFITS OVERVIEW
-We offer a comprehensive benefits package including:
-- Health insurance
-- Dental and vision coverage
-- Retirement savings plan with company matching
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
 - Paid time off
 - Professional development opportunities
 
-5. WORK ENVIRONMENT AND SAFETY
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
 
-5.1 WORKPLACE SAFETY
-The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
-
-5.2 DRUG-FREE WORKPLACE
-We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
-
-6. PROFESSIONAL DEVELOPMENT
-
-We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
-
-7. TECHNOLOGY AND COMMUNICATION
-
-7.1 COMPUTER AND INTERNET USE
-Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
-
-7.2 CONFIDENTIALITY
-Employees must protect confidential company information and respect the privacy of customer and employee data.
-
-8. LEAVE POLICIES
-
-8.1 PAID TIME OFF (PTO)
-Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
-
-8.2 FAMILY AND MEDICAL LEAVE
-Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
-
-9. PERFORMANCE MANAGEMENT
-
-Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
-
-10. DISCIPLINARY PROCEDURES
-
-When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
-
-11. EMPLOYEE RESOURCES
-
-11.1 HUMAN RESOURCES DEPARTMENT
-The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
-
-11.2 EMPLOYEE ASSISTANCE PROGRAM
-Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
-
-═══════════════════════════════════════════════════════════════
-
-ACKNOWLEDGMENT
-
-I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-This handbook is subject to change. Updates will be communicated to all employees.
-
-Document Control:
-- Document ID: EH-2024-001
-- Last Review Date: December 1, 2023
-- Next Review Date: December 1, 2024
-- Document Owner: Human Resources Department`
+For questions, please contact the Human Resources Department.`
       },
       "Safety Manual": {
         content: `WORKPLACE SAFETY MANUAL
 
-SAFETY FIRST - ALWAYS
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.3
-APPROVED BY: Safety Committee
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
 
-═══════════════════════════════════════════════════════════════
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
 
-TABLE OF CONTENTS
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
 
-1. Safety Policy Statement ................................... 3
-2. General Safety Rules ..................................... 4
-3. Emergency Procedures ..................................... 6
-4. Personal Protective Equipment ............................ 8
-5. Hazard Communication ..................................... 10
-6. Incident Reporting ....................................... 12
-7. Training Requirements .................................... 14
-8. Safety Committee ......................................... 16
-
-═══════════════════════════════════════════════════════════════
-
-1. SAFETY POLICY STATEMENT
-
-The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
-
-Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
-
-2. GENERAL SAFETY RULES
-
-2.1 BASIC SAFETY PRINCIPLES
-- Follow all safety procedures and guidelines
-- Report unsafe conditions immediately
-- Use appropriate personal protective equipment
-- Keep work areas clean and organized
-- Never take shortcuts that compromise safety
-
-2.2 PROHIBITED ACTIVITIES
-- Horseplay or practical jokes
-- Operating equipment without proper training
-- Removing or disabling safety devices
-- Working under the influence of drugs or alcohol
-
-3. EMERGENCY PROCEDURES
-
-3.1 FIRE EMERGENCY
-- Activate the nearest fire alarm
-- Evacuate immediately using designated routes
-- Proceed to assembly areas
-- Do not use elevators
-- Do not re-enter the building until authorized
-
-3.2 MEDICAL EMERGENCY
-- Call 911 immediately for serious injuries
-- Notify your supervisor and security
-- Provide first aid only if trained to do so
-- Do not move seriously injured persons
-
-3.3 SEVERE WEATHER
-- Monitor weather alerts and warnings
-- Follow instructions from management
-- Move to designated shelter areas if required
-- Remain in shelter until all-clear is given
-
-4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
-
-4.1 GENERAL REQUIREMENTS
-Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
-- Safety glasses or goggles
-- Hard hats
-- Safety shoes
-- Gloves
-- Hearing protection
-- Respiratory protection
-
-4.2 PPE MAINTENANCE
-- Inspect PPE before each use
-- Replace damaged or worn equipment
-- Clean and store PPE properly
-- Report defective equipment immediately
-
-5. HAZARD COMMUNICATION
-
-5.1 CHEMICAL SAFETY
-- Read and understand Safety Data Sheets (SDS)
-- Follow proper handling procedures
-- Use appropriate PPE when working with chemicals
-- Store chemicals according to manufacturer instructions
-
-5.2 LABELING REQUIREMENTS
-All hazardous materials must be properly labeled with:
-- Product identification
-- Hazard warnings
-- Precautionary statements
-- Supplier information
-
-6. INCIDENT REPORTING
-
-6.1 REPORTING REQUIREMENTS
-All incidents, including near misses, must be reported immediately to:
-- Your immediate supervisor
-- The Safety Department
-- Human Resources (for injuries)
-
-6.2 INVESTIGATION PROCESS
-All incidents will be thoroughly investigated to:
-- Determine root causes
-- Implement corrective actions
-- Prevent similar occurrences
-- Comply with regulatory requirements
-
-7. TRAINING REQUIREMENTS
-
-7.1 NEW EMPLOYEE ORIENTATION
-All new employees must complete safety orientation training before beginning work assignments.
-
-7.2 ONGOING TRAINING
-Regular safety training is provided on topics including:
-- Job-specific safety procedures
-- Emergency response
-- Hazard recognition
-- PPE use and maintenance
-
-8. SAFETY COMMITTEE
-
-Our Safety Committee meets monthly to:
-- Review incident reports and trends
-- Evaluate safety procedures
-- Recommend improvements
-- Promote safety awareness
-
-Committee members represent all departments and levels of the organization.
-
-═══════════════════════════════════════════════════════════════
-
-SAFETY CONTACTS
-
-Emergency: 911
-Security: Extension 2911
-Safety Department: Extension 2500
-Human Resources: Extension 2100
-
-═══════════════════════════════════════════════════════════════
-
-Remember: Safety is everyone's responsibility!
-
-Document Control:
-- Document ID: SM-2024-001
-- Last Review Date: November 15, 2023
-- Next Review Date: November 15, 2024
-- Document Owner: Safety Committee`
+For safety concerns, contact the Safety Department.`
       }
     };
 
-    return documentTemplates[document.name as keyof typeof documentTemplates] || {
-      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
-    };
+    return templates[documentName] || { content: "Document content not available." };
   };
 
   // State for document modals
@@ -6052,310 +4523,53 @@ Document Control:
 
 WELCOME TO OUR ORGANIZATION
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 3.2
-APPROVED BY: Executive Leadership Team
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Welcome Message .......................................... 3
-2. Company Overview ......................................... 4
-3. Employment Policies ...................................... 6
-4. Compensation and Benefits ................................ 12
-5. Work Environment and Safety .............................. 18
-6. Professional Development ................................. 22
-7. Technology and Communication ............................. 25
-8. Leave Policies ........................................... 28
-9. Performance Management ................................... 32
-10. Disciplinary Procedures ................................. 35
-11. Employee Resources ...................................... 38
-
-═══════════════════════════════════════════════════════════════
+This handbook provides important information about company policies, procedures, and benefits.
 
 1. WELCOME MESSAGE
-
-Dear Team Member,
-
-Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
-
-This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
-
-Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
-
-If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
-
-Welcome aboard!
-
-Sincerely,
-The Executive Leadership Team
+Welcome to our organization! We are committed to providing a positive work environment.
 
 2. COMPANY OVERVIEW
-
-2.1 OUR MISSION
-To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
-
-2.2 OUR VALUES
-- Integrity: We conduct business with honesty and transparency
-- Excellence: We strive for the highest quality in everything we do
-- Innovation: We embrace change and continuously improve
-- Teamwork: We collaborate effectively to achieve common goals
-- Respect: We value diversity and treat everyone with dignity
-
-2.3 ORGANIZATIONAL STRUCTURE
-Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+Our mission is to deliver exceptional products and services with integrity and innovation.
 
 3. EMPLOYMENT POLICIES
-
-3.1 EQUAL EMPLOYMENT OPPORTUNITY
-We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
-
-3.2 AT-WILL EMPLOYMENT
-Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
-
-3.3 BACKGROUND CHECKS
-All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+We provide equal employment opportunities and maintain fair employment practices.
 
 4. COMPENSATION AND BENEFITS
-
-4.1 PAY PERIODS
-Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
-
-4.2 OVERTIME
-Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
-
-4.3 BENEFITS OVERVIEW
-We offer a comprehensive benefits package including:
-- Health insurance
-- Dental and vision coverage
-- Retirement savings plan with company matching
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
 - Paid time off
 - Professional development opportunities
 
-5. WORK ENVIRONMENT AND SAFETY
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
 
-5.1 WORKPLACE SAFETY
-The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
-
-5.2 DRUG-FREE WORKPLACE
-We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
-
-6. PROFESSIONAL DEVELOPMENT
-
-We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
-
-7. TECHNOLOGY AND COMMUNICATION
-
-7.1 COMPUTER AND INTERNET USE
-Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
-
-7.2 CONFIDENTIALITY
-Employees must protect confidential company information and respect the privacy of customer and employee data.
-
-8. LEAVE POLICIES
-
-8.1 PAID TIME OFF (PTO)
-Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
-
-8.2 FAMILY AND MEDICAL LEAVE
-Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
-
-9. PERFORMANCE MANAGEMENT
-
-Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
-
-10. DISCIPLINARY PROCEDURES
-
-When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
-
-11. EMPLOYEE RESOURCES
-
-11.1 HUMAN RESOURCES DEPARTMENT
-The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
-
-11.2 EMPLOYEE ASSISTANCE PROGRAM
-Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
-
-═══════════════════════════════════════════════════════════════
-
-ACKNOWLEDGMENT
-
-I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-This handbook is subject to change. Updates will be communicated to all employees.
-
-Document Control:
-- Document ID: EH-2024-001
-- Last Review Date: December 1, 2023
-- Next Review Date: December 1, 2024
-- Document Owner: Human Resources Department`
+For questions, please contact the Human Resources Department.`
       },
       "Safety Manual": {
         content: `WORKPLACE SAFETY MANUAL
 
-SAFETY FIRST - ALWAYS
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.3
-APPROVED BY: Safety Committee
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
 
-═══════════════════════════════════════════════════════════════
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
 
-TABLE OF CONTENTS
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
 
-1. Safety Policy Statement ................................... 3
-2. General Safety Rules ..................................... 4
-3. Emergency Procedures ..................................... 6
-4. Personal Protective Equipment ............................ 8
-5. Hazard Communication ..................................... 10
-6. Incident Reporting ....................................... 12
-7. Training Requirements .................................... 14
-8. Safety Committee ......................................... 16
-
-═══════════════════════════════════════════════════════════════
-
-1. SAFETY POLICY STATEMENT
-
-The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
-
-Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
-
-2. GENERAL SAFETY RULES
-
-2.1 BASIC SAFETY PRINCIPLES
-- Follow all safety procedures and guidelines
-- Report unsafe conditions immediately
-- Use appropriate personal protective equipment
-- Keep work areas clean and organized
-- Never take shortcuts that compromise safety
-
-2.2 PROHIBITED ACTIVITIES
-- Horseplay or practical jokes
-- Operating equipment without proper training
-- Removing or disabling safety devices
-- Working under the influence of drugs or alcohol
-
-3. EMERGENCY PROCEDURES
-
-3.1 FIRE EMERGENCY
-- Activate the nearest fire alarm
-- Evacuate immediately using designated routes
-- Proceed to assembly areas
-- Do not use elevators
-- Do not re-enter the building until authorized
-
-3.2 MEDICAL EMERGENCY
-- Call 911 immediately for serious injuries
-- Notify your supervisor and security
-- Provide first aid only if trained to do so
-- Do not move seriously injured persons
-
-3.3 SEVERE WEATHER
-- Monitor weather alerts and warnings
-- Follow instructions from management
-- Move to designated shelter areas if required
-- Remain in shelter until all-clear is given
-
-4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
-
-4.1 GENERAL REQUIREMENTS
-Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
-- Safety glasses or goggles
-- Hard hats
-- Safety shoes
-- Gloves
-- Hearing protection
-- Respiratory protection
-
-4.2 PPE MAINTENANCE
-- Inspect PPE before each use
-- Replace damaged or worn equipment
-- Clean and store PPE properly
-- Report defective equipment immediately
-
-5. HAZARD COMMUNICATION
-
-5.1 CHEMICAL SAFETY
-- Read and understand Safety Data Sheets (SDS)
-- Follow proper handling procedures
-- Use appropriate PPE when working with chemicals
-- Store chemicals according to manufacturer instructions
-
-5.2 LABELING REQUIREMENTS
-All hazardous materials must be properly labeled with:
-- Product identification
-- Hazard warnings
-- Precautionary statements
-- Supplier information
-
-6. INCIDENT REPORTING
-
-6.1 REPORTING REQUIREMENTS
-All incidents, including near misses, must be reported immediately to:
-- Your immediate supervisor
-- The Safety Department
-- Human Resources (for injuries)
-
-6.2 INVESTIGATION PROCESS
-All incidents will be thoroughly investigated to:
-- Determine root causes
-- Implement corrective actions
-- Prevent similar occurrences
-- Comply with regulatory requirements
-
-7. TRAINING REQUIREMENTS
-
-7.1 NEW EMPLOYEE ORIENTATION
-All new employees must complete safety orientation training before beginning work assignments.
-
-7.2 ONGOING TRAINING
-Regular safety training is provided on topics including:
-- Job-specific safety procedures
-- Emergency response
-- Hazard recognition
-- PPE use and maintenance
-
-8. SAFETY COMMITTEE
-
-Our Safety Committee meets monthly to:
-- Review incident reports and trends
-- Evaluate safety procedures
-- Recommend improvements
-- Promote safety awareness
-
-Committee members represent all departments and levels of the organization.
-
-═══════════════════════════════════════════════════════════════
-
-SAFETY CONTACTS
-
-Emergency: 911
-Security: Extension 2911
-Safety Department: Extension 2500
-Human Resources: Extension 2100
-
-═══════════════════════════════════════════════════════════════
-
-Remember: Safety is everyone's responsibility!
-
-Document Control:
-- Document ID: SM-2024-001
-- Last Review Date: November 15, 2023
-- Next Review Date: November 15, 2024
-- Document Owner: Safety Committee`
+For safety concerns, contact the Safety Department.`
       }
     };
 
-    return documentTemplates[document.name as keyof typeof documentTemplates] || {
-      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
-    };
+    return templates[documentName] || { content: "Document content not available." };
   };
 
   // State for document modals
@@ -6577,310 +4791,53 @@ Document Control:
 
 WELCOME TO OUR ORGANIZATION
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 3.2
-APPROVED BY: Executive Leadership Team
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Welcome Message .......................................... 3
-2. Company Overview ......................................... 4
-3. Employment Policies ...................................... 6
-4. Compensation and Benefits ................................ 12
-5. Work Environment and Safety .............................. 18
-6. Professional Development ................................. 22
-7. Technology and Communication ............................. 25
-8. Leave Policies ........................................... 28
-9. Performance Management ................................... 32
-10. Disciplinary Procedures ................................. 35
-11. Employee Resources ...................................... 38
-
-═══════════════════════════════════════════════════════════════
+This handbook provides important information about company policies, procedures, and benefits.
 
 1. WELCOME MESSAGE
-
-Dear Team Member,
-
-Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
-
-This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
-
-Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
-
-If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
-
-Welcome aboard!
-
-Sincerely,
-The Executive Leadership Team
+Welcome to our organization! We are committed to providing a positive work environment.
 
 2. COMPANY OVERVIEW
-
-2.1 OUR MISSION
-To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
-
-2.2 OUR VALUES
-- Integrity: We conduct business with honesty and transparency
-- Excellence: We strive for the highest quality in everything we do
-- Innovation: We embrace change and continuously improve
-- Teamwork: We collaborate effectively to achieve common goals
-- Respect: We value diversity and treat everyone with dignity
-
-2.3 ORGANIZATIONAL STRUCTURE
-Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+Our mission is to deliver exceptional products and services with integrity and innovation.
 
 3. EMPLOYMENT POLICIES
-
-3.1 EQUAL EMPLOYMENT OPPORTUNITY
-We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
-
-3.2 AT-WILL EMPLOYMENT
-Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
-
-3.3 BACKGROUND CHECKS
-All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+We provide equal employment opportunities and maintain fair employment practices.
 
 4. COMPENSATION AND BENEFITS
-
-4.1 PAY PERIODS
-Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
-
-4.2 OVERTIME
-Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
-
-4.3 BENEFITS OVERVIEW
-We offer a comprehensive benefits package including:
-- Health insurance
-- Dental and vision coverage
-- Retirement savings plan with company matching
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
 - Paid time off
 - Professional development opportunities
 
-5. WORK ENVIRONMENT AND SAFETY
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
 
-5.1 WORKPLACE SAFETY
-The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
-
-5.2 DRUG-FREE WORKPLACE
-We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
-
-6. PROFESSIONAL DEVELOPMENT
-
-We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
-
-7. TECHNOLOGY AND COMMUNICATION
-
-7.1 COMPUTER AND INTERNET USE
-Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
-
-7.2 CONFIDENTIALITY
-Employees must protect confidential company information and respect the privacy of customer and employee data.
-
-8. LEAVE POLICIES
-
-8.1 PAID TIME OFF (PTO)
-Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
-
-8.2 FAMILY AND MEDICAL LEAVE
-Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
-
-9. PERFORMANCE MANAGEMENT
-
-Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
-
-10. DISCIPLINARY PROCEDURES
-
-When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
-
-11. EMPLOYEE RESOURCES
-
-11.1 HUMAN RESOURCES DEPARTMENT
-The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
-
-11.2 EMPLOYEE ASSISTANCE PROGRAM
-Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
-
-═══════════════════════════════════════════════════════════════
-
-ACKNOWLEDGMENT
-
-I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-This handbook is subject to change. Updates will be communicated to all employees.
-
-Document Control:
-- Document ID: EH-2024-001
-- Last Review Date: December 1, 2023
-- Next Review Date: December 1, 2024
-- Document Owner: Human Resources Department`
+For questions, please contact the Human Resources Department.`
       },
       "Safety Manual": {
         content: `WORKPLACE SAFETY MANUAL
 
-SAFETY FIRST - ALWAYS
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.3
-APPROVED BY: Safety Committee
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
 
-═══════════════════════════════════════════════════════════════
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
 
-TABLE OF CONTENTS
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
 
-1. Safety Policy Statement ................................... 3
-2. General Safety Rules ..................................... 4
-3. Emergency Procedures ..................................... 6
-4. Personal Protective Equipment ............................ 8
-5. Hazard Communication ..................................... 10
-6. Incident Reporting ....................................... 12
-7. Training Requirements .................................... 14
-8. Safety Committee ......................................... 16
-
-═══════════════════════════════════════════════════════════════
-
-1. SAFETY POLICY STATEMENT
-
-The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
-
-Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
-
-2. GENERAL SAFETY RULES
-
-2.1 BASIC SAFETY PRINCIPLES
-- Follow all safety procedures and guidelines
-- Report unsafe conditions immediately
-- Use appropriate personal protective equipment
-- Keep work areas clean and organized
-- Never take shortcuts that compromise safety
-
-2.2 PROHIBITED ACTIVITIES
-- Horseplay or practical jokes
-- Operating equipment without proper training
-- Removing or disabling safety devices
-- Working under the influence of drugs or alcohol
-
-3. EMERGENCY PROCEDURES
-
-3.1 FIRE EMERGENCY
-- Activate the nearest fire alarm
-- Evacuate immediately using designated routes
-- Proceed to assembly areas
-- Do not use elevators
-- Do not re-enter the building until authorized
-
-3.2 MEDICAL EMERGENCY
-- Call 911 immediately for serious injuries
-- Notify your supervisor and security
-- Provide first aid only if trained to do so
-- Do not move seriously injured persons
-
-3.3 SEVERE WEATHER
-- Monitor weather alerts and warnings
-- Follow instructions from management
-- Move to designated shelter areas if required
-- Remain in shelter until all-clear is given
-
-4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
-
-4.1 GENERAL REQUIREMENTS
-Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
-- Safety glasses or goggles
-- Hard hats
-- Safety shoes
-- Gloves
-- Hearing protection
-- Respiratory protection
-
-4.2 PPE MAINTENANCE
-- Inspect PPE before each use
-- Replace damaged or worn equipment
-- Clean and store PPE properly
-- Report defective equipment immediately
-
-5. HAZARD COMMUNICATION
-
-5.1 CHEMICAL SAFETY
-- Read and understand Safety Data Sheets (SDS)
-- Follow proper handling procedures
-- Use appropriate PPE when working with chemicals
-- Store chemicals according to manufacturer instructions
-
-5.2 LABELING REQUIREMENTS
-All hazardous materials must be properly labeled with:
-- Product identification
-- Hazard warnings
-- Precautionary statements
-- Supplier information
-
-6. INCIDENT REPORTING
-
-6.1 REPORTING REQUIREMENTS
-All incidents, including near misses, must be reported immediately to:
-- Your immediate supervisor
-- The Safety Department
-- Human Resources (for injuries)
-
-6.2 INVESTIGATION PROCESS
-All incidents will be thoroughly investigated to:
-- Determine root causes
-- Implement corrective actions
-- Prevent similar occurrences
-- Comply with regulatory requirements
-
-7. TRAINING REQUIREMENTS
-
-7.1 NEW EMPLOYEE ORIENTATION
-All new employees must complete safety orientation training before beginning work assignments.
-
-7.2 ONGOING TRAINING
-Regular safety training is provided on topics including:
-- Job-specific safety procedures
-- Emergency response
-- Hazard recognition
-- PPE use and maintenance
-
-8. SAFETY COMMITTEE
-
-Our Safety Committee meets monthly to:
-- Review incident reports and trends
-- Evaluate safety procedures
-- Recommend improvements
-- Promote safety awareness
-
-Committee members represent all departments and levels of the organization.
-
-═══════════════════════════════════════════════════════════════
-
-SAFETY CONTACTS
-
-Emergency: 911
-Security: Extension 2911
-Safety Department: Extension 2500
-Human Resources: Extension 2100
-
-═══════════════════════════════════════════════════════════════
-
-Remember: Safety is everyone's responsibility!
-
-Document Control:
-- Document ID: SM-2024-001
-- Last Review Date: November 15, 2023
-- Next Review Date: November 15, 2024
-- Document Owner: Safety Committee`
+For safety concerns, contact the Safety Department.`
       }
     };
 
-    return documentTemplates[document.name as keyof typeof documentTemplates] || {
-      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
-    };
+    return templates[documentName] || { content: "Document content not available." };
   };
 
   // State for document modals
@@ -7102,310 +5059,53 @@ Document Control:
 
 WELCOME TO OUR ORGANIZATION
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 3.2
-APPROVED BY: Executive Leadership Team
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Welcome Message .......................................... 3
-2. Company Overview ......................................... 4
-3. Employment Policies ...................................... 6
-4. Compensation and Benefits ................................ 12
-5. Work Environment and Safety .............................. 18
-6. Professional Development ................................. 22
-7. Technology and Communication ............................. 25
-8. Leave Policies ........................................... 28
-9. Performance Management ................................... 32
-10. Disciplinary Procedures ................................. 35
-11. Employee Resources ...................................... 38
-
-═══════════════════════════════════════════════════════════════
+This handbook provides important information about company policies, procedures, and benefits.
 
 1. WELCOME MESSAGE
-
-Dear Team Member,
-
-Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
-
-This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
-
-Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
-
-If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
-
-Welcome aboard!
-
-Sincerely,
-The Executive Leadership Team
+Welcome to our organization! We are committed to providing a positive work environment.
 
 2. COMPANY OVERVIEW
-
-2.1 OUR MISSION
-To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
-
-2.2 OUR VALUES
-- Integrity: We conduct business with honesty and transparency
-- Excellence: We strive for the highest quality in everything we do
-- Innovation: We embrace change and continuously improve
-- Teamwork: We collaborate effectively to achieve common goals
-- Respect: We value diversity and treat everyone with dignity
-
-2.3 ORGANIZATIONAL STRUCTURE
-Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+Our mission is to deliver exceptional products and services with integrity and innovation.
 
 3. EMPLOYMENT POLICIES
-
-3.1 EQUAL EMPLOYMENT OPPORTUNITY
-We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
-
-3.2 AT-WILL EMPLOYMENT
-Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
-
-3.3 BACKGROUND CHECKS
-All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+We provide equal employment opportunities and maintain fair employment practices.
 
 4. COMPENSATION AND BENEFITS
-
-4.1 PAY PERIODS
-Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
-
-4.2 OVERTIME
-Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
-
-4.3 BENEFITS OVERVIEW
-We offer a comprehensive benefits package including:
-- Health insurance
-- Dental and vision coverage
-- Retirement savings plan with company matching
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
 - Paid time off
 - Professional development opportunities
 
-5. WORK ENVIRONMENT AND SAFETY
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
 
-5.1 WORKPLACE SAFETY
-The safety and well-being of our employees is our top priority. All employees are expected to follow safety procedures and report any unsafe conditions immediately.
-
-5.2 DRUG-FREE WORKPLACE
-We maintain a drug-free workplace. The use, possession, or distribution of illegal drugs or alcohol on company premises is strictly prohibited.
-
-6. PROFESSIONAL DEVELOPMENT
-
-We are committed to supporting the professional growth and development of our employees through training programs, educational assistance, and career advancement opportunities.
-
-7. TECHNOLOGY AND COMMUNICATION
-
-7.1 COMPUTER AND INTERNET USE
-Company-provided technology resources are to be used primarily for business purposes. Personal use should be limited and must not interfere with work responsibilities.
-
-7.2 CONFIDENTIALITY
-Employees must protect confidential company information and respect the privacy of customer and employee data.
-
-8. LEAVE POLICIES
-
-8.1 PAID TIME OFF (PTO)
-Full-time employees accrue PTO based on length of service. PTO requests should be submitted in advance and approved by supervisors.
-
-8.2 FAMILY AND MEDICAL LEAVE
-Eligible employees may take unpaid leave for qualifying family and medical reasons as provided by applicable law.
-
-9. PERFORMANCE MANAGEMENT
-
-Regular performance evaluations help ensure that employees understand expectations and receive feedback on their performance. These evaluations also identify opportunities for professional development.
-
-10. DISCIPLINARY PROCEDURES
-
-When performance or conduct issues arise, we follow a progressive discipline process designed to help employees improve while maintaining workplace standards.
-
-11. EMPLOYEE RESOURCES
-
-11.1 HUMAN RESOURCES DEPARTMENT
-The HR Department is available to assist with questions about policies, benefits, and workplace concerns.
-
-11.2 EMPLOYEE ASSISTANCE PROGRAM
-Confidential counseling and support services are available to help employees deal with personal and work-related challenges.
-
-═══════════════════════════════════════════════════════════════
-
-ACKNOWLEDGMENT
-
-I acknowledge that I have received and read this Employee Handbook. I understand that it is my responsibility to comply with the policies and procedures outlined herein.
-
-Employee Signature: ___________________________ Date: ___________
-
-Print Name: ___________________________
-
-═══════════════════════════════════════════════════════════════
-
-This handbook is subject to change. Updates will be communicated to all employees.
-
-Document Control:
-- Document ID: EH-2024-001
-- Last Review Date: December 1, 2023
-- Next Review Date: December 1, 2024
-- Document Owner: Human Resources Department`
+For questions, please contact the Human Resources Department.`
       },
       "Safety Manual": {
         content: `WORKPLACE SAFETY MANUAL
 
-SAFETY FIRST - ALWAYS
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
 
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.3
-APPROVED BY: Safety Committee
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
 
-═══════════════════════════════════════════════════════════════
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
 
-TABLE OF CONTENTS
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
 
-1. Safety Policy Statement ................................... 3
-2. General Safety Rules ..................................... 4
-3. Emergency Procedures ..................................... 6
-4. Personal Protective Equipment ............................ 8
-5. Hazard Communication ..................................... 10
-6. Incident Reporting ....................................... 12
-7. Training Requirements .................................... 14
-8. Safety Committee ......................................... 16
-
-═══════════════════════════════════════════════════════════════
-
-1. SAFETY POLICY STATEMENT
-
-The safety and health of our employees is our highest priority. We are committed to providing a safe and healthy work environment for all employees, contractors, and visitors.
-
-Every employee has the right to a safe workplace and the responsibility to work safely. Management is committed to providing the resources necessary to maintain a safe work environment and expects all employees to actively participate in our safety program.
-
-2. GENERAL SAFETY RULES
-
-2.1 BASIC SAFETY PRINCIPLES
-- Follow all safety procedures and guidelines
-- Report unsafe conditions immediately
-- Use appropriate personal protective equipment
-- Keep work areas clean and organized
-- Never take shortcuts that compromise safety
-
-2.2 PROHIBITED ACTIVITIES
-- Horseplay or practical jokes
-- Operating equipment without proper training
-- Removing or disabling safety devices
-- Working under the influence of drugs or alcohol
-
-3. EMERGENCY PROCEDURES
-
-3.1 FIRE EMERGENCY
-- Activate the nearest fire alarm
-- Evacuate immediately using designated routes
-- Proceed to assembly areas
-- Do not use elevators
-- Do not re-enter the building until authorized
-
-3.2 MEDICAL EMERGENCY
-- Call 911 immediately for serious injuries
-- Notify your supervisor and security
-- Provide first aid only if trained to do so
-- Do not move seriously injured persons
-
-3.3 SEVERE WEATHER
-- Monitor weather alerts and warnings
-- Follow instructions from management
-- Move to designated shelter areas if required
-- Remain in shelter until all-clear is given
-
-4. PERSONAL PROTECTIVE EQUIPMENT (PPE)
-
-4.1 GENERAL REQUIREMENTS
-Appropriate PPE must be worn when required by job duties or workplace conditions. This may include:
-- Safety glasses or goggles
-- Hard hats
-- Safety shoes
-- Gloves
-- Hearing protection
-- Respiratory protection
-
-4.2 PPE MAINTENANCE
-- Inspect PPE before each use
-- Replace damaged or worn equipment
-- Clean and store PPE properly
-- Report defective equipment immediately
-
-5. HAZARD COMMUNICATION
-
-5.1 CHEMICAL SAFETY
-- Read and understand Safety Data Sheets (SDS)
-- Follow proper handling procedures
-- Use appropriate PPE when working with chemicals
-- Store chemicals according to manufacturer instructions
-
-5.2 LABELING REQUIREMENTS
-All hazardous materials must be properly labeled with:
-- Product identification
-- Hazard warnings
-- Precautionary statements
-- Supplier information
-
-6. INCIDENT REPORTING
-
-6.1 REPORTING REQUIREMENTS
-All incidents, including near misses, must be reported immediately to:
-- Your immediate supervisor
-- The Safety Department
-- Human Resources (for injuries)
-
-6.2 INVESTIGATION PROCESS
-All incidents will be thoroughly investigated to:
-- Determine root causes
-- Implement corrective actions
-- Prevent similar occurrences
-- Comply with regulatory requirements
-
-7. TRAINING REQUIREMENTS
-
-7.1 NEW EMPLOYEE ORIENTATION
-All new employees must complete safety orientation training before beginning work assignments.
-
-7.2 ONGOING TRAINING
-Regular safety training is provided on topics including:
-- Job-specific safety procedures
-- Emergency response
-- Hazard recognition
-- PPE use and maintenance
-
-8. SAFETY COMMITTEE
-
-Our Safety Committee meets monthly to:
-- Review incident reports and trends
-- Evaluate safety procedures
-- Recommend improvements
-- Promote safety awareness
-
-Committee members represent all departments and levels of the organization.
-
-═══════════════════════════════════════════════════════════════
-
-SAFETY CONTACTS
-
-Emergency: 911
-Security: Extension 2911
-Safety Department: Extension 2500
-Human Resources: Extension 2100
-
-═══════════════════════════════════════════════════════════════
-
-Remember: Safety is everyone's responsibility!
-
-Document Control:
-- Document ID: SM-2024-001
-- Last Review Date: November 15, 2023
-- Next Review Date: November 15, 2024
-- Document Owner: Safety Committee`
+For safety concerns, contact the Safety Department.`
       }
     };
 
-    return documentTemplates[document.name as keyof typeof documentTemplates] || {
-      content: `Document: ${document.name}\n\nThis is a sample document content for ${document.name}.\n\nFile Type: ${document.type}\nFile Size: ${document.size}\n\nThis document contains important information relevant to your role and responsibilities within the organization. Please review carefully and contact HR if you have any questions.`
-    };
+    return templates[documentName] || { content: "Document content not available." };
   };
 
   // State for document modals
@@ -7627,85 +5327,2408 @@ Document Control:
 
 WELCOME TO OUR ORGANIZATION
 
+This handbook provides important information about company policies, procedures, and benefits.
+
+1. WELCOME MESSAGE
+Welcome to our organization! We are committed to providing a positive work environment.
+
+2. COMPANY OVERVIEW
+Our mission is to deliver exceptional products and services with integrity and innovation.
+
+3. EMPLOYMENT POLICIES
+We provide equal employment opportunities and maintain fair employment practices.
+
+4. COMPENSATION AND BENEFITS
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
+
+For questions, please contact the Human Resources Department.`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
+
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
+
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
+
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
+
+For safety concerns, contact the Safety Department.`
+      }
+    };
+
+    return templates[documentName] || { content: "Document content not available." };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
 EFFECTIVE DATE: January 1, 2024
-VERSION: 3.2
-APPROVED BY: Executive Leadership Team
+VERSION: 2.1
+APPROVED BY: Board of Directors
 
 ═══════════════════════════════════════════════════════════════
 
 TABLE OF CONTENTS
 
-1. Welcome Message .......................................... 3
-2. Company Overview ......................................... 4
-3. Employment Policies ...................................... 6
-4. Compensation and Benefits ................................ 12
-5. Work Environment and Safety .............................. 18
-6. Professional Development ................................. 22
-7. Technology and Communication ............................. 25
-8. Leave Policies ........................................... 28
-9. Performance Management ................................... 32
-10. Disciplinary Procedures ................................. 35
-11. Employee Resources ...................................... 38
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
 
 ═══════════════════════════════════════════════════════════════
 
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+This handbook provides important information about company policies, procedures, and benefits.
+
 1. WELCOME MESSAGE
-
-Dear Team Member,
-
-Welcome to our organization! We are delighted to have you join our team and look forward to the contributions you will make to our continued success.
-
-This Employee Handbook serves as your comprehensive guide to our company policies, procedures, benefits, and expectations. Please take the time to read through this handbook carefully and keep it as a reference throughout your employment.
-
-Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment that promotes professional growth, work-life balance, and mutual respect.
-
-If you have any questions about the information contained in this handbook, please don't hesitate to contact the Human Resources Department.
-
-Welcome aboard!
-
-Sincerely,
-The Executive Leadership Team
+Welcome to our organization! We are committed to providing a positive work environment.
 
 2. COMPANY OVERVIEW
-
-2.1 OUR MISSION
-To deliver exceptional products and services while maintaining the highest standards of integrity, innovation, and customer satisfaction.
-
-2.2 OUR VALUES
-- Integrity: We conduct business with honesty and transparency
-- Excellence: We strive for the highest quality in everything we do
-- Innovation: We embrace change and continuously improve
-- Teamwork: We collaborate effectively to achieve common goals
-- Respect: We value diversity and treat everyone with dignity
-
-2.3 ORGANIZATIONAL STRUCTURE
-Our organization is structured to promote efficiency, accountability, and clear communication. Each department plays a vital role in achieving our overall objectives.
+Our mission is to deliver exceptional products and services with integrity and innovation.
 
 3. EMPLOYMENT POLICIES
-
-3.1 EQUAL EMPLOYMENT OPPORTUNITY
-We are committed to providing equal employment opportunities to all qualified individuals regardless of race, color, religion, gender, sexual orientation, national origin, age, disability, or veteran status.
-
-3.2 AT-WILL EMPLOYMENT
-Employment with our organization is at-will, meaning that either the employee or the company may terminate the employment relationship at any time, with or without cause or notice.
-
-3.3 BACKGROUND CHECKS
-All employment offers are contingent upon successful completion of background checks as required by law and company policy.
+We provide equal employment opportunities and maintain fair employment practices.
 
 4. COMPENSATION AND BENEFITS
-
-4.1 PAY PERIODS
-Employees are paid bi-weekly on Fridays. If a payday falls on a holiday, payment will be made on the preceding business day.
-
-4.2 OVERTIME
-Non-exempt employees will receive overtime pay at one and one-half times their regular rate for hours worked in excess of 40 hours per week.
-
-4.3 BENEFITS OVERVIEW
-We offer a comprehensive benefits package including:
-- Health insurance
-- Dental and vision coverage
-- Retirement savings plan with company matching
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
 - Paid time off
 - Professional development opportunities
 
-5. WORK
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
+
+For questions, please contact the Human Resources Department.`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
+
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
+
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
+
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
+
+For safety concerns, contact the Safety Department.`
+      }
+    };
+
+    return templates[documentName] || { content: "Document content not available." };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+This handbook provides important information about company policies, procedures, and benefits.
+
+1. WELCOME MESSAGE
+Welcome to our organization! We are committed to providing a positive work environment.
+
+2. COMPANY OVERVIEW
+Our mission is to deliver exceptional products and services with integrity and innovation.
+
+3. EMPLOYMENT POLICIES
+We provide equal employment opportunities and maintain fair employment practices.
+
+4. COMPENSATION AND BENEFITS
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
+
+For questions, please contact the Human Resources Department.`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
+
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
+
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
+
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
+
+For safety concerns, contact the Safety Department.`
+      }
+    };
+
+    return templates[documentName] || { content: "Document content not available." };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+This handbook provides important information about company policies, procedures, and benefits.
+
+1. WELCOME MESSAGE
+Welcome to our organization! We are committed to providing a positive work environment.
+
+2. COMPANY OVERVIEW
+Our mission is to deliver exceptional products and services with integrity and innovation.
+
+3. EMPLOYMENT POLICIES
+We provide equal employment opportunities and maintain fair employment practices.
+
+4. COMPENSATION AND BENEFITS
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
+
+For questions, please contact the Human Resources Department.`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
+
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
+
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
+
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
+
+For safety concerns, contact the Safety Department.`
+      }
+    };
+
+    return templates[documentName] || { content: "Document content not available." };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+This handbook provides important information about company policies, procedures, and benefits.
+
+1. WELCOME MESSAGE
+Welcome to our organization! We are committed to providing a positive work environment.
+
+2. COMPANY OVERVIEW
+Our mission is to deliver exceptional products and services with integrity and innovation.
+
+3. EMPLOYMENT POLICIES
+We provide equal employment opportunities and maintain fair employment practices.
+
+4. COMPENSATION AND BENEFITS
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
+
+For questions, please contact the Human Resources Department.`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
+
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
+
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
+
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
+
+For safety concerns, contact the Safety Department.`
+      }
+    };
+
+    return templates[documentName] || { content: "Document content not available." };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+This handbook provides important information about company policies, procedures, and benefits.
+
+1. WELCOME MESSAGE
+Welcome to our organization! We are committed to providing a positive work environment.
+
+2. COMPANY OVERVIEW
+Our mission is to deliver exceptional products and services with integrity and innovation.
+
+3. EMPLOYMENT POLICIES
+We provide equal employment opportunities and maintain fair employment practices.
+
+4. COMPENSATION AND BENEFITS
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
+
+For questions, please contact the Human Resources Department.`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
+
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
+
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
+
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
+
+For safety concerns, contact the Safety Department.`
+      }
+    };
+
+    return templates[documentName] || { content: "Document content not available." };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+This handbook provides important information about company policies, procedures, and benefits.
+
+1. WELCOME MESSAGE
+Welcome to our organization! We are committed to providing a positive work environment.
+
+2. COMPANY OVERVIEW
+Our mission is to deliver exceptional products and services with integrity and innovation.
+
+3. EMPLOYMENT POLICIES
+We provide equal employment opportunities and maintain fair employment practices.
+
+4. COMPENSATION AND BENEFITS
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
+
+For questions, please contact the Human Resources Department.`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
+
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
+
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
+
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
+
+For safety concerns, contact the Safety Department.`
+      }
+    };
+
+    return templates[documentName] || { content: "Document content not available." };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+This handbook provides important information about company policies, procedures, and benefits.
+
+1. WELCOME MESSAGE
+Welcome to our organization! We are committed to providing a positive work environment.
+
+2. COMPANY OVERVIEW
+Our mission is to deliver exceptional products and services with integrity and innovation.
+
+3. EMPLOYMENT POLICIES
+We provide equal employment opportunities and maintain fair employment practices.
+
+4. COMPENSATION AND BENEFITS
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
+
+For questions, please contact the Human Resources Department.`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
+
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
+
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
+
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
+
+For safety concerns, contact the Safety Department.`
+      }
+    };
+
+    return templates[documentName] || { content: "Document content not available." };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next Review Date: December 15, 2024
+- Document Owner: Human Resources Department`
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+This handbook provides important information about company policies, procedures, and benefits.
+
+1. WELCOME MESSAGE
+Welcome to our organization! We are committed to providing a positive work environment.
+
+2. COMPANY OVERVIEW
+Our mission is to deliver exceptional products and services with integrity and innovation.
+
+3. EMPLOYMENT POLICIES
+We provide equal employment opportunities and maintain fair employment practices.
+
+4. COMPENSATION AND BENEFITS
+- Competitive salary packages
+- Health insurance coverage
+- Retirement savings plans
+- Paid time off
+- Professional development opportunities
+
+5. WORK ENVIRONMENT
+We maintain a safe, respectful, and productive workplace for all employees.
+
+For questions, please contact the Human Resources Department.`
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+1. SAFETY POLICY
+Employee safety is our top priority. All employees must follow safety guidelines.
+
+2. EMERGENCY PROCEDURES
+- Know emergency exits
+- Follow evacuation procedures
+- Report all incidents immediately
+
+3. WORKPLACE SAFETY
+- Use proper equipment
+- Report hazards
+- Follow safety protocols
+
+4. INCIDENT REPORTING
+Report all accidents and near-misses to your supervisor immediately.
+
+For safety concerns, contact the Safety Department.`
+      }
+    };
+
+    return templates[documentName] || { content: "Document content not available." };
+  };
+
+  // State for document modals
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [newDocumentName, setNewDocumentName] = useState('');
+  const [editDocumentName, setEditDocumentName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // PDF Viewer State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation for PDF files
+      if (file.type === "application/pdf") {
+        setSelectedFile(file);
+        setUploadProgress(0); // Reset progress on new file selection
+        // Simulate upload progress
+        const interval = setInterval(() => {
+          setUploadProgress((prev) => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 100);
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        setSelectedFile(null);
+      }
+    }
+  };
+
+  const handleAddDocument = async () => {
+    if (!newDocumentName.trim() || !selectedFile) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a document name and upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDocument(true);
+    try {
+      // Simulate saving the document
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDoc = {
+        id: hrDocuments.length + 1,
+        name: newDocumentName,
+        type: "PDF", // Assuming PDF for now
+        size: `${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`,
+        visibleToAll: true, // Default visibility
+      };
+
+      setHrDocuments((prev) => [...prev, newDoc]);
+      setShowAddDocumentModal(false);
+      setNewDocumentName('');
+      setSelectedFile(null);
+      setUploadProgress(0);
+
+      toast({
+        title: "Document Added",
+        description: `${newDocumentName} has been successfully added.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  const handleEditDocumentModal = (document: any) => {
+    setSelectedDocument(document);
+    setEditDocumentName(document.name);
+    setShowEditDocumentModal(true);
+    setSelectedFile(null); // Reset selected file for editing
+    setUploadProgress(0);
+  };
+
+  const handleDocumentDelete = (docId: number) => {
+    if (confirm("Are you sure you want to delete this document?")) {
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    }
+  };
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document);
+    setDocumentModalType("view");
+    setShowDocumentModal(true);
+    // Simulate setting total pages for PDF viewer
+    setTotalPages(Math.floor(Math.random() * 10) + 5); // Random pages between 5 and 14
+    setCurrentPage(1);
+    setZoomLevel(1);
+  };
+
+  const handlePdfNavigation = (direction: 'prev' | 'next') => {
+    setCurrentPage(prev => {
+      if (direction === 'next') {
+        return Math.min(prev + 1, totalPages);
+      } else {
+        return Math.max(1, prev - 1);
+      }
+    });
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom);
+  };
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+This Code of Conduct establishes the ethical standards and behavioral expectations for all employees, contractors, and representatives of our organization. It serves as a guide for making ethical decisions and maintaining the highest standards of professional integrity.
+
+Our commitment to ethical business practices is fundamental to our success and reputation. Every individual associated with our organization is expected to read, understand, and comply with this Code of Conduct.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 RESPECT AND DIGNITY
+All employees must treat colleagues, customers, suppliers, and stakeholders with respect and dignity. Discrimination, harassment, or intimidation of any kind will not be tolerated.
+
+2.2 HONESTY AND INTEGRITY
+Employees must conduct themselves with honesty and integrity in all business dealings. This includes accurate reporting, truthful communication, and ethical decision-making.
+
+2.3 PROFESSIONAL COMPETENCE
+Employees are expected to maintain and develop their professional skills and knowledge to perform their duties effectively and efficiently.
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 CONFIDENTIAL INFORMATION
+Employees must protect confidential and proprietary information belonging to the company, customers, and business partners. This obligation continues even after employment ends.
+
+3.2 DATA PROTECTION
+All personal and sensitive data must be handled in accordance with applicable privacy laws and company policies. Unauthorized access, use, or disclosure of such information is strictly prohibited.
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 IDENTIFICATION OF CONFLICTS
+Employees must identify and disclose any actual or potential conflicts of interest that may affect their ability to perform their duties objectively.
+
+4.2 OUTSIDE ACTIVITIES
+Employees should avoid outside activities, investments, or relationships that could interfere with their job performance or create conflicts with company interests.
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must comply with applicable laws, regulations, and company policies. Ignorance of the law is not an acceptable excuse for non-compliance.
+
+6. REPORTING VIOLATIONS
+
+Employees are encouraged to report suspected violations of this Code of Conduct through appropriate channels. The company prohibits retaliation against individuals who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations of this Code of Conduct may result in disciplinary action, up to and including termination of employment, depending on the severity of the violation.
+
+8. ACKNOWLEDGMENT
+
+By signing below, I acknowledge that I have read, understood, and agree to comply with this Code of Conduct.
+
+Employee Signature: ___________________________ Date: ___________
+
+Print Name: ___________________________
+
+═══════════════════════════════════════════════════════════════
+
+For questions or clarifications regarding this Code of Conduct, please contact the Human Resources Department.
+
+Document Control:
+- Document ID: COC-2024-001
+- Last Review Date: December 15, 2023
+- Next
