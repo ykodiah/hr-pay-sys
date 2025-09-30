@@ -2283,6 +2283,7 @@ function AddEmployeeForm({
                   <SelectItem value="Married">Married</SelectItem>
                   <SelectItem value="Divorced">Divorced</SelectItem>
                   <SelectItem value="Widowed">Widowed</SelectItem>
+                  <SelectItem value="Separated">Separated</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2296,7 +2297,6 @@ function AddEmployeeForm({
                 <SelectContent>
                   <SelectItem value="Male">Male</SelectItem>
                   <SelectItem value="Female">Female</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2383,12 +2383,22 @@ function AddEmployeeForm({
 
             <div className="space-y-2">
               <Label htmlFor="educationalLevel">12. Educational Level</Label>
-              <Input
-                type="text"
-                id="educationalLevel"
+              <Select
                 value={formData.educationalLevel}
-                onChange={(e) => handleInputChange("educationalLevel", e.target.value)}
-              />
+                onValueChange={(value) => handleInputChange("educationalLevel", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select educational level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Certificate">Certificate</SelectItem>
+                  <SelectItem value="Diploma">Diploma</SelectItem>
+                  <SelectItem value="Degree">Degree</SelectItem>
+                  <SelectItem value="Masters">Masters</SelectItem>
+                  <SelectItem value="Professional">Professional</SelectItem>
+                  <SelectItem value="Others">Others</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -2909,7 +2919,6 @@ function AddEmployeeForm({
             </div>
           </div>
         </TabsContent>
-        // Restored comprehensive Documents tab with all required documents as shown in images
         <TabsContent value="documents" className="space-y-4">
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Required Documents</h3>
