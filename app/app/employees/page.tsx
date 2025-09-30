@@ -3,7 +3,7 @@
 import { DialogDescription } from "@/components/ui/dialog"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -231,6 +231,9 @@ export default function EmployeesPage() {
     personalEmail: "",
     phone: "",
     position: "",
+    specialRole: "No Role",
+    hasSubsidiary: "No",
+    // </CHANGE>
     subsidiary: "",
     division: "",
     department: "",
@@ -239,6 +242,8 @@ export default function EmployeesPage() {
     dateOfJoining: "",
     dateOfExit: "",
     status: "Active",
+    inactiveReason: "",
+    // </CHANGE>
     probationPeriod: "6",
     confirmationDate: "",
     noticePeriod: "",
@@ -337,42 +342,70 @@ export default function EmployeesPage() {
     }
   }, [])
 
-  const generateEmployeeId = async () => {
-    try {
-      const supabase = createClient()
-      const { data: employees, error } = await supabase
-        .from("employees")
-        .select("employee_id")
-        .order("created_at", { ascending: false })
-        .limit(1)
+  const generateEmployeeId = useCallback(() => {
+    // Get company name initials
+    const companyName = companySettings?.name || "AKHR"
+    let letterPart = ""
 
-      if (error) {
-        console.error("[v0] Error fetching last employee:", error)
-        return "AKWA0001" // Default first ID
+    if (formData.hasSubsidiary === "Yes" && formData.subsidiary) {
+      // Get subsidiary name
+      const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
+      if (selectedSubsidiary) {
+        // First 2 initials of parent company
+        const companyInitials = companyName
+          .split(" ")
+          .map((word) => word[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2)
+
+        // First 2 initials of subsidiary
+        const subsidiaryInitials = selectedSubsidiary.name
+          .split(" ")
+          .map((word) => word[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2)
+
+        letterPart = (companyInitials + subsidiaryInitials).slice(0, 4).padEnd(4, "X")
+      } else {
+        // Fallback to company initials
+        letterPart = companyName
+          .split(" ")
+          .map((word) => word[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 4)
+          .padEnd(4, "X")
       }
-
-      let nextNumber = 1
-      if (employees && employees.length > 0) {
-        const lastId = employees[0].employee_id
-        const lastNumber = Number.parseInt(lastId.slice(-4)) // Extract last 4 digits
-        nextNumber = lastNumber + 1
-      }
-
-      const companyPrefix = formData.subsidiary
-        ? `${companySettings?.name?.substring(0, 2)?.toUpperCase() || "AK"}${
-            subsidiaries
-              .find((s) => s.id === formData.subsidiary)
-              ?.name?.substring(0, 2)
-              ?.toUpperCase() || "WA"
-          }`
-        : companySettings?.name?.substring(0, 4)?.toUpperCase() || "AKWA"
-
-      return `${companyPrefix}${nextNumber.toString().padStart(4, "0")}`
-    } catch (error) {
-      console.error("[v0] Error generating employee ID:", error)
-      return "AKWA0001"
+    } else {
+      // Use first 4 initials of parent company
+      letterPart = companyName
+        .split(" ")
+        .map((word) => word[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 4)
+        .padEnd(4, "X")
     }
-  }
+
+    // Generate sequential 4-digit number based on existing employees
+    const numberPart = String(employees.length + 1).padStart(4, "0")
+
+    return `${letterPart}${numberPart}`
+  }, [companySettings, formData.hasSubsidiary, formData.subsidiary, subsidiaries, employees.length])
+
+  // Auto-generate employee ID when position is filled
+  useEffect(() => {
+    if (formData.position && !formData.employeeId) {
+      const newEmployeeId = generateEmployeeId()
+      setFormData((prev: any) => ({
+        ...prev,
+        employeeId: newEmployeeId,
+      }))
+    }
+  }, [formData.position, formData.hasSubsidiary, formData.subsidiary, generateEmployeeId])
+  // </CHANGE>
 
   const loadCompanyData = async () => {
     try {
@@ -636,6 +669,7 @@ export default function EmployeesPage() {
         date_of_joining: employeeData.dateOfJoining || null,
         date_of_exit: employeeData.dateOfExit || null,
         status: employeeData.status || "Active",
+        inactive_reason: employeeData.inactiveReason || null, // Added inactive_reason
         probation_period: employeeData.probationPeriod ? Number.parseInt(employeeData.probationPeriod) : null,
         confirmation_date: employeeData.confirmationDate || null,
         notice_period: employeeData.noticePeriod || null,
@@ -784,8 +818,24 @@ export default function EmployeesPage() {
         emergency_contact_tel: employeeData.emergencyContactTel,
         department: employeeData.department,
         position: employeeData.position,
-        salary: Number.parseFloat(employeeData.salary) || 0,
+        special_role: employeeData.specialRole, // Update special role
+        subsidiary_id: employeeData.subsidiary, // Update subsidiary
+        has_subsidiary: employeeData.hasSubsidiary, // Update hasSubsidiary
+        division: employeeData.division,
+        location: employeeData.location,
+        contract_type: employeeData.contractType,
+        date_of_joining: employeeData.dateOfJoining || null,
+        date_of_exit: employeeData.dateOfExit || null,
         status: employeeData.status || "Active",
+        inactive_reason: employeeData.inactiveReason || null, // Update inactive reason
+        probation_period: employeeData.probationPeriod ? Number.parseInt(employeeData.probationPeriod) : null,
+        confirmation_date: employeeData.confirmationDate || null,
+        notice_period: employeeData.noticePeriod || null,
+        direct_supervisor: employeeData.directSupervisor,
+        head_of_department: employeeData.headOfDepartment,
+        ghana_card_number: employeeData.ghanaCard || null,
+        salary: Number.parseFloat(employeeData.salary) || 0,
+        // ... include other fields as needed
       }
 
       const { error } = await supabase.from("employees").update(updatedEmployee).eq("id", selectedEmployee.id)
@@ -1989,6 +2039,8 @@ function AddEmployeeForm({
         phone: employee.phone || "",
         position: employee.position || "",
         subsidiary: employee.subsidiary_id || "",
+        hasSubsidiary: employee.subsidiary_id ? "Yes" : "No", // Set based on existing data
+        specialRole: employee.special_role || "No Role", // Set based on existing data
         division: employee.division || "",
         department: employee.department || "",
         location: employee.location || "",
@@ -1996,6 +2048,7 @@ function AddEmployeeForm({
         dateOfJoining: employee.date_of_joining || "",
         dateOfExit: employee.date_of_exit || "",
         status: employee.status || "Active",
+        inactiveReason: employee.inactive_reason || "", // Set based on existing data
         probationPeriod: employee.probation_period || "6",
         confirmationDate: employee.confirmation_date || "",
         noticePeriod: employee.notice_period || "",
@@ -2140,6 +2193,11 @@ function AddEmployeeForm({
       isValid = false
     }
 
+    if (formData.status === "Inactive" && !formData.inactiveReason) {
+      newErrors.inactiveReason = "Inactive reason is required when status is Inactive"
+      isValid = false
+    }
+
     setErrors(newErrors)
     return isValid
   }
@@ -2153,6 +2211,7 @@ function AddEmployeeForm({
         ...formData,
         fullName: fullName,
         displayName: displayName,
+        employeeId: formData.employeeId, // Ensure employeeId is passed
       }
 
       onSubmit(employeeData)
@@ -2209,7 +2268,7 @@ function AddEmployeeForm({
 
   return (
     <div className="space-y-6">
-      <Tabs value={currentTab} onValueChange={handleInputChange}>
+      <Tabs value={currentTab} onValueChange={setCurrentTab}>
         <TabsList className="flex justify-between">
           <TabsTrigger value="personal">Personal</TabsTrigger>
           <TabsTrigger value="employment">Employment</TabsTrigger>
@@ -2456,20 +2515,74 @@ function AddEmployeeForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="subsidiary">2. Subsidiary</Label>
-              <Select value={formData.subsidiary} onValueChange={(value) => handleInputChange("subsidiary", value)}>
+              <Label htmlFor="employeeId">1a. Employee ID *</Label>
+              <Input
+                type="text"
+                id="employeeId"
+                value={formData.employeeId}
+                onChange={(e) => handleInputChange("employeeId", e.target.value)}
+                className="bg-muted"
+                readOnly
+                placeholder="Auto-generated"
+              />
+              <p className="text-xs text-muted-foreground">Auto-generated based on company/subsidiary</p>
+            </div>
+            {/* </CHANGE> */}
+
+            <div className="space-y-2">
+              <Label htmlFor="specialRole">1b. Special Role</Label>
+              <Select value={formData.specialRole} onValueChange={(value) => handleInputChange("specialRole", value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select subsidiary" />
+                  <SelectValue placeholder="Select special role" />
                 </SelectTrigger>
                 <SelectContent>
-                  {subsidiaries.map((subsidiary) => (
-                    <SelectItem key={subsidiary.id} value={subsidiary.id}>
-                      {subsidiary.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="Head of Department">Head of Department</SelectItem>
+                  <SelectItem value="Direct Supervisor">Direct Supervisor</SelectItem>
+                  <SelectItem value="No Role">No Role</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {/* </CHANGE> */}
+
+            <div className="space-y-2">
+              <Label htmlFor="hasSubsidiary">2a. Select Subsidiary</Label>
+              <Select
+                value={formData.hasSubsidiary}
+                onValueChange={(value) => {
+                  handleInputChange("hasSubsidiary", value)
+                  if (value === "No") {
+                    handleInputChange("subsidiary", "")
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select option" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.hasSubsidiary === "Yes" && (
+              <div className="space-y-2">
+                <Label htmlFor="subsidiary">2b. Subsidiary</Label>
+                <Select value={formData.subsidiary} onValueChange={(value) => handleInputChange("subsidiary", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select subsidiary" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subsidiaries.map((subsidiary) => (
+                      <SelectItem key={subsidiary.id} value={subsidiary.id}>
+                        {subsidiary.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {/* </CHANGE> */}
 
             <div className="space-y-2">
               <Label htmlFor="division">3. Division</Label>
@@ -2566,20 +2679,46 @@ function AddEmployeeForm({
 
             <div className="space-y-2">
               <Label htmlFor="status">9. Status *</Label>
-              <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
+              <Select
+                value={formData.status}
+                onValueChange={(value) => {
+                  handleInputChange("status", value)
+                  if (value === "Active") {
+                    handleInputChange("inactiveReason", "")
+                  }
+                }}
+              >
                 <SelectTrigger className={errors.status ? "border-red-500" : ""}>
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="On leave">On leave</SelectItem>
-                  <SelectItem value="Resigned">Resigned</SelectItem>
-                  <SelectItem value="Terminated">Terminated</SelectItem>
-                  <SelectItem value="Suspend">Suspend</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
               {errors.status && <p className="text-red-500 text-sm mt-1">{errors.status}</p>}
             </div>
+
+            {formData.status === "Inactive" && (
+              <div className="space-y-2">
+                <Label htmlFor="inactiveReason">9a. Inactive Reason *</Label>
+                <Select
+                  value={formData.inactiveReason}
+                  onValueChange={(value) => handleInputChange("inactiveReason", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select reason" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Resigned">Resigned</SelectItem>
+                    <SelectItem value="Terminated">Terminated</SelectItem>
+                    <SelectItem value="On Leave">On Leave</SelectItem>
+                    <SelectItem value="Suspended">Suspended</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {/* </CHANGE> */}
 
             <div className="space-y-2">
               <Label htmlFor="probationPeriod">10. Probation Period (Months)</Label>
@@ -2693,23 +2832,23 @@ function AddEmployeeForm({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="ssnitNumber">SSNIT Number</Label>
+                <Label htmlFor="ssnit">SSNIT Number</Label>
                 <Input
                   type="text"
-                  id="ssnitNumber"
-                  value={formData.ssnitNumber}
-                  onChange={(e) => handleInputChange("ssnitNumber", e.target.value)}
+                  id="ssnit"
+                  value={formData.ssnit}
+                  onChange={(e) => handleInputChange("ssnit", e.target.value)}
                   placeholder="GHA-123456789-0"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="ghanaCardNumber">Ghana Card Number</Label>
+                <Label htmlFor="ghanaCard">Ghana Card Number</Label>
                 <Input
                   type="text"
-                  id="ghanaCardNumber"
-                  value={formData.ghanaCardNumber}
-                  onChange={(e) => handleInputChange("ghanaCardNumber", e.target.value)}
+                  id="ghanaCard"
+                  value={formData.ghanaCard}
+                  onChange={(e) => handleInputChange("ghanaCard", e.target.value)}
                   placeholder="GHA-123456789-0"
                 />
               </div>
@@ -2814,12 +2953,12 @@ function AddEmployeeForm({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="tier3Contribution">Tier 3 Contribution (GHS)</Label>
+                  <Label htmlFor="tier3">Tier 3 Contribution (GHS)</Label>
                   <Input
                     type="number"
-                    id="tier3Contribution"
-                    value={formData.tier3Contribution}
-                    onChange={(e) => handleInputChange("tier3Contribution", e.target.value)}
+                    id="tier3"
+                    value={formData.tier3}
+                    onChange={(e) => handleInputChange("tier3", e.target.value)}
                     placeholder="0"
                   />
                 </div>
@@ -2886,12 +3025,12 @@ function AddEmployeeForm({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="monthlyInstallment">Monthly Installment (GHS)</Label>
+                  <Label htmlFor="loanInstallment">Monthly Installment (GHS)</Label>
                   <Input
                     type="number"
-                    id="monthlyInstallment"
-                    value={formData.monthlyInstallment}
-                    onChange={(e) => handleInputChange("monthlyInstallment", e.target.value)}
+                    id="loanInstallment"
+                    value={formData.loanInstallment}
+                    onChange={(e) => handleInputChange("loanInstallment", e.target.value)}
                     placeholder="0"
                   />
                 </div>
