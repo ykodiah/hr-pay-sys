@@ -395,9 +395,8 @@ export default function EmployeesPage() {
     return `${letterPart}${numberPart}`
   }, [companySettings, formData.hasSubsidiary, formData.subsidiary, subsidiaries, employees.length])
 
-  // Auto-generate employee ID when position is filled
   useEffect(() => {
-    if (formData.position && !formData.employeeId) {
+    if (formData.position) {
       const newEmployeeId = generateEmployeeId()
       setFormData((prev: any) => ({
         ...prev,
@@ -462,7 +461,8 @@ export default function EmployeesPage() {
   }
 
   useEffect(() => {
-    if (formData.subsidiary) {
+    // If "Yes" is selected and a subsidiary is chosen, load subsidiary data
+    if (formData.hasSubsidiary === "Yes" && formData.subsidiary) {
       const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
       if (selectedSubsidiary) {
         console.log("[v0] Loading subsidiary data:", selectedSubsidiary.name)
@@ -493,8 +493,10 @@ export default function EmployeesPage() {
         console.log("[v0] Set subsidiary departments:", subDepartments)
         console.log("[v0] Set subsidiary locations:", subLocations)
       }
-    } else if (companySettings) {
-      console.log("[v0] Loading company data (no subsidiary selected)")
+    }
+    // If "No" is selected or no subsidiary is chosen, load parent company data
+    else if (companySettings) {
+      console.log("[v0] Loading parent company data (no subsidiary selected)")
 
       const companyDivisions = Array.isArray(companySettings.divisions)
         ? companySettings.divisions
@@ -522,7 +524,8 @@ export default function EmployeesPage() {
       console.log("[v0] Set company departments:", companyDepartments)
       console.log("[v0] Set company locations:", companyLocations)
     }
-  }, [formData.subsidiary, subsidiaries, companySettings])
+  }, [formData.hasSubsidiary, formData.subsidiary, subsidiaries, companySettings])
+  // </CHANGE>
 
   const loadEmployees = async () => {
     try {
