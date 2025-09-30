@@ -1,23 +1,65 @@
 "use client"
 import { useState, useEffect } from "react"
 
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
-import { Building, Building2, ChevronLeft, ChevronRight, FileText, Loader2, Plus, ZoomIn, ZoomOut } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Building2,
+  Users,
+  X,
+  Eye,
+  Edit,
+  MoreVertical,
+  Loader2,
+  Brain,
+  Plus,
+  RefreshCw,
+  MapPin,
+  Briefcase,
+  Copy,
+  Download,
+  Upload,
+  ImageIcon,
+  AlertTriangle,
+  CheckCircle,
+  Save,
+  Settings,
+  Calendar,
+  Sparkles,
+  TrendingUp,
+  DollarSign,
+  Minus,
+  Calculator,
+  Wifi,
+  Bell,
+  MoreHorizontal,
+  Trash2,
+  Send,
+  Mail,
+  Shield,
+  Database,
+  FileText,
+  EyeOff,
+  Check,
+} from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Separator } from "@/components/ui/separator" // Added for Separator
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table" // Added for Table components
 
 interface Company {
   id: string
@@ -138,8 +180,6 @@ export default function SettingsPage() {
   const { toast } = useToast()
   const supabase = createClient()
 
-  // Company State
-  const [company, setCompany] = useState<Company | null>(null) // Changed to allow null initially
   const [companyData, setCompanyData] = useState<Company>({
     id: "",
     name: "",
@@ -153,10 +193,7 @@ export default function SettingsPage() {
     departments: [],
     locations: [],
   })
-  const [showCompanyModal, setShowCompanyModal] = useState(false)
-  const [isSavingCompany, setIsSavingCompany] = useState(false)
 
-  // HR State
   const [hrConfig, setHrConfig] = useState({
     leaveYearStart: "January",
     probationPeriod: 3,
@@ -175,15 +212,9 @@ export default function SettingsPage() {
     description: "",
   })
   const [isSavingPolicy, setIsSavingPolicy] = useState(false)
+  const [isSavingDocument, setIsSavingDocument] = useState(false)
   const [showDocumentPreview, setShowDocumentPreview] = useState(false)
   const [documentPreviewContent, setDocumentPreviewContent] = useState("")
-  const [isSavingDocument, setIsSavingDocument] = useState(false)
-  const [pdfViewerState, setPdfViewerState] = useState({
-    currentPage: 1,
-    totalPages: 1,
-    zoom: 100,
-    isLoading: false,
-  })
 
   const [documentZoom, setDocumentZoom] = useState(100)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -192,47 +223,13 @@ export default function SettingsPage() {
   const [documentModalType, setDocumentModalType] = useState("add") // add, view, edit, delete
   const [selectedDocument, setSelectedDocument] = useState(null)
   const [uploadedFile, setUploadedFile] = useState(null)
-  const [newDocumentName, setNewDocumentName] = useState("") // Fixed undeclared variable
-  const [newDocumentFile, setNewDocumentFile] = useState<File | null>(null)
-  const [newDocumentAvailable, setNewDocumentAvailable] = useState(true)
-  const [uploadingDocument, setUploadingDocument] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0) // Added for upload progress
-
+  const [documentName, setDocumentName] = useState("")
   const [currentPolicies, setCurrentPolicies] = useState([
     { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Annual vacation leave" },
     { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness" },
     { name: "Maternity Leave", days: 84, usage: "12%", trend: "stable", description: "Maternity and paternity leave" },
   ])
 
-  // HR Documents State
-  const [hrDocuments, setHrDocuments] = useState([
-    { id: 1, name: "Employee Handbook", type: "PDF", size: "1.2MB", availableToEmployees: true },
-    { id: 2, name: "Code of Conduct", type: "DOC", size: "0.5MB", availableToEmployees: true },
-    { id: 3, name: "Safety Manual", type: "PDF", size: "0.8MB", availableToEmployees: false },
-  ])
-  const [viewingDocument, setViewingDocument] = useState<any>(null)
-  const [showDocumentViewer, setShowDocumentViewer] = useState(false)
-  const [loadingDocument, setLoadingDocument] = useState(false)
-  const [documentContent, setDocumentContent] = useState("")
-  const [editingDocument, setEditingDocument] = useState<any>(null)
-  const [currentPage, setCurrentPage] = useState(1) // Fixed undeclared variable
-  const [totalPages, setTotalPages] = useState(1) // Fixed undeclared variable
-  const [zoomLevel, setZoomLevel] = useState(1) // Fixed undeclared variable
-
-  // Leave Policies State
-  const [leavePolicies, setLeavePolicies] = useState([
-    { id: 1, name: "Annual Leave", days: 21, carryOver: true },
-    { id: 2, name: "Sick Leave", days: 10, carryOver: false },
-    { id: 3, name: "Maternity Leave", days: 84, carryOver: true },
-    { id: 4, name: "Paternity Leave", days: 5, carryOver: false },
-  ])
-  const [showLeavePolicyModal, setShowLeavePolicyModal] = useState(false)
-  const [editingLeavePolicy, setEditingLeavePolicy] = useState<any>(null)
-  const [newLeaveType, setNewLeaveType] = useState("") // Fixed redeclared variable
-  const [newLeaveDays, setNewLeaveDays] = useState(0)
-  const [newLeaveCarryOver, setNewLeaveCarryOver] = useState(false)
-
-  // Divisions, Departments, Locations State
   const [divisions, setDivisions] = useState<string[]>([])
   const [departments, setDepartments] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
@@ -245,11 +242,9 @@ export default function SettingsPage() {
   const [showAddSubsidiary, setShowAddSubsidiary] = useState<boolean>(false)
   const [showEditSubsidiary, setShowEditSubsidiary] = useState(false)
   const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState(false)
-  const [showSubsidiaryModal, setShowSubsidiaryModal] = useState<boolean>(false)
-  const [editingSubsidiary, setEditingSubsidiary] = useState<Subsidiary | null>(null)
   const [selectedSubsidiary, setSelectedSubsidiary] = useState<Subsidiary | null>(null)
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<boolean>(false)
-  const [showReactivateConfirm, setShowReactivateConfirm] = useState(false)
+  const [showReactivateConfirm, setShowReactivateConfirm] = useState<boolean>(false)
   const [subsidiaryToToggle, setSubsidiaryToToggle] = useState<Subsidiary | null>(null)
 
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string>("")
@@ -277,8 +272,7 @@ export default function SettingsPage() {
   const [showAddLeaveTypeModal, setShowAddLeaveTypeModal] = useState(false)
   const [showPolicyModal, setShowPolicyModal] = useState(false)
   const [policyModalType, setPolicyModalType] = useState("view") // view, edit, delete
-  const [newLeaveTypeState, setNewLeaveTypeState] = useState({
-    // Fixed redeclared variable
+  const [newLeaveType, setNewLeaveType] = useState({
     name: "",
     days: 0,
     description: "",
@@ -582,11 +576,10 @@ export default function SettingsPage() {
   const [testConnectionStatus, setTestConnectionStatus] = useState<"idle" | "testing" | "success" | "error">("idle")
 
   // Structured Salary Grades
-  const [structuredSalaryGrades, setStructuredSalaryGrades] = useState([
+  const [salaryGrades, setSalaryGrades] = useState([
     {
       id: 1,
       name: "Grade 1",
-      currency: "GHS",
       description: "Entry Level",
       minSalary: 2500,
       maxSalary: 4000,
@@ -602,9 +595,7 @@ export default function SettingsPage() {
     },
   ])
   const [showSalaryGradeModal, setShowSalaryGradeModal] = useState(false)
-  const [showStructuredGradeModal, setShowStructuredGradeModal] = useState(false)
-  const [showUnstructuredGradeModal, setShowUnstructuredGradeModal] = useState(false)
-  const [editingGrade, setEditingGrade] = useState<any>(null) // Changed to any to match usage
+  const [editingGrade, setEditingGrade] = useState(null)
   const [newGrade, setNewGrade] = useState({
     name: "",
     description: "",
@@ -621,7 +612,7 @@ export default function SettingsPage() {
   const [isExporting, setIsExporting] = useState(false)
 
   const [salaryGradeTab, setSalaryGradeTab] = useState("structured")
-  const [unstructuredSalaryGrades, setUnstructuredSalaryGrades] = useState([
+  const [unstructuredGrades, setUnstructuredGrades] = useState([
     {
       id: 1,
       name: "Management Level",
@@ -630,12 +621,13 @@ export default function SettingsPage() {
       performanceIncrement: { type: "percentage", value: 10 },
     },
   ])
-  const [editingUnstructured, setEditingUnstructured] = useState<any>(null) // Changed to any to match usage
+  const [showUnstructuredModal, setShowUnstructuredModal] = useState(false)
+  const [editingUnstructured, setEditingUnstructured] = useState(null)
   const [newUnstructured, setNewUnstructured] = useState({
     name: "",
     description: "",
-    generalIncrement: { type: "percentage", value: 0, min: 0, max: 0 },
-    performanceIncrement: { type: "percentage", value: 0, min: 0, max: 0 },
+    generalIncrement: { type: "percentage", value: 0 },
+    performanceIncrement: { type: "percentage", value: 0 },
   })
 
   const handleExportSalaryGrades = async (format: "csv" | "excel") => {
@@ -649,7 +641,7 @@ export default function SettingsPage() {
       exportData.push(["Grade Name", "Description", "Min Salary", "Max Salary", "Step", "Step Amount"])
 
       // Add data rows
-      structuredSalaryGrades.forEach((grade) => {
+      salaryGrades.forEach((grade) => {
         grade.notches.forEach((notch) => {
           exportData.push([grade.name, grade.description, grade.minSalary, grade.maxSalary, notch.step, notch.amount])
         })
@@ -763,7 +755,7 @@ export default function SettingsPage() {
       }))
 
       // Add to existing grades
-      setStructuredSalaryGrades((prev) => [...prev, ...importedGrades])
+      setSalaryGrades((prev) => [...prev, ...importedGrades])
 
       toast({
         title: "Import Successful",
@@ -786,6 +778,13 @@ export default function SettingsPage() {
   const [newDivisionName, setNewDivisionName] = useState("")
   const [newDepartmentName, setNewDepartmentName] = useState("")
   const [newLocationName, setNewLocationName] = useState("")
+
+  // HR Documents State
+  const [hrDocuments, setHrDocuments] = useState([
+    { id: 1, name: "Employee Handbook", type: "PDF", size: "1.2MB", visibleToAll: true },
+    { id: 2, name: "Code of Conduct", type: "DOC", size: "0.5MB", visibleToAll: true },
+    { id: 3, name: "Safety Manual", type: "PDF", size: "0.8MB", visibleToAll: false },
+  ])
 
   const getCurrencyConfig = (currency: string) => {
     return currencyConfig[currency as keyof typeof currencyConfig] || currencyConfig.ghs
@@ -932,20 +931,9 @@ export default function SettingsPage() {
     setDocumentZoom((prev) => Math.max(prev - 25, 50))
   }
 
-  // Helper function to parse document content (mock implementation)
-  const parseDocumentContent = (document: any) => {
-    // In a real application, this would parse different document types (PDF, DOC, etc.)
-    // For demo purposes, we'll return a simple string representation.
-    return {
-      content: `This is the content of the document: ${document.name}. It's a ${document.type} file.`,
-      // Simulate total pages for PDF
-      totalPages: document.type === "PDF" ? Math.floor(Math.random() * 10) + 5 : 1,
-    }
-  }
-
   const handleDownload = () => {
     if (selectedDocument) {
-      const { content } = parseDocumentContent(selectedDocument) // Fixed undeclared variable
+      const content = parseDocumentContent(selectedDocument)
       let blob
       let filename
 
@@ -1055,7 +1043,7 @@ export default function SettingsPage() {
 
     if (isDemoMode()) {
       console.log("[v0] Demo mode detected, using mock company data")
-      const mockCompanyData = {
+      setCompanyData({
         id: "demo-company-001",
         name: "Akwaaba Technologies Ltd",
         email_address: "ykodiah@gmail.com",
@@ -1068,13 +1056,10 @@ export default function SettingsPage() {
         divisions: ["Head Office", "Regional Office"],
         departments: ["Technology", "Human Resources", "Finance"],
         locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-      }
-      setCompany(mockCompanyData)
-      setCompanyData(mockCompanyData) // Also update the detailed state
-      setDivisions(mockCompanyData.divisions || [])
-      setDepartments(mockCompanyData.departments || [])
-      setLocations(mockCompanyData.locations || [])
-      setLogoPreview(mockCompanyData.logo_url || "")
+      })
+      setDivisions(["Head Office", "Regional Office"])
+      setDepartments(["Technology", "Human Resources", "Finance"])
+      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
       return
     }
 
@@ -1084,7 +1069,6 @@ export default function SettingsPage() {
       if (error) throw error
 
       if (data) {
-        setCompany(data) // Set the company data
         setCompanyData({
           id: data.id,
           name: data.name || "",
@@ -1112,7 +1096,7 @@ export default function SettingsPage() {
         // Set demo session cookie to prevent future database calls
         document.cookie = "demo-session=active; path=/; max-age=86400"
         // Load demo data
-        const mockCompanyData = {
+        setCompanyData({
           id: "demo-company-001",
           name: "Akwaaba Technologies Ltd",
           email_address: "ykodiah@gmail.com",
@@ -1125,9 +1109,7 @@ export default function SettingsPage() {
           divisions: ["Head Office", "Regional Office"],
           departments: ["Technology", "Human Resources", "Finance"],
           locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-        }
-        setCompany(mockCompanyData)
-        setCompanyData(mockCompanyData)
+        })
         setDivisions(["Head Office", "Regional Office"])
         setDepartments(["Technology", "Human Resources", "Finance"])
         setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
@@ -1410,14 +1392,14 @@ export default function SettingsPage() {
             name: "Administrator",
             description: "Full system access",
             permissions: ["read", "write", "delete", "admin"],
-            user_count: 2, // Added user_count to match interface
+            status: "active",
           },
           {
             id: "role-002",
             name: "HR Manager",
             description: "Human Resources management",
             permissions: ["read", "write"],
-            user_count: 3, // Added user_count to match interface
+            status: "active",
           },
         ])
         return
@@ -2153,77 +2135,654 @@ export default function SettingsPage() {
     }
   }
 
-  const handleDeleteLeavePolicy = async (policyId: number) => {
-    if (!confirm("Are you sure you want to delete this leave policy?")) return
+  const handleDeletePolicy = async () => {
+    if (!selectedPolicy) return
 
-    setLeavePolicies((prev) => prev.filter((p) => p.id !== policyId))
+    setIsSavingPolicy(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      setCurrentPolicies((prev) => prev.filter((policy) => policy.name !== selectedPolicy.name))
+      setShowPolicyModal(false)
+
+      toast({
+        title: "Policy Deleted",
+        description: `${selectedPolicy.name} policy has been successfully deleted.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete policy. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingPolicy(false)
+    }
+  }
+
+  const handleToggleDocumentVisibility = (docId: number) => {
+    setHrDocuments((prev) => prev.map((doc) => (doc.id === docId ? { ...doc, visibleToAll: !doc.visibleToAll } : doc)))
+
+    const doc = hrDocuments.find((d) => d.id === docId)
     toast({
-      title: "Leave Policy Deleted",
-      description: "The leave policy has been successfully deleted.",
+      title: "Visibility Updated",
+      description: `${doc?.name} is now ${doc?.visibleToAll ? "hidden from" : "visible to"} all employees.`,
     })
   }
 
-  const handleSaveLeavePolicy = async () => {
-    if (!newLeaveType.trim() || newLeaveDays <= 0) {
+  const handleEditDocument = async () => {
+    if (!documentName) {
       toast({
-        title: "Validation Error",
-        description: "Please provide a leave type name and a valid number of days.",
+        title: "Error",
+        description: "Please provide a document name.",
         variant: "destructive",
       })
       return
     }
 
-    if (editingLeavePolicy) {
-      // Edit existing policy
-      setLeavePolicies((prev) =>
-        prev.map((p) =>
-          p.id === editingLeavePolicy.id
-            ? { ...p, name: newLeaveType, days: newLeaveDays, carryOver: newLeaveCarryOver }
-            : p,
-        ),
+    setIsSavingDocument(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      setHrDocuments((prev) =>
+        prev.map((doc) => (doc.id === selectedDocument.id ? { ...doc, name: documentName } : doc)),
       )
+
+      setShowDocumentModal(false)
       toast({
-        title: "Leave Policy Updated",
-        description: `${newLeaveType} has been successfully updated.`,
+        title: "Document Updated",
+        description: `${documentName} has been successfully updated.`,
       })
-    } else {
-      // Add new policy
-      const newPolicy = {
-        id: Date.now(), // Simple unique ID generation
-        name: newLeaveType,
-        days: newLeaveDays,
-        carryOver: newLeaveCarryOver,
-      }
-      setLeavePolicies((prev) => [...prev, newPolicy])
+    } catch (error) {
       toast({
-        title: "Leave Policy Added",
-        description: `${newLeaveType} has been successfully added.`,
+        title: "Error",
+        description: "Failed to update document. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingDocument(false)
+    }
+  }
+
+  const handleToggleSubsidiaryStatus = (subsidiary: Subsidiary) => {
+    setSubsidiaryToToggle(subsidiary)
+    if (subsidiary.status === "active") {
+      setShowDeactivateConfirm(true)
+    } else {
+      setShowReactivateConfirm(true)
+    }
+  }
+
+  const confirmToggleStatus = async () => {
+    if (!subsidiaryToToggle) return
+
+    await toggleSubsidiaryStatus(subsidiaryToToggle.id, subsidiaryToToggle.status)
+    setShowDeactivateConfirm(false)
+    setShowReactivateConfirm(false)
+    setSubsidiaryToToggle(null)
+  }
+
+  const handleAddLeaveType = async () => {
+    if (!newLeaveType.name || !newLeaveType.days) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSavingPolicy(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      const newPolicy = {
+        name: newLeaveType.name,
+        days: newLeaveType.days,
+        usage: "0%",
+        trend: "new",
+        description: newLeaveType.description,
+      }
+
+      setCurrentPolicies((prev) => [...prev, newPolicy])
+      setNewLeaveType({ name: "", days: 0, description: "", carryOver: false })
+      setShowAddLeaveTypeModal(false)
+
+      toast({
+        title: "Leave Type Added",
+        description: `${newLeaveType.name} has been successfully added.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add leave type. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingPolicy(false)
+    }
+  }
+
+  const handlePolicyAction = (action, policyName) => {
+    const policy = currentPolicies.find((p) => p.name === policyName)
+
+    setSelectedPolicy(policy)
+    setPolicyModalType(action)
+
+    if (action === "edit") {
+      setEditingPolicy({
+        name: policy.name,
+        days: policy.days,
+        description: policy.description,
       })
     }
 
-    setShowLeavePolicyModal(false)
-    setEditingLeavePolicy(null)
-    setNewLeaveType("")
-    setNewLeaveDays(0)
-    setNewLeaveCarryOver(false)
+    setShowPolicyModal(true)
   }
 
-  const handleToggleDocumentVisibility = (docId: number) => {
-    setHrDocuments((prev) =>
-      prev.map((doc) => (doc.id === docId ? { ...doc, availableToEmployees: !doc.availableToEmployees } : doc)),
-    )
+  const handleSavePolicyChanges = async () => {
+    setIsSavingPolicy(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
-    const doc = hrDocuments.find((d) => d.id === docId)
-    toast({
-      title: "Visibility Updated",
-      description: `${doc?.name} is now ${doc?.availableToEmployees ? "visible to" : "hidden from"} employees.`,
-    })
+      // Update the policy in current policies
+      setCurrentPolicies((prev) =>
+        prev.map((policy) =>
+          policy.name === selectedPolicy.name
+            ? { ...policy, name: editingPolicy.name, days: editingPolicy.days, description: editingPolicy.description }
+            : policy,
+        ),
+      )
+
+      setShowPolicyModal(false)
+      toast({
+        title: "Policy Updated",
+        description: `${editingPolicy.name} policy has been successfully updated.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update policy. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingPolicy(false)
+    }
+  }
+
+  const generateLeaveTypeInsights = (name: string, days: number, description: string) => {
+    const insights = []
+
+    if (days > 30) {
+      insights.push("⚠️ Consider if this extended leave period aligns with industry standards")
+    }
+    if (days < 5) {
+      insights.push("💡 Short leave periods may require frequent approvals - consider automation")
+    }
+    if (name.toLowerCase().includes("sick")) {
+      insights.push("🏥 Recommend integrating with health insurance policies")
+    }
+    if (name.toLowerCase().includes("maternity") || name.toLowerCase().includes("paternity")) {
+      insights.push("👶 Ensure compliance with local family leave regulations")
+    }
+    if (description.length < 20) {
+      insights.push("📝 Consider adding more detailed policy description for clarity")
+    }
+
+    insights.push("✨ AI suggests reviewing similar policies in your industry for benchmarking")
+
+    return insights
+  }
+
+  const getDocumentContent = (document: any) => {
+    if (!document) return ""
+
+    const documentTemplates: Record<string, { content: string }> = {
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+WELCOME TO OUR COMPANY
+
+This handbook serves as a guide to our company policies, procedures, and benefits. Please read it carefully and keep it for future reference.
+
+TABLE OF CONTENTS
+
+1. EMPLOYMENT POLICIES
+   - Equal Employment Opportunity
+   - Anti-Discrimination Policy
+   - Harassment Prevention
+   - Code of Conduct
+
+2. WORK SCHEDULES AND ATTENDANCE
+   - Standard Work Hours
+   - Flexible Work Arrangements
+   - Attendance Policy
+   - Time Off Requests
+
+3. COMPENSATION AND BENEFITS
+   - Salary Administration
+   - Performance Reviews
+   - Health Insurance
+   - Retirement Plans
+   - Paid Time Off
+
+4. WORKPLACE POLICIES
+   - Dress Code
+   - Technology Use
+   - Confidentiality
+   - Safety Procedures
+
+5. EMPLOYEE DEVELOPMENT
+   - Training Programs
+   - Career Advancement
+   - Performance Management
+   - Professional Development
+
+For questions about this handbook, please contact Human Resources.`,
+      },
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+INTRODUCTION
+
+Our Code of Conduct outlines the ethical standards and behavioral expectations for all employees, contractors, and business partners.
+
+CORE VALUES
+
+1. INTEGRITY
+   - Act honestly and transparently
+   - Keep commitments and promises
+   - Report violations without fear of retaliation
+
+2. RESPECT
+   - Treat all individuals with dignity
+   - Value diversity and inclusion
+   - Maintain professional relationships
+
+3. ACCOUNTABILITY
+   - Take responsibility for actions
+   - Meet performance expectations
+   - Support team objectives
+
+ETHICAL GUIDELINES
+
+• Conflict of Interest
+• Confidential Information
+• Fair Dealing
+• Compliance with Laws
+• Reporting Concerns
+
+ENFORCEMENT
+
+Violations of this Code may result in disciplinary action, up to and including termination of employment.
+
+For questions or to report concerns, contact the Ethics Hotline at ethics@company.com`,
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.0
+APPROVED BY: Safety Committee
+
+SAFETY FIRST
+
+The safety and well-being of our employees is our top priority. This manual provides guidelines for maintaining a safe work environment.
+
+GENERAL SAFETY RULES
+
+1. Report all accidents and injuries immediately
+2. Use personal protective equipment when required
+3. Follow all safety procedures and protocols
+4. Keep work areas clean and organized
+5. Report unsafe conditions or practices
+
+EMERGENCY PROCEDURES
+
+• Fire Emergency
+• Medical Emergency
+• Evacuation Procedures
+• Emergency Contacts
+
+WORKPLACE HAZARDS
+
+• Chemical Safety
+• Electrical Safety
+• Ergonomic Guidelines
+• Equipment Operation
+
+TRAINING REQUIREMENTS
+
+All employees must complete safety training within 30 days of employment and annually thereafter.
+
+For safety concerns, contact the Safety Officer at safety@company.com`,
+      },
+    }
+
+    return (
+      documentTemplates[document.name]?.content ||
+      `Document: ${document.name}
+
+This document contains important information about ${document.name.toLowerCase()}. The content would be displayed here in a real implementation.`
+    )
+  }
+
+  const parseDocumentContent = (document: any) => {
+    const documentTemplates = {
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+1. Introduction and Purpose ................................. 3
+2. Professional Conduct Standards .......................... 4
+3. Confidentiality and Information Security ............... 6
+4. Conflict of Interest Policy ............................. 8
+5. Compliance with Laws and Regulations .................... 10
+6. Reporting Violations and Whistleblower Protection ...... 12
+7. Disciplinary Actions and Consequences .................. 14
+8. Acknowledgment and Certification ........................ 16
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUCTION AND PURPOSE
+
+Welcome to our organization. This Code of Conduct serves as a comprehensive guide for ethical decision-making and professional behavior within our company. All employees, contractors, and business partners are expected to adhere to these standards.
+
+Our mission is to provide exceptional service while maintaining the highest standards of integrity and professionalism in all business dealings.
+
+2. PROFESSIONAL CONDUCT STANDARDS
+
+2.1 General Principles
+All employees must:
+• Treat colleagues, clients, and stakeholders with respect and dignity
+• Maintain professional demeanor in all business interactions
+• Uphold company values and reputation
+• Act with honesty and transparency
+
+2.2 Workplace Behavior
+• Harassment, discrimination, or bullying will not be tolerated
+• Maintain a safe and inclusive work environment
+• Respect diversity and promote equal opportunities
+• Follow all safety protocols and procedures
+
+3. CONFIDENTIALITY AND INFORMATION SECURITY
+
+3.1 Confidential Information
+Employees must protect:
+• Client data and personal information
+• Proprietary business information
+• Trade secrets and intellectual property
+• Financial and strategic information
+
+3.2 Data Protection
+• Use strong passwords and secure authentication
+• Report security incidents immediately
+• Follow data retention and disposal policies
+• Comply with privacy regulations (GDPR, CCPA, etc.)
+
+4. CONFLICT OF INTEREST POLICY
+
+4.1 Definition
+A conflict of interest occurs when personal interests interfere with company interests or decision-making processes.
+
+4.2 Common Examples
+• Financial interests in competitors or suppliers
+• Personal relationships affecting business decisions
+• Outside employment that competes with company business
+• Accepting gifts or favors from business partners
+
+5. COMPLIANCE WITH LAWS AND REGULATIONS
+
+All employees must:
+• Comply with applicable local, state, and federal laws
+• Follow industry-specific regulations
+• Adhere to international trade and export controls
+• Report legal violations or concerns
+
+6. REPORTING VIOLATIONS
+
+6.1 Reporting Channels
+• Direct supervisor or manager
+• Human Resources department
+• Ethics hotline: 1-800-ETHICS-1
+• Anonymous online reporting portal
+• Legal department for serious violations
+
+6.2 Whistleblower Protection
+The company prohibits retaliation against employees who report violations in good faith.
+
+7. DISCIPLINARY ACTIONS
+
+Violations may result in:
+• Verbal or written warnings
+• Mandatory training or counseling
+• Suspension or probation
+• Termination of employment
+• Legal action where appropriate
+
+This document is reviewed annually and updated as needed to reflect current laws and best practices.
+
+═══════════════════════════════════════════════════════════════
+
+For questions about this Code of Conduct, contact:
+Ethics and Compliance Office
+ethics@company.com | (555) 123-4567
+
+Document ID: COC-2024-001
+Last Updated: January 15, 2024
+Next Review Date: January 15, 2025`,
+      },
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
+
+WELCOME TO OUR ORGANIZATION
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.2
+HUMAN RESOURCES DEPARTMENT
+
+═══════════════════════════════════════════════════════════════
+
+TABLE OF CONTENTS
+
+SECTION I: WELCOME AND INTRODUCTION
+1. Welcome Message .......................................... 4
+2. Company Overview ......................................... 5
+3. Mission, Vision, and Values ............................. 6
+
+SECTION II: EMPLOYMENT POLICIES
+4. Equal Opportunity Employment ............................. 8
+5. Anti-Discrimination Policy ............................... 9
+6. Harassment Prevention Policy ............................. 10
+7. Work Schedule and Attendance ............................. 12
+
+SECTION III: BENEFITS AND COMPENSATION
+8. Health Insurance ......................................... 14
+9. Retirement Plans ......................................... 16
+10. Paid Time Off ........................................... 18
+11. Professional Development ................................ 20
+
+SECTION IV: PERFORMANCE MANAGEMENT
+12. Performance Reviews ..................................... 22
+13. Career Development ...................................... 24
+14. Training and Education .................................. 26
+
+SECTION V: SAFETY AND SECURITY
+15. Workplace Safety ........................................ 28
+16. Technology Usage ........................................ 30
+17. Security Protocols ...................................... 32
+
+═══════════════════════════════════════════════════════════════
+
+1. WELCOME MESSAGE
+
+Dear Team Member,
+
+Welcome to our organization! We are pleased to have you join our team. This handbook will help you understand our company culture, policies, and expectations.
+
+Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment where everyone can thrive and contribute to our shared goals.
+
+This handbook is your guide to understanding our policies and procedures. Please read it carefully and keep it as a reference throughout your employment.
+
+We look forward to working with you and supporting your professional growth.
+
+Sincerely,
+The Management Team
+
+2. COMPANY OVERVIEW
+
+Our mission is to provide exceptional service while maintaining the highest standards of integrity and professionalism.
+
+Founded in 1995, we have grown from a small startup to a leading organization in our industry. We serve clients across multiple sectors and pride ourselves on innovation, quality, and customer satisfaction.
+
+Key Facts:
+• Founded: 1995
+• Employees: 500+
+• Locations: 12 offices worldwide
+• Industries Served: Technology, Healthcare, Finance, Education
+
+3. MISSION, VISION, AND VALUES
+
+MISSION STATEMENT
+To deliver innovative solutions that exceed client expectations while fostering a culture of excellence, integrity, and continuous improvement.
+
+VISION STATEMENT
+To be the leading provider of professional services, recognized for our expertise, innovation, and commitment to client success.
+
+CORE VALUES
+• INTEGRITY: We act with honesty and transparency in all our dealings
+• EXCELLENCE: We strive for the highest quality in everything we do
+• INNOVATION: We embrace new ideas and creative solutions
+• COLLABORATION: We work together to achieve common goals
+• RESPECT: We treat everyone with dignity and consideration
+
+SECTION II: EMPLOYMENT POLICIES
+
+4. EQUAL OPPORTUNITY EMPLOYMENT
+
+We are an equal opportunity employer committed to providing employment opportunities regardless of:
+• Race, color, or national origin
+• Religion or creed
+• Gender or gender identity
+• Sexual orientation
+• Age (40 and over)
+• Disability status
+• Veteran status
+• Genetic information
+
+5. BENEFITS AND COMPENSATION
+
+HEALTH INSURANCE
+• Comprehensive medical coverage
+• Dental and vision plans
+• Health Savings Account (HSA) options
+• Employee assistance programs
+
+RETIREMENT PLANS
+• 401(k) plan with company matching
+• Vesting schedule: 100% after 3 years
+• Financial planning resources
+• Retirement counseling services
+
+PAID TIME OFF
+• Annual Leave: 21 days per year
+• Sick Leave: 10 days per year
+• Maternity/Paternity Leave: As per local regulations
+• Personal Days: 5 days per year
+
+LEAVE POLICIES
+
+Annual Leave: 21 days per year
+• Accrual begins on first day of employment
+• Maximum carryover: 5 days to following year
+• Advance approval required for extended leave
+
+Sick Leave: 10 days per year
+• Available for personal illness or family care
+• Medical certification required for absences over 3 days
+• Unused sick days do not carry over
+
+Maternity/Paternity Leave: As per local regulations
+• Up to 12 weeks for eligible employees
+• Combination of paid and unpaid leave
+• Job protection guaranteed upon return
+
+This handbook is updated regularly to reflect current policies and procedures. For the most current version, please check the company intranet or contact Human Resources.
+
+═══════════════════════════════════════════════════════════════
+
+For questions about policies in this handbook, contact:
+Human Resources Department
+hr@company.com | (555) 123-4567
+
+Document ID: EH-2024-001
+Last Updated: January 15, 2024
+Next Review Date: January 15, 2025`,
+      },
+    }
+
+    return (
+      documentTemplates[document.name]?.content ||
+      `Document: ${document.name}\n\nThis document contains important information about ${document.name.toLowerCase()}. The content would be displayed here in a real implementation.`
+    )
+  }
+
+  const handleDocumentView = (document: any) => {
+    setSelectedDocument(document)
+    setDocumentModalType("view")
+    setShowDocumentModal(true)
+    setShowDocumentPreview(false) // Reset preview state
+
+    setTimeout(() => {
+      const parsedContent = parseDocumentContent(document)
+      setDocumentPreviewContent(parsedContent)
+    }, 500)
+  }
+
+  const handleDocumentAction = (action, docId = null) => {
+    if (docId) {
+      const doc = hrDocuments.find((d) => d.id === docId)
+      setSelectedDocument(doc)
+    }
+    setDocumentModalType(action)
+    setShowDocumentModal(true)
+  }
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0]
+    if (file) {
+      setUploadedFile(file)
+      if (!documentName) {
+        setDocumentName(file.name.replace(/\.[^/.]+$/, ""))
+      }
+    }
+  }
+
+  const handleAddDocument = () => {
+    setDocumentName("")
+    setUploadedFile(null)
+    handleDocumentAction("add")
   }
 
   const handleSaveDocument = async () => {
-    if (!newDocumentName.trim() || (!newDocumentFile && !editingDocument)) {
+    if (!documentName || !uploadedFile) {
       toast({
-        title: "Validation Error",
+        title: "Error",
         description: "Please provide a document name and upload a file.",
         variant: "destructive",
       })
@@ -2231,1009 +2790,4522 @@ export default function SettingsPage() {
     }
 
     setIsSavingDocument(true)
-    setUploadingDocument(true) // Indicate upload is in progress
-
     try {
-      let fileUrl = editingDocument?.url // Use existing URL if editing and no new file
-
-      if (newDocumentFile) {
-        // Upload new file
-        const formData = new FormData()
-        formData.append("file", newDocumentFile)
-
-        const uploadResponse = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        })
-
-        if (!uploadResponse.ok) {
-          throw new Error("File upload failed")
-        }
-        const uploadResult = await uploadResponse.json()
-        fileUrl = uploadResult.url
-      }
-
-      // Simulate saving document details
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      if (editingDocument) {
-        // Update existing document
-        setHrDocuments((prev) =>
-          prev.map((doc) =>
-            doc.id === editingDocument.id
-              ? { ...doc, name: newDocumentName, availableToEmployees: newDocumentAvailable, url: fileUrl }
-              : doc,
-          ),
-        )
-        toast({
-          title: "Document Updated",
-          description: `${newDocumentName} has been successfully updated.`,
-        })
-      } else {
-        // Add new document
-        const newDoc = {
-          id: Date.now(),
-          name: newDocumentName,
-          type: newDocumentFile?.type.split("/")[1].toUpperCase() || "PDF", // Infer type or default to PDF
-          size: newDocumentFile ? `${(newDocumentFile.size / 1024 / 1024).toFixed(2)}MB` : "0MB",
-          availableToEmployees: newDocumentAvailable,
-          url: fileUrl, // Store the URL of the uploaded file
-        }
-        setHrDocuments((prev) => [...prev, newDoc])
-        toast({
-          title: "Document Added",
-          description: `${newDocumentName} has been successfully added.`,
-        })
+      const newDoc = {
+        id: Date.now(),
+        name: documentName,
+        type: uploadedFile.type.includes("pdf") ? "PDF" : "DOC",
+        size: `${(uploadedFile.size / (1024 * 1024)).toFixed(1)} MB`,
+        visibleToAll: false,
       }
 
+      setHrDocuments((prev) => [...prev, newDoc])
       setShowDocumentModal(false)
-      setEditingDocument(null)
-      setNewDocumentName("")
-      setNewDocumentFile(null)
-      setNewDocumentAvailable(true)
+      setDocumentName("")
+      setUploadedFile(null)
+
+      toast({
+        title: "Document Added",
+        description: `${documentName} has been successfully uploaded.`,
+      })
     } catch (error) {
-      console.error("Save document error:", error)
       toast({
         title: "Error",
-        description: "Failed to save document. Please try again.",
+        description: "Failed to upload document. Please try again.",
         variant: "destructive",
       })
     } finally {
       setIsSavingDocument(false)
-      setUploadingDocument(false)
     }
   }
 
-  const handleDeleteDocument = async (docId: number) => {
-    if (!confirm("Are you sure you want to delete this document?")) return
-
-    // In a real app, you'd also delete the file from storage here.
-    setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId))
-    toast({
-      title: "Document Deleted",
-      description: "The document has been successfully deleted.",
-    })
-  }
-
-  const handleDocumentView = (document: any) => {
-    setViewingDocument(document)
-    setShowDocumentViewer(true)
-    setLoadingDocument(true) // Start loading indicator
-
-    // Simulate fetching document content
-    const { content, totalPages: docTotalPages } = parseDocumentContent(document) // Fixed undeclared variable
-    setDocumentContent(content)
-    setTotalPages(docTotalPages) // Fixed undeclared variable
-    setCurrentPage(1) // Fixed undeclared variable
-    setZoomLevel(1) // Fixed undeclared variable
-    setLoadingDocument(false)
-  }
-
-  const handlePageChange = (direction: "prev" | "next") => {
-    setCurrentPage((prev) => {
-      if (direction === "prev") {
-        return Math.max(1, prev - 1)
-      } else {
-        return Math.min(prev + 1, totalPages) // Fixed undeclared variable
-      }
-    })
-  }
-
-  const handleSaveCompanyInfo = async () => {
-    if (!company) return
-    setIsSavingCompany(true)
+  const handleDeleteDocument = async (docId) => {
     try {
-      const { error } = await supabase.from("companies").upsert({
-        ...company,
-        updated_at: new Date().toISOString(),
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId))
+      setShowDocumentModal(false)
+      toast({
+        title: "Document Deleted",
+        description: "Document has been successfully removed.",
       })
-      if (error) throw error
-      toast({ title: "Company Info Saved", description: "Company information updated successfully." })
     } catch (error) {
-      console.error("Error saving company info:", error)
-      toast({ title: "Error", description: "Failed to save company information.", variant: "destructive" })
+      toast({
+        title: "Error",
+        description: "Failed to delete document. Please try again.",
+        variant: "destructive",
+      })
     } finally {
-      setIsSavingCompany(false)
-      setShowCompanyModal(false)
+      setIsSavingDocument(false)
     }
   }
 
-  const handleSaveSubsidiary = async () => {
-    if (!editingSubsidiary) return // Fixed undeclared variable
-    setIsSavingSubsidiary(true)
+  const handleSaveSubsidiaries = async () => {
+    console.log("[v0] Saving subsidiaries changes")
+    setIsSavingSubsidiaries(true)
+
     try {
-      if (editingSubsidiary.id) {
-        // Update existing subsidiary
-        await updateSubsidiary(editingSubsidiary.id, editingSubsidiary)
-      } else {
-        // Add new subsidiary
-        await addNewSubsidiary(editingSubsidiary)
+      if (isDemoMode()) {
+        // Simulate saving delay for demo
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+
+        toast({
+          title: "Changes Saved",
+          description: "All subsidiary changes have been saved successfully (Demo Mode)",
+        })
+        setIsSavingSubsidiaries(false)
+        return
       }
-      setShowSubsidiaryModal(false) // Fixed undeclared variable
-      setEditingSubsidiary(null) // Fixed undeclared variable
+
+      // Save any pending changes to the database
+      // This could include updated subsidiary information, organizational changes, etc.
+
+      // For now, we'll refresh the data to ensure consistency
+      await loadSubsidiaries()
+
+      toast({
+        title: "Changes Saved",
+        description: "All subsidiary changes have been saved successfully",
+      })
     } catch (error) {
-      console.error("Error saving subsidiary:", error)
-      toast({ title: "Error", description: "Failed to save subsidiary.", variant: "destructive" })
+      console.error("Save error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save changes",
+        variant: "destructive",
+      })
     } finally {
-      setIsSavingSubsidiary(false)
+      setIsSavingSubsidiaries(false)
     }
   }
 
-  const handleDeleteSubsidiary = async (subsidiaryId: string) => {
-    if (!confirm("Are you sure you want to delete this subsidiary?")) return
-    await deleteSubsidiary(subsidiaryId)
+  const handleSaveHRConfig = async () => {
+    setIsSaving(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      if (isDemoMode) {
+        toast({
+          title: "HR Configuration Saved",
+          description: "HR settings updated successfully (Demo Mode)",
+        })
+      } else {
+        // Real database update would go here
+        toast({
+          title: "HR Configuration Saved",
+          description: "HR settings updated successfully",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save HR configuration",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
-  const [activeTab, setActiveTab] = useState("company")
+  const confirmDeactivateSubsidiary = (subsidiaryId: string) => {
+    setSubsidiaryToToggle(subsidiaries.find((s) => s.id === subsidiaryId) || null)
+    setShowDeactivateConfirm(true)
+  }
 
-  // Render function
+  const confirmReactivateSubsidiary = (subsidiaryId: string) => {
+    setSubsidiaryToToggle(subsidiaries.find((s) => s.id === subsidiaryId) || null)
+    setShowReactivateConfirm(true)
+  }
+
+  const handleManageLeaveTypes = () => {
+    setShowAddLeaveTypeModal(true)
+  }
+
+  const handleManageAllowances = () => {
+    toast({
+      title: "Allowances Management",
+      description: "Opening allowances configuration...",
+    })
+  }
+
+  const handleManageDeductions = () => {
+    toast({
+      title: "Deductions Management",
+      description: "Opening deductions configuration...",
+    })
+  }
+
+  const handleManageSalaryGrades = () => {
+    toast({
+      title: "Salary Grades Management",
+      description: "Opening salary grades configuration...",
+    })
+  }
+
+  const handleEditEmailTemplate = (templateName: string) => {
+    toast({
+      title: "Edit Email Template",
+      description: `Editing ${templateName} template...`,
+    })
+  }
+
+  const handleAddEmailTemplate = () => {
+    toast({
+      title: "Add Email Template",
+      description: "Opening email template editor...",
+    })
+  }
+
+  const handleAddRole = () => {
+    toast({
+      title: "Add Role",
+      description: "Opening role creation form...",
+    })
+  }
+
+  const handleEditRole = (roleName: string) => {
+    toast({
+      title: "Edit Role",
+      description: `Editing ${roleName} role...`,
+    })
+  }
+
+  const handleBackupNow = async () => {
+    setIsBackingUp(true)
+    console.log("[v0] Initiating manual backup...")
+    try {
+      // Simulate backup process
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      setLastBackupTime(new Date().toISOString())
+      setBackupSize("55 MB") // Simulate updated size
+      setBackupStatus("Completed")
+      toast({
+        title: "Backup Successful",
+        description: "Manual backup completed successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Backup Failed",
+        description: "Failed to complete system backup.",
+      })
+    } finally {
+      setIsBackingUp(false)
+    }
+  }
+
+  const handleGenerateAIInsights = async () => {
+    setIsGeneratingInsights(true)
+    setShowAIInsightsModal(true)
+
+    try {
+      // Prepare leave policies data for AI analysis
+      const policiesData = currentPolicies.map((policy) => ({
+        name: policy.name,
+        days: policy.days,
+        usage: policy.usage,
+        trend: policy.trend,
+        description: policy.description,
+      }))
+
+      const prompt = `Analyze the following leave policies and provide professional HR insights:
+
+${policiesData
+  .map(
+    (policy) =>
+      `- ${policy.name}: ${policy.days} days allocated, ${policy.usage} usage rate, trend: ${policy.trend}
+    Description: ${policy.description}`,
+  )
+  .join("\n")}
+
+Please provide:
+1. Usage pattern analysis
+2. Policy optimization recommendations
+3. Compliance considerations
+4. Industry benchmarking insights
+5. Cost impact analysis
+6. Employee satisfaction implications
+
+Format the response in a professional, actionable manner for HR decision-makers.`
+
+      const response = await fetch("/api/ai-insights", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prompt }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to generate insights")
+      }
+
+      const data = await response.json()
+      setAiInsights(data.insights)
+
+      toast({
+        title: "AI Insights Generated",
+        description: "Professional leave policy analysis completed successfully.",
+      })
+    } catch (error) {
+      console.error("Error generating AI insights:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate AI insights. Please try again.",
+        variant: "destructive",
+      })
+      setShowAIInsightsModal(false)
+    } finally {
+      setIsGeneratingInsights(false)
+    }
+  }
+
+  const handleGeneratePolicyInsight = async (policyName: string) => {
+    const policy = currentPolicies.find((p) => p.name === policyName)
+    if (!policy) return
+
+    setLoadingInsights((prev) => ({ ...prev, [policyName]: true }))
+
+    try {
+      console.log("[v0] Generating insight for policy:", policyName)
+      console.log("[v0] JSON object available:", typeof JSON, JSON)
+
+      // Simulate AI insight generation with realistic delay
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      // Generate contextual insights based on policy data
+      const insights = {
+        "Annual Leave": `Based on 68% usage rate, this policy shows healthy utilization. Consider implementing carry-over limits to prevent year-end clustering. Industry benchmark: 15-25 days annually.`,
+        "Sick Leave": `Low 23% usage indicates good employee health or potential underreporting. Consider wellness programs and ensure employees feel comfortable using sick days when needed.`,
+        "Maternity Leave": `12% usage aligns with demographic expectations. Ensure compliance with local labor laws. Consider paternity leave expansion for better work-life balance.`,
+      }
+
+      const insight =
+        insights[policyName as keyof typeof insights] ||
+        `Policy analysis: ${policy.days} days allocated with ${policy.usage} usage. Consider reviewing against industry standards and employee feedback.`
+
+      setPolicyInsights((prev) => ({ ...prev, [policyName]: insight }))
+
+      toast({
+        title: "AI Insight Generated",
+        description: `Professional analysis completed for ${policyName} policy.`,
+      })
+    } catch (error) {
+      console.error("Error generating insight:", error)
+      console.error("Error details:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : "No stack trace",
+        policyName,
+        policy,
+      })
+      toast({
+        title: "Error",
+        description: "Failed to generate AI insight. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingInsights((prev) => ({ ...prev, [policyName]: false }))
+    }
+  }
+
+  const [showAIInsights, setShowAIInsights] = useState(false)
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false)
+
+  const handleAddTaxBand = () => {
+    console.log("[v0] Adding new tax band...")
+    const currentConfig = getCurrencyConfig(selectedCurrency)
+    const newBand = {
+      rate: 0,
+      from: 0,
+      to: 0,
+      cumulativeTax: 0,
+    }
+
+    // Update the currency config with new band
+    const updatedBands = [...currentConfig.taxBands, newBand]
+    // This would typically update the state or database
+    toast({
+      title: "Success",
+      description: "New tax band added successfully",
+    })
+  }
+
+  const handleSavePayrollConfig = async () => {
+    setIsSavingPayroll(true)
+    console.log("[v0] Saving payroll configuration...")
+
+    try {
+      // Simulate save operation
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      toast({
+        title: "Success",
+        description: "Payroll configuration saved successfully",
+      })
+    } catch (error) {
+      console.error("Error saving payroll config:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save payroll configuration",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingPayroll(false)
+    }
+  }
+
+  const handleSaveTaxConfig = async () => {
+    setIsSavingTax(true)
+    console.log("[v0] Saving tax configuration...")
+
+    try {
+      // Simulate save operation
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      toast({
+        title: "Success",
+        description: "Tax configuration saved successfully",
+      })
+    } catch (error) {
+      console.error("Error saving tax config:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save tax configuration",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingTax(false)
+    }
+  }
+
+  const handleAllowanceFieldChange = (index: number, field: string, value: any) => {
+    const updatedAllowances = [...allowances]
+    updatedAllowances[index] = { ...updatedAllowances[index], [field]: value }
+    setAllowances(updatedAllowances)
+  }
+
+  const handleDeductionFieldChange = (index: number, field: string, value: any) => {
+    const updatedDeductions = [...deductions]
+    updatedDeductions[index] = { ...updatedDeductions[index], [field]: value }
+    setDeductions(updatedDeductions)
+  }
+
+  const handleAddAllowance = () => {
+    const newAllowance = {
+      code: "",
+      description: "",
+      taxable: false,
+      recurring: false,
+      amount: 0,
+      percentage: 0,
+      type: "FIXED",
+    }
+    setAllowances([...allowances, newAllowance])
+  }
+
+  const handleAddDeduction = () => {
+    const newDeduction = {
+      code: "",
+      description: "",
+      recurring: false,
+      amount: 0,
+      percentage: 0,
+      type: "FIXED",
+    }
+    setDeductions([...deductions, newDeduction])
+  }
+
+  const handleEditAllowance = (index: number) => {
+    console.log(`[v0] Editing allowance at index ${index}`)
+    setEditingAllowance(index)
+  }
+
+  const handleDeleteAllowance = (index: number) => {
+    const updatedAllowances = allowances.filter((_, i) => i !== index)
+    setAllowances(updatedAllowances)
+    toast({
+      title: "Success",
+      description: "Allowance deleted successfully",
+    })
+  }
+
+  const handleEditDeduction = (index: number) => {
+    console.log(`[v0] Editing deduction at index ${index}`)
+    setEditingDeduction(index)
+  }
+
+  const handleDeleteDeduction = (index: number) => {
+    const updatedDeductions = deductions.filter((_, i) => i !== index)
+    setDeductions(updatedDeductions)
+    toast({
+      title: "Success",
+      description: "Deduction deleted successfully",
+    })
+  }
+
+  const handleAddNotificationTemplate = () => {
+    setIsAddingTemplate(true)
+    setNewTemplate({
+      name: "",
+      category: "HR",
+      type: "Email",
+      subject: "",
+      body: "",
+      variables: [],
+    })
+  }
+
+  const handleSaveTemplate = async () => {
+    if (!newTemplate.name || !newTemplate.subject || !newTemplate.body) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSaving(true) // Use the general saving state
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      const template = {
+        id: Date.now().toString(),
+        name: newTemplate.name,
+        category: newTemplate.category,
+        type: newTemplate.type,
+        status: "Active",
+        lastModified: new Date().toISOString().split("T")[0],
+        description: newTemplate.subject,
+      }
+
+      setNotificationTemplates([...notificationTemplates, template])
+      setIsAddingTemplate(false)
+      setEditingTemplate(null) // Clear editing state
+
+      toast({
+        title: "Template Created",
+        description: `${newTemplate.name} template has been created successfully`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create template",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleEditTemplate = (template) => {
+    setEditingTemplate(template)
+    setNewTemplate({
+      name: template.name,
+      category: template.category,
+      type: template.type,
+      subject: template.description, // Assuming description holds the subject for editing
+      body: `Dear {{employee_name}},\n\nThis is a sample template for ${template.name}.\n\nBest regards,\nHR Team`, // Placeholder body
+      variables: ["employee_name", "company_name"], // Placeholder variables
+    })
+    setIsAddingTemplate(true)
+  }
+
+  const handleDeleteTemplate = async (templateId) => {
+    setIsSaving(true) // Use the general saving state
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      setNotificationTemplates(notificationTemplates.filter((t) => t.id !== templateId))
+      toast({
+        title: "Template Deleted",
+        description: "Template has been deleted successfully",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete template",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleTestEmail = async () => {
+    setTestConnectionStatus("testing")
+    try {
+      // Simulate API call to test SMTP connection
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+
+      // Simulate random success/failure for demo
+      const isSuccess = Math.random() > 0.3
+
+      if (isSuccess) {
+        setTestConnectionStatus("success")
+        toast({
+          title: "Connection Successful! ✅",
+          description: "SMTP connection established successfully. Email configuration is working properly.",
+        })
+      } else {
+        throw new Error("Connection failed")
+      }
+    } catch (error) {
+      setTestConnectionStatus("error")
+      toast({
+        title: "Connection Failed ❌",
+        description: "Unable to connect to SMTP server. Please check your credentials and settings.",
+        variant: "destructive",
+      })
+    }
+
+    // Reset status after 5 seconds
+    setTimeout(() => setTestConnectionStatus("idle"), 5000)
+  }
+
+  const handleSaveEmailConfig = async () => {
+    setIsSaving(true) // Use the general saving state
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      toast({
+        title: "Email Configuration Saved",
+        description: "Email settings have been updated successfully",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save email configuration",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Added for Access Control
+  const handleRefreshSessions = async () => {
+    setIsRefreshingSessions(true)
+    console.log("[v0] Refreshing active sessions...")
+    await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate API call
+    // Mock data update
+    setActiveSessions([
+      {
+        id: "session-001",
+        user_email: "admin@example.com",
+        ip_address: "192.168.1.10",
+        device: "Desktop",
+        last_activity: new Date().toISOString(),
+      },
+      {
+        id: "session-003",
+        user_email: "newuser@example.com",
+        ip_address: "192.168.1.15",
+        device: "Laptop",
+        last_activity: new Date().toISOString(),
+      },
+    ])
+    setIsRefreshingSessions(false)
+    toast({ title: "Sessions Refreshed", description: "Active sessions have been updated." })
+  }
+
+  const handleTerminateSession = async (sessionId: string) => {
+    console.log(`[v0] Terminating session: ${sessionId}`)
+    if (!confirm("Are you sure you want to terminate this session?")) return
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    setActiveSessions((prev) => prev.filter((session) => session.id !== sessionId))
+    toast({ title: "Session Terminated", description: "The selected session has been terminated." })
+  }
+
+  const handleSaveAccessSettings = async () => {
+    setIsSavingAccessSettings(true)
+    console.log("[v0] Saving access settings...")
+    await new Promise((resolve) => setTimeout(resolve, 1500)) // Simulate API call
+    setIsSavingAccessSettings(false)
+    toast({ title: "Access Settings Saved", description: "Access control settings have been updated." })
+  }
+
+  // Added for Security
+  // const handleBackupNow = async () => { // This function was duplicated and is now removed.
+  //   setIsBackingUp(true)
+  //   console.log("[v0] Initiating manual backup...")
+  //   await new Promise((resolve) => setTimeout(resolve, 3000)) // Simulate backup process
+  //   setLastBackupTime(new Date().toISOString())
+  //   setBackupSize("55 MB") // Simulate updated size
+  //   setBackupStatus("Completed")
+  //   toast({ title: "Backup Successful", description: "Manual backup completed." })
+  //   setIsBackingUp(false)
+  // }
+
+  const handleSaveSecuritySettings = async () => {
+    setIsSavingSecuritySettings(true)
+    console.log("[v0] Saving security settings...")
+    await new Promise((resolve) => setTimeout(resolve, 1500)) // Simulate API call
+    setIsSavingSecuritySettings(false)
+    toast({ title: "Security Settings Saved", description: "Security configurations have been updated." })
+  }
+
+  const handleViewAllLogs = () => {
+    console.log("[v0] Navigating to Audit Logs page...")
+    // In a real app, this would navigate to a dedicated audit logs page
+    toast({ title: "View All Logs", description: "Navigating to the full audit log history." })
+  }
+
+  const handleExportSecurityReport = async () => {
+    setIsExportingReport(true)
+    console.log("[v0] Exporting security report...")
+    await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate export process
+    setIsExportingReport(false)
+    toast({ title: "Report Exported", description: "Security report generated and downloaded." })
+  }
+
+  const handleAddSalaryGrade = () => {
+    setEditingGrade(null)
+    setNewGrade({
+      name: "",
+      description: "",
+      minSalary: "",
+      maxSalary: "",
+      numberOfNotches: 5,
+      notches: [],
+    })
+    setShowSalaryGradeModal(true)
+  }
+
+  const handleEditSalaryGrade = (grade) => {
+    setEditingGrade(grade)
+    setNewGrade({
+      name: grade.name,
+      description: grade.description,
+      minSalary: grade.minSalary.toString(),
+      maxSalary: grade.maxSalary.toString(),
+      numberOfNotches: grade.notches.length,
+      notches: grade.notches,
+    })
+    setShowSalaryGradeModal(true)
+  }
+
+  const handleGenerateNotches = async () => {
+    const minSalary = Number.parseFloat(newGrade.minSalary)
+    const maxSalary = Number.parseFloat(newGrade.maxSalary)
+    const numberOfNotches = newGrade.numberOfNotches
+
+    if (!minSalary || !maxSalary || minSalary >= maxSalary) {
+      toast({
+        title: "Invalid Salary Range",
+        description: "Please enter valid minimum and maximum salary values.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsGeneratingNotches(true)
+
+    // Simulate API call delay
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+
+    const increment = (maxSalary - minSalary) / (numberOfNotches - 1)
+    const generatedNotches = []
+
+    for (let i = 0; i < numberOfNotches; i++) {
+      generatedNotches.push({
+        step: i + 1,
+        amount: Math.round(minSalary + increment * i),
+      })
+    }
+
+    setNewGrade((prev) => ({ ...prev, notches: generatedNotches }))
+    setIsGeneratingNotches(false)
+
+    toast({
+      title: "Notches Generated",
+      description: `Successfully generated ${numberOfNotches} salary notches.`,
+    })
+  }
+
+  const handleSaveSalaryGrade = () => {
+    if (!newGrade.name || !newGrade.minSalary || !newGrade.maxSalary) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const gradeToAdd = {
+      id: editingGrade ? editingGrade.id : Date.now(),
+      name: newGrade.name,
+      description: newGrade.description,
+      minSalary: Number.parseFloat(newGrade.minSalary),
+      maxSalary: Number.parseFloat(newGrade.maxSalary),
+      notches: newGrade.notches,
+    }
+
+    if (editingGrade) {
+      setSalaryGrades((prev) => prev.map((grade) => (grade.id === editingGrade.id ? gradeToAdd : grade)))
+      toast({
+        title: "Grade Updated",
+        description: "Salary grade has been updated successfully.",
+      })
+    } else {
+      setSalaryGrades((prev) => [...prev, gradeToAdd])
+      toast({
+        title: "Grade Added",
+        description: "New salary grade has been added successfully.",
+      })
+    }
+
+    setShowSalaryGradeModal(false)
+    setEditingGrade(null)
+    setNewGrade({
+      name: "",
+      description: "",
+      minSalary: "",
+      maxSalary: "",
+      numberOfNotches: 5,
+      notches: [],
+    })
+  }
+
+  const handleDeleteSalaryGrade = (gradeId) => {
+    setSalaryGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
+    toast({
+      title: "Grade Deleted",
+      description: "Salary grade has been deleted successfully.",
+    })
+  }
+
+  const handleAddDivision = () => {
+    const newDivision = newDivisionName.trim()
+    if (newDivision && !divisions.includes(newDivision)) {
+      const updatedDivisions = [...divisions, newDivision]
+      setDivisions(updatedDivisions)
+      setCompanyData({ ...companyData, divisions: updatedDivisions })
+      setNewDivisionName("")
+      toast({
+        title: "Success",
+        description: "Division added successfully",
+      })
+    }
+  }
+
+  const handleRemoveDivision = (divisionToRemove: string) => {
+    const updatedDivisions = divisions.filter((division) => division !== divisionToRemove)
+    setDivisions(updatedDivisions)
+    setCompanyData({ ...companyData, divisions: updatedDivisions })
+    toast({
+      title: "Success",
+      description: "Division removed successfully",
+    })
+  }
+
+  const handleAddDepartment = () => {
+    const newDept = newDepartmentName.trim()
+    if (newDept && !departments.includes(newDept)) {
+      const updatedDepartments = [...departments, newDept]
+      setDepartments(updatedDepartments)
+      setCompanyData({ ...companyData, departments: updatedDepartments })
+      setNewDepartmentName("")
+      toast({
+        title: "Success",
+        description: "Department added successfully",
+      })
+    }
+  }
+
+  const handleRemoveDepartment = (departmentToRemove: string) => {
+    const updatedDepartments = departments.filter((dept) => dept !== departmentToRemove)
+    setDepartments(updatedDepartments)
+    setCompanyData({ ...companyData, departments: updatedDepartments })
+    toast({
+      title: "Success",
+      description: "Department removed successfully",
+    })
+  }
+
+  const handleAddLocation = () => {
+    const newLoc = newLocationName.trim()
+    if (newLoc && !locations.includes(newLoc)) {
+      const updatedLocations = [...locations, newLoc]
+      setLocations(updatedLocations)
+      setCompanyData({ ...companyData, locations: updatedLocations })
+      setNewLocationName("")
+      toast({
+        title: "Success",
+        description: "Location added successfully",
+      })
+    }
+  }
+
+  const handleRemoveLocation = (locationToRemove: string) => {
+    const updatedLocations = locations.filter((loc) => loc !== locationToRemove)
+    setLocations(updatedLocations)
+    setCompanyData({ ...companyData, locations: updatedLocations })
+    toast({
+      title: "Success",
+      description: "Location removed successfully",
+    })
+  }
+
+  const handleAddUnstructuredGrade = () => {
+    setEditingUnstructured(null)
+    setNewUnstructured({
+      name: "",
+      description: "",
+      generalIncrement: { type: "percentage", value: 0 },
+      performanceIncrement: { type: "percentage", value: 0 },
+    })
+    setShowUnstructuredModal(true)
+  }
+
+  const handleEditUnstructuredGrade = (grade) => {
+    setEditingUnstructured(grade)
+    setNewUnstructured({
+      name: grade.name,
+      description: grade.description,
+      generalIncrement: grade.generalIncrement,
+      performanceIncrement: grade.performanceIncrement,
+    })
+    setShowUnstructuredModal(true)
+  }
+
+  const handleSaveUnstructuredGrade = () => {
+    if (!newUnstructured.name) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const gradeToAdd = {
+      id: editingUnstructured ? editingUnstructured.id : Date.now(),
+      name: newUnstructured.name,
+      description: newUnstructured.description,
+      generalIncrement: newUnstructured.generalIncrement,
+      performanceIncrement: newUnstructured.performanceIncrement,
+    }
+
+    if (editingUnstructured) {
+      setUnstructuredGrades((prev) => prev.map((grade) => (grade.id === editingUnstructured.id ? gradeToAdd : grade)))
+      toast({
+        title: "Grade Updated",
+        description: "Unstructured salary grade has been updated successfully.",
+      })
+    } else {
+      setUnstructuredGrades((prev) => [...prev, gradeToAdd])
+      toast({
+        title: "Grade Added",
+        description: "New unstructured salary grade has been added successfully.",
+      })
+    }
+
+    setShowUnstructuredModal(false)
+    setEditingUnstructured(null)
+    setNewUnstructured({
+      name: "",
+      description: "",
+      generalIncrement: { type: "percentage", value: 0 },
+      performanceIncrement: { type: "percentage", value: 0 },
+    })
+  }
+
+  const handleDeleteUnstructuredGrade = (gradeId) => {
+    setUnstructuredGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
+    toast({
+      title: "Grade Deleted",
+      description: "Unstructured salary grade has been deleted successfully.",
+    })
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Settings</h1>
-            <p className="text-muted-foreground">Manage your organization settings and preferences</p>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+          <p className="text-gray-600">Manage your organization settings and configurations</p>
         </div>
+      </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="company">Company</TabsTrigger>
-            <TabsTrigger value="hr">HR</TabsTrigger>
-            <TabsTrigger value="payroll">Payroll</TabsTrigger>
-            <TabsTrigger value="notifications">Notifications</TabsTrigger>
-            <TabsTrigger value="security">Security</TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="company" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-8">
+          <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="subsidiaries">Multi-Company</TabsTrigger>
+          <TabsTrigger value="hr">HR</TabsTrigger>
+          <TabsTrigger value="payroll">Payroll</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="roles">Roles</TabsTrigger>
+          <TabsTrigger value="access">Access</TabsTrigger>
+          <TabsTrigger value="security">Security</TabsTrigger>
+        </TabsList>
 
-          {/* Company Tab */}
-          <TabsContent value="company" className="space-y-6">
-            {/* Company Information Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Company Information
-                </CardTitle>
-                <CardDescription>Basic information about your organization</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {company && (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <Label>Company Name</Label>
-                      <p className="text-sm font-medium">{company.name}</p>
+        {/* Company Settings */}
+        <TabsContent value="company">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Building2 className="w-5 h-5" />
+                <span>Company Settings</span>
+              </CardTitle>
+              <CardDescription>Manage your company information and organizational structure</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <Label>Company Logo</Label>
+                <div className="flex items-center space-x-4">
+                  {companyLogoPreview || companyData.logo_url ? (
+                    <div className="relative">
+                      <img
+                        src={companyLogoPreview || companyData.logo_url}
+                        alt="Company Logo"
+                        className="w-20 h-20 object-cover rounded-lg border"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                        onClick={() => {
+                          setCompanyLogoPreview("")
+                          setCompanyData({ ...companyData, logo_url: "" })
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
                     </div>
-                    <div>
-                      <Label>Tax ID</Label>
-                      <p className="text-sm font-medium">{company.tax_id}</p>
+                  ) : (
+                    <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                      <ImageIcon className="w-8 h-8 text-gray-400" />
                     </div>
-                    <div>
-                      <Label>SSNIT Number</Label>
-                      <p className="text-sm font-medium">{company.ssnit_number}</p>
-                    </div>
-                    <div>
-                      <Label>Industry</Label>
-                      <p className="text-sm font-medium">{company.industry}</p>
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label>Address</Label>
-                      <p className="text-sm font-medium">{company.address}</p>
-                    </div>
-                    <div>
-                      <Label>Phone</Label>
-                      <p className="text-sm font-medium">{company.phone_number}</p>
-                    </div>
-                    <div>
-                      <Label>Email</Label>
-                      <p className="text-sm font-medium">{company.email_address}</p>
-                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleLogoUpload(file, "company")
+                        }
+                      }}
+                      className="hidden"
+                      id="company-logo-upload"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => document.getElementById("company-logo-upload")?.click()}
+                      disabled={isUploadingLogo}
+                      className="flex items-center space-x-2"
+                    >
+                      {isUploadingLogo ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" />
+                          <span>Upload Logo</span>
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
                   </div>
-                )}
-                <Button onClick={() => setShowCompanyModal(true)}>Edit Company Information</Button>
-              </CardContent>
-            </Card>
+                </div>
+              </div>
 
-            {/* Subsidiaries Card */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="companyName">Company Name</Label>
+                  <Input
+                    id="companyName"
+                    value={companyData.name}
+                    onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="industry">Industry</Label>
+                  <Input
+                    id="industry"
+                    value={companyData.industry}
+                    onChange={(e) => setCompanyData({ ...companyData, industry: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="taxId">Tax ID</Label>
+                  <Input
+                    id="taxId"
+                    value={companyData.tax_id}
+                    onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="ssnitNumber">SSNIT Number</Label>
+                  <Input
+                    id="ssnitNumber"
+                    value={companyData.ssnit_number}
+                    onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={companyData.email_address}
+                    onChange={(e) => setCompanyData({ ...companyData, email_address: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={companyData.phone_number}
+                    onChange={(e) => setCompanyData({ ...companyData, phone_number: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="address">Address</Label>
+                <Textarea
+                  id="address"
+                  value={companyData.address}
+                  onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Divisions</Label>
+                <div className="space-y-3">
+                  {divisions.length > 0 ? (
+                    <div className="space-y-2">
+                      {divisions.map((division, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <span className="font-medium">{division}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveDivision(division)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No divisions added yet</p>
+                  )}
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Enter division name"
+                      value={newDivisionName}
+                      onChange={(e) => setNewDivisionName(e.target.value)}
+                      onKeyPress={(e) => e.key === "Enter" && handleAddDivision()}
+                    />
+                    <Button variant="outline" size="sm" onClick={handleAddDivision} disabled={!newDivisionName.trim()}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Division
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Departments</Label>
+                <div className="space-y-3">
+                  {departments.length > 0 ? (
+                    <div className="space-y-2">
+                      {departments.map((department, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <span className="font-medium">{department}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveDepartment(department)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No departments added yet</p>
+                  )}
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Enter department name"
+                      value={newDepartmentName}
+                      onChange={(e) => setNewDepartmentName(e.target.value)}
+                      onKeyPress={(e) => e.key === "Enter" && handleAddDepartment()}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddDepartment}
+                      disabled={!newDepartmentName.trim()}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Department
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Locations</Label>
+                <div className="space-y-3">
+                  {locations.length > 0 ? (
+                    <div className="space-y-2">
+                      {locations.map((location, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <span className="font-medium">{location}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveLocation(location)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No locations added yet</p>
+                  )}
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Enter location name"
+                      value={newLocationName}
+                      onChange={(e) => setNewLocationName(e.target.value)}
+                      onKeyPress={(e) => e.key === "Enter" && handleAddLocation()}
+                    />
+                    <Button variant="outline" size="sm" onClick={handleAddLocation} disabled={!newLocationName.trim()}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Location
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveSettings}
+                  disabled={isSavingSettings}
+                >
+                  {isSavingSettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Company Settings
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="subsidiaries">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Building2 className="w-5 h-5" />
+                  <span>Multi-Company Management</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button onClick={() => setShowAddSubsidiary(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Subsidiary
+                  </Button>
+                  <Button variant="outline" onClick={handleSaveSubsidiaryChanges} disabled={isSavingSubsidiary}>
+                    {isSavingSubsidiary ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardTitle>
+              <CardDescription>
+                Manage subsidiary companies, their organizational structure, and synchronize settings across entities
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Company Overview Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Building2 className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <p className="text-sm font-medium">Total Subsidiaries</p>
+                          <p className="text-2xl font-bold">{subsidiaries.length}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Users className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="text-sm font-medium">Active Companies</p>
+                          <p className="text-2xl font-bold">
+                            {subsidiaries.filter((s) => s.status === "active").length}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <MapPin className="w-5 h-5 text-purple-600" />
+                        <div>
+                          <p className="text-sm font-medium">Total Locations</p>
+                          <p className="text-2xl font-bold">
+                            {subsidiaries.reduce((acc, s) => acc + (s.locations?.length || 0), 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Briefcase className="w-5 h-5 text-orange-600" />
+                        <div>
+                          <p className="text-sm font-medium">Total Departments</p>
+                          <p className="text-2xl font-bold">
+                            {subsidiaries.reduce((acc, s) => acc + (s.departments?.length || 0), 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Subsidiaries List */}
+                <div className="space-y-3">
+                  {subsidiaries.map((subsidiary) => (
+                    // Updated subsidiary card to show logo and removed Edit button
+                    <Card key={subsidiary.id} className="border-l-4 border-l-blue-500">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
+                                {subsidiary.logo_url ? (
+                                  <img
+                                    src={subsidiary.logo_url || "/placeholder.svg"}
+                                    alt={`${subsidiary.name} logo`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                                    {subsidiary.name.charAt(0)}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h3 className="text-base font-semibold">{subsidiary.name}</h3>
+                                    <p className="text-xs text-gray-600">{subsidiary.industry}</p>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Badge
+                                      variant={subsidiary.status === "active" ? "default" : "secondary"}
+                                      className="text-xs"
+                                    >
+                                      {subsidiary.status}
+                                    </Badge>
+                                    <span className="text-xs text-gray-500">Tax ID: {subsidiary.tax_id}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                              <div>
+                                <p className="text-xs font-medium text-gray-700 mb-1">Contact Information</p>
+                                <div className="space-y-0.5">
+                                  <p className="text-xs text-gray-600">{subsidiary.email_address}</p>
+                                  <p className="text-xs text-gray-600">{subsidiary.phone_number}</p>
+                                  <p className="text-xs text-gray-600 truncate">{subsidiary.address}</p>
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-700 mb-1">Organizational Structure</p>
+                                <div className="flex items-center space-x-3 text-xs text-gray-600">
+                                  <span>
+                                    {subsidiary.divisions_count || subsidiary.divisions?.length || 0} Divisions
+                                  </span>
+                                  <span>
+                                    {subsidiary.departments_count || subsidiary.departments?.length || 0} Departments
+                                  </span>
+                                  <span>
+                                    {subsidiary.locations_count || subsidiary.locations?.length || 0} Locations
+                                  </span>
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-700 mb-1">Registration Details</p>
+                                <div className="space-y-0.5">
+                                  <p className="text-xs text-gray-600">SSNIT: {subsidiary.ssnit_number}</p>
+                                  <p className="text-xs text-gray-600">
+                                    Created:{" "}
+                                    {subsidiary.created_at
+                                      ? new Date(subsidiary.created_at).toLocaleDateString()
+                                      : "N/A"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowSubsidiaryDetails(true)
+                                }}
+                              >
+                                <Eye className="w-3 h-3 mr-1" />
+                                View Details
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowEditSubsidiary(true)
+                                }}
+                              >
+                                <Edit className="w-3 h-3 mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
+                                onClick={() => syncSubsidiarySettings(subsidiary.id)}
+                              >
+                                <RefreshCw className="w-3 h-3 mr-1" />
+                                Sync Settings
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
+                                onClick={() => viewSubsidiaryEmployees(subsidiary.id)}
+                              >
+                                <Users className="w-3 h-3 mr-1" />
+                                View Employees ({subsidiary.employee_count || 0})
+                              </Button>
+                            </div>
+                          </div>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                <MoreVertical className="h-3 w-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowSubsidiaryDetails(true)
+                                }}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowEditSubsidiary(true)
+                                }}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Subsidiary
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => syncSubsidiarySettings(subsidiary.id)}>
+                                <RefreshCw className="w-4 h-4 mr-2" />
+                                Sync Settings
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => duplicateSubsidiary(subsidiary)}>
+                                <Copy className="w-4 h-4 mr-2" />
+                                Duplicate
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              {subsidiary.status === "active" ? (
+                                <DropdownMenuItem
+                                  onClick={() => confirmDeactivateSubsidiary(subsidiary.id)}
+                                  className="text-orange-600"
+                                >
+                                  <AlertTriangle className="w-4 h-4 mr-2" />
+                                  Deactivate
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem
+                                  onClick={() => confirmReactivateSubsidiary(subsidiary.id)}
+                                  className="text-green-600"
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-2" />
+                                  Reactivate
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                  {subsidiaries.length === 0 && (
+                    <Card>
+                      <CardContent className="p-8 text-center">
+                        <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Subsidiaries Found</h3>
+                        <p className="text-gray-600 mb-4">
+                          Get started by adding your first subsidiary company to manage multiple entities.
+                        </p>
+                        <Button onClick={() => setShowAddSubsidiary(true)}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add First Subsidiary
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Settings Synchronization Panel */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <RefreshCw className="w-5 h-5" />
+                      <span>Settings Synchronization</span>
+                    </CardTitle>
+                    <CardDescription>Synchronize settings across all subsidiary companies</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="font-medium mb-2">Sync Options</h4>
+                        <div className="space-y-2">
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" defaultChecked />
+                            <span className="text-sm">HR Policies</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" defaultChecked />
+                            <span className="text-sm">Payroll Configuration</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" />
+                            <span className="text-sm">Leave Types</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" />
+                            <span className="text-sm">Roles & Permissions</span>
+                          </label>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-2">Sync Actions</h4>
+
+                        <div className="space-y-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={handleSaveSettings}
+                            disabled={isSavingSettings}
+                          >
+                            {isSavingSettings ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-4 h-4 mr-2" />
+                                Save Settings
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={handleExportSettingsTemplate}
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Export Settings Template
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={() => setImportModal(true)}
+                          >
+                            <Upload className="w-4 h-4 mr-2" />
+                            Import Settings
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="hr">
+          <div className="space-y-6">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Building className="h-5 w-5" />
-                      Subsidiaries
+                    <CardTitle className="flex items-center space-x-2">
+                      <Settings className="w-5 h-5" />
+                      <span>HR Configuration</span>
                     </CardTitle>
-                    <CardDescription>Manage subsidiary companies and their settings</CardDescription>
+                    <CardDescription>Configure core HR settings and policies</CardDescription>
                   </div>
                   <Button
-                    onClick={() => {
-                      setEditingSubsidiary(null) // Ensure we are adding a new one
-                      setShowSubsidiaryModal(true) // Fixed undeclared variable
-                    }}
+                    onClick={handleSaveHRConfig}
+                    disabled={isSaving}
+                    className="bg-black text-white hover:bg-gray-800"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Subsidiary
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save HR Configuration
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {subsidiaries.map((sub) => (
-                    <div key={sub.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex-1">
-                        <h3 className="font-semibold">{sub.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {sub.industry} • {sub.email_address}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditingSubsidiary(sub) // Fixed undeclared variable
-                            setShowSubsidiaryModal(true) // Fixed undeclared variable
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => handleDeleteSubsidiary(sub.id)}>
-                          Delete
-                        </Button>
-                      </div>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="leaveYearStart">Leave Year Start</Label>
+                      <Select
+                        value={hrConfig.leaveYearStart}
+                        onValueChange={(value) => setHrConfig({ ...hrConfig, leaveYearStart: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="January">January</SelectItem>
+                          <SelectItem value="February">February</SelectItem>
+                          <SelectItem value="March">March</SelectItem>
+                          <SelectItem value="April">April</SelectItem>
+                          <SelectItem value="May">May</SelectItem>
+                          <SelectItem value="June">June</SelectItem>
+                          <SelectItem value="July">July</SelectItem>
+                          <SelectItem value="August">August</SelectItem>
+                          <SelectItem value="September">September</SelectItem>
+                          <SelectItem value="October">October</SelectItem>
+                          <SelectItem value="November">November</SelectItem>
+                          <SelectItem value="December">December</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+
+                    <div>
+                      <Label htmlFor="workingHours">Working Hours/Day</Label>
+                      <Input
+                        id="workingHours"
+                        type="number"
+                        value={hrConfig.workingHoursPerDay}
+                        onChange={(e) =>
+                          setHrConfig({ ...hrConfig, workingHoursPerDay: Number.parseInt(e.target.value) })
+                        }
+                        min="1"
+                        max="24"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="probationPeriod">Probation Period (months)</Label>
+                      <Input
+                        id="probationPeriod"
+                        type="number"
+                        value={hrConfig.probationPeriod}
+                        onChange={(e) => setHrConfig({ ...hrConfig, probationPeriod: Number.parseInt(e.target.value) })}
+                        min="0"
+                        max="12"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="workingDays">Working Days/Week</Label>
+                      <Input
+                        id="workingDays"
+                        type="number"
+                        value={hrConfig.workingDaysPerWeek}
+                        onChange={(e) =>
+                          setHrConfig({ ...hrConfig, workingDaysPerWeek: Number.parseInt(e.target.value) })
+                        }
+                        min="1"
+                        max="7"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Auto-approve leave requests</Label>
+                      <p className="text-sm text-muted-foreground">Automatically approve requests within policy</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.autoApproveLeave}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, autoApproveLeave: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Email notifications</Label>
+                      <p className="text-sm text-muted-foreground">Send email updates for HR activities</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.emailNotifications}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, emailNotifications: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center space-x-2">
+                        <Sparkles className="w-4 h-4 text-purple-500" />
+                        <span>AI Recommendations</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground">Enable AI-driven insights for HR processes</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.aiRecommendations}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, aiRecommendations: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center space-x-2">
+                        <TrendingUp className="w-4 h-4 text-blue-500" />
+                        <span>Smart Scheduling</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground">Optimize schedules based on employee availability</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.smartScheduling}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, smartScheduling: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center space-x-2">
+                        <Calendar className="w-4 h-4 text-green-500" />
+                        <span>Performance Tracking</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground">Track employee performance metrics and goals</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.performanceTracking}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, performanceTracking: checked })}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Leave Policies Management */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center space-x-2">
+                    <Calendar className="w-5 h-5" />
+                    <span>Leave Policies</span>
+                  </CardTitle>
+                  <div className="flex items-center space-x-2">
+                    <Button variant="outline" onClick={handleManageLeaveTypes}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Leave Type
+                    </Button>
+                  </div>
+                </div>
+                <CardDescription>Manage leave policies and generate AI insights</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {currentPolicies.map((policy) => (
+                    <Card key={policy.name} className="border-l-4 border-l-blue-500">
+                      <CardHeader>
+                        <CardTitle className="text-lg font-semibold">{policy.name}</CardTitle>
+                        <CardDescription>{policy.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          <p className="text-sm">
+                            <span className="font-medium">Days:</span> {policy.days}
+                          </p>
+                          <p className="text-sm">
+                            <span className="font-medium">Usage:</span> {policy.usage}
+                          </p>
+                        </div>
+
+                        <div className="border-t pt-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-muted-foreground">AI Insight</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleGeneratePolicyInsight(policy.name)}
+                              disabled={loadingInsights[policy.name]}
+                              className="h-6 px-2 text-xs"
+                            >
+                              {loadingInsights[policy.name] ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Brain className="w-3 h-3" />
+                              )}
+                              <span className="ml-1">Generate</span>
+                            </Button>
+                          </div>
+
+                          {policyInsights[policy.name] ? (
+                            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                              <p className="text-xs text-blue-800 leading-relaxed">{policyInsights[policy.name]}</p>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 text-center">
+                              <p className="text-xs text-gray-500">Click Generate to get AI insights for this policy</p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex justify-end space-x-2 pt-2">
+                          <Button variant="outline" size="sm" onClick={() => handlePolicyAction("view", policy.name)}>
+                            View
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handlePolicyAction("edit", policy.name)}>
+                            Edit
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handlePolicyAction("delete", policy.name)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          {/* HR Tab */}
-          <TabsContent value="hr" className="space-y-6">
-            {/* HR Documents Card */}
+            {/* HR Documents Management */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      HR Documents
-                    </CardTitle>
-                    <CardDescription>Manage HR documents and visibility settings</CardDescription>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      setEditingDocument(null) // Ensure we are adding a new one
-                      setShowDocumentModal(true)
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
+                  <CardTitle className="flex items-center space-x-2">
+                    <ImageIcon className="w-5 h-5" />
+                    <span>HR Documents</span>
+                  </CardTitle>
+                  <Button variant="outline" onClick={handleAddDocument}>
+                    <Plus className="w-4 h-4 mr-2" />
                     Add Document
                   </Button>
                 </div>
+                <CardDescription>Manage HR documents and visibility settings</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
                   {hrDocuments.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between p-4 border rounded-lg border-l-4"
-                      style={{ borderLeftColor: doc.availableToEmployees ? "#22c55e" : "#e5e7eb" }}
-                    >
-                      <div className="flex-1">
-                        <h3 className="font-semibold">{doc.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {doc.type.toUpperCase()} • {doc.size}
-                        </p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Switch
-                            checked={doc.availableToEmployees}
-                            onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
-                          />
-                          <span className="text-xs text-muted-foreground">Available for employees</span>
+                    <Card key={doc.id} className="border-l-4 border-l-green-500">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-base font-semibold">{doc.name}</h3>
+                            <p className="text-xs text-gray-600">
+                              {doc.type} - {doc.size}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-4">
+                            <Switch
+                              checked={doc.visibleToAll}
+                              onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
+                            />
+                            <Button variant="outline" size="sm" onClick={() => handleDocumentView(doc)}>
+                              View
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => handleDocumentAction("edit", doc.id)}>
+                              Edit
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDocumentAction("delete", doc.id)}
+                            >
+                              Delete
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleDocumentView(doc)}>
-                          View
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditingDocument(doc)
-                            setNewDocumentName(doc.name) // Pre-fill name for editing
-                            setNewDocumentAvailable(doc.availableToEmployees) // Pre-fill availability
-                            setShowDocumentModal(true)
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => handleDeleteDocument(doc.id)}>
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Leave Policies Card */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Leave Policies</CardTitle>
-                    <CardDescription>Configure leave types and policies</CardDescription>
+                  <CardTitle className="flex items-center space-x-2">
+                    <TrendingUp className="w-5 h-5" />
+                    <span>Salary Grades & Notches</span>
+                  </CardTitle>
+                  <div className="flex items-center space-x-2">
+                    <Button variant="outline" onClick={() => setShowImportExportModal(true)}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Import/Export
+                    </Button>
+                    {salaryGradeTab === "structured" ? (
+                      <Button variant="outline" onClick={handleAddSalaryGrade}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Salary Grade
+                      </Button>
+                    ) : (
+                      <Button variant="outline" onClick={handleAddUnstructuredGrade}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Unstructured Grade
+                      </Button>
+                    )}
                   </div>
-                  <Button
-                    onClick={() => {
-                      setEditingLeavePolicy(null) // Ensure we are adding a new one
-                      setShowLeavePolicyModal(true)
-                    }}
+                </div>
+                <CardDescription>Manage salary grades and compensation structure for employees</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Tab Navigation */}
+                <div className="flex space-x-1 bg-muted p-1 rounded-lg">
+                  <button
+                    onClick={() => setSalaryGradeTab("structured")}
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                      salaryGradeTab === "structured"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Leave Type
+                    Structured Salary Grade
+                  </button>
+                  <button
+                    onClick={() => setSalaryGradeTab("unstructured")}
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                      salaryGradeTab === "unstructured"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Unstructured Salary Grade
+                  </button>
+                </div>
+
+                {/* Structured Salary Grades */}
+                {salaryGradeTab === "structured" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {salaryGrades.map((grade) => (
+                      <Card key={grade.id} className="border-l-4 border-l-purple-500">
+                        <CardHeader>
+                          <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
+                          <CardDescription>{grade.description}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-2">
+                            <p className="text-sm">
+                              <span className="font-medium">Range:</span> ₵{grade.minSalary.toLocaleString()} - ₵
+                              {grade.maxSalary.toLocaleString()}
+                            </p>
+                            <p className="text-sm">
+                              <span className="font-medium">Notches:</span> {grade.notches.length} steps
+                            </p>
+                          </div>
+
+                          <div className="border-t pt-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-muted-foreground">Salary Steps</span>
+                            </div>
+                            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-32 overflow-y-auto">
+                              <div className="space-y-1">
+                                {grade.notches.map((notch) => (
+                                  <div key={notch.step} className="flex justify-between text-xs">
+                                    <span>Step {notch.step}</span>
+                                    <span className="font-medium">₵{notch.amount.toLocaleString()}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end space-x-2 pt-2">
+                            <Button variant="outline" size="sm" onClick={() => handleEditSalaryGrade(grade)}>
+                              Edit
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteSalaryGrade(grade.id)}>
+                              Delete
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+
+                {/* Unstructured Salary Grades */}
+                {salaryGradeTab === "unstructured" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {unstructuredGrades.map((grade) => (
+                      <Card key={grade.id} className="border-l-4 border-l-blue-500">
+                        <CardHeader>
+                          <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
+                          <CardDescription>{grade.description}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-3">
+                            <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-green-800">General Increment</span>
+                                <span className="text-sm font-semibold text-green-900">
+                                  {grade.generalIncrement.type === "percentage"
+                                    ? `${grade.generalIncrement.value}%`
+                                    : `₵${grade.generalIncrement.value.toLocaleString()}`}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-blue-800">Performance Increment</span>
+                                <span className="text-sm font-semibold text-blue-900">
+                                  {grade.performanceIncrement.type === "percentage"
+                                    ? `${grade.performanceIncrement.value}%`
+                                    : `₵${grade.performanceIncrement.value.toLocaleString()}`}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end space-x-2 pt-2">
+                            <Button variant="outline" size="sm" onClick={() => handleEditUnstructuredGrade(grade)}>
+                              Edit
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteUnstructuredGrade(grade.id)}>
+                              Delete
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="payroll">
+          <div className="space-y-6">
+            {/* Payroll Configuration Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Settings className="w-5 h-5" />
+                  <span>Payroll Configuration</span>
+                </CardTitle>
+                <CardDescription>Configure basic payroll settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div>
+                    <Label htmlFor="payFrequency">Pay Frequency</Label>
+                    <Select defaultValue="monthly">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="biweekly">Bi-Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="currency">Currency</Label>
+                    <Select value={selectedCurrency} onValueChange={handleCurrencyChange}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ghs">Ghana Cedis (GHS)</SelectItem>
+                        <SelectItem value="usd">US Dollar (USD)</SelectItem>
+                        <SelectItem value="eur">Euro (EUR)</SelectItem>
+                        <SelectItem value="ngn">Nigerian Naira (NGN)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="minimumWage">Minimum Wage ({getCurrencyConfig(selectedCurrency).symbol})</Label>
+                    <Input type="number" defaultValue="18.15" />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="weekdayOvertimeRate">Weekday Overtime Rate Multiplier</Label>
+                    <Input type="number" step="0.1" defaultValue="1.5" />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="weekendOvertimeRate">Weekend Overtime Rate Multiplier</Label>
+                    <Input type="number" step="0.1" defaultValue="2" />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="payrollCutoffDay">Payroll Cutoff Day</Label>
+                    <Input type="number" min="1" max="31" defaultValue="25" />
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch id="autoCalculatePAYE" defaultChecked />
+                    <Label htmlFor="autoCalculatePAYE">Auto-calculate PAYE</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="autoCalculateSSNIT" defaultChecked />
+                    <Label htmlFor="autoCalculateSSNIT">Auto-calculate SSNIT</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="autoCalculateProvidentFund" defaultChecked />
+                    <Label htmlFor="autoCalculateProvidentFund">Auto-calculate Provident Fund (Tier 3)</Label>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button onClick={handleSavePayrollConfig} disabled={isSavingPayroll}>
+                    {isSavingPayroll ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4 mr-2" />
+                    )}
+                    Save Payroll Configuration
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Tax Configuration Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Calculator className="w-5 h-5" />
+                  <span>Tax Configuration</span>
+                </CardTitle>
+                <CardDescription>Configure tax bands and SSNIT rates</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="font-medium">PAYE Tax Bands</h4>
+                      <p className="text-sm text-gray-500">
+                        {getCurrencyConfig(selectedCurrency).country} - Version{" "}
+                        {getCurrencyConfig(selectedCurrency)?.version} - Last Updated:{" "}
+                        {getCurrencyConfig(selectedCurrency)?.lastUpdated}
+                      </p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => syncWithGovernmentAPI(selectedCurrency)}
+                        disabled={!apiStatus[selectedCurrency as keyof typeof apiStatus]?.connected || isSyncing}
+                      >
+                        {isSyncing ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                        )}
+                        Sync API
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleAddTaxBand}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Band
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse border border-gray-200 rounded-lg">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">Band</th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">Rate (%)</th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
+                            From ({getCurrencyConfig(selectedCurrency).symbol})
+                          </th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
+                            To ({getCurrencyConfig(selectedCurrency).symbol})
+                          </th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
+                            Cumulative Tax ({getCurrencyConfig(selectedCurrency).symbol})
+                          </th>
+                          <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getCurrencyConfig(selectedCurrency)?.taxBands.map((band, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="border border-gray-200 px-4 py-3 font-medium">{band.rate}</td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {band.rate}%
+                              </span>
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              {band.from ? band.from.toLocaleString() : "0"}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              {band.to ? band.to.toLocaleString() : "∞"}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3 font-medium text-green-600">
+                              {band.cumulativeTax ? band.cumulativeTax.toLocaleString() : "0"}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3 text-center">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  console.log("[v0] Editing tax band:", band)
+                                }}
+                              >
+                                Edit
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* SSNIT Rates Section */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">SSNIT Rates</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employee:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={ssnitRates.employee}
+                              onChange={(e) => updateSsnitRates("employee", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employer:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={ssnitRates.employer}
+                              onChange={(e) => updateSsnitRates("employer", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t">
+                          <span className="font-medium text-blue-600">Total:</span>
+                          <span className="font-medium text-blue-600">{ssnitRates.total}%</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Tier 2 Rates</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employee:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={tier2Rates.employee}
+                              onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employer:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={tier2Rates.employer}
+                              onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t">
+                          <span className="font-medium text-blue-600">Total:</span>
+                          <span className="font-medium text-blue-600">{tier2Rates.total}%</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Tier 3 Rates</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employee:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={tier3Rates.employee}
+                              onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employer:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={tier3Rates.employer}
+                              onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t">
+                          <span className="font-medium text-blue-600">Total:</span>
+                          <span className="font-medium text-blue-600">{tier3Rates.total}%</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* API Status and Recent Updates */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <Wifi className="w-5 h-5" />
+                          <span>API Status</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span>Ghana</span>
+                          <Badge variant="default" className="bg-green-100 text-green-800">
+                            Connected
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Nigeria</span>
+                          <Badge variant="destructive">Disconnected</Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Usa</span>
+                          <Badge variant="destructive">Disconnected</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <Bell className="w-5 h-5" />
+                          <span>Recent Updates</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <div className="flex items-start space-x-2">
+                            <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                            <div>
+                              <p className="text-sm font-medium">Ghana PAYE Rates Updated</p>
+                              <p className="text-xs text-gray-500">New tax rates effective January 1, 2024</p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="flex justify-end mt-6">
+                    <Button
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={handleSaveTaxConfig}
+                      disabled={isSavingTax}
+                    >
+                      {isSavingTax ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      Save Tax Configuration
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <DollarSign className="w-5 h-5" />
+                  <span>Allowances</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-end mb-4">
+                  <Button onClick={handleAddAllowance} className="bg-green-600 hover:bg-green-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-200 rounded-lg">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Code</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Description</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Taxable</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Recurring</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">AMOUNT</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">%</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">FIXED/VARIABLE</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allowances.map((allowance, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={allowance.code}
+                              onChange={(e) => handleAllowanceFieldChange(index, "code", e.target.value)}
+                              className="border-0 bg-transparent p-0 font-medium"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={allowance.description}
+                              onChange={(e) => handleAllowanceFieldChange(index, "description", e.target.value)}
+                              className="border-0 bg-transparent p-0"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Switch
+                              checked={allowance.taxable}
+                              onCheckedChange={(checked) => handleAllowanceFieldChange(index, "taxable", checked)}
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Switch
+                              checked={allowance.recurring}
+                              onCheckedChange={(checked) => handleAllowanceFieldChange(index, "recurring", checked)}
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              value={allowance.amount}
+                              onChange={(e) =>
+                                handleAllowanceFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={allowance.percentage}
+                              onChange={(e) =>
+                                handleAllowanceFieldChange(index, "percentage", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Select
+                              value={allowance.type}
+                              onValueChange={(value) => handleAllowanceFieldChange(index, "type", value)}
+                            >
+                              <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
+                                <Badge variant={allowance.type === "FIXED" ? "default" : "secondary"}>
+                                  {allowance.type}
+                                </Badge>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="FIXED">FIXED</SelectItem>
+                                <SelectItem value="VARIABLE">VARIABLE</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => handleEditAllowance(index)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteAllowance(index)} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Minus className="w-5 h-5" />
+                  <span>Deductions</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-end mb-4">
+                  <Button onClick={handleAddDeduction} className="bg-green-600 hover:bg-green-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-200 rounded-lg">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Code</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Description</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Recurring</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">AMOUNT</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">%</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">FIXED/VARIABLE</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deductions.map((deduction, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={deduction.code}
+                              onChange={(e) => handleDeductionFieldChange(index, "code", e.target.value)}
+                              className="border-0 bg-transparent p-0 font-medium"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={deduction.description}
+                              onChange={(e) => handleDeductionFieldChange(index, "description", e.target.value)}
+                              className="border-0 bg-transparent p-0"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Switch
+                              checked={deduction.recurring}
+                              onCheckedChange={(checked) => handleDeductionFieldChange(index, "recurring", checked)}
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              value={deduction.amount}
+                              onChange={(e) =>
+                                handleDeductionFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={deduction.percentage}
+                              onChange={(e) =>
+                                handleDeductionFieldChange(index, "percentage", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Select
+                              value={deduction.type}
+                              onValueChange={(value) => handleDeductionFieldChange(index, "type", value)}
+                            >
+                              <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
+                                <Badge variant={deduction.type === "FIXED" ? "default" : "secondary"}>
+                                  {deduction.type}
+                                </Badge>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="FIXED">FIXED</SelectItem>
+                                <SelectItem value="VARIABLE">VARIABLE</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => handleEditDeduction(index)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteDeduction(index)} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Save Button */}
+            <div className="flex justify-end">
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={handleSavePayrollConfig}
+                disabled={isSavingPayroll}
+              >
+                {isSavingPayroll ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                Save Payroll Configuration
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Bell className="w-5 h-5" />
+                  <span>Notification Templates</span>
+                </CardTitle>
+                <CardDescription>Manage email and SMS templates for HR and payroll notifications</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {leavePolicies.map((policy) => (
-                    <div key={policy.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <h3 className="font-semibold">{policy.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {policy.days} days • {policy.carryOver ? "Carry over allowed" : "No carry over"}
-                        </p>
+                  <div className="flex justify-between items-center">
+                    <div className="flex space-x-2">
+                      <Button onClick={handleAddNotificationTemplate} className="bg-green-600 hover:bg-green-700">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Template
+                      </Button>
+                      <Button variant="outline" onClick={handleTestEmail} disabled={testConnectionStatus === "testing"}>
+                        {testConnectionStatus === "testing" ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : testConnectionStatus === "success" ? (
+                          <Check className="w-4 h-4 mr-2 text-green-600" />
+                        ) : testConnectionStatus === "error" ? (
+                          <X className="w-4 h-4 mr-2 text-red-600" />
+                        ) : (
+                          <Send className="w-4 h-4 mr-2" />
+                        )}
+                        {testConnectionStatus === "testing"
+                          ? "Testing Connection..."
+                          : testConnectionStatus === "success"
+                            ? "Connection Successful"
+                            : testConnectionStatus === "error"
+                              ? "Connection Failed"
+                              : "Test Connection"}
+                      </Button>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary">{notificationTemplates.length} Templates</Badge>
+                    </div>
+                  </div>
+
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Template Name</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Last Modified</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {notificationTemplates.map((template) => (
+                          <TableRow key={template.id}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{template.name}</div>
+                                <div className="text-sm text-muted-foreground">{template.description}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{template.category}</Badge>
+                            </TableCell>
+                            <TableCell>{template.type}</TableCell>
+                            <TableCell>
+                              <Badge variant={template.status === "Active" ? "default" : "secondary"}>
+                                {template.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{template.lastModified}</TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleDeleteTemplate(template.id)}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Email Configuration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Mail className="w-5 h-5" />
+                  <span>Email Configuration</span>
+                </CardTitle>
+                <CardDescription>Configure SMTP settings for sending notifications</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="provider">Email Provider</Label>
+                      <Select
+                        value={emailConfig.provider}
+                        onValueChange={(value) => setEmailConfig({ ...emailConfig, provider: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="smtp">SMTP</SelectItem>
+                          <SelectItem value="sendgrid">SendGrid</SelectItem>
+                          <SelectItem value="mailgun">Mailgun</SelectItem>
+                          <SelectItem value="ses">Amazon SES</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="smtpHost">SMTP Host</Label>
+                      <Input
+                        id="smtpHost"
+                        value={emailConfig.smtpHost}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpHost: e.target.value })}
+                        placeholder="smtp.gmail.com"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="smtpPort">SMTP Port</Label>
+                      <Input
+                        id="smtpPort"
+                        type="number"
+                        value={emailConfig.smtpPort}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpPort: Number.parseInt(e.target.value) })}
+                        placeholder="587"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="smtpUsername">Username</Label>
+                      <Input
+                        id="smtpUsername"
+                        value={emailConfig.smtpUsername}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpUsername: e.target.value })}
+                        placeholder="your-email@company.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="fromEmail">From Email</Label>
+                      <Input
+                        id="fromEmail"
+                        value={emailConfig.fromEmail}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, fromEmail: e.target.value })}
+                        placeholder="hr@company.com"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="fromName">From Name</Label>
+                      <Input
+                        id="fromName"
+                        value={emailConfig.fromName}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, fromName: e.target.value })}
+                        placeholder="HR Department"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="replyTo">Reply To</Label>
+                      <Input
+                        id="replyTo"
+                        value={emailConfig.replyTo}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, replyTo: e.target.value })}
+                        placeholder="noreply@company.com"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="enableTLS"
+                          checked={emailConfig.enableTLS}
+                          onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableTLS: checked })}
+                        />
+                        <Label htmlFor="enableTLS">Enable TLS</Label>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditingLeavePolicy(policy)
-                            setNewLeaveType(policy.name)
-                            setNewLeaveDays(policy.days)
-                            setNewLeaveCarryOver(policy.carryOver)
-                            setShowLeavePolicyModal(true)
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => handleDeleteLeavePolicy(policy.id)}>
-                          Delete
-                        </Button>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="enableSSL"
+                          checked={emailConfig.enableSSL}
+                          onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableSSL: checked })}
+                        />
+                        <Label htmlFor="enableSSL">Enable SSL</Label>
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="smtpPassword">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="smtpPassword"
+                      type={showPassword ? "text" : "password"}
+                      value={emailConfig.smtpPassword}
+                      onChange={(e) => setEmailConfig({ ...emailConfig, smtpPassword: e.target.value })}
+                      placeholder="Enter your email password"
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleTestEmail}
+                    disabled={testConnectionStatus === "testing"}
+                    className={`${
+                      testConnectionStatus === "success"
+                        ? "border-green-500 text-green-600"
+                        : testConnectionStatus === "error"
+                          ? "border-red-500 text-red-600"
+                          : ""
+                    }`}
+                  >
+                    {testConnectionStatus === "testing" ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : testConnectionStatus === "success" ? (
+                      <Check className="w-4 h-4 mr-2 text-green-600" />
+                    ) : testConnectionStatus === "error" ? (
+                      <X className="w-4 h-4 mr-2 text-red-600" />
+                    ) : (
+                      <Send className="w-4 h-4 mr-2" />
+                    )}
+                    {testConnectionStatus === "testing"
+                      ? "Testing Connection..."
+                      : testConnectionStatus === "success"
+                        ? "Connection Successful"
+                        : testConnectionStatus === "error"
+                          ? "Connection Failed"
+                          : "Test Connection"}
+                  </Button>
+                  <Button onClick={handleSaveEmailConfig} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                    Save Configuration
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Notification Preferences */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Settings className="w-5 h-5" />
+                  <span>Notification Preferences</span>
+                </CardTitle>
+                <CardDescription>Configure default notification settings for all employees</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <h4 className="font-medium">HR Notifications</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Employee Welcome</Label>
+                            <p className="text-sm text-muted-foreground">Send welcome email to new employees</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.payrollNotifications} // Corrected to use a relevant setting
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Leave Notifications</Label>
+                            <p className="text-sm text-muted-foreground">Notify about leave requests and approvals</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.leaveNotifications}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, leaveNotifications: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Promotion Notifications</Label>
+                            <p className="text-sm text-muted-foreground">Send promotion and transfer notifications</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.promotionNotifications}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, promotionNotifications: checked })
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="font-medium">Payroll & Attendance</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Payroll Processing</Label>
+                            <p className="text-sm text-muted-foreground">Notify when payroll is processed</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.payrollNotifications}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Attendance Alerts</Label>
+                            <p className="text-sm text-muted-foreground">Send alerts for attendance issues</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.attendanceAlerts}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, attendanceAlerts: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>System Maintenance</Label>
+                            <p className="text-sm text-muted-foreground">Notify about system maintenance</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.systemMaintenanceAlerts}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, systemMaintenanceAlerts: checked })
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <Label>Email Digest Frequency</Label>
+                      <Select
+                        value={notificationSettings.emailDigest}
+                        onValueChange={(value) =>
+                          setNotificationSettings({ ...notificationSettings, emailDigest: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="immediate">Immediate</SelectItem>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="smsAlerts"
+                        checked={notificationSettings.smsAlerts}
+                        onCheckedChange={(checked) =>
+                          setNotificationSettings({ ...notificationSettings, smsAlerts: checked })
+                        }
+                      />
+                      <div>
+                        <Label htmlFor="smsAlerts">SMS Alerts</Label>
+                        <p className="text-sm text-muted-foreground">Enable SMS notifications</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="pushNotifications"
+                        checked={notificationSettings.pushNotifications}
+                        onCheckedChange={(checked) =>
+                          setNotificationSettings({ ...notificationSettings, pushNotifications: checked })
+                        }
+                      />
+                      <div>
+                        <Label htmlFor="pushNotifications">Push Notifications</Label>
+                        <p className="text-sm text-muted-foreground">Enable browser push notifications</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => {
+                        setIsSaving(true) // Use the general saving state
+                        setTimeout(() => {
+                          setIsSaving(false)
+                          toast({
+                            title: "Preferences Saved",
+                            description: "Notification preferences have been updated successfully",
+                          })
+                        }, 1500)
+                      }}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                      Save Preferences
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="roles">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="w-5 h-5" />
+                  <span>Roles & Permissions</span>
+                </CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" onClick={handleAddRoleInner}>
+                    Add Role
+                  </Button>
+                </div>
+              </div>
+              <CardDescription>Manage user roles and permissions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                {roles.map((role) => (
+                  <Card key={role.id} className="border-l-4 border-l-indigo-500">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-base font-semibold">{role.name}</h3>
+                          <p className="text-xs text-gray-600">{role.description}</p>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <span className="text-sm text-gray-500">{role.user_count} Users</span>
+                          <Button variant="outline" size="sm" onClick={() => handleEditRoleInner(role.name)}>
+                            Edit
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Access Control Tab Content */}
+        <TabsContent value="access">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Shield className="w-5 h-5" />
+                <span>Access Control</span>
+              </CardTitle>
+              <CardDescription>Manage user access and authentication settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Authentication Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Authentication Settings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="twoFactor">Two-Factor Authentication</Label>
+                      <Switch
+                        id="twoFactor"
+                        checked={accessSettings.twoFactorEnabled}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, twoFactorEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="ssoEnabled">Single Sign-On (SSO)</Label>
+                      <Switch
+                        id="ssoEnabled"
+                        checked={accessSettings.ssoEnabled}
+                        onCheckedChange={(checked) => setAccessSettings({ ...accessSettings, ssoEnabled: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="passwordExpiry">Password Expiry</Label>
+                      <Switch
+                        id="passwordExpiry"
+                        checked={accessSettings.passwordExpiryEnabled}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordExpiryEnabled: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
+                      <Input
+                        id="sessionTimeout"
+                        type="number"
+                        value={accessSettings.sessionTimeout}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, sessionTimeout: Number.parseInt(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
+                      <Input
+                        id="maxLoginAttempts"
+                        type="number"
+                        value={accessSettings.maxLoginAttempts}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, maxLoginAttempts: Number.parseInt(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="passwordMinLength">Minimum Password Length</Label>
+                      <Input
+                        id="passwordMinLength"
+                        type="number"
+                        value={accessSettings.passwordMinLength}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, passwordMinLength: Number.parseInt(e.target.value) })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* IP Restrictions */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">IP Access Control</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="ipRestrictions">Enable IP Restrictions</Label>
+                    <Switch
+                      id="ipRestrictions"
+                      checked={accessSettings.ipRestrictionsEnabled}
+                      onCheckedChange={(checked) =>
+                        setAccessSettings({ ...accessSettings, ipRestrictionsEnabled: checked })
+                      }
+                    />
+                  </div>
+                  {accessSettings.ipRestrictionsEnabled && (
+                    <div className="space-y-2">
+                      <Label>Allowed IP Addresses</Label>
+                      {accessSettings.allowedIPs.map((ip, index) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <Input
+                            value={ip}
+                            onChange={(e) => {
+                              const newIPs = [...accessSettings.allowedIPs]
+                              newIPs[index] = e.target.value
+                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
+                            }}
+                            placeholder="192.168.1.0/24"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const newIPs = accessSettings.allowedIPs.filter((_, i) => i !== index)
+                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setAccessSettings({
+                            ...accessSettings,
+                            allowedIPs: [...accessSettings.allowedIPs, ""],
+                          })
+                        }
+                      >
+                        Add IP Range
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Active Sessions */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Active Sessions</h3>
+                  <Button variant="outline" onClick={handleRefreshSessions} disabled={isRefreshingSessions}>
+                    {isRefreshingSessions ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    Refresh
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {activeSessions.map((session) => (
+                    <Card key={session.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{session.user_email}</p>
+                            <p className="text-sm text-gray-600">
+                              {session.ip_address} • {session.device} • Last active:{" "}
+                              {new Date(session.last_activity).toLocaleString()}
+                            </p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => handleTerminateSession(session.id)}>
+                            Terminate
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              </div>
 
-          {/* Payroll Tab */}
-          <TabsContent value="payroll" className="space-y-6">
-            {/* Salary Grades Card */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Salary Grades</CardTitle>
-                    <CardDescription>Manage salary structures and grades</CardDescription>
+              <div className="flex justify-end">
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveAccessSettings}
+                  disabled={isSavingAccessSettings}
+                >
+                  {isSavingAccessSettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Access Settings
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Security Tab Content */}
+        <TabsContent value="security">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="w-5 h-5" />
+                  <span>Security Settings</span>
+                </CardTitle>
+                <Button variant="outline" onClick={handleBackupNow} disabled={isBackingUp}>
+                  {isBackingUp ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Backing Up...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" />
+                      Backup Now
+                    </>
+                  )}
+                </Button>
+              </div>
+              <CardDescription>Manage security settings, backups, and audit logs</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Security Policies */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Security Policies</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="dataEncryption">Data Encryption at Rest</Label>
+                      <Switch
+                        id="dataEncryption"
+                        checked={securitySettings.dataEncryptionEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, dataEncryptionEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="auditLogging">Audit Logging</Label>
+                      <Switch
+                        id="auditLogging"
+                        checked={securitySettings.auditLoggingEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, auditLoggingEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="autoBackup">Automatic Backups</Label>
+                      <Switch
+                        id="autoBackup"
+                        checked={securitySettings.autoBackupEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, autoBackupEnabled: checked })
+                        }
+                      />
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setEditingGrade(null) // Ensure adding new
-                        setShowStructuredGradeModal(true) // Fixed undeclared variable
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Structured Grade
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setEditingUnstructured(null) // Ensure adding new
-                        setShowUnstructuredGradeModal(true) // Fixed undeclared variable
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Unstructured Grade
-                    </Button>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="backupFrequency">Backup Frequency</Label>
+                      <Select
+                        value={securitySettings.backupFrequency}
+                        onValueChange={(value) => setSecuritySettings({ ...securitySettings, backupFrequency: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="retentionPeriod">Data Retention Period (days)</Label>
+                      <Input
+                        id="retentionPeriod"
+                        type="number"
+                        value={securitySettings.dataRetentionDays}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            dataRetentionDays: Number.parseInt(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="structured">
-                  <TabsList>
-                    <TabsTrigger value="structured">Structured</TabsTrigger>
-                    <TabsTrigger value="unstructured">Unstructured</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="structured" className="space-y-4 mt-4">
-                    {structuredSalaryGrades.map((grade) => (
-                      <div key={grade.id} className="flex items-center justify-between p-4 border rounded-lg">
+              </div>
+
+              {/* Backup Status */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Backup Status</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="w-5 h-5 text-blue-600" />
                         <div>
-                          <h3 className="font-semibold">{grade.name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {grade.currency} {grade.minSalary.toLocaleString()} - {grade.maxSalary.toLocaleString()}
+                          <p className="text-sm font-medium">Last Backup</p>
+                          <p className="text-lg font-bold">
+                            {lastBackupTime ? new Date(lastBackupTime).toLocaleDateString() : "Never"}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm">
-                            Edit
-                          </Button>
-                          <Button variant="destructive" size="sm">
-                            Delete
-                          </Button>
-                        </div>
                       </div>
-                    ))}
-                  </TabsContent>
-                  <TabsContent value="unstructured" className="space-y-4 mt-4">
-                    {unstructuredSalaryGrades.map((grade) => (
-                      <div key={grade.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Database className="w-5 h-5 text-green-600" />
                         <div>
-                          <h3 className="font-semibold">{grade.name}</h3>
-                          <p className="text-sm text-muted-foreground">{grade.description}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm">
-                            Edit
-                          </Button>
-                          <Button variant="destructive" size="sm">
-                            Delete
-                          </Button>
+                          <p className="text-sm font-medium">Backup Size</p>
+                          <p className="text-lg font-bold">{backupSize || "0 MB"}</p>
                         </div>
                       </div>
-                    ))}
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="w-5 h-5 text-emerald-600" />
+                        <div>
+                          <p className="text-sm font-medium">Status</p>
+                          <p className="text-lg font-bold">{backupStatus || "Ready"}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
 
-          {/* Notifications Tab */}
-          <TabsContent value="notifications" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Settings</CardTitle>
-                <CardDescription>Configure email and system notifications</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Notification settings coming soon...</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              {/* Audit Logs */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Recent Audit Logs</h3>
+                  <Button variant="outline" onClick={handleViewAllLogs}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    View All Logs
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {auditLogs.slice(0, 5).map((log) => (
+                    <Card key={log.id}>
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-sm">{log.action}</p>
+                            <p className="text-xs text-gray-600">
+                              {log.user_email} • {log.ip_address} •{new Date(log.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                          <Badge variant={log.severity === "high" ? "destructive" : "secondary"}>{log.severity}</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
 
-          {/* Security Tab */}
-          <TabsContent value="security" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Access Control & Security</CardTitle>
-                <CardDescription>Manage security settings and access controls</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Security settings coming soon...</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* Company Info Modal */}
-      <Dialog open={showCompanyModal} onOpenChange={setShowCompanyModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Company Information</DialogTitle>
-            <DialogDescription>Update your company's details</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label htmlFor="company-name">Company Name</Label>
-                <Input
-                  id="company-name"
-                  value={company?.name || ""}
-                  onChange={(e) => setCompany({ ...company!, name: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="company-tax-id">Tax ID</Label>
-                <Input
-                  id="company-tax-id"
-                  value={company?.tax_id || ""}
-                  onChange={(e) => setCompany({ ...company!, tax_id: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="company-ssnit">SSNIT Number</Label>
-                <Input
-                  id="company-ssnit"
-                  value={company?.ssnit_number || ""}
-                  onChange={(e) => setCompany({ ...company!, ssnit_number: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="company-industry">Industry</Label>
-                <Input
-                  id="company-industry"
-                  value={company?.industry || ""}
-                  onChange={(e) => setCompany({ ...company!, industry: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="col-span-2">
-              <Label htmlFor="company-address">Address</Label>
-              <Input
-                id="company-address"
-                value={company?.address || ""}
-                onChange={(e) => setCompany({ ...company!, address: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="company-phone">Phone</Label>
-                <Input
-                  id="company-phone"
-                  value={company?.phone_number || ""}
-                  onChange={(e) => setCompany({ ...company!, phone_number: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="company-email">Email</Label>
-                <Input
-                  id="company-email"
-                  value={company?.email_address || ""}
-                  onChange={(e) => setCompany({ ...company!, email_address: e.target.value })}
-                />
-              </div>
-            </div>
-            {/* Logo Upload */}
-            <div>
-              <Label>Company Logo</Label>
-              <div className="flex items-center gap-4 mt-2">
-                {companyLogoPreview && (
-                  <img
-                    src={companyLogoPreview || "/placeholder.svg"}
-                    alt="Company Logo Preview"
-                    className="h-16 w-16 object-cover rounded-md"
-                  />
-                )}
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => e.target.files && handleLogoUpload(e.target.files[0], "company")}
-                  className="max-w-xs"
-                />
-                {isUploadingLogo && <Loader2 className="h-5 w-5 animate-spin" />}
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCompanyModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveCompanyInfo} disabled={isSavingCompany}>
-              {isSavingCompany ? "Saving..." : "Save Changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Subsidiary Modal */}
-      <Dialog open={showSubsidiaryModal} onOpenChange={setShowSubsidiaryModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingSubsidiary ? "Edit Subsidiary" : "Add New Subsidiary"}</DialogTitle>
-            <DialogDescription>
-              {editingSubsidiary ? "Update subsidiary details" : "Enter details for the new subsidiary"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="subsidiary-name">Subsidiary Name</Label>
-                <Input
-                  id="subsidiary-name"
-                  value={editingSubsidiary?.name || ""}
-                  onChange={(e) => setEditingSubsidiary({ ...editingSubsidiary!, name: e.target.value })}
-                  placeholder="e.g., Akwaaba Digital Solutions"
-                />
-              </div>
-              <div>
-                <Label htmlFor="subsidiary-tax-id">Tax ID</Label>
-                <Input
-                  id="subsidiary-tax-id"
-                  value={editingSubsidiary?.tax_id || ""}
-                  onChange={(e) => setEditingSubsidiary({ ...editingSubsidiary!, tax_id: e.target.value })}
-                  placeholder="e.g., TIN-ADS-2023-001"
-                />
-              </div>
-              <div>
-                <Label htmlFor="subsidiary-ssnit">SSNIT Number</Label>
-                <Input
-                  id="subsidiary-ssnit"
-                  value={editingSubsidiary?.ssnit_number || ""}
-                  onChange={(e) => setEditingSubsidiary({ ...editingSubsidiary!, ssnit_number: e.target.value })}
-                  placeholder="e.g., SSNIT-ADS-789012"
-                />
-              </div>
-              <div>
-                <Label htmlFor="subsidiary-industry">Industry</Label>
-                <Input
-                  id="subsidiary-industry"
-                  value={editingSubsidiary?.industry || ""}
-                  onChange={(e) => setEditingSubsidiary({ ...editingSubsidiary!, industry: e.target.value })}
-                  placeholder="e.g., Digital Marketing"
-                />
-              </div>
-            </div>
-            <div className="col-span-2">
-              <Label htmlFor="subsidiary-address">Address</Label>
-              <Input
-                id="subsidiary-address"
-                value={editingSubsidiary?.address || ""}
-                onChange={(e) => setEditingSubsidiary({ ...editingSubsidiary!, address: e.target.value })}
-                placeholder="e.g., 15 Liberation Road, Ridge, Accra"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="subsidiary-phone">Phone</Label>
-                <Input
-                  id="subsidiary-phone"
-                  value={editingSubsidiary?.phone_number || ""}
-                  onChange={(e) => setEditingSubsidiary({ ...editingSubsidiary!, phone_number: e.target.value })}
-                  placeholder="+233 30 276 5432"
-                />
-              </div>
-              <div>
-                <Label htmlFor="subsidiary-email">Email</Label>
-                <Input
-                  id="subsidiary-email"
-                  value={editingSubsidiary?.email_address || ""}
-                  onChange={(e) => setEditingSubsidiary({ ...editingSubsidiary!, email_address: e.target.value })}
-                  placeholder="info@akwaabadigital.com"
-                />
-              </div>
-            </div>
-            {/* Logo Upload */}
-            <div>
-              <Label>Subsidiary Logo</Label>
-              <div className="flex items-center gap-4 mt-2">
-                {subsidiaryLogoPreview && (
-                  <img
-                    src={subsidiaryLogoPreview || "/placeholder.svg"}
-                    alt="Subsidiary Logo Preview"
-                    className="h-16 w-16 object-cover rounded-md"
-                  />
-                )}
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => e.target.files && handleLogoUpload(e.target.files[0], "subsidiary")}
-                  className="max-w-xs"
-                />
-                {isUploadingLogo && <Loader2 className="h-5 w-5 animate-spin" />}
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSubsidiaryModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveSubsidiary} disabled={isSavingSubsidiary}>
-              {isSavingSubsidiary ? "Saving..." : "Save Subsidiary"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Document Viewer Modal */}
-      <Dialog open={showDocumentViewer} onOpenChange={setShowDocumentViewer}>
-        <DialogContent className="max-w-4xl h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>{viewingDocument?.name}</DialogTitle>
-            <DialogDescription>
-              {viewingDocument?.type.toUpperCase()} • {viewingDocument?.size}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 flex flex-col h-full">
-            {/* PDF Viewer Controls */}
-            <div className="flex items-center justify-between p-2 border-b bg-muted/50">
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => handlePageChange("prev")} disabled={currentPage === 1}>
-                  <ChevronLeft className="h-4 w-4" />
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={handleExportSecurityReport} disabled={isExportingReport}>
+                  {isExportingReport ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4 mr-2" />
+                      Export Security Report
+                    </>
+                  )}
                 </Button>
-                <span className="text-sm">
-                  Page {currentPage} of {totalPages}
-                </span>
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handlePageChange("next")}
-                  disabled={currentPage === totalPages}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveSecuritySettings}
+                  disabled={isSavingSecuritySettings}
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  {isSavingSecuritySettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Security Settings
+                    </>
+                  )}
                 </Button>
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))}>
-                  <ZoomOut className="h-4 w-4" />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Add Subsidiary Modal */}
+      {showAddSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Add New Subsidiary</CardTitle>
+                <CardDescription>Enter the details for the new subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    <div className="flex items-center space-x-4">
+                      {subsidiaryLogoPreview ? (
+                        <div className="relative">
+                          <img
+                            src={subsidiaryLogoPreview || "/placeholder.svg"}
+                            alt="Subsidiary Logo"
+                            className="w-20 h-20 object-cover rounded-lg border"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                            onClick={() => setSubsidiaryLogoPreview("")}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                          <ImageIcon className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              handleLogoUpload(file, "subsidiary")
+                            }
+                          }}
+                          className="hidden"
+                          id="subsidiary-logo-upload"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById("subsidiary-logo-upload")?.click()}
+                          disabled={isUploadingLogo}
+                          className="flex items-center space-x-2"
+                        >
+                          {isUploadingLogo ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              <span>Upload Logo</span>
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="subsidiaryName">Subsidiary Name</Label>
+                      <Input id="subsidiaryName" placeholder="Enter subsidiary name" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryIndustry">Industry</Label>
+                      <Input id="subsidiaryIndustry" placeholder="Enter industry" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryTaxId">Tax ID</Label>
+                      <Input id="subsidiaryTaxId" placeholder="Enter tax ID" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiarySsnit">SSNIT Number</Label>
+                      <Input id="subsidiarySsnit" placeholder="Enter SSNIT number" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryEmail">Email Address</Label>
+                      <Input id="subsidiaryEmail" type="email" placeholder="Enter email address" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryPhone">Phone Number</Label>
+                      <Input id="subsidiaryPhone" placeholder="Enter phone number" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="subsidiaryAddress">Address</Label>
+                    <Textarea id="subsidiaryAddress" placeholder="Enter address" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter division" />
+                      <Button variant="outline" size="sm">
+                        Add Division
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter department" />
+                      <Button variant="outline" size="sm">
+                        Add Department
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter location name" />
+                      <Button variant="outline" size="sm">
+                        Add Location
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setShowAddSubsidiary(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => setShowAddSubsidiary(false)}>Add Subsidiary</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Subsidiary Modal */}
+      {showEditSubsidiary && selectedSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Edit Subsidiary</CardTitle>
+                <CardDescription>Edit the details for the selected subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    <div className="flex items-center space-x-4">
+                      {subsidiaryLogoPreview || selectedSubsidiary.logo_url ? (
+                        <div className="relative">
+                          <img
+                            src={subsidiaryLogoPreview || selectedSubsidiary.logo_url}
+                            alt="Subsidiary Logo"
+                            className="w-20 h-20 object-cover rounded-lg border"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                            onClick={() => setSubsidiaryLogoPreview("")}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                          <ImageIcon className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              handleLogoUpload(file, "subsidiary")
+                            }
+                          }}
+                          className="hidden"
+                          id="subsidiary-logo-upload-edit"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById("subsidiary-logo-upload-edit")?.click()}
+                          disabled={isUploadingLogo}
+                          className="flex items-center space-x-2"
+                        >
+                          {isUploadingLogo ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              <span>Upload Logo</span>
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="editSubsidiaryName">Subsidiary Name</Label>
+                      <Input
+                        id="editSubsidiaryName"
+                        placeholder="Enter subsidiary name"
+                        value={selectedSubsidiary.name}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryIndustry">Industry</Label>
+                      <Input
+                        id="editSubsidiaryIndustry"
+                        placeholder="Enter industry"
+                        value={selectedSubsidiary.industry}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, industry: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryTaxId">Tax ID</Label>
+                      <Input
+                        id="editSubsidiaryTaxId"
+                        placeholder="Enter tax ID"
+                        value={selectedSubsidiary.tax_id}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, tax_id: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiarySsnit">SSNIT Number</Label>
+                      <Input
+                        id="editSubsidiarySsnit"
+                        placeholder="Enter SSNIT number"
+                        value={selectedSubsidiary.ssnit_number}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, ssnit_number: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryEmail">Email Address</Label>
+                      <Input
+                        id="editSubsidiaryEmail"
+                        type="email"
+                        placeholder="Enter email address"
+                        value={selectedSubsidiary.email_address}
+                        onChange={(e) =>
+                          setSelectedSubsidiary({ ...selectedSubsidiary, email_address: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryPhone">Phone Number</Label>
+                      <Input
+                        id="editSubsidiaryPhone"
+                        placeholder="Enter phone number"
+                        value={selectedSubsidiary.phone_number}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, phone_number: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="editSubsidiaryAddress">Address</Label>
+                    <Textarea
+                      id="editSubsidiaryAddress"
+                      placeholder="Enter address"
+                      value={selectedSubsidiary.address}
+                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, address: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.divisions) ? (
+                        selectedSubsidiary.divisions.map((division, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={division}
+                              onChange={(e) => {
+                                const newDivisions = [...selectedSubsidiary.divisions]
+                                newDivisions[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newDivisions = selectedSubsidiary.divisions.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <Input placeholder="No divisions defined" disabled />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newDivisions = selectedSubsidiary.divisions
+                            ? [...selectedSubsidiary.divisions, "New Division"]
+                            : ["New Division"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                        }}
+                      >
+                        Add Division
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.departments) ? (
+                        selectedSubsidiary.departments.map((department, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={department}
+                              onChange={(e) => {
+                                const newDepartments = [...selectedSubsidiary.departments]
+                                newDepartments[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newDepartments = selectedSubsidiary.departments.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <Input placeholder="No departments defined" disabled />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newDepartments = selectedSubsidiary.departments
+                            ? [...selectedSubsidiary.departments, "New Department"]
+                            : ["New Department"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                        }}
+                      >
+                        Add Department
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.locations) ? (
+                        selectedSubsidiary.locations.map((location, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={location}
+                              onChange={(e) => {
+                                const newLocations = [...selectedSubsidiary.locations]
+                                newLocations[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newLocations = selectedSubsidiary.locations.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <Input placeholder="No locations defined" disabled />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newLocations = selectedSubsidiary.locations
+                            ? [...selectedSubsidiary.locations, "New Location"]
+                            : ["New Location"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                        }}
+                      >
+                        Add Location
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setShowEditSubsidiary(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (selectedSubsidiary) {
+                        await updateSubsidiary(selectedSubsidiary.id, {
+                          name: selectedSubsidiary.name,
+                          industry: selectedSubsidiary.industry,
+                          tax_id: selectedSubsidiary.tax_id,
+                          ssnit_number: selectedSubsidiary.ssnit_number,
+                          email_address: selectedSubsidiary.email_address,
+                          phone_number: selectedSubsidiary.phone_number,
+                          address: selectedSubsidiary.address,
+                          divisions: selectedSubsidiary.divisions,
+                          departments: selectedSubsidiary.departments,
+                          locations: selectedSubsidiary.locations,
+                          logo_url: subsidiaryLogoPreview || selectedSubsidiary.logo_url,
+                        })
+                        setShowEditSubsidiary(false)
+                        setSubsidiaryLogoPreview("")
+                      }
+                    }}
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Subsidiary Details Modal */}
+      {showSubsidiaryDetails && selectedSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Subsidiary Details</CardTitle>
+                <CardDescription>View the details for the selected subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    {selectedSubsidiary.logo_url ? (
+                      <img
+                        src={selectedSubsidiary.logo_url || "/placeholder.svg"}
+                        alt="Subsidiary Logo"
+                        className="w-20 h-20 object-cover rounded-lg border"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                        <ImageIcon className="w-8 h-8 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label>Subsidiary Name</Label>
+                      <Input value={selectedSubsidiary.name} disabled />
+                    </div>
+                    <div>
+                      <Label>Industry</Label>
+                      <Input value={selectedSubsidiary.industry} disabled />
+                    </div>
+                    <div>
+                      <Label>Tax ID</Label>
+                      <Input value={selectedSubsidiary.tax_id} disabled />
+                    </div>
+                    <div>
+                      <Label>SSNIT Number</Label>
+                      <Input value={selectedSubsidiary.ssnit_number} disabled />
+                    </div>
+                    <div>
+                      <Label>Email Address</Label>
+                      <Input value={selectedSubsidiary.email_address} disabled />
+                    </div>
+                    <div>
+                      <Label>Phone Number</Label>
+                      <Input value={selectedSubsidiary.phone_number} disabled />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Address</Label>
+                    <Textarea value={selectedSubsidiary.address} disabled />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    {Array.isArray(selectedSubsidiary.divisions) ? (
+                      selectedSubsidiary.divisions.map((division, index) => (
+                        <Input key={index} value={division} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No divisions defined" disabled />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    {Array.isArray(selectedSubsidiary.departments) ? (
+                      selectedSubsidiary.departments.map((department, index) => (
+                        <Input key={index} value={department} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No departments defined" disabled />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    {Array.isArray(selectedSubsidiary.locations) ? (
+                      selectedSubsidiary.locations.map((location, index) => (
+                        <Input key={index} value={location} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No locations defined" disabled />
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="ghost" onClick={() => setShowSubsidiaryDetails(false)}>
+                    Close
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate Confirmation Modal */}
+      {showDeactivateConfirm && subsidiaryToToggle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="max-w-md p-6">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Deactivate Subsidiary</CardTitle>
+              <CardDescription>Are you sure you want to deactivate {subsidiaryToToggle.name}?</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p>Deactivating will prevent further actions on this subsidiary.</p>
+              <div className="flex justify-end space-x-2">
+                <Button variant="ghost" onClick={() => setShowDeactivateConfirm(false)}>
+                  Cancel
                 </Button>
-                <span className="text-sm">{zoomLevel}%</span>
-                <Button variant="ghost" size="sm" onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))}>
-                  <ZoomIn className="h-4 w-4" />
+                <Button variant="destructive" onClick={confirmToggleStatus}>
+                  Deactivate
                 </Button>
               </div>
-            </div>
-            {/* Document Content */}
-            <div className="flex-1 overflow-auto bg-gray-100 p-4">
-              <div
-                className="bg-white shadow-lg mx-auto p-8"
-                style={{
-                  width: `${zoomLevel}%`,
-                  minHeight: "100%",
-                }}
-              >
-                {loadingDocument ? (
-                  <div className="flex items-center justify-center h-full">
-                    <Loader2 className="h-8 w-8 animate-spin" />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Reactivate Confirmation Modal */}
+      {showReactivateConfirm && subsidiaryToToggle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="max-w-md p-6">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Reactivate Subsidiary</CardTitle>
+              <CardDescription>Are you sure you want to reactivate {subsidiaryToToggle.name}?</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p>Reactivating will allow full access and actions on this subsidiary.</p>
+              <div className="flex justify-end space-x-2">
+                <Button variant="ghost" onClick={() => setShowReactivateConfirm(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={confirmToggleStatus}>Reactivate</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* View Employees Modal */}
+      {viewEmployeesModal.isOpen && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Employees of Subsidiary</CardTitle>
+                <CardDescription>View the employees for the selected subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {viewEmployeesModal.employees && viewEmployeesModal.employees.length > 0 ? (
+                  <div className="space-y-3">
+                    {viewEmployeesModal.employees.map((employee) => (
+                      <Card key={employee.id} className="border-l-4 border-l-indigo-500">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-base font-semibold">{employee.name}</h3>
+                              <p className="text-sm text-gray-600">{employee.position}</p>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              <span className="text-sm text-gray-500">{employee.email}</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 ) : (
-                  <pre className="whitespace-pre-wrap font-sans text-sm">{documentContent}</pre>
+                  <p>No employees found for this subsidiary.</p>
                 )}
-              </div>
-            </div>
+                <div className="flex justify-end">
+                  <Button variant="ghost" onClick={() => setViewEmployeesModal({ isOpen: false, subsidiaryId: "" })}>
+                    Close
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      {/* Add/Edit Document Modal */}
-      <Dialog open={showDocumentModal} onOpenChange={setShowDocumentModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingDocument ? "Edit Document" : "Add Document"}</DialogTitle>
-            <DialogDescription>
-              {editingDocument ? "Update document details" : "Upload a new HR document (PDF only)"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="doc-name">Document Name</Label>
-              <Input
-                id="doc-name"
-                value={newDocumentName}
-                onChange={(e) => setNewDocumentName(e.target.value)}
-                placeholder="e.g., Employee Handbook"
-              />
-            </div>
-            {!editingDocument && (
-              <div>
-                <Label htmlFor="doc-file">Upload PDF</Label>
-                <Input
-                  id="doc-file"
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      setNewDocumentFile(file)
-                    }
-                  }}
-                />
-                {newDocumentFile && (
-                  <div className="text-sm text-muted-foreground mt-2">
-                    Selected: {newDocumentFile.name} ({(newDocumentFile.size / 1024 / 1024).toFixed(2)} MB)
+      {/* Import Settings Modal */}
+      {importModal && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-lg mx-auto">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">Import Settings</CardTitle>
+                <CardDescription>Import settings from a CSV file</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="importFile">Select CSV File</Label>
+                    <Input
+                      id="importFile"
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleImportSettings(file)
+                        }
+                      }}
+                    />
                   </div>
-                )}
-                {uploadingDocument && (
-                  <div className="mt-2">
-                    <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-                      <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+                  <p className="text-sm text-gray-600">
+                    Upload a CSV file with subsidiary settings. The file should include columns for name, tax_id,
+                    ssnit_number, industry, etc.
+                  </p>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setImportModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => setImportModal(false)}>Import</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {showImportExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Import/Export Salary Grades</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowImportExportModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Export Section */}
+              <div>
+                <h3 className="text-lg font-medium mb-3">Export Data</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Download your current salary grades data in CSV or Excel format.
+                </p>
+                <div className="flex space-x-3">
+                  <Button
+                    onClick={() => handleExportSalaryGrades("csv")}
+                    disabled={isExporting || salaryGrades.length === 0}
+                    className="flex items-center space-x-2"
+                  >
+                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    <span>Export as CSV</span>
+                  </Button>
+                  <Button
+                    onClick={() => handleExportSalaryGrades("excel")}
+                    disabled={isExporting || salaryGrades.length === 0}
+                    variant="outline"
+                    className="flex items-center space-x-2"
+                  >
+                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    <span>Export as Excel</span>
+                  </Button>
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                {/* Import Section */}
+                <div>
+                  <h3 className="text-lg font-medium mb-3">Import Data</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Import salary grades from CSV data. Expected format: Grade Name, Description, Min Salary, Max
+                    Salary, Step, Step Amount
+                  </p>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="importData">CSV Data</Label>
+                      <textarea
+                        id="importData"
+                        className="w-full h-32 p-3 border border-gray-300 rounded-md resize-none font-mono text-sm"
+                        placeholder={`Grade Name,Description,Min Salary,Max Salary,Step,Step Amount
+"Grade 1","Entry Level",2500,4000,1,2500
+"Grade 1","Entry Level",2500,4000,2,3000
+"Grade 2","Mid Level",4000,6000,1,4000`}
+                        value={importData}
+                        onChange={(e) => setImportData(e.target.value)}
+                      />
                     </div>
-                    <div className="text-sm text-muted-foreground text-center">{uploadProgress}%</div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">
+                        {importData.trim() ? `${importData.trim().split("\n").length - 1} rows to import` : "No data"}
+                      </span>
+                      <Button
+                        onClick={handleImportSalaryGrades}
+                        disabled={isImporting || !importData.trim()}
+                        className="flex items-center space-x-2"
+                      >
+                        {isImporting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Importing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            <span>Import Data</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
-            )}
-            <div className="flex items-center gap-2">
-              <Switch checked={newDocumentAvailable} onCheckedChange={setNewDocumentAvailable} />
-              <Label>Available for employees</Label>
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <Button variant="outline" onClick={() => setShowImportExportModal(false)}>
+                Close
+              </Button>
             </div>
           </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowDocumentModal(false)
-                setEditingDocument(null) // Reset editing state
-                setNewDocumentName("")
-                setNewDocumentFile(null)
-                setNewDocumentAvailable(true)
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSaveDocument} disabled={isSavingDocument || uploadingDocument}>
-              {isSavingDocument ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save"
+        </div>
+      )}
+
+      {showSalaryGradeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">{editingGrade ? "Edit Salary Grade" : "Add New Salary Grade"}</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowSalaryGradeModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <p className="text-sm text-muted-foreground mb-6">Configure salary grade details and notch structure</p>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="gradeName">Grade Name</Label>
+                  <Input
+                    id="gradeName"
+                    value={newGrade.name}
+                    onChange={(e) => setNewGrade((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., Grade 1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="gradeDescription">Description</Label>
+                  <Input
+                    id="gradeDescription"
+                    value={newGrade.description}
+                    onChange={(e) => setNewGrade((prev) => ({ ...prev, description: e.target.value }))}
+                    placeholder="e.g., Entry Level"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="minSalary">Minimum Salary (₵)</Label>
+                  <Input
+                    id="minSalary"
+                    type="number"
+                    value={newGrade.minSalary}
+                    onChange={(e) => setNewGrade((prev) => ({ ...prev, minSalary: e.target.value }))}
+                    placeholder="2500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="maxSalary">Maximum Salary (₵)</Label>
+                  <Input
+                    id="maxSalary"
+                    type="number"
+                    value={newGrade.maxSalary}
+                    onChange={(e) => setNewGrade((prev) => ({ ...prev, maxSalary: e.target.value }))}
+                    placeholder="4000"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="numberOfNotches">Number of Notches/Steps</Label>
+                  <Input
+                    id="numberOfNotches"
+                    type="number"
+                    min="2"
+                    max="20"
+                    value={newGrade.numberOfNotches}
+                    onChange={(e) =>
+                      setNewGrade((prev) => ({ ...prev, numberOfNotches: Number.parseInt(e.target.value) || 5 }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Button
+                  onClick={handleGenerateNotches}
+                  disabled={isGeneratingNotches || !newGrade.minSalary || !newGrade.maxSalary}
+                  className="flex items-center space-x-2"
+                >
+                  {isGeneratingNotches ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Settings className="w-4 h-4" />
+                      <span>Generate Notches</span>
+                    </>
+                  )}
+                </Button>
+                <span className="text-sm text-muted-foreground">{newGrade.notches.length} notches configured</span>
+              </div>
+
+              {newGrade.notches.length > 0 && (
+                <div>
+                  <Label>Generated Notches Preview</Label>
+                  <div className="mt-2 bg-gray-50 border border-gray-200 rounded-md p-4 max-h-40 overflow-y-auto">
+                    <div className="space-y-2">
+                      {newGrade.notches.map((notch) => (
+                        <div key={notch.step} className="flex justify-between text-sm">
+                          <span>Step {notch.step}</span>
+                          <span className="font-medium">₵{notch.amount.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </div>
 
-      {/* Add/Edit Leave Policy Modal */}
-      <Dialog open={showLeavePolicyModal} onOpenChange={setShowLeavePolicyModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingLeavePolicy ? "Edit Leave Type" : "Add Leave Type"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="leave-name">Leave Type Name</Label>
-              <Input
-                id="leave-name"
-                value={newLeaveType}
-                onChange={(e) => setNewLeaveType(e.target.value)}
-                placeholder="e.g., Annual Leave"
-              />
-            </div>
-            <div>
-              <Label htmlFor="leave-days">Number of Days</Label>
-              <Input
-                id="leave-days"
-                type="number"
-                value={newLeaveDays}
-                onChange={(e) => setNewLeaveDays(Number(e.target.value))}
-                placeholder="e.g., 21"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch checked={newLeaveCarryOver} onCheckedChange={setNewLeaveCarryOver} />
-              <Label>Allow carry over to next year</Label>
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button variant="outline" onClick={() => setShowSalaryGradeModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveSalaryGrade} className="bg-black text-white hover:bg-gray-800">
+                <Save className="w-4 h-4 mr-2" />
+                {editingGrade ? "Update Grade" : "Save Grade"}
+              </Button>
             </div>
           </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowLeavePolicyModal(false)
-                setEditingLeavePolicy(null)
-                setNewLeaveType("")
-                setNewLeaveDays(0)
-                setNewLeaveCarryOver(false)
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSaveLeavePolicy}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      {/* Add Unstructured Salary Grade Modal */}
-      <Dialog open={showUnstructuredGradeModal} onOpenChange={setShowUnstructuredGradeModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Unstructured Salary Grade</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="grade-name">Grade Name</Label>
-              <Input
-                id="grade-name"
-                value={newUnstructured?.name}
-                onChange={(e) => setNewUnstructured({ ...newUnstructured!, name: e.target.value })}
-                placeholder="e.g., Executive Level"
-              />
+      {showAddLeaveTypeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Add New Leave Type</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowAddLeaveTypeModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
             </div>
-            <div>
-              <Label htmlFor="grade-desc">Description</Label>
-              <Input
-                id="grade-desc"
-                value={newUnstructured?.description}
-                onChange={(e) => setNewUnstructured({ ...newUnstructured!, description: e.target.value })}
-                placeholder="Description of this grade"
-              />
-            </div>
-            {/* Add fields for increments */}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUnstructuredGradeModal(false)}>
-              Cancel
-            </Button>
-            <Button>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      {/* Add Structured Salary Grade Modal */}
-      <Dialog open={showStructuredGradeModal} onOpenChange={setShowStructuredGradeModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Structured Salary Grade</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="struct-grade-name">Grade Name</Label>
-              <Input
-                id="struct-grade-name"
-                value={editingGrade?.name}
-                onChange={(e) => setEditingGrade({ ...editingGrade!, name: e.target.value })}
-                placeholder="e.g., Grade A"
-              />
-            </div>
-            <div>
-              <Label htmlFor="currency">Currency</Label>
-              <Input
-                id="currency"
-                value={editingGrade?.currency}
-                onChange={(e) => setEditingGrade({ ...editingGrade!, currency: e.target.value })}
-                placeholder="GHS"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div>
-                <Label htmlFor="min-salary">Minimum Salary</Label>
+                <Label htmlFor="leaveName">Leave Type Name</Label>
                 <Input
-                  id="min-salary"
-                  type="number"
-                  value={editingGrade?.minSalary}
-                  onChange={(e) => setEditingGrade({ ...editingGrade!, minSalary: Number(e.target.value) })}
-                  placeholder="0"
+                  id="leaveName"
+                  value={newLeaveType.name}
+                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g., Study Leave"
                 />
               </div>
+
               <div>
-                <Label htmlFor="max-salary">Maximum Salary</Label>
+                <Label htmlFor="leaveDays">Number of Days</Label>
                 <Input
-                  id="max-salary"
+                  id="leaveDays"
                   type="number"
-                  value={editingGrade?.maxSalary}
-                  onChange={(e) => setEditingGrade({ ...editingGrade!, maxSalary: Number(e.target.value) })}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-            {/* Add fields for notches */}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowStructuredGradeModal(false)}>
-              Cancel
-            </Button>
-            <Button>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
-}
+                  value={newLeaveType.days}
+                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, days: Number(e.target.value)
