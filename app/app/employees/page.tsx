@@ -396,14 +396,17 @@ export default function EmployeesPage() {
   }, [companySettings, formData.hasSubsidiary, formData.subsidiary, subsidiaries, employees.length])
 
   useEffect(() => {
-    if (formData.position) {
-      const newEmployeeId = generateEmployeeId()
-      setFormData((prev: any) => ({
-        ...prev,
-        employeeId: newEmployeeId,
-      }))
-    }
-  }, [formData.position, formData.hasSubsidiary, formData.subsidiary, generateEmployeeId])
+    const newEmployeeId = generateEmployeeId()
+    console.log("[v0] Generating Employee ID:", {
+      hasSubsidiary: formData.hasSubsidiary,
+      subsidiary: formData.subsidiary,
+      newEmployeeId,
+    })
+    setFormData((prev: any) => ({
+      ...prev,
+      employeeId: newEmployeeId,
+    }))
+  }, [formData.hasSubsidiary, formData.subsidiary, generateEmployeeId])
   // </CHANGE>
 
   const loadCompanyData = async () => {
@@ -461,6 +464,11 @@ export default function EmployeesPage() {
   }
 
   useEffect(() => {
+    console.log("[v0] Subsidiary selection changed:", {
+      hasSubsidiary: formData.hasSubsidiary,
+      subsidiary: formData.subsidiary,
+    })
+
     // If "Yes" is selected and a subsidiary is chosen, load subsidiary data
     if (formData.hasSubsidiary === "Yes" && formData.subsidiary) {
       const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
@@ -2552,8 +2560,10 @@ function AddEmployeeForm({
               <Select
                 value={formData.hasSubsidiary}
                 onValueChange={(value) => {
+                  console.log("[v0] hasSubsidiary changed to:", value)
                   handleInputChange("hasSubsidiary", value)
                   if (value === "No") {
+                    console.log("[v0] Clearing subsidiary selection")
                     handleInputChange("subsidiary", "")
                   }
                 }}
@@ -2571,7 +2581,13 @@ function AddEmployeeForm({
             {formData.hasSubsidiary === "Yes" && (
               <div className="space-y-2">
                 <Label htmlFor="subsidiary">2b. Subsidiary</Label>
-                <Select value={formData.subsidiary} onValueChange={(value) => handleInputChange("subsidiary", value)}>
+                <Select
+                  value={formData.subsidiary}
+                  onValueChange={(value) => {
+                    console.log("[v0] Subsidiary changed to:", value)
+                    handleInputChange("subsidiary", value)
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select subsidiary" />
                   </SelectTrigger>
