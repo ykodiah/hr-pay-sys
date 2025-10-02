@@ -194,7 +194,7 @@ const initialEmployees = [
   },
 ]
 
-const departmentsListOptions = ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+const departments = ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
 
 const MAIN_COMPANY_ID = "f44f079e-1779-446d-9194-199994111111"
 
@@ -217,8 +217,7 @@ export default function EmployeesPage() {
   const [companySettings, setCompanySettings] = useState<any>(null)
   const [subsidiaries, setSubsidiaries] = useState<any[]>([])
   const [divisions, setDivisions] = useState<string[]>([])
-  const [departments, setDepartments] = useState<string[]>([])
-  // </CHANGE>
+  const [departmentsList, setDepartments] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
   const [currentTab, setCurrentTab] = useState("personal")
   const [formData, setFormData] = useState<any>({
@@ -470,42 +469,6 @@ export default function EmployeesPage() {
       subsidiary: formData.subsidiary,
     })
 
-    // If "No" is selected, always load parent company data
-    if (formData.hasSubsidiary === "No") {
-      console.log("[v0] Loading parent company data (No subsidiary selected)")
-
-      if (companySettings) {
-        const companyDivisions = Array.isArray(companySettings.divisions)
-          ? companySettings.divisions
-          : companySettings.divisions
-            ? JSON.parse(companySettings.divisions)
-            : ["Head Office", "Regional Office"]
-
-        const companyDepartments = Array.isArray(companySettings.departments)
-          ? companySettings.departments
-          : companySettings.departments
-            ? JSON.parse(companySettings.departments)
-            : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
-
-        const companyLocations = Array.isArray(companySettings.locations)
-          ? companySettings.locations
-          : companySettings.locations
-            ? JSON.parse(companySettings.locations)
-            : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
-
-        setDivisions(companyDivisions)
-        setDepartments(companyDepartments)
-        setLocations(companyLocations)
-
-        console.log("[v0] Loaded parent company data:", {
-          divisions: companyDivisions,
-          departments: companyDepartments,
-          locations: companyLocations,
-        })
-      }
-      return
-    }
-
     // If "Yes" is selected and a subsidiary is chosen, load subsidiary data
     if (formData.hasSubsidiary === "Yes" && formData.subsidiary) {
       const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
@@ -534,16 +497,14 @@ export default function EmployeesPage() {
         setDepartments(subDepartments)
         setLocations(subLocations)
 
-        console.log("[v0] Loaded subsidiary data:", {
-          divisions: subDivisions,
-          departments: subDepartments,
-          locations: subLocations,
-        })
+        console.log("[v0] Set subsidiary divisions:", subDivisions)
+        console.log("[v0] Set subsidiary departments:", subDepartments)
+        console.log("[v0] Set subsidiary locations:", subLocations)
       }
     }
-    // If "Yes" is selected but no subsidiary chosen yet, load parent company data as default
-    else if (formData.hasSubsidiary === "Yes" && !formData.subsidiary && companySettings) {
-      console.log("[v0] Loading parent company data (Yes selected but no subsidiary chosen)")
+    // If "No" is selected or no subsidiary is chosen, load parent company data
+    else if (companySettings) {
+      console.log("[v0] Loading parent company data (no subsidiary selected)")
 
       const companyDivisions = Array.isArray(companySettings.divisions)
         ? companySettings.divisions
@@ -567,7 +528,9 @@ export default function EmployeesPage() {
       setDepartments(companyDepartments)
       setLocations(companyLocations)
 
-      console.log("[v0] Loaded parent company data as default")
+      console.log("[v0] Set company divisions:", companyDivisions)
+      console.log("[v0] Set company departments:", companyDepartments)
+      console.log("[v0] Set company locations:", companyLocations)
     }
   }, [formData.hasSubsidiary, formData.subsidiary, subsidiaries, companySettings])
   // </CHANGE>
@@ -1227,7 +1190,7 @@ export default function EmployeesPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((dept) => (
+                {departmentsList.map((dept) => (
                   <SelectItem key={dept} value={dept}>
                     {dept}
                   </SelectItem>
@@ -1264,7 +1227,7 @@ export default function EmployeesPage() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-gray-900">{departments.length}</div>
+            <div className="text-2xl font-bold text-gray-900">{departmentsList.length}</div>
             <p className="text-sm text-gray-600">Departments</p>
           </CardContent>
         </Card>
@@ -2597,16 +2560,11 @@ function AddEmployeeForm({
               <Select
                 value={formData.hasSubsidiary}
                 onValueChange={(value) => {
-                  console.log("[v0] Select Subsidiary changed to:", value)
+                  console.log("[v0] hasSubsidiary changed to:", value)
                   handleInputChange("hasSubsidiary", value)
-                  // Clear subsidiary selection when "No" is selected
                   if (value === "No") {
-                    console.log("[v0] Clearing subsidiary selection and resetting to parent company data")
+                    console.log("[v0] Clearing subsidiary selection")
                     handleInputChange("subsidiary", "")
-                    // Clear division, department, location to force re-selection from parent company
-                    handleInputChange("division", "")
-                    handleInputChange("department", "")
-                    handleInputChange("location", "")
                   }
                 }}
               >
@@ -2628,10 +2586,6 @@ function AddEmployeeForm({
                   onValueChange={(value) => {
                     console.log("[v0] Subsidiary changed to:", value)
                     handleInputChange("subsidiary", value)
-                    // Clear division, department, location to force re-selection from subsidiary
-                    handleInputChange("division", "")
-                    handleInputChange("department", "")
-                    handleInputChange("location", "")
                   }}
                 >
                   <SelectTrigger>

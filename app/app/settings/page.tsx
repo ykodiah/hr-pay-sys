@@ -30,20 +30,15 @@ import {
   Calendar,
   Sparkles,
   TrendingUp,
-  DollarSign,
-  Minus,
-  Calculator,
-  Wifi,
-  Bell,
-  MoreHorizontal,
-  Trash2,
-  Send,
-  Mail,
-  Shield,
-  Database,
-  FileText,
-  EyeOff,
-  Check,
+  Printer,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ZoomOut,
+  ZoomIn,
+  Minimize,
+  Maximize,
+  AlertCircle,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -58,8 +53,6 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator" // Added for Separator
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table" // Added for Table components
 
 interface Company {
   id: string
@@ -630,6 +623,8 @@ export default function SettingsPage() {
     performanceIncrement: { type: "percentage", value: 0 },
   })
 
+  const [userRole, setUserRole] = useState<"admin" | "employee">("admin") // In production, get from auth context
+
   const handleExportSalaryGrades = async (format: "csv" | "excel") => {
     setIsExporting(true)
 
@@ -932,6 +927,15 @@ export default function SettingsPage() {
   }
 
   const handleDownload = () => {
+    if (userRole === "employee") {
+      toast({
+        title: "Download Restricted",
+        description: "Employees can only view documents. Contact HR for a copy.",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (selectedDocument) {
       const content = parseDocumentContent(selectedDocument)
       let blob
@@ -969,6 +973,25 @@ export default function SettingsPage() {
       toast({
         title: "Download Started",
         description: `Downloading ${filename}...`,
+      })
+    }
+  }
+
+  const handlePrint = () => {
+    window.print()
+  }
+
+  const [searchTerm, setSearchTerm] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages] = useState(1) // In production, calculate from actual PDF
+
+  const handleSearch = (term: string) => {
+    setSearchTerm(term)
+    // In production, implement actual search in PDF content
+    if (term) {
+      toast({
+        title: "Search",
+        description: `Searching for "${term}"...`,
       })
     }
   }
@@ -4673,10 +4696,15 @@ Format the response in a professional, actionable manner for HR decision-makers.
                             </p>
                           </div>
                           <div className="flex items-center space-x-4">
-                            <Switch
-                              checked={doc.visibleToAll}
-                              onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
-                            />
+                            <div className="flex flex-col items-end">
+                              <Switch
+                                checked={doc.visibleToAll}
+                                onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
+                              />
+                              <span className="text-xs text-gray-500 mt-1">
+                                {doc.visibleToAll ? "Available to employees" : "Not available"}
+                              </span>
+                            </div>
                             <Button variant="outline" size="sm" onClick={() => handleDocumentView(doc)}>
                               View
                             </Button>
@@ -4851,1534 +4879,237 @@ Format the response in a professional, actionable manner for HR decision-makers.
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="payroll">
-          <div className="space-y-6">
-            {/* Payroll Configuration Section */}
-            <Card>
+      {showDocumentModal && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-4 md:m-8">
+            <Card className={`mx-auto ${documentModalType === "view" ? "max-w-6xl" : "max-w-2xl"}`}>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Settings className="w-5 h-5" />
-                  <span>Payroll Configuration</span>
-                </CardTitle>
-                <CardDescription>Configure basic payroll settings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div>
-                    <Label htmlFor="payFrequency">Pay Frequency</Label>
-                    <Select defaultValue="monthly">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="biweekly">Bi-Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="currency">Currency</Label>
-                    <Select value={selectedCurrency} onValueChange={handleCurrencyChange}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ghs">Ghana Cedis (GHS)</SelectItem>
-                        <SelectItem value="usd">US Dollar (USD)</SelectItem>
-                        <SelectItem value="eur">Euro (EUR)</SelectItem>
-                        <SelectItem value="ngn">Nigerian Naira (NGN)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="minimumWage">Minimum Wage ({getCurrencyConfig(selectedCurrency).symbol})</Label>
-                    <Input type="number" defaultValue="18.15" />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="weekdayOvertimeRate">Weekday Overtime Rate Multiplier</Label>
-                    <Input type="number" step="0.1" defaultValue="1.5" />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="weekendOvertimeRate">Weekend Overtime Rate Multiplier</Label>
-                    <Input type="number" step="0.1" defaultValue="2" />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="payrollCutoffDay">Payroll Cutoff Day</Label>
-                    <Input type="number" min="1" max="31" defaultValue="25" />
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch id="autoCalculatePAYE" defaultChecked />
-                    <Label htmlFor="autoCalculatePAYE">Auto-calculate PAYE</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="autoCalculateSSNIT" defaultChecked />
-                    <Label htmlFor="autoCalculateSSNIT">Auto-calculate SSNIT</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="autoCalculateProvidentFund" defaultChecked />
-                    <Label htmlFor="autoCalculateProvidentFund">Auto-calculate Provident Fund (Tier 3)</Label>
-                  </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button onClick={handleSavePayrollConfig} disabled={isSavingPayroll}>
-                    {isSavingPayroll ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="w-4 h-4 mr-2" />
-                    )}
-                    Save Payroll Configuration
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl">
+                    {documentModalType === "add" && "Add New Document"}
+                    {documentModalType === "edit" && "Edit Document"}
+                    {documentModalType === "view" && selectedDocument?.name}
+                    {documentModalType === "delete" && "Delete Document"}
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setShowDocumentModal(false)}>
+                    <X className="w-4 h-4" />
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Tax Configuration Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Calculator className="w-5 h-5" />
-                  <span>Tax Configuration</span>
-                </CardTitle>
-                <CardDescription>Configure tax bands and SSNIT rates</CardDescription>
+                {documentModalType === "view" && (
+                  <CardDescription>
+                    {selectedDocument?.type} - {selectedDocument?.size}
+                  </CardDescription>
+                )}
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
+              <CardContent>
+                {/* Add Document Form */}
+                {documentModalType === "add" && (
+                  <div className="space-y-4">
                     <div>
-                      <h4 className="font-medium">PAYE Tax Bands</h4>
-                      <p className="text-sm text-gray-500">
-                        {getCurrencyConfig(selectedCurrency).country} - Version{" "}
-                        {getCurrencyConfig(selectedCurrency)?.version} - Last Updated:{" "}
-                        {getCurrencyConfig(selectedCurrency)?.lastUpdated}
+                      <Label htmlFor="documentName">Document Name *</Label>
+                      <Input
+                        id="documentName"
+                        value={documentName}
+                        onChange={(e) => setDocumentName(e.target.value)}
+                        placeholder="e.g., Employee Handbook"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="documentFile">Upload File *</Label>
+                      <Input
+                        id="documentFile"
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        onChange={handleFileUpload}
+                      />
+                      {uploadedFile && (
+                        <p className="text-sm text-gray-600 mt-2">
+                          Selected: {uploadedFile.name} ({(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB)
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex justify-end space-x-2 pt-4">
+                      <Button variant="ghost" onClick={() => setShowDocumentModal(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleSaveDocument} disabled={isSavingDocument}>
+                        {isSavingDocument ? "Uploading..." : "Upload Document"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Edit Document Form */}
+                {documentModalType === "edit" && selectedDocument && (
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="editDocumentName">Document Name *</Label>
+                      <Input
+                        id="editDocumentName"
+                        value={documentName || selectedDocument.name}
+                        onChange={(e) => setDocumentName(e.target.value)}
+                        placeholder="e.g., Employee Handbook"
+                      />
+                    </div>
+                    <div>
+                      <Label>Current File</Label>
+                      <p className="text-sm text-gray-600">
+                        {selectedDocument.name} ({selectedDocument.type} - {selectedDocument.size})
                       </p>
                     </div>
-                    <div className="flex space-x-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => syncWithGovernmentAPI(selectedCurrency)}
-                        disabled={!apiStatus[selectedCurrency as keyof typeof apiStatus]?.connected || isSyncing}
-                      >
-                        {isSyncing ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <RefreshCw className="w-4 h-4 mr-2" />
-                        )}
-                        Sync API
+                    <div>
+                      <Label htmlFor="editDocumentFile">Replace File (Optional)</Label>
+                      <Input
+                        id="editDocumentFile"
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        onChange={handleFileUpload}
+                      />
+                      {uploadedFile && (
+                        <p className="text-sm text-gray-600 mt-2">
+                          New file: {uploadedFile.name} ({(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB)
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex justify-end space-x-2 pt-4">
+                      <Button variant="ghost" onClick={() => setShowDocumentModal(false)}>
+                        Cancel
                       </Button>
-                      <Button size="sm" variant="outline" onClick={handleAddTaxBand}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Band
+                      <Button onClick={handleEditDocument} disabled={isSavingDocument}>
+                        {isSavingDocument ? "Saving..." : "Save Changes"}
                       </Button>
                     </div>
                   </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border border-gray-200 rounded-lg">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">Band</th>
-                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">Rate (%)</th>
-                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
-                            From ({getCurrencyConfig(selectedCurrency).symbol})
-                          </th>
-                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
-                            To ({getCurrencyConfig(selectedCurrency).symbol})
-                          </th>
-                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
-                            Cumulative Tax ({getCurrencyConfig(selectedCurrency).symbol})
-                          </th>
-                          <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {getCurrencyConfig(selectedCurrency)?.taxBands.map((band, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="border border-gray-200 px-4 py-3 font-medium">{band.rate}</td>
-                            <td className="border border-gray-200 px-4 py-3">
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                {band.rate}%
-                              </span>
-                            </td>
-                            <td className="border border-gray-200 px-4 py-3">
-                              {band.from ? band.from.toLocaleString() : "0"}
-                            </td>
-                            <td className="border border-gray-200 px-4 py-3">
-                              {band.to ? band.to.toLocaleString() : "∞"}
-                            </td>
-                            <td className="border border-gray-200 px-4 py-3 font-medium text-green-600">
-                              {band.cumulativeTax ? band.cumulativeTax.toLocaleString() : "0"}
-                            </td>
-                            <td className="border border-gray-200 px-4 py-3 text-center">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  console.log("[v0] Editing tax band:", band)
-                                }}
-                              >
-                                Edit
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* SSNIT Rates Section */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">SSNIT Rates</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Employee:</span>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              type="number"
-                              value={ssnitRates.employee}
-                              onChange={(e) => updateSsnitRates("employee", Number.parseFloat(e.target.value) || 0)}
-                              className="w-20 text-right"
-                              step="0.1"
-                            />
-                            <span className="text-sm">%</span>
-                            <Badge variant="secondary">Active</Badge>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Employer:</span>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              type="number"
-                              value={ssnitRates.employer}
-                              onChange={(e) => updateSsnitRates("employer", Number.parseFloat(e.target.value) || 0)}
-                              className="w-20 text-right"
-                              step="0.1"
-                            />
-                            <span className="text-sm">%</span>
-                            <Badge variant="secondary">Active</Badge>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between pt-2 border-t">
-                          <span className="font-medium text-blue-600">Total:</span>
-                          <span className="font-medium text-blue-600">{ssnitRates.total}%</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Tier 2 Rates</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Employee:</span>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              type="number"
-                              value={tier2Rates.employee}
-                              onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value) || 0)}
-                              className="w-20 text-right"
-                              step="0.1"
-                            />
-                            <span className="text-sm">%</span>
-                            <Badge variant="secondary">Active</Badge>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Employer:</span>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              type="number"
-                              value={tier2Rates.employer}
-                              onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value) || 0)}
-                              className="w-20 text-right"
-                              step="0.1"
-                            />
-                            <span className="text-sm">%</span>
-                            <Badge variant="secondary">Active</Badge>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between pt-2 border-t">
-                          <span className="font-medium text-blue-600">Total:</span>
-                          <span className="font-medium text-blue-600">{tier2Rates.total}%</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Tier 3 Rates</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Employee:</span>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              type="number"
-                              value={tier3Rates.employee}
-                              onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value) || 0)}
-                              className="w-20 text-right"
-                              step="0.1"
-                            />
-                            <span className="text-sm">%</span>
-                            <Badge variant="secondary">Active</Badge>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Employer:</span>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              type="number"
-                              value={tier3Rates.employer}
-                              onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value) || 0)}
-                              className="w-20 text-right"
-                              step="0.1"
-                            />
-                            <span className="text-sm">%</span>
-                            <Badge variant="secondary">Active</Badge>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between pt-2 border-t">
-                          <span className="font-medium text-blue-600">Total:</span>
-                          <span className="font-medium text-blue-600">{tier3Rates.total}%</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* API Status and Recent Updates */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center space-x-2">
-                          <Wifi className="w-5 h-5" />
-                          <span>API Status</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span>Ghana</span>
-                          <Badge variant="default" className="bg-green-100 text-green-800">
-                            Connected
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Nigeria</span>
-                          <Badge variant="destructive">Disconnected</Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Usa</span>
-                          <Badge variant="destructive">Disconnected</Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center space-x-2">
-                          <Bell className="w-5 h-5" />
-                          <span>Recent Updates</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          <div className="flex items-start space-x-2">
-                            <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
-                            <div>
-                              <p className="text-sm font-medium">Ghana PAYE Rates Updated</p>
-                              <p className="text-xs text-gray-500">New tax rates effective January 1, 2024</p>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Save Button */}
-                  <div className="flex justify-end mt-6">
-                    <Button
-                      className="bg-blue-600 hover:bg-blue-700"
-                      onClick={handleSaveTaxConfig}
-                      disabled={isSavingTax}
-                    >
-                      {isSavingTax ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Save className="w-4 h-4 mr-2" />
-                      )}
-                      Save Tax Configuration
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <DollarSign className="w-5 h-5" />
-                  <span>Allowances</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-end mb-4">
-                  <Button onClick={handleAddAllowance} className="bg-green-600 hover:bg-green-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add
-                  </Button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-200 rounded-lg">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Code</th>
-                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Description</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Taxable</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Recurring</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">AMOUNT</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">%</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">FIXED/VARIABLE</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allowances.map((allowance, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="border border-gray-200 px-4 py-3">
-                            <Input
-                              value={allowance.code}
-                              onChange={(e) => handleAllowanceFieldChange(index, "code", e.target.value)}
-                              className="border-0 bg-transparent p-0 font-medium"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3">
-                            <Input
-                              value={allowance.description}
-                              onChange={(e) => handleAllowanceFieldChange(index, "description", e.target.value)}
-                              className="border-0 bg-transparent p-0"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Switch
-                              checked={allowance.taxable}
-                              onCheckedChange={(checked) => handleAllowanceFieldChange(index, "taxable", checked)}
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Switch
-                              checked={allowance.recurring}
-                              onCheckedChange={(checked) => handleAllowanceFieldChange(index, "recurring", checked)}
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Input
-                              type="number"
-                              value={allowance.amount}
-                              onChange={(e) =>
-                                handleAllowanceFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)
-                              }
-                              className="border-0 bg-transparent p-0 text-center w-20"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Input
-                              type="number"
-                              step="0.1"
-                              value={allowance.percentage}
-                              onChange={(e) =>
-                                handleAllowanceFieldChange(index, "percentage", Number.parseFloat(e.target.value) || 0)
-                              }
-                              className="border-0 bg-transparent p-0 text-center w-20"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Select
-                              value={allowance.type}
-                              onValueChange={(value) => handleAllowanceFieldChange(index, "type", value)}
-                            >
-                              <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
-                                <Badge variant={allowance.type === "FIXED" ? "default" : "secondary"}>
-                                  {allowance.type}
-                                </Badge>
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="FIXED">FIXED</SelectItem>
-                                <SelectItem value="VARIABLE">VARIABLE</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => handleEditAllowance(index)}>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteAllowance(index)} className="text-red-600">
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Minus className="w-5 h-5" />
-                  <span>Deductions</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-end mb-4">
-                  <Button onClick={handleAddDeduction} className="bg-green-600 hover:bg-green-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add
-                  </Button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-200 rounded-lg">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Code</th>
-                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Description</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Recurring</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">AMOUNT</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">%</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">FIXED/VARIABLE</th>
-                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {deductions.map((deduction, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="border border-gray-200 px-4 py-3">
-                            <Input
-                              value={deduction.code}
-                              onChange={(e) => handleDeductionFieldChange(index, "code", e.target.value)}
-                              className="border-0 bg-transparent p-0 font-medium"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3">
-                            <Input
-                              value={deduction.description}
-                              onChange={(e) => handleDeductionFieldChange(index, "description", e.target.value)}
-                              className="border-0 bg-transparent p-0"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Switch
-                              checked={deduction.recurring}
-                              onCheckedChange={(checked) => handleDeductionFieldChange(index, "recurring", checked)}
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Input
-                              type="number"
-                              value={deduction.amount}
-                              onChange={(e) =>
-                                handleDeductionFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)
-                              }
-                              className="border-0 bg-transparent p-0 text-center w-20"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Input
-                              type="number"
-                              step="0.1"
-                              value={deduction.percentage}
-                              onChange={(e) =>
-                                handleDeductionFieldChange(index, "percentage", Number.parseFloat(e.target.value) || 0)
-                              }
-                              className="border-0 bg-transparent p-0 text-center w-20"
-                            />
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <Select
-                              value={deduction.type}
-                              onValueChange={(value) => handleDeductionFieldChange(index, "type", value)}
-                            >
-                              <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
-                                <Badge variant={deduction.type === "FIXED" ? "default" : "secondary"}>
-                                  {deduction.type}
-                                </Badge>
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="FIXED">FIXED</SelectItem>
-                                <SelectItem value="VARIABLE">VARIABLE</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          <td className="border border-gray-200 px-4 py-3 text-center">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => handleEditDeduction(index)}>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteDeduction(index)} className="text-red-600">
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Save Button */}
-            <div className="flex justify-end">
-              <Button
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={handleSavePayrollConfig}
-                disabled={isSavingPayroll}
-              >
-                {isSavingPayroll ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4 mr-2" />
                 )}
-                Save Payroll Configuration
-              </Button>
-            </div>
-          </div>
-        </TabsContent>
 
-        <TabsContent value="notifications">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Bell className="w-5 h-5" />
-                  <span>Notification Templates</span>
-                </CardTitle>
-                <CardDescription>Manage email and SMS templates for HR and payroll notifications</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div className="flex space-x-2">
-                      <Button onClick={handleAddNotificationTemplate} className="bg-green-600 hover:bg-green-700">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Template
-                      </Button>
-                      <Button variant="outline" onClick={handleTestEmail} disabled={testConnectionStatus === "testing"}>
-                        {testConnectionStatus === "testing" ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : testConnectionStatus === "success" ? (
-                          <Check className="w-4 h-4 mr-2 text-green-600" />
-                        ) : testConnectionStatus === "error" ? (
-                          <X className="w-4 h-4 mr-2 text-red-600" />
-                        ) : (
-                          <Send className="w-4 h-4 mr-2" />
-                        )}
-                        {testConnectionStatus === "testing"
-                          ? "Testing Connection..."
-                          : testConnectionStatus === "success"
-                            ? "Connection Successful"
-                            : testConnectionStatus === "error"
-                              ? "Connection Failed"
-                              : "Test Connection"}
-                      </Button>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="secondary">{notificationTemplates.length} Templates</Badge>
-                    </div>
-                  </div>
-
-                  <div className="border rounded-lg">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Template Name</TableHead>
-                          <TableHead>Category</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Last Modified</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {notificationTemplates.map((template) => (
-                          <TableRow key={template.id}>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{template.name}</div>
-                                <div className="text-sm text-muted-foreground">{template.description}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{template.category}</Badge>
-                            </TableCell>
-                            <TableCell>{template.type}</TableCell>
-                            <TableCell>
-                              <Badge variant={template.status === "Active" ? "default" : "secondary"}>
-                                {template.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{template.lastModified}</TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreHorizontal className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
-                                    <Edit className="w-4 h-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleDeleteTemplate(template.id)}
-                                    className="text-red-600"
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Email Configuration */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Mail className="w-5 h-5" />
-                  <span>Email Configuration</span>
-                </CardTitle>
-                <CardDescription>Configure SMTP settings for sending notifications</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* View Document - Adobe-like PDF Viewer */}
+                {documentModalType === "view" && selectedDocument && (
                   <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="provider">Email Provider</Label>
-                      <Select
-                        value={emailConfig.provider}
-                        onValueChange={(value) => setEmailConfig({ ...emailConfig, provider: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="smtp">SMTP</SelectItem>
-                          <SelectItem value="sendgrid">SendGrid</SelectItem>
-                          <SelectItem value="mailgun">Mailgun</SelectItem>
-                          <SelectItem value="ses">Amazon SES</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="smtpHost">SMTP Host</Label>
-                      <Input
-                        id="smtpHost"
-                        value={emailConfig.smtpHost}
-                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpHost: e.target.value })}
-                        placeholder="smtp.gmail.com"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="smtpPort">SMTP Port</Label>
-                      <Input
-                        id="smtpPort"
-                        type="number"
-                        value={emailConfig.smtpPort}
-                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpPort: Number.parseInt(e.target.value) })}
-                        placeholder="587"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="smtpUsername">Username</Label>
-                      <Input
-                        id="smtpUsername"
-                        value={emailConfig.smtpUsername}
-                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpUsername: e.target.value })}
-                        placeholder="your-email@company.com"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="fromEmail">From Email</Label>
-                      <Input
-                        id="fromEmail"
-                        value={emailConfig.fromEmail}
-                        onChange={(e) => setEmailConfig({ ...emailConfig, fromEmail: e.target.value })}
-                        placeholder="hr@company.com"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="fromName">From Name</Label>
-                      <Input
-                        id="fromName"
-                        value={emailConfig.fromName}
-                        onChange={(e) => setEmailConfig({ ...emailConfig, fromName: e.target.value })}
-                        placeholder="HR Department"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="replyTo">Reply To</Label>
-                      <Input
-                        id="replyTo"
-                        value={emailConfig.replyTo}
-                        onChange={(e) => setEmailConfig({ ...emailConfig, replyTo: e.target.value })}
-                        placeholder="noreply@company.com"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
+                    {/* Toolbar */}
+                    <div className="flex items-center justify-between p-3 bg-gray-100 rounded-lg border">
                       <div className="flex items-center space-x-2">
-                        <Switch
-                          id="enableTLS"
-                          checked={emailConfig.enableTLS}
-                          onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableTLS: checked })}
-                        />
-                        <Label htmlFor="enableTLS">Enable TLS</Label>
+                        {/* Page Navigation */}
+                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}>
+                          <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <span className="text-sm">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}>
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
                       </div>
+
+                      {/* Zoom Controls */}
                       <div className="flex items-center space-x-2">
-                        <Switch
-                          id="enableSSL"
-                          checked={emailConfig.enableSSL}
-                          onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableSSL: checked })}
-                        />
-                        <Label htmlFor="enableSSL">Enable SSL</Label>
+                        <Button variant="outline" size="sm" onClick={handleZoomOut}>
+                          <ZoomOut className="w-4 h-4" />
+                        </Button>
+                        <span className="text-sm font-medium">{documentZoom}%</span>
+                        <Button variant="outline" size="sm" onClick={handleZoomIn}>
+                          <ZoomIn className="w-4 h-4" />
+                        </Button>
                       </div>
-                    </div>
-                  </div>
-                </div>
 
-                <div>
-                  <Label htmlFor="smtpPassword">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="smtpPassword"
-                      type={showPassword ? "text" : "password"}
-                      value={emailConfig.smtpPassword}
-                      onChange={(e) => setEmailConfig({ ...emailConfig, smtpPassword: e.target.value })}
-                      placeholder="Enter your email password"
-                      className="pr-10"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4 text-gray-400" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-gray-400" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="mt-6 flex justify-end space-x-2">
-                  <Button
-                    variant="outline"
-                    onClick={handleTestEmail}
-                    disabled={testConnectionStatus === "testing"}
-                    className={`${
-                      testConnectionStatus === "success"
-                        ? "border-green-500 text-green-600"
-                        : testConnectionStatus === "error"
-                          ? "border-red-500 text-red-600"
-                          : ""
-                    }`}
-                  >
-                    {testConnectionStatus === "testing" ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : testConnectionStatus === "success" ? (
-                      <Check className="w-4 h-4 mr-2 text-green-600" />
-                    ) : testConnectionStatus === "error" ? (
-                      <X className="w-4 h-4 mr-2 text-red-600" />
-                    ) : (
-                      <Send className="w-4 h-4 mr-2" />
-                    )}
-                    {testConnectionStatus === "testing"
-                      ? "Testing Connection..."
-                      : testConnectionStatus === "success"
-                        ? "Connection Successful"
-                        : testConnectionStatus === "error"
-                          ? "Connection Failed"
-                          : "Test Connection"}
-                  </Button>
-                  <Button onClick={handleSaveEmailConfig} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                    Save Configuration
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Notification Preferences */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Settings className="w-5 h-5" />
-                  <span>Notification Preferences</span>
-                </CardTitle>
-                <CardDescription>Configure default notification settings for all employees</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <h4 className="font-medium">HR Notifications</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Employee Welcome</Label>
-                            <p className="text-sm text-muted-foreground">Send welcome email to new employees</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.payrollNotifications} // Corrected to use a relevant setting
-                            onCheckedChange={(checked) =>
-                              setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Leave Notifications</Label>
-                            <p className="text-sm text-muted-foreground">Notify about leave requests and approvals</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.leaveNotifications}
-                            onCheckedChange={(checked) =>
-                              setNotificationSettings({ ...notificationSettings, leaveNotifications: checked })
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Promotion Notifications</Label>
-                            <p className="text-sm text-muted-foreground">Send promotion and transfer notifications</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.promotionNotifications}
-                            onCheckedChange={(checked) =>
-                              setNotificationSettings({ ...notificationSettings, promotionNotifications: checked })
-                            }
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h4 className="font-medium">Payroll & Attendance</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Payroll Processing</Label>
-                            <p className="text-sm text-muted-foreground">Notify when payroll is processed</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.payrollNotifications}
-                            onCheckedChange={(checked) =>
-                              setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Attendance Alerts</Label>
-                            <p className="text-sm text-muted-foreground">Send alerts for attendance issues</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.attendanceAlerts}
-                            onCheckedChange={(checked) =>
-                              setNotificationSettings({ ...notificationSettings, attendanceAlerts: checked })
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>System Maintenance</Label>
-                            <p className="text-sm text-muted-foreground">Notify about system maintenance</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.systemMaintenanceAlerts}
-                            onCheckedChange={(checked) =>
-                              setNotificationSettings({ ...notificationSettings, systemMaintenanceAlerts: checked })
-                            }
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                      <Label>Email Digest Frequency</Label>
-                      <Select
-                        value={notificationSettings.emailDigest}
-                        onValueChange={(value) =>
-                          setNotificationSettings({ ...notificationSettings, emailDigest: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="immediate">Immediate</SelectItem>
-                          <SelectItem value="daily">Daily</SelectItem>
-                          <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="smsAlerts"
-                        checked={notificationSettings.smsAlerts}
-                        onCheckedChange={(checked) =>
-                          setNotificationSettings({ ...notificationSettings, smsAlerts: checked })
-                        }
-                      />
-                      <div>
-                        <Label htmlFor="smsAlerts">SMS Alerts</Label>
-                        <p className="text-sm text-muted-foreground">Enable SMS notifications</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="pushNotifications"
-                        checked={notificationSettings.pushNotifications}
-                        onCheckedChange={(checked) =>
-                          setNotificationSettings({ ...notificationSettings, pushNotifications: checked })
-                        }
-                      />
-                      <div>
-                        <Label htmlFor="pushNotifications">Push Notifications</Label>
-                        <p className="text-sm text-muted-foreground">Enable browser push notifications</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={() => {
-                        setIsSaving(true) // Use the general saving state
-                        setTimeout(() => {
-                          setIsSaving(false)
-                          toast({
-                            title: "Preferences Saved",
-                            description: "Notification preferences have been updated successfully",
-                          })
-                        }, 1500)
-                      }}
-                      disabled={isSaving}
-                    >
-                      {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                      Save Preferences
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="roles">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center space-x-2">
-                  <Users className="w-5 h-5" />
-                  <span>Roles & Permissions</span>
-                </CardTitle>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" onClick={handleAddRoleInner}>
-                    Add Role
-                  </Button>
-                </div>
-              </div>
-              <CardDescription>Manage user roles and permissions</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-3">
-                {roles.map((role) => (
-                  <Card key={role.id} className="border-l-4 border-l-indigo-500">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-base font-semibold">{role.name}</h3>
-                          <p className="text-xs text-gray-600">{role.description}</p>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <span className="text-sm text-gray-500">{role.user_count} Users</span>
-                          <Button variant="outline" size="sm" onClick={() => handleEditRoleInner(role.name)}>
-                            Edit
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Access Control Tab Content */}
-        <TabsContent value="access">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Shield className="w-5 h-5" />
-                <span>Access Control</span>
-              </CardTitle>
-              <CardDescription>Manage user access and authentication settings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Authentication Settings */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Authentication Settings</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="twoFactor">Two-Factor Authentication</Label>
-                      <Switch
-                        id="twoFactor"
-                        checked={accessSettings.twoFactorEnabled}
-                        onCheckedChange={(checked) =>
-                          setAccessSettings({ ...accessSettings, twoFactorEnabled: checked })
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="ssoEnabled">Single Sign-On (SSO)</Label>
-                      <Switch
-                        id="ssoEnabled"
-                        checked={accessSettings.ssoEnabled}
-                        onCheckedChange={(checked) => setAccessSettings({ ...accessSettings, ssoEnabled: checked })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="passwordExpiry">Password Expiry</Label>
-                      <Switch
-                        id="passwordExpiry"
-                        checked={accessSettings.passwordExpiryEnabled}
-                        onCheckedChange={(checked) =>
-                          setAccessSettings({ ...accessSettings, passwordExpiryEnabled: checked })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
-                      <Input
-                        id="sessionTimeout"
-                        type="number"
-                        value={accessSettings.sessionTimeout}
-                        onChange={(e) =>
-                          setAccessSettings({ ...accessSettings, sessionTimeout: Number.parseInt(e.target.value) })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
-                      <Input
-                        id="maxLoginAttempts"
-                        type="number"
-                        value={accessSettings.maxLoginAttempts}
-                        onChange={(e) =>
-                          setAccessSettings({ ...accessSettings, maxLoginAttempts: Number.parseInt(e.target.value) })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="passwordMinLength">Minimum Password Length</Label>
-                      <Input
-                        id="passwordMinLength"
-                        type="number"
-                        value={accessSettings.passwordMinLength}
-                        onChange={(e) =>
-                          setAccessSettings({ ...accessSettings, passwordMinLength: Number.parseInt(e.target.value) })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* IP Restrictions */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">IP Access Control</h3>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="ipRestrictions">Enable IP Restrictions</Label>
-                    <Switch
-                      id="ipRestrictions"
-                      checked={accessSettings.ipRestrictionsEnabled}
-                      onCheckedChange={(checked) =>
-                        setAccessSettings({ ...accessSettings, ipRestrictionsEnabled: checked })
-                      }
-                    />
-                  </div>
-                  {accessSettings.ipRestrictionsEnabled && (
-                    <div className="space-y-2">
-                      <Label>Allowed IP Addresses</Label>
-                      {accessSettings.allowedIPs.map((ip, index) => (
-                        <div key={index} className="flex items-center space-x-2">
+                      {/* Search */}
+                      <div className="flex items-center space-x-2">
+                        <div className="relative">
+                          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                           <Input
-                            value={ip}
-                            onChange={(e) => {
-                              const newIPs = [...accessSettings.allowedIPs]
-                              newIPs[index] = e.target.value
-                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
-                            }}
-                            placeholder="192.168.1.0/24"
+                            type="text"
+                            placeholder="Search document..."
+                            className="pl-8 w-48"
+                            value={searchTerm}
+                            onChange={(e) => handleSearch(e.target.value)}
                           />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const newIPs = accessSettings.allowedIPs.filter((_, i) => i !== index)
-                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
                         </div>
-                      ))}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center space-x-2">
+                        <Button variant="outline" size="sm" onClick={handlePrint}>
+                          <Printer className="w-4 h-4 mr-1" />
+                          Print
+                        </Button>
+                        {userRole === "admin" && (
+                          <Button variant="outline" size="sm" onClick={handleDownload}>
+                            <Download className="w-4 h-4 mr-1" />
+                            Download
+                          </Button>
+                        )}
+                        <Button variant="outline" size="sm" onClick={handleFullscreen}>
+                          {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Document Content */}
+                    <div
+                      className={`bg-white border rounded-lg overflow-auto ${isFullscreen ? "h-[calc(100vh-200px)]" : "h-[600px]"}`}
+                      style={{ zoom: `${documentZoom}%` }}
+                    >
+                      <div className="p-8 max-w-4xl mx-auto">
+                        <div className="prose prose-sm max-w-none">
+                          {documentPreviewContent ? (
+                            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                              {documentPreviewContent}
+                            </pre>
+                          ) : (
+                            <div className="flex items-center justify-center h-96">
+                              <div className="text-center">
+                                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-gray-400" />
+                                <p className="text-gray-500">Loading document...</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Info */}
+                    <div className="flex items-center justify-between text-xs text-gray-500 pt-2">
+                      <span>
+                        {userRole === "employee" && "View-only mode - Download restricted for employees"}
+                      </span>
+                      <span>Last modified: {new Date().toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Delete Confirmation */}
+                {documentModalType === "delete" && selectedDocument && (
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <AlertCircle className="w-5 h-5 text-red-600" />
+                      <div>
+                        <p className="font-medium text-red-900">Are you sure you want to delete this document?</p>
+                        <p className="text-sm text-red-700 mt-1">
+                          "{selectedDocument.name}" will be permanently removed. This action cannot be undone.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex justify-end space-x-2 pt-4">
+                      <Button variant="ghost" onClick={() => setShowDocumentModal(false)}>
+                        Cancel
+                      </Button>
                       <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setAccessSettings({
-                            ...accessSettings,
-                            allowedIPs: [...accessSettings.allowedIPs, ""],
-                          })
-                        }
+                        variant="destructive"
+                        onClick={() => handleDeleteDocument(selectedDocument.id)}
+                        disabled={isSavingDocument}
                       >
-                        Add IP Range
+                        {isSavingDocument ? "Deleting..." : "Delete Document"}
                       </Button>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Active Sessions */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Active Sessions</h3>
-                  <Button variant="outline" onClick={handleRefreshSessions} disabled={isRefreshingSessions}>
-                    {isRefreshingSessions ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                    )}
-                    Refresh
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {activeSessions.map((session) => (
-                    <Card key={session.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{session.user_email}</p>
-                            <p className="text-sm text-gray-600">
-                              {session.ip_address} • {session.device} • Last active:{" "}
-                              {new Date(session.last_activity).toLocaleString()}
-                            </p>
-                          </div>
-                          <Button variant="outline" size="sm" onClick={() => handleTerminateSession(session.id)}>
-                            Terminate
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                  onClick={handleSaveAccessSettings}
-                  disabled={isSavingAccessSettings}
-                >
-                  {isSavingAccessSettings ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Access Settings
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Security Tab Content */}
-        <TabsContent value="security">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5" />
-                  <span>Security Settings</span>
-                </CardTitle>
-                <Button variant="outline" onClick={handleBackupNow} disabled={isBackingUp}>
-                  {isBackingUp ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Backing Up...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="mr-2 h-4 w-4" />
-                      Backup Now
-                    </>
-                  )}
-                </Button>
-              </div>
-              <CardDescription>Manage security settings, backups, and audit logs</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Security Policies */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Security Policies</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="dataEncryption">Data Encryption at Rest</Label>
-                      <Switch
-                        id="dataEncryption"
-                        checked={securitySettings.dataEncryptionEnabled}
-                        onCheckedChange={(checked) =>
-                          setSecuritySettings({ ...securitySettings, dataEncryptionEnabled: checked })
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="auditLogging">Audit Logging</Label>
-                      <Switch
-                        id="auditLogging"
-                        checked={securitySettings.auditLoggingEnabled}
-                        onCheckedChange={(checked) =>
-                          setSecuritySettings({ ...securitySettings, auditLoggingEnabled: checked })
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="autoBackup">Automatic Backups</Label>
-                      <Switch
-                        id="autoBackup"
-                        checked={securitySettings.autoBackupEnabled}
-                        onCheckedChange={(checked) =>
-                          setSecuritySettings({ ...securitySettings, autoBackupEnabled: checked })
-                        }
-                      />
-                    </div>
                   </div>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="backupFrequency">Backup Frequency</Label>
-                      <Select
-                        value={securitySettings.backupFrequency}
-                        onValueChange={(value) => setSecuritySettings({ ...securitySettings, backupFrequency: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="daily">Daily</SelectItem>
-                          <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="retentionPeriod">Data Retention Period (days)</Label>
-                      <Input
-                        id="retentionPeriod"
-                        type="number"
-                        value={securitySettings.dataRetentionDays}
-                        onChange={(e) =>
-                          setSecuritySettings({
-                            ...securitySettings,
-                            dataRetentionDays: Number.parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Backup Status */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Backup Status</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="w-5 h-5 text-blue-600" />
-                        <div>
-                          <p className="text-sm font-medium">Last Backup</p>
-                          <p className="text-lg font-bold">
-                            {lastBackupTime ? new Date(lastBackupTime).toLocaleDateString() : "Never"}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-2">
-                        <Database className="w-5 h-5 text-green-600" />
-                        <div>
-                          <p className="text-sm font-medium">Backup Size</p>
-                          <p className="text-lg font-bold">{backupSize || "0 MB"}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-5 h-5 text-emerald-600" />
-                        <div>
-                          <p className="text-sm font-medium">Status</p>
-                          <p className="text-lg font-bold">{backupStatus || "Ready"}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-
-              {/* Audit Logs */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Recent Audit Logs</h3>
-                  <Button variant="outline" onClick={handleViewAllLogs}>
-                    <Eye className="w-4 h-4 mr-2" />
-                    View All Logs
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {auditLogs.slice(0, 5).map((log) => (
-                    <Card key={log.id}>
-                      <CardContent className="p-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-sm">{log.action}</p>
-                            <p className="text-xs text-gray-600">
-                              {log.user_email} • {log.ip_address} •{new Date(log.timestamp).toLocaleString()}
-                            </p>
-                          </div>
-                          <Badge variant={log.severity === "high" ? "destructive" : "secondary"}>{log.severity}</Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={handleExportSecurityReport} disabled={isExportingReport}>
-                  {isExportingReport ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Exporting...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="w-4 h-4 mr-2" />
-                      Export Security Report
-                    </>
-                  )}
-                </Button>
-                <Button
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                  onClick={handleSaveSecuritySettings}
-                  disabled={isSavingSecuritySettings}
-                >
-                  {isSavingSecuritySettings ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Security Settings
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
 
       {/* Add Subsidiary Modal */}
       {showAddSubsidiary && (
@@ -7308,4 +6039,151 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   id="leaveDays"
                   type="number"
                   value={newLeaveType.days}
-                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, days: Number(e.target.value)
+                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, days: Number(e.target.value) }))}
+                  placeholder="e.g., 10"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="leaveDescription">Description</Label>
+                <Textarea
+                  id="leaveDescription"
+                  value={newLeaveType.description}
+                  onChange={(e) => setNewLeaveType((prev) => ({ ...prev, description: e.target.value }))}
+                  placeholder="e.g., Leave for further studies"
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="carryOver"
+                    checked={newLeaveType.carryOver}
+                    onCheckedChange={(checked) => setNewLeaveType((prev) => ({ ...prev, carryOver: checked }))}
+                  />
+                  <Label htmlFor="carryOver">Carry Over Allowed</Label>
+                </div>
+                <span className="text-sm text-muted-foreground">Can unused days be carried to next year?</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button variant="ghost" onClick={() => setShowAddLeaveTypeModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddLeaveType} disabled={isSavingPolicy}>
+                {isSavingPolicy ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Leave Type
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPolicyModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="max-w-md w-full p-6">
+            <CardHeader>
+              <CardTitle className="text-xl">
+                {policyModalType === "edit" && `Edit ${selectedPolicy?.name}`}
+                {policyModalType === "delete" && `Delete ${selectedPolicy?.name}`}
+                {policyModalType === "view" && selectedPolicy?.name}
+              </CardTitle>
+              <CardDescription>
+                {policyModalType === "edit" && "Update details for this leave policy"}
+                {policyModalType === "delete" && "Permanently remove this leave policy"}
+                {policyModalType === "view" && "Details of the leave policy"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {policyModalType === "edit" && (
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="editPolicyName">Leave Type Name</Label>
+                    <Input
+                      id="editPolicyName"
+                      value={editingPolicy.name}
+                      onChange={(e) => setEditingPolicy((prev) => ({ ...prev, name: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="editPolicyDays">Number of Days</Label>
+                    <Input
+                      id="editPolicyDays"
+                      type="number"
+                      value={editingPolicy.days}
+                      onChange={(e) => setEditingPolicy((prev) => ({ ...prev, days: Number(e.target.value) }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="editPolicyDescription">Description</Label>
+                    <Textarea
+                      id="editPolicyDescription"
+                      value={editingPolicy.description}
+                      onChange={(e) => setEditingPolicy((prev) => ({ ...prev, description: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="ghost" onClick={() => setShowPolicyModal(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSavePolicyChanges} disabled={isSavingPolicy}>
+                      {isSavingPolicy ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {policyModalType === "delete" && (
+                <div className="space-y-4">
+                  <p className="text-red-600">
+                    Are you sure you want to delete the "{selectedPolicy?.name}" leave policy? This action cannot be undone.
+                  </p>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="ghost" onClick={() => setShowPolicyModal(false)}>
+                      Cancel
+                    </Button>
+                    <Button variant="destructive" onClick={handleDeletePolicy} disabled={isSavingPolicy}>
+                      {isSavingPolicy ? "Deleting..." : "Delete Policy"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {policyModalType === "view" && (
+                <div className="space-y-4">
+                  <div>
+                    <Label>Leave Type Name</Label>
+                    <Input value={selectedPolicy?.name} disabled />
+                  </div>
+                  <div>
+                    <Label>Number of Days</Label>
+                    <Input value={selectedPolicy?.days} disabled />
+                  </div>
+                  <div>
+                    <Label>Description</Label>
+                    <Textarea value={selectedPolicy?.description} disabled />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button variant="outline" onClick={() => setShowPolicyModal(false)}>
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  )\
+}
