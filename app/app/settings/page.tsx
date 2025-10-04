@@ -265,8 +265,10 @@ export default function SettingsPage() {
   const [showDocumentModal, setShowDocumentModal] = useState(false)
   const [documentModalType, setDocumentModalType] = useState("add") // add, view, edit, delete
   const [selectedDocument, setSelectedDocument] = useState(null)
+  const [showDocumentPreview, setShowDocumentPreview] = useState(false) // Added missing showDocumentPreview state variable
   const [uploadedFile, setUploadedFile] = useState(null)
   const [documentName, setDocumentName] = useState("")
+
   const [currentPolicies, setCurrentPolicies] = useState([
     { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Annual vacation leave" },
     { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness" },
