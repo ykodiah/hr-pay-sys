@@ -222,6 +222,7 @@ export default function SettingsPage() {
   const [isSavingPolicy, setIsSavingPolicy] = useState(false)
   const [isSavingDocument, setIsSavingDocument] = useState(false)
   const [documentPreviewContent, setDocumentPreviewContent] = useState("")
+  const [isParsingFile, setIsParsingFile] = useState(false)
 
   const [hrDocuments, setHrDocuments] = useState([
     {
@@ -2560,7 +2561,12 @@ This document contains important information about ${document.name.toLowerCase()
 
   // Parse document content based on document type and name
   const parseDocumentContent = (document: any) => {
-    // Document templates with realistic content
+    // If document has stored content from uploaded file, use that
+    if (document.content) {
+      return document.content
+    }
+
+    // Document templates with realistic content for default documents
     const documentTemplates = {
       "Employee Handbook": `# Employee Handbook
 
@@ -2599,6 +2605,57 @@ All employees are expected to:
 
 ## Contact Information
 For questions about this handbook, please contact HR Department at hr@company.com or extension 1001.`,
+      
+      "Code of Conduct": `# Code of Conduct
+
+## Professional Standards
+All employees must maintain the highest standards of professional conduct.
+
+### Core Values
+- Integrity and honesty
+- Respect for all individuals
+- Excellence in performance
+- Innovation and creativity
+
+### Workplace Behavior
+- Arrive on time and maintain regular attendance
+- Complete assigned tasks efficiently
+- Collaborate effectively with team members
+- Maintain confidentiality of sensitive information
+
+## Compliance Requirements
+- Follow all company policies and procedures
+- Comply with applicable laws and regulations
+- Report violations immediately
+- Participate in required training programs
+
+## Contact Information
+For questions about this code of conduct, contact HR Department.`,
+      
+      "Safety Manual": `# Safety Manual
+
+## General Safety Rules
+Safety is everyone's responsibility in our workplace.
+
+### Emergency Procedures
+- Fire Emergency: Call 192
+- Medical Emergency: Call 193
+- Security Emergency: Call internal security
+
+### Workplace Safety
+- Keep walkways clear
+- Report hazards immediately
+- Use proper safety equipment
+- Follow all safety protocols
+
+## Personal Protective Equipment
+Required PPE for specific tasks:
+- Safety glasses for laboratory work
+- Hard hats for construction areas
+- Safety shoes for warehouse operations
+
+## Incident Reporting
+All workplace incidents must be reported within 24 hours.`,
       
       "HR Policies": `# HR Policies and Procedures
 
@@ -2800,6 +2857,7 @@ This document contains important information about ${document.name.toLowerCase()
     setTotalPages(1)
     setSearchTerm("")
     setIsFullscreen(false)
+    setIsParsingFile(false)
   }
 
   const handleDocumentAction = (action, docId = null) => {
@@ -2811,14 +2869,174 @@ This document contains important information about ${document.name.toLowerCase()
     setShowDocumentModal(true)
   }
 
-  const handleFileUpload = (event) => {
+  const handleFileUpload = async (event) => {
     const file = event.target.files[0]
     if (file) {
       setUploadedFile(file)
       if (!documentName) {
         setDocumentName(file.name.replace(/\.[^/.]+$/, ""))
       }
+      
+      // Parse file content for preview
+      setIsParsingFile(true)
+      try {
+        const content = await parseFileContent(file)
+        setDocumentPreviewContent(content)
+      } catch (error) {
+        console.error("Error parsing file content:", error)
+        // Set fallback content if parsing fails
+        setDocumentPreviewContent(`# ${file.name}\n\nFile uploaded successfully. Content preview not available for this file type.`)
+      } finally {
+        setIsParsingFile(false)
+      }
     }
+  }
+
+  // Parse file content based on file type
+  const parseFileContent = async (file: File): Promise<string> => {
+    const fileType = file.type
+    const fileName = file.name.toLowerCase()
+    
+    try {
+      if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
+        return await parsePDFContent(file)
+      } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileName.endsWith('.docx')) {
+        return await parseDOCXContent(file)
+      } else if (fileType === 'application/msword' || fileName.endsWith('.doc')) {
+        return await parseDOCContent(file)
+      } else {
+        return `# ${file.name}\n\nFile type: ${fileType}\nSize: ${(file.size / (1024 * 1024)).toFixed(2)}MB\n\nContent preview not available for this file type.`
+      }
+    } catch (error) {
+      console.error("Error parsing file:", error)
+      return `# ${file.name}\n\nError parsing file content. The file may be corrupted or in an unsupported format.`
+    }
+  }
+
+  // Parse PDF content
+  const parsePDFContent = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = async () => {
+        try {
+          // Import pdfjs-dist dynamically to avoid SSR issues
+          const pdfjsLib = await import('pdfjs-dist')
+          
+          // Set worker source
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+          
+          const arrayBuffer = reader.result as ArrayBuffer
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+          
+          let fullText = ''
+          
+          // Extract text from all pages
+          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum)
+            const textContent = await page.getTextContent()
+            const pageText = textContent.items
+              .map((item: any) => item.str)
+              .join(' ')
+            fullText += pageText + '\n'
+          }
+          
+          resolve(formatPDFContent(fullText, file.name))
+        } catch (error) {
+          console.error("PDF parsing error:", error)
+          // Fallback to basic file info if parsing fails
+          resolve(`# ${file.name}\n\n**Document Type:** PDF Document\n**Size:** ${(file.size / (1024 * 1024)).toFixed(2)}MB\n\n**Note:** Unable to extract text content from this PDF. The document may be image-based or password-protected. The file has been uploaded successfully and can be downloaded when needed.`)
+        }
+      }
+      reader.onerror = reject
+      reader.readAsArrayBuffer(file)
+    })
+  }
+
+  // Parse DOCX content
+  const parseDOCXContent = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = async () => {
+        try {
+          // Import mammoth dynamically to avoid SSR issues
+          const mammoth = (await import('mammoth')).default
+          const result = await mammoth.convertToHtml({ arrayBuffer: reader.result as ArrayBuffer })
+          resolve(formatDOCXContent(result.value, file.name))
+        } catch (error) {
+          reject(error)
+        }
+      }
+      reader.onerror = reject
+      reader.readAsArrayBuffer(file)
+    })
+  }
+
+  // Parse DOC content (fallback to basic parsing)
+  const parseDOCContent = async (file: File): Promise<string> => {
+    return `# ${file.name}\n\n**Document Type:** Microsoft Word Document (.doc)\n**Size:** ${(file.size / (1024 * 1024)).toFixed(2)}MB\n\n**Note:** Content preview for .doc files is not available. Please convert to .docx format for full preview functionality.\n\nThis document has been uploaded successfully and can be downloaded when needed.`
+  }
+
+  // Format PDF content for display
+  const formatPDFContent = (text: string, fileName: string): string => {
+    if (!text || text.trim().length === 0) {
+      return `# ${fileName}\n\n**Document Type:** PDF\n\n**Note:** This PDF appears to be image-based or contains no extractable text. The document has been uploaded successfully and can be downloaded when needed.`
+    }
+
+    // Clean and format the text
+    let formattedText = text
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+
+    // Add document header
+    const header = `# ${fileName}\n\n**Document Type:** PDF Document\n**Content Preview:**\n\n---\n\n`
+    
+    return header + formattedText
+  }
+
+  // Format DOCX content for display
+  const formatDOCXContent = (html: string, fileName: string): string => {
+    if (!html || html.trim().length === 0) {
+      return `# ${fileName}\n\n**Document Type:** Microsoft Word Document (.docx)\n\n**Note:** This document appears to be empty or contains no readable content.`
+    }
+
+    // Convert HTML to markdown-like format
+    let formattedText = html
+      .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n')
+      .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n')
+      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n')
+      .replace(/<h4[^>]*>(.*?)<\/h4>/gi, '#### $1\n')
+      .replace(/<h5[^>]*>(.*?)<\/h5>/gi, '##### $1\n')
+      .replace(/<h6[^>]*>(.*?)<\/h6>/gi, '###### $1\n')
+      .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
+      .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
+      .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
+      .replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
+      .replace(/<ul[^>]*>(.*?)<\/ul>/gis, (match, content) => {
+        return content.replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
+      })
+      .replace(/<ol[^>]*>(.*?)<\/ol>/gis, (match, content) => {
+        let counter = 1
+        return content.replace(/<li[^>]*>(.*?)<\/li>/gi, () => `${counter++}. $1\n`)
+      })
+      .replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
+      .replace(/<[^>]+>/g, '') // Remove any remaining HTML tags
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+
+    // Add document header
+    const header = `# ${fileName}\n\n**Document Type:** Microsoft Word Document (.docx)\n**Content Preview:**\n\n---\n\n`
+    
+    return header + formattedText
   }
 
   const handleAddDocument = () => {
@@ -2839,6 +3057,12 @@ This document contains important information about ${document.name.toLowerCase()
 
     setIsSavingDocument(true)
     try {
+      // Parse file content if not already parsed
+      let content = documentPreviewContent
+      if (!content || content.includes("File uploaded successfully")) {
+        content = await parseFileContent(uploadedFile)
+      }
+
       // Upload file to Vercel Blob storage
       const formData = new FormData()
       formData.append('file', uploadedFile)
@@ -2849,26 +3073,40 @@ This document contains important information about ${document.name.toLowerCase()
       // Create a temporary URL for the uploaded file
       const fileUrl = URL.createObjectURL(uploadedFile)
 
+      // Determine file type more accurately
+      let fileType = "FILE"
+      const fileName = uploadedFile.name.toLowerCase()
+      if (uploadedFile.type.includes("pdf") || fileName.endsWith('.pdf')) {
+        fileType = "PDF"
+      } else if (uploadedFile.type.includes("word") || fileName.endsWith('.docx')) {
+        fileType = "DOCX"
+      } else if (fileName.endsWith('.doc')) {
+        fileType = "DOC"
+      }
+
       const newDoc = {
         id: Date.now(),
         name: documentName,
-        type: uploadedFile.type.includes("pdf") ? "PDF" : uploadedFile.type.includes("word") ? "DOC" : "FILE",
+        type: fileType,
         size: `${(uploadedFile.size / (1024 * 1024)).toFixed(1)}MB`,
         visibleToAll: false,
         fileUrl: fileUrl,
-        uploadedAt: new Date().toISOString()
+        uploadedAt: new Date().toISOString(),
+        content: content // Store the parsed content
       }
 
       setHrDocuments((prev) => [...prev, newDoc])
       setShowDocumentModal(false)
       setDocumentName("")
       setUploadedFile(null)
+      setDocumentPreviewContent("") // Clear preview content
 
       toast({
         title: "Document Added",
-        description: `${documentName} has been successfully uploaded.`,
+        description: `${documentName} has been successfully uploaded with content preview.`,
       })
     } catch (error) {
+      console.error("Error saving document:", error)
       toast({
         title: "Error",
         description: "Failed to upload document. Please try again.",
@@ -6479,6 +6717,49 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     Supported formats: PDF, DOC, DOCX. Maximum file size: 10MB
                   </p>
                 </div>
+
+                {/* File Content Preview */}
+                {(documentPreviewContent || isParsingFile) && (
+                  <div className="space-y-2">
+                    <Label>Content Preview</Label>
+                    <div className="border border-gray-300 rounded-md bg-gray-50 h-64 overflow-auto p-4">
+                      {isParsingFile ? (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center space-y-2">
+                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600" />
+                            <p className="text-sm text-gray-600">Parsing file content...</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="prose prose-sm max-w-none">
+                          <div 
+                            className="whitespace-pre-wrap text-gray-800 leading-relaxed text-sm"
+                            dangerouslySetInnerHTML={{
+                              __html: documentPreviewContent
+                                .replace(/# (.*)/g, '<h1 class="text-lg font-bold text-gray-900 mb-3 border-b border-gray-200 pb-1">$1</h1>')
+                                .replace(/## (.*)/g, '<h2 class="text-base font-semibold text-gray-800 mb-2 mt-4">$1</h2>')
+                                .replace(/### (.*)/g, '<h3 class="text-sm font-medium text-gray-700 mb-2 mt-3">$1</h3>')
+                                .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+                                .replace(/- (.*)/g, '<li class="mb-1 text-gray-700">$1</li>')
+                                .replace(/(\d+)\. (.*)/g, '<li class="mb-1 text-gray-700"><span class="font-medium">$1.</span> $2</li>')
+                                .replace(/\n\n/g, '</p><p class="mb-2 text-gray-700">')
+                                .replace(/^(?!<[h|l])/gm, '<p class="mb-2 text-gray-700">')
+                                .replace(/<li/g, '<ul class="list-disc list-inside mb-2"><li')
+                                .replace(/<\/li>/g, '</li></ul>')
+                                .replace(/<ul class="list-disc list-inside mb-2"><ul class="list-disc list-inside mb-2">/g, '<ul class="list-disc list-inside mb-2">')
+                                .replace(/<\/ul><\/ul>/g, '</ul>')
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    {!isParsingFile && (
+                      <p className="text-xs text-gray-500">
+                        This is a preview of the parsed content from your uploaded file.
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex justify-end space-x-3 mt-6">
                   <Button variant="outline" onClick={() => setShowDocumentModal(false)}>
