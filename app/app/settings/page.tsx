@@ -584,6 +584,11 @@ export default function SettingsPage() {
   const [aiDescription, setAiDescription] = useState("")
   const [isGeneratingAi, setIsGeneratingAi] = useState(false)
   const [showAiPanel, setShowAiPanel] = useState(false)
+  const [showFeedbackPanel, setShowFeedbackPanel] = useState(false)
+  const [templateRating, setTemplateRating] = useState(0)
+  const [templateFeedback, setTemplateFeedback] = useState("")
+  const [templateImprovements, setTemplateImprovements] = useState("")
+  const [lastGeneratedTemplateId, setLastGeneratedTemplateId] = useState("")
   const [newTemplate, setNewTemplate] = useState({
     name: "",
     category: "HR",
@@ -3628,6 +3633,11 @@ Format the response in a professional, actionable manner for HR decision-makers.
       setAiDescription("")
       setShowAiPanel(false)
       setIsGeneratingAi(false)
+      setShowFeedbackPanel(false)
+      setTemplateRating(0)
+      setTemplateFeedback("")
+      setTemplateImprovements("")
+      setLastGeneratedTemplateId("")
 
       // Reset form
       setNewTemplate({
@@ -3702,28 +3712,63 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
     setIsGeneratingAi(true)
     try {
-      // Simulate AI API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Generate AI template based on description
-      const generatedTemplate = generateTemplateFromDescription(aiDescription, newTemplate.category, newTemplate.type)
-      
-      // Update the form with AI-generated content
-      setNewTemplate({
-        ...newTemplate,
-        name: generatedTemplate.name,
-        subject: generatedTemplate.subject,
-        body: generatedTemplate.body,
+      // Call the AI template generation API
+      const response = await fetch('/api/generate-template', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          description: aiDescription,
+          category: newTemplate.category,
+          type: newTemplate.type,
+          context: {
+            companyName: "Akwaaba HR & Payroll",
+            industry: "HR Technology",
+            userRole: "HR Manager",
+          },
+          previousTemplates: notificationTemplates.slice(-5), // Send recent templates for context
+          userPreferences: {
+            tone: "Professional",
+            length: "Detailed",
+            includeVariables: true,
+          },
+        }),
       })
 
-      toast({
-        title: "AI Template Generated",
-        description: "Template has been generated based on your description. You can edit it before saving.",
-      })
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.success && result.template) {
+        // Store the generation ID for feedback
+        setLastGeneratedTemplateId(result.generationId)
+        
+        // Update the form with AI-generated content
+        setNewTemplate({
+          ...newTemplate,
+          name: result.template.name,
+          subject: result.template.subject,
+          body: result.template.body,
+        })
+
+        // Show feedback panel after generation
+        setShowFeedbackPanel(true)
+
+        toast({
+          title: "AI Template Generated",
+          description: "Professional template generated using GPT-5. You can edit it before saving.",
+        })
+      } else {
+        throw new Error(result.error || "Failed to generate template")
+      }
     } catch (error) {
+      console.error("AI template generation error:", error)
       toast({
         title: "AI Generation Failed",
-        description: "Failed to generate template. Please try again.",
+        description: "Failed to generate template. Please try again or check your connection.",
         variant: "destructive",
       })
     } finally {
@@ -3731,148 +3776,54 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
   }
 
-  const generateTemplateFromDescription = (description, category, type) => {
-    const templates = {
-      "HR": {
-        "Email": {
-          "welcome": {
-            name: "Welcome New Employee",
-            subject: "Welcome to {{company_name}} - Your Journey Begins!",
-            body: `Dear {{employee_name}},
+  const handleSubmitTemplateFeedback = async () => {
+    if (!lastGeneratedTemplateId || templateRating === 0) {
+      toast({
+        title: "Rating Required",
+        description: "Please provide a rating for the generated template",
+        variant: "destructive",
+      })
+      return
+    }
 
-Welcome to {{company_name}}! We're thrilled to have you join our team as {{position}}.
-
-Your first day is scheduled for {{start_date}}. Please arrive at {{office_location}} at 9:00 AM. You'll meet with {{hr_contact}} who will guide you through your orientation.
-
-What to bring:
-- Government-issued ID
-- Bank account details for payroll setup
-- Emergency contact information
-
-We're excited to see what you'll accomplish here!
-
-Best regards,
-{{hr_manager_name}}
-Human Resources Department`
-          },
-          "leave_approval": {
-            name: "Leave Request Approved",
-            subject: "Your Leave Request Has Been Approved",
-            body: `Dear {{employee_name}},
-
-Your leave request for {{leave_type}} from {{start_date}} to {{end_date}} has been approved.
-
-Leave Details:
-- Type: {{leave_type}}
-- Duration: {{duration}} days
-- Start Date: {{start_date}}
-- End Date: {{end_date}}
-- Balance Remaining: {{remaining_balance}} days
-
-Please ensure all your tasks are completed before your leave begins. Contact your supervisor if you have any questions.
-
-Enjoy your time off!
-
-Best regards,
-{{hr_manager_name}}
-Human Resources Department`
-          },
-          "performance_review": {
-            name: "Performance Review Reminder",
-            subject: "Annual Performance Review - Action Required",
-            body: `Dear {{employee_name}},
-
-It's time for your annual performance review. This is an important opportunity to reflect on your achievements and set goals for the coming year.
-
-Review Schedule:
-- Self-Assessment Due: {{self_assessment_date}}
-- Manager Review: {{manager_review_date}}
-- Meeting Scheduled: {{meeting_date}} at {{meeting_time}}
-
-Please complete your self-assessment in the HR portal by {{self_assessment_date}}. Your manager will review your performance and discuss your goals for next year.
-
-If you have any questions, please contact {{hr_contact}}.
-
-Best regards,
-{{hr_manager_name}}
-Human Resources Department`
-          }
+    try {
+      const response = await fetch('/api/generate-template', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        "SMS": {
-          "welcome": {
-            name: "Welcome SMS",
-            subject: "Welcome to {{company_name}}!",
-            body: "Welcome {{employee_name}}! Your first day is {{start_date}} at {{office_location}}. Contact {{hr_contact}} for questions. - {{company_name}} HR"
-          },
-          "leave_approval": {
-            name: "Leave Approved SMS",
-            subject: "Leave Request Approved",
-            body: "Hi {{employee_name}}, your {{leave_type}} leave from {{start_date}} to {{end_date}} has been approved. Enjoy your time off! - {{company_name}}"
-          }
-        }
-      },
-      "Payroll": {
-        "Email": {
-          "payslip": {
-            name: "Payslip Available",
-            subject: "Your {{month_year}} Payslip is Ready",
-            body: `Dear {{employee_name}},
+        body: JSON.stringify({
+          templateId: lastGeneratedTemplateId,
+          rating: templateRating,
+          feedback: templateFeedback,
+          improvements: templateImprovements.split('\n').filter(imp => imp.trim()),
+        }),
+      })
 
-Your payslip for {{month_year}} is now available in your employee portal.
-
-Summary:
-- Gross Pay: {{gross_pay}}
-- Net Pay: {{net_pay}}
-- Deductions: {{total_deductions}}
-
-Please log in to the employee portal to view your detailed payslip. If you have any questions about your pay, please contact {{payroll_contact}}.
-
-Best regards,
-{{payroll_manager_name}}
-Payroll Department`
-          },
-          "bonus": {
-            name: "Bonus Notification",
-            subject: "Congratulations! You've Received a Bonus",
-            body: `Dear {{employee_name}},
-
-Congratulations! You've been awarded a {{bonus_type}} bonus of {{bonus_amount}} for your outstanding performance.
-
-Bonus Details:
-- Type: {{bonus_type}}
-- Amount: {{bonus_amount}}
-- Payment Date: {{payment_date}}
-- Tax Deduction: {{tax_amount}}
-
-This bonus will be included in your next paycheck. Thank you for your dedication and hard work!
-
-Best regards,
-{{hr_manager_name}}
-Human Resources Department`
-          }
-        }
+      if (response.ok) {
+        toast({
+          title: "Feedback Submitted",
+          description: "Thank you for helping improve our AI templates!",
+        })
+        
+        // Reset feedback form
+        setTemplateRating(0)
+        setTemplateFeedback("")
+        setTemplateImprovements("")
+        setShowFeedbackPanel(false)
+      } else {
+        throw new Error("Failed to submit feedback")
       }
+    } catch (error) {
+      console.error("Feedback submission error:", error)
+      toast({
+        title: "Feedback Failed",
+        description: "Failed to submit feedback. Please try again.",
+        variant: "destructive",
+      })
     }
-
-    // Simple keyword matching for template selection
-    const desc = description.toLowerCase()
-    let templateKey = "welcome" // default
-
-    if (desc.includes("leave") || desc.includes("vacation") || desc.includes("time off")) {
-      templateKey = "leave_approval"
-    } else if (desc.includes("performance") || desc.includes("review") || desc.includes("appraisal")) {
-      templateKey = "performance_review"
-    } else if (desc.includes("pay") || desc.includes("salary") || desc.includes("payslip")) {
-      templateKey = "payslip"
-    } else if (desc.includes("bonus") || desc.includes("incentive") || desc.includes("reward")) {
-      templateKey = "bonus"
-    }
-
-    const categoryTemplates = templates[category]?.[type] || templates["HR"]["Email"]
-    const selectedTemplate = categoryTemplates[templateKey] || categoryTemplates["welcome"]
-
-    return selectedTemplate
   }
+
 
   const handleTestEmail = async () => {
     setTestConnectionStatus("testing")
@@ -6119,6 +6070,11 @@ Human Resources Department`
                       setAiDescription("")
                       setShowAiPanel(false)
                       setIsGeneratingAi(false)
+                      setShowFeedbackPanel(false)
+                      setTemplateRating(0)
+                      setTemplateFeedback("")
+                      setTemplateImprovements("")
+                      setLastGeneratedTemplateId("")
                     }}>
                       <X className="w-4 h-4" />
                     </Button>
@@ -6169,6 +6125,11 @@ Human Resources Department`
                           setAiDescription("")
                           setShowAiPanel(false)
                           setIsGeneratingAi(false)
+                          setShowFeedbackPanel(false)
+                          setTemplateRating(0)
+                          setTemplateFeedback("")
+                          setTemplateImprovements("")
+                          setLastGeneratedTemplateId("")
                         }}>
                           Close
                         </Button>
@@ -6249,6 +6210,87 @@ Human Resources Department`
                             <p className="text-xs text-blue-700">
                               💡 AI will generate a professional template based on your description. You can edit the generated content before saving.
                             </p>
+                          </div>
+                        )}
+
+                        {/* Feedback Panel */}
+                        {showFeedbackPanel && lastGeneratedTemplateId && (
+                          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="font-semibold text-green-900">Rate This AI Template</h4>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowFeedbackPanel(false)}
+                                className="text-green-600 hover:bg-green-100"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              <div>
+                                <Label>How would you rate this template?</Label>
+                                <div className="flex space-x-1 mt-1">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                      key={star}
+                                      onClick={() => setTemplateRating(star)}
+                                      className={`w-6 h-6 ${
+                                        star <= templateRating
+                                          ? 'text-yellow-400'
+                                          : 'text-gray-300'
+                                      } hover:text-yellow-400 transition-colors`}
+                                    >
+                                      <svg className="w-full h-full" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                      </svg>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="templateFeedback">Additional Feedback (Optional)</Label>
+                                <Textarea
+                                  id="templateFeedback"
+                                  value={templateFeedback}
+                                  onChange={(e) => setTemplateFeedback(e.target.value)}
+                                  placeholder="What did you like or dislike about this template?"
+                                  rows={2}
+                                  className="mt-1"
+                                />
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="templateImprovements">Suggested Improvements (Optional)</Label>
+                                <Textarea
+                                  id="templateImprovements"
+                                  value={templateImprovements}
+                                  onChange={(e) => setTemplateImprovements(e.target.value)}
+                                  placeholder="How could this template be improved? (One suggestion per line)"
+                                  rows={2}
+                                  className="mt-1"
+                                />
+                              </div>
+                              
+                              <div className="flex justify-end space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setShowFeedbackPanel(false)}
+                                >
+                                  Skip
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={handleSubmitTemplateFeedback}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  Submit Feedback
+                                </Button>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -6403,6 +6445,87 @@ Human Resources Department`
                             </p>
                           </div>
                         )}
+
+                        {/* Feedback Panel */}
+                        {showFeedbackPanel && lastGeneratedTemplateId && (
+                          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="font-semibold text-green-900">Rate This AI Template</h4>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowFeedbackPanel(false)}
+                                className="text-green-600 hover:bg-green-100"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              <div>
+                                <Label>How would you rate this template?</Label>
+                                <div className="flex space-x-1 mt-1">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                      key={star}
+                                      onClick={() => setTemplateRating(star)}
+                                      className={`w-6 h-6 ${
+                                        star <= templateRating
+                                          ? 'text-yellow-400'
+                                          : 'text-gray-300'
+                                      } hover:text-yellow-400 transition-colors`}
+                                    >
+                                      <svg className="w-full h-full" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                      </svg>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="templateFeedbackAdd">Additional Feedback (Optional)</Label>
+                                <Textarea
+                                  id="templateFeedbackAdd"
+                                  value={templateFeedback}
+                                  onChange={(e) => setTemplateFeedback(e.target.value)}
+                                  placeholder="What did you like or dislike about this template?"
+                                  rows={2}
+                                  className="mt-1"
+                                />
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="templateImprovementsAdd">Suggested Improvements (Optional)</Label>
+                                <Textarea
+                                  id="templateImprovementsAdd"
+                                  value={templateImprovements}
+                                  onChange={(e) => setTemplateImprovements(e.target.value)}
+                                  placeholder="How could this template be improved? (One suggestion per line)"
+                                  rows={2}
+                                  className="mt-1"
+                                />
+                              </div>
+                              
+                              <div className="flex justify-end space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setShowFeedbackPanel(false)}
+                                >
+                                  Skip
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={handleSubmitTemplateFeedback}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  Submit Feedback
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -6469,6 +6592,11 @@ Human Resources Department`
                           setAiDescription("")
                           setShowAiPanel(false)
                           setIsGeneratingAi(false)
+                          setShowFeedbackPanel(false)
+                          setTemplateRating(0)
+                          setTemplateFeedback("")
+                          setTemplateImprovements("")
+                          setLastGeneratedTemplateId("")
                           setNewTemplate({
                             name: "",
                             category: "HR",
