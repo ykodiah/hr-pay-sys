@@ -2249,13 +2249,6 @@ function AddEmployeeForm({
     { code: "+263", country: "Zimbabwe", flag: "🇿🇼" },
   ]
 
-  const handleInputChange = (key: string, value: any) => {
-    setFormData({
-      ...formData,
-      [key]: value,
-    })
-  }
-
   useEffect(() => {
     if (employee) {
       setFormData({
