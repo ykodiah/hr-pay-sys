@@ -21,7 +21,9 @@ import {
   Calculator,
   ChevronLeft,
   ChevronRight,
+  RefreshCw,
 } from "lucide-react"
+import { createBrowserClient } from "@supabase/ssr"
 
 interface PayrollRun {
   id: string
@@ -33,92 +35,92 @@ interface PayrollRun {
   total_net_pay: number
   status: string
   created_at: string
-  employee_count: number
+  employee_count?: number
+  approved_by?: string
+  approved_at?: string
+  created_by?: string
+}
+
+interface PayrollItem {
+  id: string
+  employee_id: string
+  basic_salary: number
+  gross_pay: number
+  total_deductions: number
+  net_pay: number
+  tax_deduction: number
+  ssnit_employee: number
+  ssnit_employer: number
+  allowances: any
+  deductions: any
 }
 
 export default function PayrollHistoryPage() {
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([])
   const [filteredRuns, setFilteredRuns] = useState<PayrollRun[]>([])
   const [selectedRun, setSelectedRun] = useState<PayrollRun | null>(null)
+  const [payrollItems, setPayrollItems] = useState<PayrollItem[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [yearFilter, setYearFilter] = useState("2025")
   const [statusFilter, setStatusFilter] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingItems, setIsLoadingItems] = useState(false)
   const itemsPerPage = 10
 
-  // Mock data - replace with actual API call
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  )
+
   useEffect(() => {
     const fetchPayrollHistory = async () => {
       setIsLoading(true)
-      // Simulate API call
-      setTimeout(() => {
-        const mockData: PayrollRun[] = [
-          {
-            id: "1",
-            pay_period_start: "2025-01-01",
-            pay_period_end: "2025-01-31",
-            pay_date: "2025-02-05",
-            total_gross_pay: 485200,
-            total_deductions: 97040,
-            total_net_pay: 388160,
-            status: "completed",
-            created_at: "2025-02-05T10:30:00Z",
-            employee_count: 247,
-          },
-          {
-            id: "2",
-            pay_period_start: "2024-12-01",
-            pay_period_end: "2024-12-31",
-            pay_date: "2025-01-05",
-            total_gross_pay: 472800,
-            total_deductions: 94560,
-            total_net_pay: 378240,
-            status: "completed",
-            created_at: "2025-01-05T10:30:00Z",
-            employee_count: 245,
-          },
-          {
-            id: "3",
-            pay_period_start: "2024-11-01",
-            pay_period_end: "2024-11-30",
-            pay_date: "2024-12-05",
-            total_gross_pay: 468500,
-            total_deductions: 93700,
-            total_net_pay: 374800,
-            status: "completed",
-            created_at: "2024-12-05T10:30:00Z",
-            employee_count: 243,
-          },
-          {
-            id: "4",
-            pay_period_start: "2024-10-01",
-            pay_period_end: "2024-10-31",
-            pay_date: "2024-11-05",
-            total_gross_pay: 461200,
-            total_deductions: 92240,
-            total_net_pay: 368960,
-            status: "completed",
-            created_at: "2024-11-05T10:30:00Z",
-            employee_count: 240,
-          },
-          {
-            id: "5",
-            pay_period_start: "2024-09-01",
-            pay_period_end: "2024-09-30",
-            pay_date: "2024-10-05",
-            total_gross_pay: 455800,
-            total_deductions: 91160,
-            total_net_pay: 364640,
-            status: "completed",
-            created_at: "2024-10-05T10:30:00Z",
-            employee_count: 238,
-          },
-        ]
-        setPayrollRuns(mockData)
-        setFilteredRuns(mockData)
+      console.log("[v0] Fetching payroll history from database...")
+
+      try {
+        const { data, error } = await supabase.from("payroll_runs").select("*").order("pay_date", { ascending: false })
+
+        if (error) {
+          console.error("[v0] Error fetching payroll runs:", error)
+          toast({
+            title: "Error",
+            description: "Failed to load payroll history. Please try again.",
+            variant: "destructive",
+          })
+          setIsLoading(false)
+          return
+        }
+
+        console.log("[v0] Fetched payroll runs:", data?.length || 0)
+
+        // Count employees for each payroll run
+        const runsWithCounts = await Promise.all(
+          (data || []).map(async (run) => {
+            const { count } = await supabase
+              .from("payroll_items")
+              .select("*", { count: "exact", head: true })
+              .eq("payroll_run_id", run.id)
+
+            return {
+              ...run,
+              employee_count: count || 0,
+            }
+          }),
+        )
+
+        setPayrollRuns(runsWithCounts)
+        setFilteredRuns(runsWithCounts)
+      } catch (err) {
+        console.error("[v0] Unexpected error:", err)
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred.",
+          variant: "destructive",
+        })
+      } finally {
         setIsLoading(false)
-      }, 500)
+      }
     }
 
     fetchPayrollHistory()
@@ -130,7 +132,7 @@ export default function PayrollHistoryPage() {
 
     // Year filter
     if (yearFilter !== "all") {
-      filtered = filtered.filter((run) => run.pay_date.startsWith(yearFilter))
+      filtered = filtered.filter((run) => run.pay_date?.startsWith(yearFilter))
     }
 
     // Status filter
@@ -142,9 +144,9 @@ export default function PayrollHistoryPage() {
     if (searchQuery) {
       filtered = filtered.filter(
         (run) =>
-          run.pay_period_start.includes(searchQuery) ||
-          run.pay_period_end.includes(searchQuery) ||
-          run.pay_date.includes(searchQuery),
+          run.pay_period_start?.includes(searchQuery) ||
+          run.pay_period_end?.includes(searchQuery) ||
+          run.pay_date?.includes(searchQuery),
       )
     }
 
@@ -154,11 +156,11 @@ export default function PayrollHistoryPage() {
 
   // Calculate summary statistics
   const totalProcessed = filteredRuns.length
-  const totalGrossPay = filteredRuns.reduce((sum, run) => sum + run.total_gross_pay, 0)
-  const totalNetPay = filteredRuns.reduce((sum, run) => sum + run.total_net_pay, 0)
+  const totalGrossPay = filteredRuns.reduce((sum, run) => sum + (run.total_gross_pay || 0), 0)
+  const totalNetPay = filteredRuns.reduce((sum, run) => sum + (run.total_net_pay || 0), 0)
   const avgEmployees =
     filteredRuns.length > 0
-      ? Math.round(filteredRuns.reduce((sum, run) => sum + run.employee_count, 0) / filteredRuns.length)
+      ? Math.round(filteredRuns.reduce((sum, run) => sum + (run.employee_count || 0), 0) / filteredRuns.length)
       : 0
 
   // Pagination
@@ -172,6 +174,7 @@ export default function PayrollHistoryPage() {
   }
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A"
     return new Date(dateString).toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "short",
@@ -182,6 +185,7 @@ export default function PayrollHistoryPage() {
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       completed: { label: "Completed", className: "bg-emerald-100 text-emerald-800" },
+      approved: { label: "Approved", className: "bg-emerald-100 text-emerald-800" },
       pending: { label: "Pending", className: "bg-yellow-100 text-yellow-800" },
       draft: { label: "Draft", className: "bg-gray-100 text-gray-800" },
       failed: { label: "Failed", className: "bg-red-100 text-red-800" },
@@ -190,6 +194,51 @@ export default function PayrollHistoryPage() {
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft
 
     return <Badge className={config.className}>{config.label}</Badge>
+  }
+
+  const handleRefresh = async () => {
+    setIsLoading(true)
+    console.log("[v0] Refreshing payroll history...")
+
+    try {
+      const { data, error } = await supabase.from("payroll_runs").select("*").order("pay_date", { ascending: false })
+
+      if (error) {
+        console.error("[v0] Error refreshing payroll runs:", error)
+        toast({
+          title: "Error",
+          description: "Failed to refresh payroll history.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const runsWithCounts = await Promise.all(
+        (data || []).map(async (run) => {
+          const { count } = await supabase
+            .from("payroll_items")
+            .select("*", { count: "exact", head: true })
+            .eq("payroll_run_id", run.id)
+
+          return {
+            ...run,
+            employee_count: count || 0,
+          }
+        }),
+      )
+
+      setPayrollRuns(runsWithCounts)
+      setFilteredRuns(runsWithCounts)
+
+      toast({
+        title: "Refreshed",
+        description: "Payroll history has been updated.",
+      })
+    } catch (err) {
+      console.error("[v0] Unexpected error:", err)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleExportAll = () => {
@@ -206,8 +255,31 @@ export default function PayrollHistoryPage() {
     })
   }
 
-  const handleViewDetails = (run: PayrollRun) => {
+  const handleViewDetails = async (run: PayrollRun) => {
     setSelectedRun(run)
+    setIsLoadingItems(true)
+
+    try {
+      const { data, error } = await supabase.from("payroll_items").select("*").eq("payroll_run_id", run.id)
+
+      if (error) {
+        console.error("[v0] Error fetching payroll items:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load payroll details.",
+          variant: "destructive",
+        })
+        setPayrollItems([])
+      } else {
+        console.log("[v0] Fetched payroll items:", data?.length || 0)
+        setPayrollItems(data || [])
+      }
+    } catch (err) {
+      console.error("[v0] Unexpected error:", err)
+      setPayrollItems([])
+    } finally {
+      setIsLoadingItems(false)
+    }
   }
 
   return (
@@ -219,6 +291,10 @@ export default function PayrollHistoryPage() {
           <p className="text-gray-600">View and manage historical payroll records</p>
         </div>
         <div className="flex items-center space-x-3">
+          <Button variant="outline" onClick={handleRefresh} disabled={isLoading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
           <Button variant="outline" onClick={handleExportAll}>
             <Download className="w-4 h-4 mr-2" />
             Export All
@@ -319,6 +395,7 @@ export default function PayrollHistoryPage() {
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
               </SelectContent>
@@ -342,7 +419,7 @@ export default function PayrollHistoryPage() {
             <div className="text-center py-12">
               <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-600">No payroll records found</p>
-              <p className="text-sm text-gray-500 mt-2">Try adjusting your filters</p>
+              <p className="text-sm text-gray-500 mt-2">Try adjusting your filters or create a new payroll run</p>
             </div>
           ) : (
             <>
@@ -371,17 +448,19 @@ export default function PayrollHistoryPage() {
                           <div className="text-sm text-gray-900">{formatDate(run.pay_date)}</div>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="text-sm text-gray-900">{run.employee_count}</div>
+                          <div className="text-sm text-gray-900">{run.employee_count || 0}</div>
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <div className="text-sm font-medium text-gray-900">{formatCurrency(run.total_gross_pay)}</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatCurrency(run.total_gross_pay || 0)}
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <div className="text-sm text-gray-900">{formatCurrency(run.total_deductions)}</div>
+                          <div className="text-sm text-gray-900">{formatCurrency(run.total_deductions || 0)}</div>
                         </td>
                         <td className="py-3 px-4 text-right">
                           <div className="text-sm font-semibold text-emerald-600">
-                            {formatCurrency(run.total_net_pay)}
+                            {formatCurrency(run.total_net_pay || 0)}
                           </div>
                         </td>
                         <td className="py-3 px-4 text-center">{getStatusBadge(run.status)}</td>
@@ -428,17 +507,29 @@ export default function PayrollHistoryPage() {
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
                     <div className="flex items-center space-x-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <Button
-                          key={page}
-                          variant={currentPage === page ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setCurrentPage(page)}
-                          className={currentPage === page ? "bg-emerald-600 hover:bg-emerald-700" : ""}
-                        >
-                          {page}
-                        </Button>
-                      ))}
+                      {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                        let page
+                        if (totalPages <= 5) {
+                          page = i + 1
+                        } else if (currentPage <= 3) {
+                          page = i + 1
+                        } else if (currentPage >= totalPages - 2) {
+                          page = totalPages - 4 + i
+                        } else {
+                          page = currentPage - 2 + i
+                        }
+                        return (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className={currentPage === page ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+                          >
+                            {page}
+                          </Button>
+                        )
+                      })}
                     </div>
                     <Button
                       variant="outline"
@@ -456,9 +547,8 @@ export default function PayrollHistoryPage() {
         </CardContent>
       </Card>
 
-      {/* Details Dialog */}
       <Dialog open={!!selectedRun} onOpenChange={() => setSelectedRun(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Payroll Details</DialogTitle>
             <DialogDescription>
@@ -478,28 +568,73 @@ export default function PayrollHistoryPage() {
                 </div>
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-600 mb-1">Employees</p>
-                  <p className="text-lg font-semibold text-gray-900">{selectedRun.employee_count}</p>
+                  <p className="text-lg font-semibold text-gray-900">{selectedRun.employee_count || 0}</p>
                 </div>
               </div>
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
                   <span className="text-sm font-medium text-gray-700">Total Gross Pay</span>
-                  <span className="text-lg font-bold text-gray-900">{formatCurrency(selectedRun.total_gross_pay)}</span>
+                  <span className="text-lg font-bold text-gray-900">
+                    {formatCurrency(selectedRun.total_gross_pay || 0)}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
                   <span className="text-sm font-medium text-gray-700">Total Deductions</span>
                   <span className="text-lg font-bold text-gray-900">
-                    {formatCurrency(selectedRun.total_deductions)}
+                    {formatCurrency(selectedRun.total_deductions || 0)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-lg">
                   <span className="text-sm font-medium text-gray-700">Total Net Pay</span>
                   <span className="text-lg font-bold text-emerald-600">
-                    {formatCurrency(selectedRun.total_net_pay)}
+                    {formatCurrency(selectedRun.total_net_pay || 0)}
                   </span>
                 </div>
               </div>
+
+              {isLoadingItems ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto"></div>
+                  <p className="text-gray-600 mt-2 text-sm">Loading employee details...</p>
+                </div>
+              ) : payrollItems.length > 0 ? (
+                <div className="border-t pt-4">
+                  <h4 className="font-semibold text-gray-900 mb-3">Employee Breakdown ({payrollItems.length})</h4>
+                  <div className="max-h-64 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="text-left py-2 px-3 text-xs font-semibold text-gray-700">Employee ID</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-gray-700">Basic Salary</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-gray-700">Gross Pay</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-gray-700">Deductions</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-gray-700">Net Pay</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {payrollItems.map((item) => (
+                          <tr key={item.id} className="border-b border-gray-100">
+                            <td className="py-2 px-3 text-gray-900">{item.employee_id?.substring(0, 8)}...</td>
+                            <td className="py-2 px-3 text-right text-gray-900">
+                              {formatCurrency(item.basic_salary || 0)}
+                            </td>
+                            <td className="py-2 px-3 text-right text-gray-900">
+                              {formatCurrency(item.gross_pay || 0)}
+                            </td>
+                            <td className="py-2 px-3 text-right text-gray-900">
+                              {formatCurrency(item.total_deductions || 0)}
+                            </td>
+                            <td className="py-2 px-3 text-right font-semibold text-emerald-600">
+                              {formatCurrency(item.net_pay || 0)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="flex justify-between items-center pt-4 border-t">
                 <div>
