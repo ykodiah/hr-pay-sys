@@ -589,6 +589,8 @@ export default function SettingsPage() {
   const [templateFeedback, setTemplateFeedback] = useState("")
   const [templateImprovements, setTemplateImprovements] = useState("")
   const [lastGeneratedTemplateId, setLastGeneratedTemplateId] = useState("")
+  const [currentAIModel, setCurrentAIModel] = useState(null)
+  const [showModelUpgrade, setShowModelUpgrade] = useState(false)
   const [newTemplate, setNewTemplate] = useState({
     name: "",
     category: "HR",
@@ -3638,6 +3640,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
       setTemplateFeedback("")
       setTemplateImprovements("")
       setLastGeneratedTemplateId("")
+      setCurrentAIModel(null)
+      setShowModelUpgrade(false)
 
       // Reset form
       setNewTemplate({
@@ -3746,6 +3750,16 @@ Format the response in a professional, actionable manner for HR decision-makers.
         // Store the generation ID for feedback
         setLastGeneratedTemplateId(result.generationId)
         
+        // Store AI model information
+        if (result.modelInfo) {
+          setCurrentAIModel(result.modelInfo)
+          
+          // Show upgrade notification if using latest model
+          if (result.modelInfo.isLatest && result.modelInfo.performanceScore >= 95) {
+            setShowModelUpgrade(true)
+          }
+        }
+        
         // Update the form with AI-generated content
         setNewTemplate({
           ...newTemplate,
@@ -3757,9 +3771,10 @@ Format the response in a professional, actionable manner for HR decision-makers.
         // Show feedback panel after generation
         setShowFeedbackPanel(true)
 
+        const modelName = result.modelInfo?.name || "AI"
         toast({
           title: "AI Template Generated",
-          description: "Professional template generated using GPT-5. You can edit it before saving.",
+          description: `Professional template generated using ${modelName}. You can edit it before saving.`,
         })
       } else {
         throw new Error(result.error || "Failed to generate template")
@@ -3773,6 +3788,67 @@ Format the response in a professional, actionable manner for HR decision-makers.
       })
     } finally {
       setIsGeneratingAi(false)
+    }
+  }
+
+  const checkAIModelUpdates = async () => {
+    try {
+      const response = await fetch('/api/ai-model-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'check_updates'
+        }),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.currentModel) {
+          setCurrentAIModel(result.currentModel)
+          
+          // Show upgrade notification if new model is available
+          if (result.currentModel.performanceScore >= 95) {
+            setShowModelUpgrade(true)
+            toast({
+              title: "AI Model Updated! 🚀",
+              description: `Now using ${result.currentModel.name} with ${result.currentModel.performanceScore}% performance`,
+            })
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error checking AI model updates:", error)
+    }
+  }
+
+  const simulateGPT5Upgrade = async () => {
+    try {
+      const response = await fetch('/api/ai-model-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'simulate_gpt5_upgrade'
+        }),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.newModel) {
+          setCurrentAIModel(result.newModel)
+          setShowModelUpgrade(true)
+          
+          toast({
+            title: "GPT-5 Upgrade Complete! 🎉",
+            description: `Successfully upgraded to ${result.newModel.name} with advanced capabilities!`,
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Error simulating GPT-5 upgrade:", error)
     }
   }
 
@@ -6075,6 +6151,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       setTemplateFeedback("")
                       setTemplateImprovements("")
                       setLastGeneratedTemplateId("")
+                      setCurrentAIModel(null)
+                      setShowModelUpgrade(false)
                     }}>
                       <X className="w-4 h-4" />
                     </Button>
@@ -6130,6 +6208,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
                           setTemplateFeedback("")
                           setTemplateImprovements("")
                           setLastGeneratedTemplateId("")
+                          setCurrentAIModel(null)
+                          setShowModelUpgrade(false)
                         }}>
                           Close
                         </Button>
@@ -6153,16 +6233,41 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                               </svg>
                             </div>
-                            <h3 className="font-semibold text-blue-900">AI Template Assistant</h3>
+                            <div>
+                              <h3 className="font-semibold text-blue-900">AI Template Assistant</h3>
+                              {currentAIModel && (
+                                <div className="flex items-center space-x-2 mt-1">
+                                  <Badge variant={currentAIModel.isLatest ? "default" : "secondary"} className="text-xs">
+                                    {currentAIModel.name}
+                                  </Badge>
+                                  <span className="text-xs text-blue-700">
+                                    {currentAIModel.performanceScore}% performance
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowAiPanel(!showAiPanel)}
-                            className="text-blue-600 border-blue-200 hover:bg-blue-100"
-                          >
-                            {showAiPanel ? "Hide" : "Show"} AI Assistant
-                          </Button>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={checkAIModelUpdates}
+                              className="text-blue-600 border-blue-200 hover:bg-blue-100"
+                            >
+                              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              Check Updates
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowAiPanel(!showAiPanel)}
+                              className="text-blue-600 border-blue-200 hover:bg-blue-100"
+                            >
+                              {showAiPanel ? "Hide" : "Show"} AI Assistant
+                            </Button>
+                          </div>
                         </div>
                         
                         {showAiPanel && (
@@ -6210,6 +6315,24 @@ Format the response in a professional, actionable manner for HR decision-makers.
                             <p className="text-xs text-blue-700">
                               💡 AI will generate a professional template based on your description. You can edit the generated content before saving.
                             </p>
+                            
+                            {/* GPT-5 Upgrade Simulation Button (for testing) */}
+                            <div className="mt-3 pt-3 border-t border-blue-200">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={simulateGPT5Upgrade}
+                                className="text-purple-600 border-purple-200 hover:bg-purple-100 w-full"
+                              >
+                                <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                Simulate GPT-5 Upgrade
+                              </Button>
+                              <p className="text-xs text-purple-600 mt-1 text-center">
+                                Test the automatic upgrade system
+                              </p>
+                            </div>
                           </div>
                         )}
 
@@ -6386,16 +6509,41 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                               </svg>
                             </div>
-                            <h3 className="font-semibold text-blue-900">AI Template Assistant</h3>
+                            <div>
+                              <h3 className="font-semibold text-blue-900">AI Template Assistant</h3>
+                              {currentAIModel && (
+                                <div className="flex items-center space-x-2 mt-1">
+                                  <Badge variant={currentAIModel.isLatest ? "default" : "secondary"} className="text-xs">
+                                    {currentAIModel.name}
+                                  </Badge>
+                                  <span className="text-xs text-blue-700">
+                                    {currentAIModel.performanceScore}% performance
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowAiPanel(!showAiPanel)}
-                            className="text-blue-600 border-blue-200 hover:bg-blue-100"
-                          >
-                            {showAiPanel ? "Hide" : "Show"} AI Assistant
-                          </Button>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={checkAIModelUpdates}
+                              className="text-blue-600 border-blue-200 hover:bg-blue-100"
+                            >
+                              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              Check Updates
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowAiPanel(!showAiPanel)}
+                              className="text-blue-600 border-blue-200 hover:bg-blue-100"
+                            >
+                              {showAiPanel ? "Hide" : "Show"} AI Assistant
+                            </Button>
+                          </div>
                         </div>
                         
                         {showAiPanel && (
@@ -6443,6 +6591,24 @@ Format the response in a professional, actionable manner for HR decision-makers.
                             <p className="text-xs text-blue-700">
                               💡 AI will generate a professional template based on your description. You can edit the generated content before saving.
                             </p>
+                            
+                            {/* GPT-5 Upgrade Simulation Button (for testing) */}
+                            <div className="mt-3 pt-3 border-t border-blue-200">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={simulateGPT5Upgrade}
+                                className="text-purple-600 border-purple-200 hover:bg-purple-100 w-full"
+                              >
+                                <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                Simulate GPT-5 Upgrade
+                              </Button>
+                              <p className="text-xs text-purple-600 mt-1 text-center">
+                                Test the automatic upgrade system
+                              </p>
+                            </div>
                           </div>
                         )}
 
@@ -6597,6 +6763,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
                           setTemplateFeedback("")
                           setTemplateImprovements("")
                           setLastGeneratedTemplateId("")
+                          setCurrentAIModel(null)
+                          setShowModelUpgrade(false)
                           setNewTemplate({
                             name: "",
                             category: "HR",

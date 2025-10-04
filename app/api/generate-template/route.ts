@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { generateText } from "ai"
 import { groq } from "@ai-sdk/groq"
+import { aiModelManager, getBestModel, getModelConfig } from "@/lib/ai/model-manager"
 
 // Template generation system context with continuous learning
 const TEMPLATE_SYSTEM_CONTEXT = `You are an expert HR and Payroll communication specialist with advanced AI capabilities. You generate professional, context-aware notification templates for HR and Payroll systems.
@@ -87,11 +88,15 @@ export async function POST(request: NextRequest) {
     // Build context-aware prompt
     const enhancedPrompt = buildContextAwarePrompt(description, category, type, context, previousTemplates, userPreferences)
 
-    console.log("[v0] Calling Groq API for template generation...")
+    // Automatically select the best available model
+    const bestModel = await getBestModel()
+    const modelConfig = getModelConfig()
+    
+    console.log(`[v0] Using ${bestModel.name} (Score: ${bestModel.performanceScore}) for template generation...`)
 
     const result = await Promise.race([
       generateText({
-        model: groq("llama-3.3-70b-versatile"), // Using the most advanced available model
+        model: groq(modelConfig.model), // Dynamic model selection
         system: TEMPLATE_SYSTEM_CONTEXT,
         messages: [
           {
@@ -99,8 +104,8 @@ export async function POST(request: NextRequest) {
             content: enhancedPrompt,
           },
         ],
-        temperature: 0.8, // Higher creativity for template generation
-        maxTokens: 2000, // Allow for longer, more detailed templates
+        temperature: modelConfig.temperature, // Dynamic temperature based on model capabilities
+        maxTokens: modelConfig.maxTokens, // Dynamic token limit based on model capabilities
       }),
       new Promise((_, reject) => setTimeout(() => reject(new Error("Request timeout")), 45000)),
     ])
@@ -117,6 +122,13 @@ export async function POST(request: NextRequest) {
       template: parsedTemplate,
       rawContent: generatedContent,
       generationId: Date.now().toString(),
+      modelInfo: {
+        name: bestModel.name,
+        provider: bestModel.provider,
+        performanceScore: bestModel.performanceScore,
+        capabilities: bestModel.capabilities,
+        isLatest: bestModel.performanceScore >= 95
+      }
     })
   } catch (error) {
     console.error("[v0] Template Generation API Error:", error)
