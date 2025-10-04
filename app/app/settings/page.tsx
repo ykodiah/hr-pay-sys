@@ -7332,4 +7332,39 @@ Format the response in a professional, actionable manner for HR decision-makers.
       {/* Deactivate Confirmation Modal */}
       {showDeactivateConfirm && subsidiaryToToggle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <Card className="max-\
+          <Card className="max-w-md mx-auto">
+            <CardHeader>
+              <CardTitle className="text-xl">Confirm Action</CardTitle>
+              <CardDescription>
+                Are you sure you want to {subsidiaryToToggle.status === 'active' ? 'deactivate' : 'activate'} this subsidiary?
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-end space-x-2">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => {
+                    setShowDeactivateConfirm(false)
+                    setSubsidiaryToToggle(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant={subsidiaryToToggle.status === 'active' ? 'destructive' : 'default'}
+                  onClick={() => {
+                    handleToggleSubsidiaryStatus(subsidiaryToToggle.id)
+                    setShowDeactivateConfirm(false)
+                    setSubsidiaryToToggle(null)
+                  }}
+                >
+                  {subsidiaryToToggle.status === 'active' ? 'Deactivate' : 'Activate'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  )
+}

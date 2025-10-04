@@ -129,6 +129,28 @@ export default function OffboardingPage() {
     return matchesSearch && matchesStatus
   })
 
+  // Handler functions for buttons
+  const handleInitiateOffboarding = () => {
+    // Add logic to initiate offboarding
+    console.log("Initiating offboarding process...")
+    setShowNewOffboardingDialog(false)
+  }
+
+  const handleJoinInterview = (caseId: string) => {
+    // Add logic to join interview
+    console.log(`Joining interview for case ${caseId}`)
+  }
+
+  const handleMarkAssetReturned = (assetId: string) => {
+    // Add logic to mark asset as returned
+    console.log(`Marking asset ${assetId} as returned`)
+  }
+
+  const handleProcessPayment = (caseId: string) => {
+    // Add logic to process payment
+    console.log(`Processing payment for case ${caseId}`)
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -190,7 +212,7 @@ export default function OffboardingPage() {
                 <Button variant="outline" onClick={() => setShowNewOffboardingDialog(false)}>
                   Cancel
                 </Button>
-                <Button className="bg-emerald-600 hover:bg-emerald-700">Initiate Offboarding</Button>
+                <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleInitiateOffboarding}>Initiate Offboarding</Button>
               </div>
             </div>
           </DialogContent>
@@ -354,7 +376,7 @@ export default function OffboardingPage() {
                             <p className="font-medium">Kwame Asante</p>
                             <p className="text-sm text-gray-600">Feb 10, 2024 at 2:00 PM</p>
                           </div>
-                          <Button size="sm">Join Interview</Button>
+                          <Button size="sm" onClick={() => handleJoinInterview("OFF001")}>Join Interview</Button>
                         </div>
                       </div>
                     </CardContent>
@@ -403,7 +425,7 @@ export default function OffboardingPage() {
                       <Badge className={asset.returned ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
                         {asset.returned ? "Returned" : "Pending"}
                       </Badge>
-                      {!asset.returned && <Button size="sm">Mark as Returned</Button>}
+                      {!asset.returned && <Button size="sm" onClick={() => handleMarkAssetReturned(asset.id)}>Mark as Returned</Button>}
                     </div>
                   </div>
                 ))}
@@ -436,7 +458,7 @@ export default function OffboardingPage() {
                       >
                         {case_.status === "completed" ? "Processed" : "Pending"}
                       </Badge>
-                      {case_.status !== "completed" && <Button size="sm">Process Payment</Button>}
+                      {case_.status !== "completed" && <Button size="sm" onClick={() => handleProcessPayment(case_.id)}>Process Payment</Button>}
                     </div>
                   </div>
                 ))}
