@@ -1176,11 +1176,26 @@ export default function EmployeesPage() {
   }
 
   const filteredEmployees = employees.filter((employee) => {
-    const matchesSearch =
-      employee.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.employee_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.personal_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.department?.toLowerCase().includes(searchTerm.toLowerCase())
+    if (!searchTerm && selectedDepartment === "all") return true
+    
+    const searchLower = searchTerm.toLowerCase()
+    const matchesSearch = !searchTerm || (
+      employee.display_name?.toLowerCase().includes(searchLower) ||
+      employee.employee_id?.toLowerCase().includes(searchLower) ||
+      employee.personal_email?.toLowerCase().includes(searchLower) ||
+      employee.corporate_email?.toLowerCase().includes(searchLower) ||
+      employee.department?.toLowerCase().includes(searchLower) ||
+      employee.position?.toLowerCase().includes(searchLower) ||
+      employee.location?.toLowerCase().includes(searchLower) ||
+      employee.division?.toLowerCase().includes(searchLower) ||
+      employee.status?.toLowerCase().includes(searchLower) ||
+      employee.contract_type?.toLowerCase().includes(searchLower) ||
+      employee.first_name?.toLowerCase().includes(searchLower) ||
+      employee.last_name?.toLowerCase().includes(searchLower) ||
+      employee.other_names?.toLowerCase().includes(searchLower) ||
+      employee.phone_number?.toLowerCase().includes(searchLower) ||
+      employee.ghana_card_number?.toLowerCase().includes(searchLower)
+    )
 
     const matchesDepartment = selectedDepartment === "all" || employee.department === selectedDepartment
 
@@ -1260,30 +1275,80 @@ export default function EmployeesPage() {
       {/* Filters and Search */}
       <Card>
         <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <Input
-                placeholder="Search by name, email, position, or employee ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+          <div className="space-y-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Input
+                  placeholder="Search by name, email, position, employee ID, phone, Ghana card, etc..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                <SelectTrigger className="w-full md:w-48">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Filter by department" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departmentsList.map((dept) => (
+                    <SelectItem key={dept} value={dept}>
+                      {dept}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-              <SelectTrigger className="w-full md:w-48">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Filter by department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departmentsList.map((dept) => (
-                  <SelectItem key={dept} value={dept}>
-                    {dept}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            
+            {/* Advanced Search Options */}
+            <div className="flex flex-wrap gap-2 text-sm">
+              <span className="text-muted-foreground">Quick searches:</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchTerm("active")}
+                className="h-6 px-2 text-xs"
+              >
+                Active
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchTerm("on leave")}
+                className="h-6 px-2 text-xs"
+              >
+                On Leave
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchTerm("permanent")}
+                className="h-6 px-2 text-xs"
+              >
+                Permanent
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchTerm("contract")}
+                className="h-6 px-2 text-xs"
+              >
+                Contract
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm("")
+                  setSelectedDepartment("all")
+                }}
+                className="h-6 px-2 text-xs"
+              >
+                Clear All
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -1323,12 +1388,39 @@ export default function EmployeesPage() {
       {/* Employee List */}
       <Card>
         <CardHeader>
-          <CardTitle>Employee Directory ({filteredEmployees.length} employees)</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Employee Directory ({filteredEmployees.length} employees)</span>
+            {searchTerm && (
+              <div className="text-sm text-muted-foreground">
+                Showing results for "{searchTerm}"
+              </div>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid gap-4">
-              {filteredEmployees.map((employee) => (
+            {filteredEmployees.length === 0 ? (
+              <div className="text-center py-8">
+                <Search className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No employees found</h3>
+                <p className="text-gray-500 mb-4">
+                  {searchTerm ? `No employees match your search "${searchTerm}"` : "No employees available"}
+                </p>
+                {searchTerm && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearchTerm("")
+                      setSelectedDepartment("all")
+                    }}
+                  >
+                    Clear search
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {filteredEmployees.map((employee) => (
                 <Card key={employee.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
@@ -1412,7 +1504,8 @@ export default function EmployeesPage() {
                   </CardContent>
                 </Card>
               ))}
-            </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1945,11 +2038,48 @@ function AddEmployeeForm({
   const [departments, setDepartments] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [departmentSearchTerm, setDepartmentSearchTerm] = useState("")
+  const [divisionSearchTerm, setDivisionSearchTerm] = useState("")
+  const [locationSearchTerm, setLocationSearchTerm] = useState("")
+  const [supervisorSearchTerm, setSupervisorSearchTerm] = useState("")
+  const [headSearchTerm, setHeadSearchTerm] = useState("")
+  const [subsidiarySearchTerm, setSubsidiarySearchTerm] = useState("")
   const { toast } = useToast()
   const [currentTab, setCurrentTab] = useState("personal")
 
   const [phoneCountryCode, setPhoneCountryCode] = useState("+233")
   const [emergencyCountryCode, setEmergencyCountryCode] = useState("+233")
+
+  // Filtered lists for searchable dropdowns
+  const filteredDepartments = departments.filter(dept =>
+    dept.toLowerCase().includes(departmentSearchTerm.toLowerCase())
+  )
+  
+  const filteredDivisions = divisions.filter(div =>
+    div.toLowerCase().includes(divisionSearchTerm.toLowerCase())
+  )
+  
+  const filteredLocations = locations.filter(loc =>
+    loc.toLowerCase().includes(locationSearchTerm.toLowerCase())
+  )
+  
+  const filteredSupervisors = supervisors.filter(supervisor =>
+    supervisor.display_name?.toLowerCase().includes(supervisorSearchTerm.toLowerCase()) ||
+    supervisor.position?.toLowerCase().includes(supervisorSearchTerm.toLowerCase()) ||
+    supervisor.employee_id?.toLowerCase().includes(supervisorSearchTerm.toLowerCase())
+  )
+  
+  const filteredHeads = headsOfDepartment.filter(head =>
+    head.display_name?.toLowerCase().includes(headSearchTerm.toLowerCase()) ||
+    head.position?.toLowerCase().includes(headSearchTerm.toLowerCase()) ||
+    head.employee_id?.toLowerCase().includes(headSearchTerm.toLowerCase())
+  )
+  
+  const filteredSubsidiaries = subsidiaries.filter(subsidiary =>
+    subsidiary.name?.toLowerCase().includes(subsidiarySearchTerm.toLowerCase()) ||
+    subsidiary.industry?.toLowerCase().includes(subsidiarySearchTerm.toLowerCase()) ||
+    subsidiary.location?.toLowerCase().includes(subsidiarySearchTerm.toLowerCase())
+  )
 
   const countryCodes = [
     { code: "+93", country: "Afghanistan", flag: "🇦🇫" },
@@ -2676,11 +2806,30 @@ function AddEmployeeForm({
                     <SelectValue placeholder="Select subsidiary" />
                   </SelectTrigger>
                   <SelectContent>
-                    {subsidiaries.map((subsidiary) => (
-                      <SelectItem key={subsidiary.id} value={subsidiary.id}>
-                        {subsidiary.name}
+                    <div className="p-2">
+                      <Input
+                        placeholder="Search subsidiaries..."
+                        value={subsidiarySearchTerm}
+                        onChange={(e) => setSubsidiarySearchTerm(e.target.value)}
+                        className="mb-2"
+                      />
+                    </div>
+                    {filteredSubsidiaries.length === 0 ? (
+                      <SelectItem value="" disabled>
+                        No subsidiaries found
                       </SelectItem>
-                    ))}
+                    ) : (
+                      filteredSubsidiaries.map((subsidiary) => (
+                        <SelectItem key={subsidiary.id} value={subsidiary.id}>
+                          <div className="flex flex-col">
+                            <span>{subsidiary.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {subsidiary.industry} • {subsidiary.location}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -2694,11 +2843,25 @@ function AddEmployeeForm({
                   <SelectValue placeholder="Select division" />
                 </SelectTrigger>
                 <SelectContent>
-                  {divisions.map((division) => (
-                    <SelectItem key={division} value={division}>
-                      {division}
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search divisions..."
+                      value={divisionSearchTerm}
+                      onChange={(e) => setDivisionSearchTerm(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
+                  {filteredDivisions.length === 0 ? (
+                    <SelectItem value="" disabled>
+                      No divisions found
                     </SelectItem>
-                  ))}
+                  ) : (
+                    filteredDivisions.map((division) => (
+                      <SelectItem key={division} value={division}>
+                        {division}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -2714,11 +2877,25 @@ function AddEmployeeForm({
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {departments.map((department) => (
-                    <SelectItem key={department} value={department}>
-                      {department}
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search departments..."
+                      value={departmentSearchTerm}
+                      onChange={(e) => setDepartmentSearchTerm(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
+                  {filteredDepartments.length === 0 ? (
+                    <SelectItem value="" disabled>
+                      No departments found
                     </SelectItem>
-                  ))}
+                  ) : (
+                    filteredDepartments.map((department) => (
+                      <SelectItem key={department} value={department}>
+                        {department}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               {errors.department && <p className="text-red-500 text-sm mt-1">{errors.department}</p>}
@@ -2735,11 +2912,25 @@ function AddEmployeeForm({
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map((location) => (
-                    <SelectItem key={location} value={location}>
-                      {location}
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search locations..."
+                      value={locationSearchTerm}
+                      onChange={(e) => setLocationSearchTerm(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
+                  {filteredLocations.length === 0 ? (
+                    <SelectItem value="" disabled>
+                      No locations found
                     </SelectItem>
-                  ))}
+                  ) : (
+                    filteredLocations.map((location) => (
+                      <SelectItem key={location} value={location}>
+                        {location}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               {errors.location && <p className="text-red-500 text-sm mt-1">{errors.location}</p>}
@@ -2869,11 +3060,32 @@ function AddEmployeeForm({
                       No supervisors available for this department
                     </SelectItem>
                   ) : (
-                    supervisors.map((supervisor) => (
-                      <SelectItem key={supervisor.id} value={supervisor.id}>
-                        {supervisor.display_name}
-                      </SelectItem>
-                    ))
+                    <>
+                      <div className="p-2">
+                        <Input
+                          placeholder="Search supervisors..."
+                          value={supervisorSearchTerm}
+                          onChange={(e) => setSupervisorSearchTerm(e.target.value)}
+                          className="mb-2"
+                        />
+                      </div>
+                      {filteredSupervisors.length === 0 ? (
+                        <SelectItem value="" disabled>
+                          No supervisors found
+                        </SelectItem>
+                      ) : (
+                        filteredSupervisors.map((supervisor) => (
+                          <SelectItem key={supervisor.id} value={supervisor.id}>
+                            <div className="flex flex-col">
+                              <span>{supervisor.display_name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {supervisor.position} • {supervisor.employee_id}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </>
                   )}
                 </SelectContent>
               </Select>
@@ -2900,11 +3112,32 @@ function AddEmployeeForm({
                       No heads available for this department
                     </SelectItem>
                   ) : (
-                    headsOfDepartment.map((head) => (
-                      <SelectItem key={head.id} value={head.id}>
-                        {head.display_name}
-                      </SelectItem>
-                    ))
+                    <>
+                      <div className="p-2">
+                        <Input
+                          placeholder="Search heads..."
+                          value={headSearchTerm}
+                          onChange={(e) => setHeadSearchTerm(e.target.value)}
+                          className="mb-2"
+                        />
+                      </div>
+                      {filteredHeads.length === 0 ? (
+                        <SelectItem value="" disabled>
+                          No heads found
+                        </SelectItem>
+                      ) : (
+                        filteredHeads.map((head) => (
+                          <SelectItem key={head.id} value={head.id}>
+                            <div className="flex flex-col">
+                              <span>{head.display_name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {head.position} • {head.employee_id}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </>
                   )}
                 </SelectContent>
               </Select>
