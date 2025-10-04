@@ -581,6 +581,9 @@ export default function SettingsPage() {
   const [selectedTemplate, setSelectedTemplate] = useState(null)
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [templateModalType, setTemplateModalType] = useState("view") // view, edit, add
+  const [aiDescription, setAiDescription] = useState("")
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false)
+  const [showAiPanel, setShowAiPanel] = useState(false)
   const [newTemplate, setNewTemplate] = useState({
     name: "",
     category: "HR",
@@ -3622,6 +3625,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
       setEditingTemplate(null)
       setSelectedTemplate(null)
       setTemplateModalType("view")
+      setAiDescription("")
+      setShowAiPanel(false)
+      setIsGeneratingAi(false)
 
       // Reset form
       setNewTemplate({
@@ -3682,6 +3688,190 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setSelectedTemplate(template)
     setShowTemplateModal(true)
     setTemplateModalType("view")
+  }
+
+  const handleGenerateAiTemplate = async () => {
+    if (!aiDescription.trim()) {
+      toast({
+        title: "Description Required",
+        description: "Please provide a description for the AI to generate a template",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsGeneratingAi(true)
+    try {
+      // Simulate AI API call
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      // Generate AI template based on description
+      const generatedTemplate = generateTemplateFromDescription(aiDescription, newTemplate.category, newTemplate.type)
+      
+      // Update the form with AI-generated content
+      setNewTemplate({
+        ...newTemplate,
+        name: generatedTemplate.name,
+        subject: generatedTemplate.subject,
+        body: generatedTemplate.body,
+      })
+
+      toast({
+        title: "AI Template Generated",
+        description: "Template has been generated based on your description. You can edit it before saving.",
+      })
+    } catch (error) {
+      toast({
+        title: "AI Generation Failed",
+        description: "Failed to generate template. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsGeneratingAi(false)
+    }
+  }
+
+  const generateTemplateFromDescription = (description, category, type) => {
+    const templates = {
+      "HR": {
+        "Email": {
+          "welcome": {
+            name: "Welcome New Employee",
+            subject: "Welcome to {{company_name}} - Your Journey Begins!",
+            body: `Dear {{employee_name}},
+
+Welcome to {{company_name}}! We're thrilled to have you join our team as {{position}}.
+
+Your first day is scheduled for {{start_date}}. Please arrive at {{office_location}} at 9:00 AM. You'll meet with {{hr_contact}} who will guide you through your orientation.
+
+What to bring:
+- Government-issued ID
+- Bank account details for payroll setup
+- Emergency contact information
+
+We're excited to see what you'll accomplish here!
+
+Best regards,
+{{hr_manager_name}}
+Human Resources Department`
+          },
+          "leave_approval": {
+            name: "Leave Request Approved",
+            subject: "Your Leave Request Has Been Approved",
+            body: `Dear {{employee_name}},
+
+Your leave request for {{leave_type}} from {{start_date}} to {{end_date}} has been approved.
+
+Leave Details:
+- Type: {{leave_type}}
+- Duration: {{duration}} days
+- Start Date: {{start_date}}
+- End Date: {{end_date}}
+- Balance Remaining: {{remaining_balance}} days
+
+Please ensure all your tasks are completed before your leave begins. Contact your supervisor if you have any questions.
+
+Enjoy your time off!
+
+Best regards,
+{{hr_manager_name}}
+Human Resources Department`
+          },
+          "performance_review": {
+            name: "Performance Review Reminder",
+            subject: "Annual Performance Review - Action Required",
+            body: `Dear {{employee_name}},
+
+It's time for your annual performance review. This is an important opportunity to reflect on your achievements and set goals for the coming year.
+
+Review Schedule:
+- Self-Assessment Due: {{self_assessment_date}}
+- Manager Review: {{manager_review_date}}
+- Meeting Scheduled: {{meeting_date}} at {{meeting_time}}
+
+Please complete your self-assessment in the HR portal by {{self_assessment_date}}. Your manager will review your performance and discuss your goals for next year.
+
+If you have any questions, please contact {{hr_contact}}.
+
+Best regards,
+{{hr_manager_name}}
+Human Resources Department`
+          }
+        },
+        "SMS": {
+          "welcome": {
+            name: "Welcome SMS",
+            subject: "Welcome to {{company_name}}!",
+            body: "Welcome {{employee_name}}! Your first day is {{start_date}} at {{office_location}}. Contact {{hr_contact}} for questions. - {{company_name}} HR"
+          },
+          "leave_approval": {
+            name: "Leave Approved SMS",
+            subject: "Leave Request Approved",
+            body: "Hi {{employee_name}}, your {{leave_type}} leave from {{start_date}} to {{end_date}} has been approved. Enjoy your time off! - {{company_name}}"
+          }
+        }
+      },
+      "Payroll": {
+        "Email": {
+          "payslip": {
+            name: "Payslip Available",
+            subject: "Your {{month_year}} Payslip is Ready",
+            body: `Dear {{employee_name}},
+
+Your payslip for {{month_year}} is now available in your employee portal.
+
+Summary:
+- Gross Pay: {{gross_pay}}
+- Net Pay: {{net_pay}}
+- Deductions: {{total_deductions}}
+
+Please log in to the employee portal to view your detailed payslip. If you have any questions about your pay, please contact {{payroll_contact}}.
+
+Best regards,
+{{payroll_manager_name}}
+Payroll Department`
+          },
+          "bonus": {
+            name: "Bonus Notification",
+            subject: "Congratulations! You've Received a Bonus",
+            body: `Dear {{employee_name}},
+
+Congratulations! You've been awarded a {{bonus_type}} bonus of {{bonus_amount}} for your outstanding performance.
+
+Bonus Details:
+- Type: {{bonus_type}}
+- Amount: {{bonus_amount}}
+- Payment Date: {{payment_date}}
+- Tax Deduction: {{tax_amount}}
+
+This bonus will be included in your next paycheck. Thank you for your dedication and hard work!
+
+Best regards,
+{{hr_manager_name}}
+Human Resources Department`
+          }
+        }
+      }
+    }
+
+    // Simple keyword matching for template selection
+    const desc = description.toLowerCase()
+    let templateKey = "welcome" // default
+
+    if (desc.includes("leave") || desc.includes("vacation") || desc.includes("time off")) {
+      templateKey = "leave_approval"
+    } else if (desc.includes("performance") || desc.includes("review") || desc.includes("appraisal")) {
+      templateKey = "performance_review"
+    } else if (desc.includes("pay") || desc.includes("salary") || desc.includes("payslip")) {
+      templateKey = "payslip"
+    } else if (desc.includes("bonus") || desc.includes("incentive") || desc.includes("reward")) {
+      templateKey = "bonus"
+    }
+
+    const categoryTemplates = templates[category]?.[type] || templates["HR"]["Email"]
+    const selectedTemplate = categoryTemplates[templateKey] || categoryTemplates["welcome"]
+
+    return selectedTemplate
   }
 
   const handleTestEmail = async () => {
@@ -5926,6 +6116,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       setShowTemplateModal(false)
                       setSelectedTemplate(null)
                       setTemplateModalType("view")
+                      setAiDescription("")
+                      setShowAiPanel(false)
+                      setIsGeneratingAi(false)
                     }}>
                       <X className="w-4 h-4" />
                     </Button>
@@ -5973,6 +6166,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <Button variant="outline" onClick={() => {
                           setShowTemplateModal(false)
                           setSelectedTemplate(null)
+                          setAiDescription("")
+                          setShowAiPanel(false)
+                          setIsGeneratingAi(false)
                         }}>
                           Close
                         </Button>
@@ -5987,6 +6183,76 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
                   {templateModalType === 'edit' && selectedTemplate && (
                     <div className="space-y-4">
+                      {/* AI Assist Panel */}
+                      <div className="border rounded-lg p-4 bg-blue-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                              </svg>
+                            </div>
+                            <h3 className="font-semibold text-blue-900">AI Template Assistant</h3>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowAiPanel(!showAiPanel)}
+                            className="text-blue-600 border-blue-200 hover:bg-blue-100"
+                          >
+                            {showAiPanel ? "Hide" : "Show"} AI Assistant
+                          </Button>
+                        </div>
+                        
+                        {showAiPanel && (
+                          <div className="space-y-3">
+                            <div>
+                              <Label htmlFor="aiDescription">Describe the template you want to create or improve:</Label>
+                              <Textarea
+                                id="aiDescription"
+                                value={aiDescription}
+                                onChange={(e) => setAiDescription(e.target.value)}
+                                placeholder="e.g., 'Create a welcome email for new employees' or 'Generate a leave approval notification'"
+                                rows={3}
+                                className="mt-1"
+                              />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                onClick={handleGenerateAiTemplate}
+                                disabled={isGeneratingAi || !aiDescription.trim()}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                {isGeneratingAi ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Generating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    Generate with AI
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAiDescription("")}
+                                disabled={isGeneratingAi}
+                              >
+                                Clear
+                              </Button>
+                            </div>
+                            <p className="text-xs text-blue-700">
+                              💡 AI will generate a professional template based on your description. You can edit the generated content before saving.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor="editTemplateName">Template Name</Label>
@@ -6069,6 +6335,76 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
                   {templateModalType === 'add' && (
                     <div className="space-y-4">
+                      {/* AI Assist Panel */}
+                      <div className="border rounded-lg p-4 bg-blue-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                              </svg>
+                            </div>
+                            <h3 className="font-semibold text-blue-900">AI Template Assistant</h3>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowAiPanel(!showAiPanel)}
+                            className="text-blue-600 border-blue-200 hover:bg-blue-100"
+                          >
+                            {showAiPanel ? "Hide" : "Show"} AI Assistant
+                          </Button>
+                        </div>
+                        
+                        {showAiPanel && (
+                          <div className="space-y-3">
+                            <div>
+                              <Label htmlFor="aiDescriptionAdd">Describe the template you want to create:</Label>
+                              <Textarea
+                                id="aiDescriptionAdd"
+                                value={aiDescription}
+                                onChange={(e) => setAiDescription(e.target.value)}
+                                placeholder="e.g., 'Create a welcome email for new employees' or 'Generate a leave approval notification'"
+                                rows={3}
+                                className="mt-1"
+                              />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                onClick={handleGenerateAiTemplate}
+                                disabled={isGeneratingAi || !aiDescription.trim()}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                {isGeneratingAi ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Generating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    Generate with AI
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAiDescription("")}
+                                disabled={isGeneratingAi}
+                              >
+                                Clear
+                              </Button>
+                            </div>
+                            <p className="text-xs text-blue-700">
+                              💡 AI will generate a professional template based on your description. You can edit the generated content before saving.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor="templateName">Template Name</Label>
@@ -6130,6 +6466,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <Button variant="outline" onClick={() => {
                           setShowTemplateModal(false)
                           setIsAddingTemplate(false)
+                          setAiDescription("")
+                          setShowAiPanel(false)
+                          setIsGeneratingAi(false)
                           setNewTemplate({
                             name: "",
                             category: "HR",
