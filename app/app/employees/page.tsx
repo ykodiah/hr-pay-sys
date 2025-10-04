@@ -219,6 +219,8 @@ export default function EmployeesPage() {
   const [divisions, setDivisions] = useState<string[]>([])
   const [departmentsList, setDepartments] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
+  const [supervisors, setSupervisors] = useState<any[]>([])
+  const [headsOfDepartment, setHeadsOfDepartment] = useState<any[]>([])
   const [currentTab, setCurrentTab] = useState("personal")
   const [formData, setFormData] = useState<any>({
     employeeId: "",
@@ -534,6 +536,89 @@ export default function EmployeesPage() {
     }
   }, [formData.hasSubsidiary, formData.subsidiary, subsidiaries, companySettings])
   // </CHANGE>
+
+  // Load supervisors and heads of department based on department selection
+  useEffect(() => {
+    const loadSupervisorsAndHeads = () => {
+      console.log("[v0] Loading supervisors and heads for department:", formData.department)
+      
+      // Filter employees based on department and special roles
+      const departmentEmployees = employees.filter((emp) => 
+        emp.department === formData.department && 
+        emp.status === "Active"
+      )
+      
+      // Get employees with "Direct Supervisor" special role
+      const supervisorsList = departmentEmployees.filter((emp) => 
+        emp.specialRole === "Direct Supervisor"
+      )
+      
+      // Get employees with "Head of Department" special role
+      const headsList = departmentEmployees.filter((emp) => 
+        emp.specialRole === "Head of Department"
+      )
+      
+      // If no specific roles found, show all department employees as options
+      const finalSupervisors = supervisorsList.length > 0 ? supervisorsList : departmentEmployees
+      const finalHeads = headsList.length > 0 ? headsList : departmentEmployees
+      
+      setSupervisors(finalSupervisors)
+      setHeadsOfDepartment(finalHeads)
+      
+      console.log("[v0] Loaded supervisors:", finalSupervisors.length)
+      console.log("[v0] Loaded heads of department:", finalHeads.length)
+      
+      // Show "No data" message if no employees found
+      if (departmentEmployees.length === 0) {
+        console.log("[v0] No employees found for department:", formData.department)
+        setSupervisors([])
+        setHeadsOfDepartment([])
+      }
+    }
+    
+    if (formData.department && employees.length > 0) {
+      loadSupervisorsAndHeads()
+    }
+  }, [formData.department, employees])
+
+  const loadParentCompanyData = () => {
+    console.log("[v0] Loading parent company data...")
+    
+    if (companySettings) {
+      const companyDivisions = Array.isArray(companySettings.divisions)
+        ? companySettings.divisions
+        : companySettings.divisions
+          ? JSON.parse(companySettings.divisions)
+          : ["Head Office", "Regional Office"]
+
+      const companyDepartments = Array.isArray(companySettings.departments)
+        ? companySettings.departments
+        : companySettings.departments
+          ? JSON.parse(companySettings.departments)
+          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+
+      const companyLocations = Array.isArray(companySettings.locations)
+        ? companySettings.locations
+        : companySettings.locations
+          ? JSON.parse(companySettings.locations)
+          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
+
+      setDivisions(companyDivisions)
+      setDepartments(companyDepartments)
+      setLocations(companyLocations)
+
+      console.log("[v0] Parent company data loaded:", {
+        divisions: companyDivisions,
+        departments: companyDepartments,
+        locations: companyLocations
+      })
+    } else {
+      console.log("[v0] No company settings available, using defaults")
+      setDivisions(["Head Office", "Regional Office"])
+      setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
+      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+    }
+  }
 
   const loadEmployees = async () => {
     try {
@@ -1161,6 +1246,8 @@ export default function EmployeesPage() {
                 subsidiaries={subsidiaries}
                 setFormData={setFormData}
                 formData={formData}
+                supervisors={supervisors}
+                headsOfDepartment={headsOfDepartment}
                 employees={employees}
                 selectedEmployee={selectedEmployee}
                 companySettings={companySettings}
@@ -1839,6 +1926,8 @@ function AddEmployeeForm({
   employees,
   selectedEmployee,
   companySettings,
+  supervisors = [],
+  headsOfDepartment = [],
 }: {
   employee?: any
   onSubmit: (data: any) => void
@@ -1849,13 +1938,13 @@ function AddEmployeeForm({
   employees: any[]
   selectedEmployee: any
   companySettings: any
+  supervisors?: any[]
+  headsOfDepartment?: any[]
 }) {
   const [divisions, setDivisions] = useState<string[]>([])
   const [departments, setDepartments] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [supervisors, setSupervisors] = useState<any[]>([])
-  const [headsOfDepartment, setHeadsOfDepartment] = useState<any[]>([])
   const { toast } = useToast()
   const [currentTab, setCurrentTab] = useState("personal")
 
@@ -2136,13 +2225,6 @@ function AddEmployeeForm({
     }
   }, [formData.subsidiary, subsidiaries])
 
-  useEffect(() => {
-    const filteredSupervisors = employees.filter((emp) => emp.department === formData.department)
-    setSupervisors(filteredSupervisors)
-
-    const filteredHeads = employees.filter((emp) => emp.department === formData.department)
-    setHeadsOfDepartment(filteredHeads)
-  }, [formData.department, employees])
 
   const validateForm = () => {
     let isValid = true
@@ -2563,8 +2645,10 @@ function AddEmployeeForm({
                   console.log("[v0] hasSubsidiary changed to:", value)
                   handleInputChange("hasSubsidiary", value)
                   if (value === "No") {
-                    console.log("[v0] Clearing subsidiary selection")
+                    console.log("[v0] Clearing subsidiary selection and loading parent company data")
                     handleInputChange("subsidiary", "")
+                    // Load parent company data immediately
+                    loadParentCompanyData()
                   }
                 }}
               >
@@ -2774,18 +2858,30 @@ function AddEmployeeForm({
               <Select
                 value={formData.directSupervisor}
                 onValueChange={(value) => handleInputChange("directSupervisor", value)}
+                disabled={supervisors.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select supervisor" />
+                  <SelectValue placeholder={supervisors.length === 0 ? "No data available" : "Select supervisor"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {supervisors.map((supervisor) => (
-                    <SelectItem key={supervisor.id} value={supervisor.id}>
-                      {supervisor.display_name}
+                  {supervisors.length === 0 ? (
+                    <SelectItem value="" disabled>
+                      No supervisors available for this department
                     </SelectItem>
-                  ))}
+                  ) : (
+                    supervisors.map((supervisor) => (
+                      <SelectItem key={supervisor.id} value={supervisor.id}>
+                        {supervisor.display_name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
+              {supervisors.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No employees with "Direct Supervisor" role found in this department
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -2793,18 +2889,30 @@ function AddEmployeeForm({
               <Select
                 value={formData.headOfDepartment}
                 onValueChange={(value) => handleInputChange("headOfDepartment", value)}
+                disabled={headsOfDepartment.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select head" />
+                  <SelectValue placeholder={headsOfDepartment.length === 0 ? "No data available" : "Select head"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {headsOfDepartment.map((head) => (
-                    <SelectItem key={head.id} value={head.id}>
-                      {head.display_name}
+                  {headsOfDepartment.length === 0 ? (
+                    <SelectItem value="" disabled>
+                      No heads available for this department
                     </SelectItem>
-                  ))}
+                  ) : (
+                    headsOfDepartment.map((head) => (
+                      <SelectItem key={head.id} value={head.id}>
+                        {head.display_name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
+              {headsOfDepartment.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No employees with "Head of Department" role found in this department
+                </p>
+              )}
             </div>
           </div>
         </TabsContent>
