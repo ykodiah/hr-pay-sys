@@ -2447,18 +2447,123 @@ function AddEmployeeForm({
     }
   }
 
+  const handleInputChange = (field: string, value: any) => {
+    setFormData({ ...formData, [field]: value })
+    // Clear error for this field when user starts typing
+    if (errors[field]) {
+      setErrors({ ...errors, [field]: "" })
+    }
+  }
+
+  const clearErrorsForTab = (tab: string) => {
+    const fieldsToClear: string[] = []
+    
+    if (tab === "personal") {
+      fieldsToClear.push("firstName", "lastName", "personalEmail", "corporateEmail", "phone", "dateOfBirth")
+    } else if (tab === "employment") {
+      fieldsToClear.push("position", "department", "location", "status")
+    }
+    
+    const newErrors = { ...errors }
+    fieldsToClear.forEach(field => {
+      if (newErrors[field]) {
+        delete newErrors[field]
+      }
+    })
+    setErrors(newErrors)
+  }
+
   const handleNext = () => {
+    // Validate current tab before moving to next
     if (currentTab === "personal") {
+      // Validate personal information
+      const personalErrors: Record<string, string> = {}
+      let hasPersonalErrors = false
+
+      if (!formData.firstName) {
+        personalErrors.firstName = "First name is required"
+        hasPersonalErrors = true
+      }
+      if (!formData.lastName) {
+        personalErrors.lastName = "Last name is required"
+        hasPersonalErrors = true
+      }
+      if (!formData.personalEmail) {
+        personalErrors.personalEmail = "Personal email is required"
+        hasPersonalErrors = true
+      } else if (!/\S+@\S+\.\S+/.test(formData.personalEmail)) {
+        personalErrors.personalEmail = "Personal email is invalid"
+        hasPersonalErrors = true
+      }
+      if (!formData.corporateEmail) {
+        personalErrors.corporateEmail = "Corporate email is required"
+        hasPersonalErrors = true
+      } else if (!/\S+@\S+\.\S+/.test(formData.corporateEmail)) {
+        personalErrors.corporateEmail = "Corporate email is invalid"
+        hasPersonalErrors = true
+      }
+      if (!formData.phone) {
+        personalErrors.phone = "Phone number is required"
+        hasPersonalErrors = true
+      }
+      if (!formData.dateOfBirth) {
+        personalErrors.dateOfBirth = "Date of birth is required"
+        hasPersonalErrors = true
+      }
+
+      if (hasPersonalErrors) {
+        setErrors(personalErrors)
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all required personal information fields correctly.",
+          variant: "destructive",
+        })
+        return
+      }
+      clearErrorsForTab("personal")
       setCurrentTab("employment")
     } else if (currentTab === "employment") {
+      // Validate employment information
+      const employmentErrors: Record<string, string> = {}
+      let hasEmploymentErrors = false
+
+      if (!formData.position) {
+        employmentErrors.position = "Position is required"
+        hasEmploymentErrors = true
+      }
+      if (!formData.department) {
+        employmentErrors.department = "Department is required"
+        hasEmploymentErrors = true
+      }
+      if (!formData.location) {
+        employmentErrors.location = "Location is required"
+        hasEmploymentErrors = true
+      }
+      if (!formData.status) {
+        employmentErrors.status = "Status is required"
+        hasEmploymentErrors = true
+      }
+
+      if (hasEmploymentErrors) {
+        setErrors(employmentErrors)
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all required employment information fields correctly.",
+          variant: "destructive",
+        })
+        return
+      }
+      clearErrorsForTab("employment")
       setCurrentTab("financial")
     } else if (currentTab === "financial") {
+      // Financial information is optional, so we can proceed
       setCurrentTab("documents")
     }
   }
 
   const handlePrevious = () => {
     if (currentTab === "employment") {
+      clearErrorsForTab("employment")
       setCurrentTab("personal")
     } else if (currentTab === "financial") {
       setCurrentTab("employment")
