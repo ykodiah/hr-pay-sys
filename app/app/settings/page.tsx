@@ -578,6 +578,9 @@ export default function SettingsPage() {
 
   const [isAddingTemplate, setIsAddingTemplate] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState(null)
+  const [selectedTemplate, setSelectedTemplate] = useState(null)
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [templateModalType, setTemplateModalType] = useState("view") // view, edit, add
   const [newTemplate, setNewTemplate] = useState({
     name: "",
     category: "HR",
@@ -3541,6 +3544,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
   const handleAddNotificationTemplate = () => {
     setIsAddingTemplate(true)
+    setTemplateModalType("add")
+    setShowTemplateModal(true)
     setNewTemplate({
       name: "",
       category: "HR",
@@ -3555,39 +3560,82 @@ Format the response in a professional, actionable manner for HR decision-makers.
     if (!newTemplate.name || !newTemplate.subject || !newTemplate.body) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields",
+        description: "Please fill in all required fields (Name, Subject, Body)",
         variant: "destructive",
       })
       return
     }
 
-    setIsSaving(true) // Use the general saving state
+    setIsSaving(true)
     try {
-      // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1500))
 
-      const template = {
-        id: Date.now().toString(),
-        name: newTemplate.name,
-        category: newTemplate.category,
-        type: newTemplate.type,
-        status: "Active",
-        lastModified: new Date().toISOString().split("T")[0],
-        description: newTemplate.subject,
+      if (templateModalType === "edit" && editingTemplate) {
+        // Update existing template
+        const updatedTemplates = notificationTemplates.map((template) =>
+          template.id === editingTemplate.id
+            ? {
+                ...template,
+                name: newTemplate.name,
+                category: newTemplate.category,
+                type: newTemplate.type,
+                description: newTemplate.subject,
+                subject: newTemplate.subject,
+                body: newTemplate.body,
+                variables: newTemplate.variables,
+                lastModified: new Date().toLocaleDateString(),
+              }
+            : template
+        )
+        setNotificationTemplates(updatedTemplates)
+        
+        toast({
+          title: "Template Updated",
+          description: `${newTemplate.name} has been updated successfully`,
+        })
+      } else {
+        // Create new template
+        const template = {
+          id: Date.now().toString(),
+          name: newTemplate.name,
+          category: newTemplate.category,
+          type: newTemplate.type,
+          description: newTemplate.subject,
+          status: "Active",
+          lastModified: new Date().toLocaleDateString(),
+          subject: newTemplate.subject,
+          body: newTemplate.body,
+          variables: newTemplate.variables,
+        }
+
+        setNotificationTemplates([...notificationTemplates, template])
+        
+        toast({
+          title: "Template Created",
+          description: `${newTemplate.name} has been created successfully`,
+        })
       }
 
-      setNotificationTemplates([...notificationTemplates, template])
+      // Close modal and reset state
+      setShowTemplateModal(false)
       setIsAddingTemplate(false)
-      setEditingTemplate(null) // Clear editing state
+      setEditingTemplate(null)
+      setSelectedTemplate(null)
+      setTemplateModalType("view")
 
-      toast({
-        title: "Template Created",
-        description: `${newTemplate.name} template has been created successfully`,
+      // Reset form
+      setNewTemplate({
+        name: "",
+        category: "HR",
+        type: "Email",
+        subject: "",
+        body: "",
+        variables: [],
       })
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to create template",
+        description: "Failed to save template. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -3597,15 +3645,17 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
   const handleEditTemplate = (template) => {
     setEditingTemplate(template)
+    setSelectedTemplate(template)
+    setTemplateModalType("edit")
+    setShowTemplateModal(true)
     setNewTemplate({
       name: template.name,
       category: template.category,
       type: template.type,
-      subject: template.description, // Assuming description holds the subject for editing
-      body: `Dear {{employee_name}},\n\nThis is a sample template for ${template.name}.\n\nBest regards,\nHR Team`, // Placeholder body
-      variables: ["employee_name", "company_name"], // Placeholder variables
+      subject: template.subject || template.description, // Use subject if available, fallback to description
+      body: template.body || `Dear {{employee_name}},\n\nThis is a sample template for ${template.name}.\n\nBest regards,\nHR Team`, // Use actual body or placeholder
+      variables: template.variables || ["employee_name", "company_name"], // Use actual variables or placeholder
     })
-    setIsAddingTemplate(true)
   }
 
   const handleDeleteTemplate = async (templateId) => {
@@ -3626,6 +3676,12 @@ Format the response in a professional, actionable manner for HR decision-makers.
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handleViewTemplate = (template) => {
+    setSelectedTemplate(template)
+    setShowTemplateModal(true)
+    setTemplateModalType("view")
   }
 
   const handleTestEmail = async () => {
@@ -5784,24 +5840,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <Plus className="w-4 h-4 mr-2" />
                         Add Template
                       </Button>
-                      <Button variant="outline" onClick={handleTestEmail} disabled={testConnectionStatus === "testing"}>
-                        {testConnectionStatus === "testing" ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : testConnectionStatus === "success" ? (
-                          <Check className="w-4 h-4 mr-2 text-green-600" />
-                        ) : testConnectionStatus === "error" ? (
-                          <X className="w-4 h-4 mr-2 text-red-600" />
-                        ) : (
-                          <Send className="w-4 h-4 mr-2" />
-                        )}
-                        {testConnectionStatus === "testing"
-                          ? "Testing Connection..."
-                          : testConnectionStatus === "success"
-                            ? "Connection Successful"
-                            : testConnectionStatus === "error"
-                              ? "Connection Failed"
-                              : "Test Connection"}
-                      </Button>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Badge variant="secondary">{notificationTemplates.length} Templates</Badge>
@@ -5847,6 +5885,10 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleViewTemplate(template)}>
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    View
+                                  </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
                                     <Edit className="w-4 h-4 mr-2" />
                                     Edit
@@ -5869,6 +5911,255 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 </div>
               </CardContent>
             </Card>
+
+            {/* Template Modal */}
+            {showTemplateModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold">
+                      {templateModalType === 'view' && `View Template: ${selectedTemplate?.name}`}
+                      {templateModalType === 'edit' && `Edit Template: ${selectedTemplate?.name}`}
+                      {templateModalType === 'add' && 'Add New Template'}
+                    </h2>
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setShowTemplateModal(false)
+                      setSelectedTemplate(null)
+                      setTemplateModalType("view")
+                    }}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {templateModalType === 'view' && selectedTemplate && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>Template Name</Label>
+                          <div className="p-3 bg-gray-50 rounded-md">{selectedTemplate.name}</div>
+                        </div>
+                        <div>
+                          <Label>Category</Label>
+                          <div className="p-3 bg-gray-50 rounded-md">{selectedTemplate.category}</div>
+                        </div>
+                        <div>
+                          <Label>Type</Label>
+                          <div className="p-3 bg-gray-50 rounded-md">{selectedTemplate.type}</div>
+                        </div>
+                        <div>
+                          <Label>Status</Label>
+                          <div className="p-3 bg-gray-50 rounded-md">
+                            <Badge variant={selectedTemplate.status === "Active" ? "default" : "secondary"}>
+                              {selectedTemplate.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Description</Label>
+                        <div className="p-3 bg-gray-50 rounded-md">{selectedTemplate.description}</div>
+                      </div>
+                      <div>
+                        <Label>Subject</Label>
+                        <div className="p-3 bg-gray-50 rounded-md">{selectedTemplate.subject || "No subject specified"}</div>
+                      </div>
+                      <div>
+                        <Label>Template Body</Label>
+                        <div className="p-3 bg-gray-50 rounded-md min-h-32 whitespace-pre-wrap">
+                          {selectedTemplate.body || "No template body specified"}
+                        </div>
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => {
+                          setShowTemplateModal(false)
+                          setSelectedTemplate(null)
+                        }}>
+                          Close
+                        </Button>
+                        <Button onClick={() => {
+                          setTemplateModalType("edit")
+                        }}>
+                          Edit Template
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {templateModalType === 'edit' && selectedTemplate && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="editTemplateName">Template Name</Label>
+                          <Input
+                            id="editTemplateName"
+                            value={newTemplate.name}
+                            onChange={(e) => setNewTemplate({...newTemplate, name: e.target.value})}
+                            placeholder="Enter template name"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="editTemplateCategory">Category</Label>
+                          <Select value={newTemplate.category} onValueChange={(value) => setNewTemplate({...newTemplate, category: value})}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="HR">HR</SelectItem>
+                              <SelectItem value="Payroll">Payroll</SelectItem>
+                              <SelectItem value="Leave">Leave</SelectItem>
+                              <SelectItem value="Performance">Performance</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="editTemplateType">Type</Label>
+                          <Select value={newTemplate.type} onValueChange={(value) => setNewTemplate({...newTemplate, type: value})}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Email">Email</SelectItem>
+                              <SelectItem value="SMS">SMS</SelectItem>
+                              <SelectItem value="Push">Push Notification</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="editTemplateSubject">Subject</Label>
+                          <Input
+                            id="editTemplateSubject"
+                            value={newTemplate.subject}
+                            onChange={(e) => setNewTemplate({...newTemplate, subject: e.target.value})}
+                            placeholder="Enter email subject"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="editTemplateBody">Template Body</Label>
+                        <Textarea
+                          id="editTemplateBody"
+                          value={newTemplate.body}
+                          onChange={(e) => setNewTemplate({...newTemplate, body: e.target.value})}
+                          placeholder="Enter template content. Use {{variable_name}} for dynamic content."
+                          rows={8}
+                        />
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => {
+                          setTemplateModalType("view")
+                        }}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSaveTemplate} disabled={isSaving}>
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-2" />
+                              Save Changes
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {templateModalType === 'add' && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="templateName">Template Name</Label>
+                          <Input
+                            id="templateName"
+                            value={newTemplate.name}
+                            onChange={(e) => setNewTemplate({...newTemplate, name: e.target.value})}
+                            placeholder="Enter template name"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="templateCategory">Category</Label>
+                          <Select value={newTemplate.category} onValueChange={(value) => setNewTemplate({...newTemplate, category: value})}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="HR">HR</SelectItem>
+                              <SelectItem value="Payroll">Payroll</SelectItem>
+                              <SelectItem value="Leave">Leave</SelectItem>
+                              <SelectItem value="Performance">Performance</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="templateType">Type</Label>
+                          <Select value={newTemplate.type} onValueChange={(value) => setNewTemplate({...newTemplate, type: value})}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Email">Email</SelectItem>
+                              <SelectItem value="SMS">SMS</SelectItem>
+                              <SelectItem value="Push">Push Notification</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="templateSubject">Subject</Label>
+                          <Input
+                            id="templateSubject"
+                            value={newTemplate.subject}
+                            onChange={(e) => setNewTemplate({...newTemplate, subject: e.target.value})}
+                            placeholder="Enter email subject"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="templateBody">Template Body</Label>
+                        <Textarea
+                          id="templateBody"
+                          value={newTemplate.body}
+                          onChange={(e) => setNewTemplate({...newTemplate, body: e.target.value})}
+                          placeholder="Enter template content. Use {{variable_name}} for dynamic content."
+                          rows={8}
+                        />
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => {
+                          setShowTemplateModal(false)
+                          setIsAddingTemplate(false)
+                          setNewTemplate({
+                            name: "",
+                            category: "HR",
+                            type: "Email",
+                            subject: "",
+                            body: "",
+                            variables: [],
+                          })
+                        }}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSaveTemplate} disabled={isSaving}>
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-2" />
+                              Save Template
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Email Configuration */}
             <Card>
