@@ -263,8 +263,10 @@ export default function SettingsPage() {
   const [showDocumentModal, setShowDocumentModal] = useState(false)
   const [documentModalType, setDocumentModalType] = useState("add") // add, view, edit, delete
   const [selectedDocument, setSelectedDocument] = useState(null)
+  const [showDocumentPreview, setShowDocumentPreview] = useState(false) // Added missing showDocumentPreview state variable
   const [uploadedFile, setUploadedFile] = useState(null)
   const [documentName, setDocumentName] = useState("")
+
   const [currentPolicies, setCurrentPolicies] = useState([
     { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Annual vacation leave" },
     { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness" },
@@ -2825,7 +2827,9 @@ Next Review Date: January 15, 2025`,
 
     return (
       documentTemplates[document.name]?.content ||
-      `Document: ${document.name}\n\nThis document contains important information about ${document.name.toLowerCase()}. The content would be displayed here in a real implementation.`
+      `Document: ${document.name}
+
+This document contains important information about ${document.name.toLowerCase()}. The content would be displayed here in a real implementation.`
     )
   }
 
@@ -7332,4 +7336,14 @@ Format the response in a professional, actionable manner for HR decision-makers.
       {/* Deactivate Confirmation Modal */}
       {showDeactivateConfirm && subsidiaryToToggle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <Card className="max-\
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <CardTitle>Deactivate Subsidiary?</CardTitle>
+              <CardDescription>
+                Are you sure you want to deactivate "{subsidiaryToToggle.name}"? This will temporarily disable its access
+                and operations.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className=\"w-5 h-
