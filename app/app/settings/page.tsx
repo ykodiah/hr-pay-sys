@@ -259,6 +259,7 @@ export default function SettingsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [searchTerm, setSearchTerm] = useState("")
+  const [showDocumentPreview, setShowDocumentPreview] = useState(false)
 
   const [showDocumentModal, setShowDocumentModal] = useState(false)
   const [documentModalType, setDocumentModalType] = useState("add") // add, view, edit, delete
@@ -2284,12 +2285,6 @@ export default function SettingsPage() {
     setCurrentPage((prev) => Math.max(prev - 1, 1))
   }
 
-  const handleResetViewer = () => {
-    setDocumentZoom(100)
-    setDocumentRotation(0)
-    setCurrentPage(1)
-    setSearchTerm("")
-  }
 
   const handleToggleSubsidiaryStatus = (subsidiary: Subsidiary) => {
     setSubsidiaryToToggle(subsidiary)
@@ -2562,271 +2557,219 @@ This document contains important information about ${document.name.toLowerCase()
     )
   }
 
+
+  // Parse document content based on document type and name
   const parseDocumentContent = (document: any) => {
+    // Document templates with realistic content
     const documentTemplates = {
-      "Code of Conduct": {
-        content: `COMPANY CODE OF CONDUCT
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 2.1
-APPROVED BY: Board of Directors
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-1. Introduction and Purpose ................................. 3
-2. Professional Conduct Standards .......................... 4
-3. Confidentiality and Information Security ............... 6
-4. Conflict of Interest Policy ............................. 8
-5. Compliance with Laws and Regulations .................... 10
-6. Reporting Violations and Whistleblower Protection ...... 12
-7. Disciplinary Actions and Consequences .................. 14
-8. Acknowledgment and Certification ........................ 16
-
-═══════════════════════════════════════════════════════════════
-
-1. INTRODUCTION AND PURPOSE
-
-Welcome to our organization. This Code of Conduct serves as a comprehensive guide for ethical decision-making and professional behavior within our company. All employees, contractors, and business partners are expected to adhere to these standards.
-
-Our mission is to provide exceptional service while maintaining the highest standards of integrity and professionalism in all business dealings.
-
-2. PROFESSIONAL CONDUCT STANDARDS
-
-2.1 General Principles
-All employees must:
-• Treat colleagues, clients, and stakeholders with respect and dignity
-• Maintain professional demeanor in all business interactions
-• Uphold company values and reputation
-• Act with honesty and transparency
-
-2.2 Workplace Behavior
-• Harassment, discrimination, or bullying will not be tolerated
-• Maintain a safe and inclusive work environment
-• Respect diversity and promote equal opportunities
-• Follow all safety protocols and procedures
-
-3. CONFIDENTIALITY AND INFORMATION SECURITY
-
-3.1 Confidential Information
-Employees must protect:
-• Client data and personal information
-• Proprietary business information
-• Trade secrets and intellectual property
-• Financial and strategic information
-
-3.2 Data Protection
-• Use strong passwords and secure authentication
-• Report security incidents immediately
-• Follow data retention and disposal policies
-• Comply with privacy regulations (GDPR, CCPA, etc.)
-
-4. CONFLICT OF INTEREST POLICY
-
-4.1 Definition
-A conflict of interest occurs when personal interests interfere with company interests or decision-making processes.
-
-4.2 Common Examples
-• Financial interests in competitors or suppliers
-• Personal relationships affecting business decisions
-• Outside employment that competes with company business
-• Accepting gifts or favors from business partners
-
-5. COMPLIANCE WITH LAWS AND REGULATIONS
-
-All employees must:
-• Comply with applicable local, state, and federal laws
-• Follow industry-specific regulations
-• Adhere to international trade and export controls
-• Report legal violations or concerns
-
-6. REPORTING VIOLATIONS
-
-6.1 Reporting Channels
-• Direct supervisor or manager
-• Human Resources department
-• Ethics hotline: 1-800-ETHICS-1
-• Anonymous online reporting portal
-• Legal department for serious violations
-
-6.2 Whistleblower Protection
-The company prohibits retaliation against employees who report violations in good faith.
-
-7. DISCIPLINARY ACTIONS
-
-Violations may result in:
-• Verbal or written warnings
-• Mandatory training or counseling
-• Suspension or probation
-• Termination of employment
-• Legal action where appropriate
-
-This document is reviewed annually and updated as needed to reflect current laws and best practices.
-
-═══════════════════════════════════════════════════════════════
-
-For questions about this Code of Conduct, contact:
-Ethics and Compliance Office
-ethics@company.com | (555) 123-4567
-
-Document ID: COC-2024-001
-Last Updated: January 15, 2024
-Next Review Date: January 15, 2025`,
-      },
-      "Employee Handbook": {
-        content: `EMPLOYEE HANDBOOK
-
-WELCOME TO OUR ORGANIZATION
-
-EFFECTIVE DATE: January 1, 2024
-VERSION: 3.2
-HUMAN RESOURCES DEPARTMENT
-
-═══════════════════════════════════════════════════════════════
-
-TABLE OF CONTENTS
-
-SECTION I: WELCOME AND INTRODUCTION
-1. Welcome Message .......................................... 4
-2. Company Overview ......................................... 5
-3. Mission, Vision, and Values ............................. 6
-
-SECTION II: EMPLOYMENT POLICIES
-4. Equal Opportunity Employment ............................. 8
-5. Anti-Discrimination Policy ............................... 9
-6. Harassment Prevention Policy ............................. 10
-7. Work Schedule and Attendance ............................. 12
-
-SECTION III: BENEFITS AND COMPENSATION
-8. Health Insurance ......................................... 14
-9. Retirement Plans ......................................... 16
-10. Paid Time Off ........................................... 18
-11. Professional Development ................................ 20
-
-SECTION IV: PERFORMANCE MANAGEMENT
-12. Performance Reviews ..................................... 22
-13. Career Development ...................................... 24
-14. Training and Education .................................. 26
-
-SECTION V: SAFETY AND SECURITY
-15. Workplace Safety ........................................ 28
-16. Technology Usage ........................................ 30
-17. Security Protocols ...................................... 32
-
-═══════════════════════════════════════════════════════════════
-
-1. WELCOME MESSAGE
-
-Dear Team Member,
-
-Welcome to our organization! We are pleased to have you join our team. This handbook will help you understand our company culture, policies, and expectations.
-
-Our success depends on the dedication, creativity, and teamwork of our employees. We are committed to providing a positive work environment where everyone can thrive and contribute to our shared goals.
-
-This handbook is your guide to understanding our policies and procedures. Please read it carefully and keep it as a reference throughout your employment.
-
-We look forward to working with you and supporting your professional growth.
-
-Sincerely,
-The Management Team
-
-2. COMPANY OVERVIEW
-
-Our mission is to provide exceptional service while maintaining the highest standards of integrity and professionalism.
-
-Founded in 1995, we have grown from a small startup to a leading organization in our industry. We serve clients across multiple sectors and pride ourselves on innovation, quality, and customer satisfaction.
-
-Key Facts:
-• Founded: 1995
-• Employees: 500+
-• Locations: 12 offices worldwide
-• Industries Served: Technology, Healthcare, Finance, Education
-
-3. MISSION, VISION, AND VALUES
-
-MISSION STATEMENT
-To deliver innovative solutions that exceed client expectations while fostering a culture of excellence, integrity, and continuous improvement.
-
-VISION STATEMENT
-To be the leading provider of professional services, recognized for our expertise, innovation, and commitment to client success.
-
-CORE VALUES
-• INTEGRITY: We act with honesty and transparency in all our dealings
-• EXCELLENCE: We strive for the highest quality in everything we do
-• INNOVATION: We embrace new ideas and creative solutions
-• COLLABORATION: We work together to achieve common goals
-• RESPECT: We treat everyone with dignity and consideration
-
-SECTION II: EMPLOYMENT POLICIES
-
-4. EQUAL OPPORTUNITY EMPLOYMENT
-
-We are an equal opportunity employer committed to providing employment opportunities regardless of:
-• Race, color, or national origin
-• Religion or creed
-• Gender or gender identity
-• Sexual orientation
-• Age (40 and over)
-• Disability status
-• Veteran status
-• Genetic information
-
-5. BENEFITS AND COMPENSATION
-
-HEALTH INSURANCE
-• Comprehensive medical coverage
-• Dental and vision plans
-• Health Savings Account (HSA) options
-• Employee assistance programs
-
-RETIREMENT PLANS
-• 401(k) plan with company matching
-• Vesting schedule: 100% after 3 years
-• Financial planning resources
-• Retirement counseling services
-
-PAID TIME OFF
-• Annual Leave: 21 days per year
-• Sick Leave: 10 days per year
-• Maternity/Paternity Leave: As per local regulations
-• Personal Days: 5 days per year
-
-LEAVE POLICIES
-
-Annual Leave: 21 days per year
-• Accrual begins on first day of employment
-• Maximum carryover: 5 days to following year
-• Advance approval required for extended leave
-
-Sick Leave: 10 days per year
-• Available for personal illness or family care
-• Medical certification required for absences over 3 days
-• Unused sick days do not carry over
-
-Maternity/Paternity Leave: As per local regulations
-• Up to 12 weeks for eligible employees
-• Combination of paid and unpaid leave
-• Job protection guaranteed upon return
-
-This handbook is updated regularly to reflect current policies and procedures. For the most current version, please check the company intranet or contact Human Resources.
-
-═══════════════════════════════════════════════════════════════
-
-For questions about policies in this handbook, contact:
-Human Resources Department
-hr@company.com | (555) 123-4567
-
-Document ID: EH-2024-001
-Last Updated: January 15, 2024
-Next Review Date: January 15, 2025`,
-      },
+      "Employee Handbook": `# Employee Handbook
+
+## Welcome to Our Company
+
+We're delighted to have you as part of our team. This handbook contains important information about our company policies, procedures, and benefits.
+
+## Company Overview
+Our company is committed to excellence and innovation in the HR and payroll management sector. We serve clients across Ghana with comprehensive HR solutions.
+
+## Employment Policies
+
+### Working Hours
+- Standard working hours: 8:00 AM - 5:00 PM, Monday to Friday
+- Flexible working arrangements available upon approval
+- Overtime compensation as per Ghana Labour Act
+
+### Leave Policies
+- Annual Leave: 21 working days per year
+- Sick Leave: 10 working days per year
+- Maternity Leave: 84 calendar days
+- Paternity Leave: 7 calendar days
+
+### Code of Conduct
+All employees are expected to:
+- Maintain professional behavior at all times
+- Respect colleagues and clients
+- Follow company policies and procedures
+- Maintain confidentiality of sensitive information
+
+## Benefits Package
+- Health Insurance Coverage
+- Provident Fund Contribution
+- Professional Development Opportunities
+- Annual Performance Bonuses
+
+## Contact Information
+For questions about this handbook, please contact HR Department at hr@company.com or extension 1001.`,
+      
+      "HR Policies": `# HR Policies and Procedures
+
+## Recruitment and Selection
+Our recruitment process ensures we hire the best talent while maintaining fairness and transparency.
+
+### Hiring Process
+1. Job Requisition Approval
+2. Job Posting and Advertisement
+3. Application Review and Screening
+4. Interview Process
+5. Reference Checks
+6. Offer and Onboarding
+
+### Equal Opportunity Employment
+We are committed to providing equal employment opportunities regardless of race, gender, religion, or background.
+
+## Performance Management
+Regular performance reviews help employees grow and contribute effectively to company goals.
+
+### Review Process
+- Quarterly performance discussions
+- Annual formal reviews
+- Goal setting and tracking
+- Development planning
+
+## Disciplinary Procedures
+Progressive disciplinary measures ensure fair treatment while maintaining workplace standards.
+
+### Disciplinary Steps
+1. Verbal Warning
+2. Written Warning
+3. Final Written Warning
+4. Suspension
+5. Termination
+
+## Grievance Procedures
+Employees have the right to raise concerns through proper channels.
+
+### Grievance Process
+1. Informal Discussion with Supervisor
+2. Formal Written Complaint
+3. HR Investigation
+4. Resolution and Follow-up`,
+      
+      "Payroll Procedures": `# Payroll Management Procedures
+
+## Payroll Processing Schedule
+- Monthly payroll processing: 25th of each month
+- Payment date: Last working day of the month
+- Cut-off date for changes: 20th of each month
+
+## Salary Components
+### Basic Salary
+- Fixed monthly amount
+- Subject to PAYE tax deductions
+- Basis for other calculations
+
+### Allowances
+- Transport Allowance: GHS 200/month
+- Communication Allowance: GHS 100/month
+- Meal Allowance: GHS 150/month
+
+### Deductions
+- PAYE Tax (as per Ghana Revenue Authority)
+- Social Security (SSNIT) - 5.5%
+- Provident Fund - 5%
+- Health Insurance - 2%
+
+## Overtime Calculations
+- Weekday overtime: 1.5x hourly rate
+- Weekend overtime: 2x hourly rate
+- Public holiday overtime: 2.5x hourly rate
+
+## Leave Encashment
+- Annual leave can be encashed up to 5 days
+- Sick leave encashment not permitted
+- Maternity leave encashment as per policy
+
+## Payroll Security
+- All payroll data encrypted
+- Access restricted to authorized personnel
+- Regular security audits conducted
+- Backup procedures in place
+
+## Contact Information
+Payroll Department: payroll@company.com
+Phone: +233-XXX-XXXX-XXX`,
+      
+      "Safety Guidelines": `# Workplace Safety Guidelines
+
+## General Safety Rules
+Safety is everyone's responsibility. All employees must follow these guidelines to maintain a safe working environment.
+
+### Emergency Procedures
+- Fire Emergency: Call 192 (Ghana Fire Service)
+- Medical Emergency: Call 193 (Ambulance Service)
+- Security Emergency: Call internal security at extension 999
+
+### Evacuation Procedures
+1. Sound the alarm
+2. Exit via nearest emergency exit
+3. Assemble at designated meeting point
+4. Account for all personnel
+5. Wait for all-clear signal
+
+## Workplace Hazards
+### Electrical Safety
+- Report damaged electrical equipment immediately
+- Don't overload power outlets
+- Use proper electrical safety equipment
+- Regular electrical inspections conducted
+
+### Office Safety
+- Keep walkways clear
+- Report slippery surfaces
+- Use proper lifting techniques
+- Maintain clean and organized workspace
+
+## Personal Protective Equipment (PPE)
+Required PPE for specific tasks:
+- Safety glasses for laboratory work
+- Hard hats for construction areas
+- Safety shoes for warehouse operations
+- High-visibility vests for outdoor work
+
+## Incident Reporting
+All workplace incidents must be reported within 24 hours:
+1. Immediate first aid if needed
+2. Report to supervisor
+3. Complete incident report form
+4. Investigation and corrective action
+
+## Health and Wellness
+- Regular health checkups encouraged
+- Mental health support available
+- Work-life balance initiatives
+- Stress management resources
+
+## Contact Information
+Safety Officer: safety@company.com
+Emergency Hotline: +233-XXX-XXXX-XXX`
     }
 
-    return (
-      documentTemplates[document.name]?.content ||
-      `Document: ${document.name}\n\nThis document contains important information about ${document.name.toLowerCase()}. The content would be displayed here in a real implementation.`
-    )
+    // Return template content or default content
+    return documentTemplates[document.name] || 
+      `# ${document.name}
+
+## Document Information
+- **Type:** ${document.type}
+- **Size:** ${document.size}
+- **Uploaded:** ${new Date(document.uploadedAt).toLocaleDateString()}
+- **Visibility:** ${document.visibleToAll ? 'Available to all employees' : 'Restricted access'}
+
+## Content Preview
+This document contains important information about ${document.name.toLowerCase()}. 
+
+### Key Sections:
+1. **Overview** - General information and purpose
+2. **Policy Details** - Specific rules and procedures
+3. **Implementation** - How to apply these guidelines
+4. **Contact Information** - Who to reach for questions
+
+### Important Notes:
+- This document is for internal use only
+- Please read carefully and follow all guidelines
+- Contact HR department for clarification
+- Regular updates will be communicated
+
+---
+*This is a preview of the document content. The full document may contain additional sections and detailed information.*`
   }
 
   const handleDocumentView = (document: any) => {
@@ -2835,12 +2778,28 @@ Next Review Date: January 15, 2025`,
     setShowDocumentModal(true)
     setShowDocumentPreview(false) // Reset preview state
 
+    // Immediately parse and set the document content
+    const parsedContent = parseDocumentContent(document)
+    setDocumentPreviewContent(parsedContent)
+    
+    // In a real PDF viewer, you'd set totalPages here based on loaded PDF
+    setTotalPages(1)
+    
+    // Show preview after a brief delay to ensure smooth transition
     setTimeout(() => {
-      const parsedContent = parseDocumentContent(document)
-      setDocumentPreviewContent(parsedContent)
-      // In a real PDF viewer, you'd set totalPages here based on loaded PDF
-      setTotalPages(1)
-    }, 500)
+      setShowDocumentPreview(true)
+    }, 100)
+  }
+
+  const handleResetViewer = () => {
+    setDocumentPreviewContent("")
+    setShowDocumentPreview(false)
+    setDocumentZoom(100)
+    setDocumentRotation(0)
+    setCurrentPage(1)
+    setTotalPages(1)
+    setSearchTerm("")
+    setIsFullscreen(false)
   }
 
   const handleDocumentAction = (action, docId = null) => {
@@ -6667,41 +6626,44 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 </div>
 
                 {/* Document Preview Area */}
-                <div className={`border border-gray-300 rounded-md bg-gray-50 ${isFullscreen ? 'h-[calc(100vh-200px)]' : 'h-[600px]'} overflow-auto flex items-center justify-center`}>
+                <div className={`border border-gray-300 rounded-md bg-gray-50 ${isFullscreen ? 'h-[calc(100vh-200px)]' : 'h-[600px]'} overflow-auto`}>
                   <div
-                    className="bg-white shadow-lg"
+                    className="bg-white shadow-lg min-h-full"
                     style={{
                       transform: `scale(${documentZoom / 100}) rotate(${documentRotation}deg)`,
                       transition: 'transform 0.3s ease',
                     }}
                   >
-                    {selectedDocument.type === 'PDF' ? (
-                      <div className="w-[800px] h-[1000px] flex items-center justify-center border border-gray-200">
-                        <div className="text-center space-y-4">
-                          <FileText className="w-16 h-16 mx-auto text-gray-400" />
-                          <div>
-                            <p className="text-lg font-semibold text-gray-700">{selectedDocument.name}</p>
-                            <p className="text-sm text-gray-500">PDF Document Preview</p>
-                            <p className="text-xs text-gray-400 mt-2">
-                              In production, this would display the actual PDF content using a PDF viewer library
-                            </p>
-                          </div>
-                          <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
-                            <EyeOff className="w-4 h-4" />
-                            <span>Download disabled - View only mode</span>
-                          </div>
+                    {documentPreviewContent ? (
+                      <div className="p-8 max-w-4xl mx-auto">
+                        <div className="prose prose-lg max-w-none">
+                          <div 
+                            className="whitespace-pre-wrap text-gray-800 leading-relaxed"
+                            dangerouslySetInnerHTML={{
+                              __html: documentPreviewContent
+                                .replace(/# (.*)/g, '<h1 class="text-3xl font-bold text-gray-900 mb-6 border-b-2 border-gray-200 pb-2">$1</h1>')
+                                .replace(/## (.*)/g, '<h2 class="text-2xl font-semibold text-gray-800 mb-4 mt-8">$1</h2>')
+                                .replace(/### (.*)/g, '<h3 class="text-xl font-medium text-gray-700 mb-3 mt-6">$1</h3>')
+                                .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+                                .replace(/- (.*)/g, '<li class="mb-2 text-gray-700">$1</li>')
+                                .replace(/(\d+)\. (.*)/g, '<li class="mb-2 text-gray-700"><span class="font-medium">$1.</span> $2</li>')
+                                .replace(/\n\n/g, '</p><p class="mb-4 text-gray-700">')
+                                .replace(/^(?!<[h|l])/gm, '<p class="mb-4 text-gray-700">')
+                                .replace(/<li/g, '<ul class="list-disc list-inside mb-4"><li')
+                                .replace(/<\/li>/g, '</li></ul>')
+                                .replace(/<ul class="list-disc list-inside mb-4"><ul class="list-disc list-inside mb-4">/g, '<ul class="list-disc list-inside mb-4">')
+                                .replace(/<\/ul><\/ul>/g, '</ul>')
+                            }}
+                          />
                         </div>
                       </div>
                     ) : (
-                      <div className="w-[800px] h-[1000px] flex items-center justify-center border border-gray-200">
+                      <div className="w-full h-full flex items-center justify-center">
                         <div className="text-center space-y-4">
                           <FileText className="w-16 h-16 mx-auto text-gray-400" />
                           <div>
                             <p className="text-lg font-semibold text-gray-700">{selectedDocument.name}</p>
-                            <p className="text-sm text-gray-500">{selectedDocument.type} Document Preview</p>
-                            <p className="text-xs text-gray-400 mt-2">
-                              Document preview available for PDF files only
-                            </p>
+                            <p className="text-sm text-gray-500">Loading document preview...</p>
                           </div>
                         </div>
                       </div>
