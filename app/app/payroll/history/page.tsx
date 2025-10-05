@@ -1,10 +1,14 @@
 "use client"
-import { useState } from "react"
+
+import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
 import {
   Calendar,
   Download,
@@ -15,6 +19,7 @@ import {
   DollarSign,
   Users,
   FileText,
+  ChevronLeft,
   ChevronRight,
   RefreshCw,
 } from "lucide-react"
@@ -56,12 +61,13 @@ export default function PayrollHistoryPage() {
   const [selectedRun, setSelectedRun] = useState<PayrollRun | null>(null)
   const [payrollItems, setPayrollItems] = useState<PayrollItem[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [yearFilter, setYearFilter] = useState("2025")
+  const [yearFilter, setYearFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingItems, setIsLoadingItems] = useState(false)
   const itemsPerPage = 10
+  const { toast } = useToast()
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -71,13 +77,12 @@ export default function PayrollHistoryPage() {
   useEffect(() => {
     const fetchPayrollHistory = async () => {
       setIsLoading(true)
-      console.log("[v0] Fetching payroll history from database...")
 
       try {
         const { data, error } = await supabase.from("payroll_runs").select("*").order("pay_date", { ascending: false })
 
         if (error) {
-          console.error("[v0] Error fetching payroll runs:", error)
+          console.error("Error fetching payroll runs:", error)
           toast({
             title: "Error",
             description: "Failed to load payroll history. Please try again.",
@@ -86,8 +91,6 @@ export default function PayrollHistoryPage() {
           setIsLoading(false)
           return
         }
-
-        console.log("[v0] Fetched payroll runs:", data?.length || 0)
 
         // Count employees for each payroll run
         const runsWithCounts = await Promise.all(
@@ -107,7 +110,7 @@ export default function PayrollHistoryPage() {
         setPayrollRuns(runsWithCounts)
         setFilteredRuns(runsWithCounts)
       } catch (err) {
-        console.error("[v0] Unexpected error:", err)
+        console.error("Unexpected error:", err)
         toast({
           title: "Error",
           description: "An unexpected error occurred.",
@@ -164,6 +167,10 @@ export default function PayrollHistoryPage() {
   const endIndex = startIndex + itemsPerPage
   const currentRuns = filteredRuns.slice(startIndex, endIndex)
 
+  // Generate years for filter
+  const currentYear = new Date().getFullYear()
+  const years = Array.from({ length: 5 }, (_, i) => String(currentYear - i))
+
   const formatCurrency = (amount: number) => {
     return `GHS ${amount.toLocaleString()}`
   }
@@ -193,13 +200,12 @@ export default function PayrollHistoryPage() {
 
   const handleRefresh = async () => {
     setIsLoading(true)
-    console.log("[v0] Refreshing payroll history...")
 
     try {
       const { data, error } = await supabase.from("payroll_runs").select("*").order("pay_date", { ascending: false })
 
       if (error) {
-        console.error("[v0] Error refreshing payroll runs:", error)
+        console.error("Error refreshing payroll runs:", error)
         toast({
           title: "Error",
           description: "Failed to refresh payroll history.",
@@ -230,7 +236,7 @@ export default function PayrollHistoryPage() {
         description: "Payroll history has been updated.",
       })
     } catch (err) {
-      console.error("[v0] Unexpected error:", err)
+      console.error("Unexpected error:", err)
     } finally {
       setIsLoading(false)
     }
@@ -258,7 +264,7 @@ export default function PayrollHistoryPage() {
       const { data, error } = await supabase.from("payroll_items").select("*").eq("payroll_run_id", run.id)
 
       if (error) {
-        console.error("[v0] Error fetching payroll items:", error)
+        console.error("Error fetching payroll items:", error)
         toast({
           title: "Error",
           description: "Failed to load payroll details.",
@@ -266,11 +272,10 @@ export default function PayrollHistoryPage() {
         })
         setPayrollItems([])
       } else {
-        console.log("[v0] Fetched payroll items:", data?.length || 0)
         setPayrollItems(data || [])
       }
     } catch (err) {
-      console.error("[v0] Unexpected error:", err)
+      console.error("Unexpected error:", err)
       setPayrollItems([])
     } finally {
       setIsLoadingItems(false)
@@ -310,8 +315,8 @@ export default function PayrollHistoryPage() {
             <div className="flex items-center space-x-2">
               <FileText className="w-5 h-5 text-blue-600" />
               <div>
-                <div className="text-2xl font-bold text-gray-900">{totalPayrollRuns}</div>
-                <p className="text-sm text-gray-600">Payroll Runs</p>
+                <div className="text-2xl font-bold text-gray-900">{totalProcessed}</div>
+                <p className="text-sm text-gray-600">Total Processed</p>
               </div>
             </div>
           </CardContent>
@@ -321,8 +326,8 @@ export default function PayrollHistoryPage() {
             <div className="flex items-center space-x-2">
               <Users className="w-5 h-5 text-purple-600" />
               <div>
-                <div className="text-2xl font-bold text-gray-900">{totalEmployeesPaid}</div>
-                <p className="text-sm text-gray-600">Total Payments</p>
+                <div className="text-2xl font-bold text-gray-900">{avgEmployees}</div>
+                <p className="text-sm text-gray-600">Avg Employees</p>
               </div>
             </div>
           </CardContent>
@@ -332,8 +337,8 @@ export default function PayrollHistoryPage() {
             <div className="flex items-center space-x-2">
               <DollarSign className="w-5 h-5 text-emerald-600" />
               <div>
-                <div className="text-2xl font-bold text-gray-900">{formatCurrency(totalGrossPaid)}</div>
-                <p className="text-sm text-gray-600">Total Gross</p>
+                <div className="text-2xl font-bold text-gray-900">{formatCurrency(totalGrossPay)}</div>
+                <p className="text-sm text-gray-600">Total Gross Pay</p>
               </div>
             </div>
           </CardContent>
@@ -343,8 +348,8 @@ export default function PayrollHistoryPage() {
             <div className="flex items-center space-x-2">
               <TrendingUp className="w-5 h-5 text-orange-600" />
               <div>
-                <div className="text-2xl font-bold text-gray-900">{formatCurrency(totalNetPaid)}</div>
-                <p className="text-sm text-gray-600">Total Net</p>
+                <div className="text-2xl font-bold text-gray-900">{formatCurrency(totalNetPay)}</div>
+                <p className="text-sm text-gray-600">Total Net Pay</p>
               </div>
             </div>
           </CardContent>
@@ -358,9 +363,9 @@ export default function PayrollHistoryPage() {
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <Input
-                placeholder="Search by period or ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by period or date..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -398,7 +403,7 @@ export default function PayrollHistoryPage() {
       {/* Payroll History List */}
       <Card>
         <CardHeader>
-          <CardTitle>Payroll Records ({filteredHistory.length})</CardTitle>
+          <CardTitle>Payroll Records ({filteredRuns.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -522,9 +527,23 @@ export default function PayrollHistoryPage() {
                         )
                       })}
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
+      {/* Details Dialog */}
       <Dialog open={!!selectedRun} onOpenChange={() => setSelectedRun(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -539,7 +558,7 @@ export default function PayrollHistoryPage() {
           </DialogHeader>
           {selectedRun && (
             <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-600 mb-1">Pay Date</p>
                   <p className="text-lg font-semibold text-gray-900">{formatDate(selectedRun.pay_date)}</p>
@@ -549,7 +568,6 @@ export default function PayrollHistoryPage() {
                   <p className="text-lg font-semibold text-gray-900">{selectedRun.employee_count || 0}</p>
                 </div>
               </div>
-            ))}
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
@@ -571,10 +589,6 @@ export default function PayrollHistoryPage() {
                   </span>
                 </div>
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
               {isLoadingItems ? (
                 <div className="text-center py-8">
@@ -618,148 +632,10 @@ export default function PayrollHistoryPage() {
                   </div>
                 </div>
               ) : null}
-
-              <div className="flex justify-between items-center pt-4 border-t">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">{selectedPayroll.period} Payroll</h2>
-                  <p className="text-gray-600 mt-1">
-                    {formatDate(selectedPayroll.pay_period_start)} - {formatDate(selectedPayroll.pay_period_end)}
-                  </p>
-                </div>
-                <Button variant="outline" onClick={() => setSelectedPayroll(null)}>
-                  Close
-                </Button>
-              </div>
             </div>
-
-            <div className="p-6 space-y-6">
-              {/* Summary Section */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Payroll Summary</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm text-gray-600 mb-1">Total Employees</p>
-                      <p className="text-2xl font-bold text-gray-900">{selectedPayroll.total_employees}</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm text-gray-600 mb-1">Gross Pay</p>
-                      <p className="text-2xl font-bold text-emerald-600">
-                        {formatCurrency(selectedPayroll.total_gross_pay)}
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm text-gray-600 mb-1">Total Deductions</p>
-                      <p className="text-2xl font-bold text-red-600">
-                        {formatCurrency(selectedPayroll.total_deductions)}
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm text-gray-600 mb-1">Net Pay</p>
-                      <p className="text-2xl font-bold text-emerald-600">
-                        {formatCurrency(selectedPayroll.total_net_pay)}
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-
-              {/* Tax Breakdown */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Tax & Deductions Breakdown</h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm text-gray-600 mb-1">PAYE Tax</p>
-                      <p className="text-xl font-bold text-red-600">{formatCurrency(selectedPayroll.total_paye)}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {((selectedPayroll.total_paye / selectedPayroll.total_gross_pay) * 100).toFixed(1)}% of gross
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm text-gray-600 mb-1">SSNIT Contributions</p>
-                      <p className="text-xl font-bold text-blue-600">{formatCurrency(selectedPayroll.total_ssnit)}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {((selectedPayroll.total_ssnit / selectedPayroll.total_gross_pay) * 100).toFixed(1)}% of gross
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm text-gray-600 mb-1">Tier 3 Pension</p>
-                      <p className="text-xl font-bold text-purple-600">{formatCurrency(selectedPayroll.total_tier3)}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {((selectedPayroll.total_tier3 / selectedPayroll.total_gross_pay) * 100).toFixed(1)}% of gross
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-
-              {/* Approval Information */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Approval Information</h3>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Status</p>
-                        <Badge
-                          variant="default"
-                          className={
-                            selectedPayroll.status === "approved"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-orange-100 text-orange-800"
-                          }
-                        >
-                          {selectedPayroll.status === "approved" && <CheckCircle className="w-3 h-3 mr-1" />}
-                          {selectedPayroll.status.charAt(0).toUpperCase() + selectedPayroll.status.slice(1)}
-                        </Badge>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Approved By</p>
-                        <p className="font-medium text-gray-900">{selectedPayroll.approved_by}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Created Date</p>
-                        <p className="font-medium text-gray-900">{formatDate(selectedPayroll.created_at)}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Approved Date</p>
-                        <p className="font-medium text-gray-900">{formatDate(selectedPayroll.approved_at)}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Actions */}
-              <div className="flex justify-end space-x-3 pt-4 border-t">
-                <Button variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Report
-                </Button>
-                <Button variant="outline">
-                  <FileText className="w-4 h-4 mr-2" />
-                  View Payslips
-                </Button>
-                <Button className="bg-emerald-600 hover:bg-emerald-700">
-                  <Eye className="w-4 h-4 mr-2" />
-                  View Details
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
