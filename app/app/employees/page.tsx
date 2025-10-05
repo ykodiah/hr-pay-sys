@@ -219,6 +219,8 @@ export default function EmployeesPage() {
   const [divisions, setDivisions] = useState<string[]>([])
   const [departmentsList, setDepartments] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
+  const [supervisors, setSupervisors] = useState<any[]>([])
+  const [headsOfDepartment, setHeadsOfDepartment] = useState<any[]>([])
   const [currentTab, setCurrentTab] = useState("personal")
   const [formData, setFormData] = useState<any>({
     employeeId: "",
@@ -415,34 +417,30 @@ export default function EmployeesPage() {
       const supabase = createClient()
 
       // Load company settings
-      const { data: companyData, error: companyError } = await supabase
-        .from("companies")
-        .select("*")
-        .eq("id", MAIN_COMPANY_ID)
-        .maybeSingle()
+      const { data, error } = await supabase.from("companies").select("*").eq("id", MAIN_COMPANY_ID).maybeSingle()
 
-      if (companyError) {
-        console.error("[v0] Error loading company data:", companyError)
-      } else if (companyData) {
-        setCompanySettings(companyData)
-        console.log("[v0] Company data loaded:", companyData)
+      if (error) {
+        console.error("[v0] Error loading company data:", error)
+      } else if (data) {
+        setCompanySettings(data)
+        console.log("[v0] Company data loaded:", data)
 
-        const companyDivisions = Array.isArray(companyData.divisions)
-          ? companyData.divisions
-          : companyData.divisions
-            ? JSON.parse(companyData.divisions)
+        const companyDivisions = Array.isArray(data.divisions)
+          ? data.divisions
+          : data.divisions
+            ? JSON.parse(data.divisions)
             : ["Head Office", "Regional Office"]
 
-        const companyDepartments = Array.isArray(companyData.departments)
-          ? companyData.departments
-          : companyData.departments
-            ? JSON.parse(companyData.departments)
+        const companyDepartments = Array.isArray(data.departments)
+          ? data.departments
+          : data.departments
+            ? JSON.parse(data.departments)
             : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
 
-        const companyLocations = Array.isArray(companyData.locations)
-          ? companyData.locations
-          : companyData.locations
-            ? JSON.parse(companyData.locations)
+        const companyLocations = Array.isArray(data.locations)
+          ? data.locations
+          : data.locations
+            ? JSON.parse(data.locations)
             : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
 
         setDivisions(companyDivisions)
@@ -534,6 +532,84 @@ export default function EmployeesPage() {
     }
   }, [formData.hasSubsidiary, formData.subsidiary, subsidiaries, companySettings])
   // </CHANGE>
+
+  // Load supervisors and heads of department based on department selection
+  useEffect(() => {
+    const loadSupervisorsAndHeads = () => {
+      console.log("[v0] Loading supervisors and heads for department:", formData.department)
+
+      // Filter employees based on department and special roles
+      const departmentEmployees = employees.filter(
+        (emp) => emp.department === formData.department && emp.status === "Active",
+      )
+
+      // Get employees with "Direct Supervisor" special role
+      const supervisorsList = departmentEmployees.filter((emp) => emp.specialRole === "Direct Supervisor")
+
+      // Get employees with "Head of Department" special role
+      const headsList = departmentEmployees.filter((emp) => emp.specialRole === "Head of Department")
+
+      // If no specific roles found, show all department employees as options
+      const finalSupervisors = supervisorsList.length > 0 ? supervisorsList : departmentEmployees
+      const finalHeads = headsList.length > 0 ? headsList : departmentEmployees
+
+      setSupervisors(finalSupervisors)
+      setHeadsOfDepartment(finalHeads)
+
+      console.log("[v0] Loaded supervisors:", finalSupervisors.length)
+      console.log("[v0] Loaded heads of department:", finalHeads.length)
+
+      // Show "No data" message if no employees found
+      if (departmentEmployees.length === 0) {
+        console.log("[v0] No employees found for department:", formData.department)
+        setSupervisors([])
+        setHeadsOfDepartment([])
+      }
+    }
+
+    if (formData.department && employees.length > 0) {
+      loadSupervisorsAndHeads()
+    }
+  }, [formData.department, employees])
+
+  const loadParentCompanyData = () => {
+    console.log("[v0] Loading parent company data...")
+
+    if (companySettings) {
+      const companyDivisions = Array.isArray(companySettings.divisions)
+        ? companySettings.divisions
+        : companySettings.divisions
+          ? JSON.parse(companySettings.divisions)
+          : ["Head Office", "Regional Office"]
+
+      const companyDepartments = Array.isArray(companySettings.departments)
+        ? companySettings.departments
+        : companySettings.departments
+          ? JSON.parse(companySettings.departments)
+          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+
+      const companyLocations = Array.isArray(companySettings.locations)
+        ? companySettings.locations
+        : companySettings.locations
+          ? JSON.parse(companySettings.locations)
+          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
+
+      setDivisions(companyDivisions)
+      setDepartments(companyDepartments)
+      setLocations(companyLocations)
+
+      console.log("[v0] Parent company data loaded:", {
+        divisions: companyDivisions,
+        departments: companyDepartments,
+        locations: companyLocations,
+      })
+    } else {
+      console.log("[v0] No company settings available, using defaults")
+      setDivisions(["Head Office", "Regional Office"])
+      setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
+      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+    }
+  }
 
   const loadEmployees = async () => {
     try {
@@ -1091,11 +1167,26 @@ export default function EmployeesPage() {
   }
 
   const filteredEmployees = employees.filter((employee) => {
+    if (!searchTerm && selectedDepartment === "all") return true
+
+    const searchLower = searchTerm.toLowerCase()
     const matchesSearch =
-      employee.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.employee_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.personal_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.department?.toLowerCase().includes(searchTerm.toLowerCase())
+      !searchTerm ||
+      employee.display_name?.toLowerCase().includes(searchLower) ||
+      employee.employee_id?.toLowerCase().includes(searchLower) ||
+      employee.personal_email?.toLowerCase().includes(searchLower) ||
+      employee.corporate_email?.toLowerCase().includes(searchLower) ||
+      employee.department?.toLowerCase().includes(searchLower) ||
+      employee.position?.toLowerCase().includes(searchLower) ||
+      employee.location?.toLowerCase().includes(searchLower) ||
+      employee.division?.toLowerCase().includes(searchLower) ||
+      employee.status?.toLowerCase().includes(searchLower) ||
+      employee.contract_type?.toLowerCase().includes(searchLower) ||
+      employee.first_name?.toLowerCase().includes(searchLower) ||
+      employee.last_name?.toLowerCase().includes(searchLower) ||
+      employee.other_names?.toLowerCase().includes(searchLower) ||
+      employee.phone_number?.toLowerCase().includes(searchLower) ||
+      employee.ghana_card_number?.toLowerCase().includes(searchLower)
 
     const matchesDepartment = selectedDepartment === "all" || employee.department === selectedDepartment
 
@@ -1161,6 +1252,8 @@ export default function EmployeesPage() {
                 subsidiaries={subsidiaries}
                 setFormData={setFormData}
                 formData={formData}
+                supervisors={supervisors}
+                headsOfDepartment={headsOfDepartment}
                 employees={employees}
                 selectedEmployee={selectedEmployee}
                 companySettings={companySettings}
@@ -1173,30 +1266,75 @@ export default function EmployeesPage() {
       {/* Filters and Search */}
       <Card>
         <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <Input
-                placeholder="Search by name, email, position, or employee ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+          <div className="space-y-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Input
+                  placeholder="Search by name, email, position, employee ID, phone, Ghana card, etc..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                <SelectTrigger className="w-full md:w-48">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Filter by department" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departmentsList.map((dept) => (
+                    <SelectItem key={dept} value={dept}>
+                      {dept}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-              <SelectTrigger className="w-full md:w-48">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Filter by department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departmentsList.map((dept) => (
-                  <SelectItem key={dept} value={dept}>
-                    {dept}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+            {/* Advanced Search Options */}
+            <div className="flex flex-wrap gap-2 text-sm">
+              <span className="text-muted-foreground">Quick searches:</span>
+              <Button variant="outline" size="sm" onClick={() => setSearchTerm("active")} className="h-6 px-2 text-xs">
+                Active
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchTerm("on leave")}
+                className="h-6 px-2 text-xs"
+              >
+                On Leave
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchTerm("permanent")}
+                className="h-6 px-2 text-xs"
+              >
+                Permanent
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchTerm("contract")}
+                className="h-6 px-2 text-xs"
+              >
+                Contract
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm("")
+                  setSelectedDepartment("all")
+                }}
+                className="h-6 px-2 text-xs"
+              >
+                Clear All
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -1236,96 +1374,120 @@ export default function EmployeesPage() {
       {/* Employee List */}
       <Card>
         <CardHeader>
-          <CardTitle>Employee Directory ({filteredEmployees.length} employees)</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Employee Directory ({filteredEmployees.length} employees)</span>
+            {searchTerm && <div className="text-sm text-muted-foreground">Showing results for "{searchTerm}"</div>}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid gap-4">
-              {filteredEmployees.map((employee) => (
-                <Card key={employee.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <Avatar className="w-12 h-12">
-                          <AvatarImage
-                            src={`https://api.dicebear.com/7.x/initials/svg?seed=${employee.display_name}`}
-                          />
-                          <AvatarFallback className="bg-emerald-100 text-emerald-700">
-                            {employee.display_name
-                              ?.split(" ")
-                              .map((n: string) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <h3 className="font-semibold text-lg">{employee.display_name}</h3>
-                          <p className="text-gray-600">{employee.position}</p>
-                          <div className="flex items-center space-x-4 mt-1">
-                            <span className="text-sm text-gray-500">{employee.department}</span>
-                            <span className="text-sm text-gray-500">•</span>
-                            <span className="text-sm text-gray-500">ID: {employee.employeeId}</span>
+            {filteredEmployees.length === 0 ? (
+              <div className="text-center py-8">
+                <Search className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No employees found</h3>
+                <p className="text-gray-500 mb-4">
+                  {searchTerm ? `No employees match your search "${searchTerm}"` : "No employees available"}
+                </p>
+                {searchTerm && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearchTerm("")
+                      setSelectedDepartment("all")
+                    }}
+                  >
+                    Clear search
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {filteredEmployees.map((employee) => (
+                  <Card key={employee.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <Avatar className="w-12 h-12">
+                            <AvatarImage
+                              src={`https://api.dicebear.com/7.x/initials/svg?seed=${employee.display_name}`}
+                            />
+                            <AvatarFallback className="bg-emerald-100 text-emerald-700">
+                              {employee.display_name
+                                ?.split(" ")
+                                .map((n: string) => n[0])
+                                .join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h3 className="font-semibold text-lg">{employee.display_name}</h3>
+                            <p className="text-gray-600">{employee.position}</p>
+                            <div className="flex items-center space-x-4 mt-1">
+                              <span className="text-sm text-gray-500">{employee.department}</span>
+                              <span className="text-sm text-gray-500">•</span>
+                              <span className="text-sm text-gray-500">ID: {employee.employeeId}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center space-x-6">
-                        <div className="text-right">
-                          <p className="text-sm text-gray-500">Monthly Salary</p>
-                          <p className="text-sm font-medium">{formatAmount(employee.salary || 0)}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-gray-500">Status</p>
-                          <Badge
-                            variant={employee.status === "Active" ? "default" : "secondary"}
-                            className={
-                              employee.status === "Active"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-gray-100 text-gray-800"
-                            }
-                          >
-                            {employee.status}
-                          </Badge>
-                        </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedEmployee(employee)
-                                setIsEditDialogOpen(true)
-                              }}
+                        <div className="flex items-center space-x-6">
+                          <div className="text-right">
+                            <p className="text-sm text-gray-500">Monthly Salary</p>
+                            <p className="text-sm font-medium">{formatAmount(employee.salary || 0)}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-gray-500">Status</p>
+                            <Badge
+                              variant={employee.status === "Active" ? "default" : "secondary"}
+                              className={
+                                employee.status === "Active"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }
                             >
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedEmployee(employee)
-                                setIsEditDialogOpen(true)
-                              }}
-                            >
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit Employee
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Mail className="w-4 h-4 mr-2" />
-                              Send Email
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600">
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete Employee
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              {employee.status}
+                            </Badge>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedEmployee(employee)
+                                  setIsEditDialogOpen(true)
+                                }}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedEmployee(employee)
+                                  setIsEditDialogOpen(true)
+                                }}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Employee
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Mail className="w-4 h-4 mr-2" />
+                                Send Email
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-red-600">
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete Employee
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1839,6 +2001,8 @@ function AddEmployeeForm({
   employees,
   selectedEmployee,
   companySettings,
+  supervisors = [],
+  headsOfDepartment = [],
 }: {
   employee?: any
   onSubmit: (data: any) => void
@@ -1849,18 +2013,54 @@ function AddEmployeeForm({
   employees: any[]
   selectedEmployee: any
   companySettings: any
+  supervisors?: any[]
+  headsOfDepartment?: any[]
 }) {
   const [divisions, setDivisions] = useState<string[]>([])
   const [departments, setDepartments] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [supervisors, setSupervisors] = useState<any[]>([])
-  const [headsOfDepartment, setHeadsOfDepartment] = useState<any[]>([])
+  const [departmentSearchTerm, setDepartmentSearchTerm] = useState("")
+  const [divisionSearchTerm, setDivisionSearchTerm] = useState("")
+  const [locationSearchTerm, setLocationSearchTerm] = useState("")
+  const [supervisorSearchTerm, setSupervisorSearchTerm] = useState("")
+  const [headSearchTerm, setHeadSearchTerm] = useState("")
+  const [subsidiarySearchTerm, setSubsidiarySearchTerm] = useState("")
   const { toast } = useToast()
   const [currentTab, setCurrentTab] = useState("personal")
 
   const [phoneCountryCode, setPhoneCountryCode] = useState("+233")
   const [emergencyCountryCode, setEmergencyCountryCode] = useState("+233")
+
+  // Filtered lists for searchable dropdowns
+  const filteredDepartments = departments.filter((dept) =>
+    dept.toLowerCase().includes(departmentSearchTerm.toLowerCase()),
+  )
+
+  const filteredDivisions = divisions.filter((div) => div.toLowerCase().includes(divisionSearchTerm.toLowerCase()))
+
+  const filteredLocations = locations.filter((loc) => loc.toLowerCase().includes(locationSearchTerm.toLowerCase()))
+
+  const filteredSupervisors = supervisors.filter(
+    (supervisor) =>
+      supervisor.display_name?.toLowerCase().includes(supervisorSearchTerm.toLowerCase()) ||
+      supervisor.position?.toLowerCase().includes(supervisorSearchTerm.toLowerCase()) ||
+      supervisor.employee_id?.toLowerCase().includes(supervisorSearchTerm.toLowerCase()),
+  )
+
+  const filteredHeads = headsOfDepartment.filter(
+    (head) =>
+      head.display_name?.toLowerCase().includes(headSearchTerm.toLowerCase()) ||
+      head.position?.toLowerCase().includes(headSearchTerm.toLowerCase()) ||
+      head.employee_id?.toLowerCase().includes(headSearchTerm.toLowerCase()),
+  )
+
+  const filteredSubsidiaries = subsidiaries.filter(
+    (subsidiary) =>
+      subsidiary.name?.toLowerCase().includes(subsidiarySearchTerm.toLowerCase()) ||
+      subsidiary.industry?.toLowerCase().includes(subsidiarySearchTerm.toLowerCase()) ||
+      subsidiary.location?.toLowerCase().includes(subsidiarySearchTerm.toLowerCase()),
+  )
 
   const countryCodes = [
     { code: "+93", country: "Afghanistan", flag: "🇦🇫" },
@@ -2030,13 +2230,6 @@ function AddEmployeeForm({
     { code: "+263", country: "Zimbabwe", flag: "🇿🇼" },
   ]
 
-  const handleInputChange = (key: string, value: any) => {
-    setFormData({
-      ...formData,
-      [key]: value,
-    })
-  }
-
   useEffect(() => {
     if (employee) {
       setFormData({
@@ -2062,7 +2255,7 @@ function AddEmployeeForm({
         inactiveReason: employee.inactive_reason || "", // Set based on existing data
         probationPeriod: employee.probation_period || "6",
         confirmationDate: employee.confirmation_date || "",
-        noticePeriod: employee.notice_period || "",
+        noticePeriod: employee.noticePeriod || "",
         directSupervisor: employee.direct_supervisor || "",
         headOfDepartment: employee.head_of_department || "",
         salary: employee.salary || "",
@@ -2135,14 +2328,6 @@ function AddEmployeeForm({
       }
     }
   }, [formData.subsidiary, subsidiaries])
-
-  useEffect(() => {
-    const filteredSupervisors = employees.filter((emp) => emp.department === formData.department)
-    setSupervisors(filteredSupervisors)
-
-    const filteredHeads = employees.filter((emp) => emp.department === formData.department)
-    setHeadsOfDepartment(filteredHeads)
-  }, [formData.department, employees])
 
   const validateForm = () => {
     let isValid = true
@@ -2235,18 +2420,123 @@ function AddEmployeeForm({
     }
   }
 
+  const handleInputChange = (field: string, value: any) => {
+    setFormData({ ...formData, [field]: value })
+    // Clear error for this field when user starts typing
+    if (errors[field]) {
+      setErrors({ ...errors, [field]: "" })
+    }
+  }
+
+  const clearErrorsForTab = (tab: string) => {
+    const fieldsToClear: string[] = []
+
+    if (tab === "personal") {
+      fieldsToClear.push("firstName", "lastName", "personalEmail", "corporateEmail", "phone", "dateOfBirth")
+    } else if (tab === "employment") {
+      fieldsToClear.push("position", "department", "location", "status")
+    }
+
+    const newErrors = { ...errors }
+    fieldsToClear.forEach((field) => {
+      if (newErrors[field]) {
+        delete newErrors[field]
+      }
+    })
+    setErrors(newErrors)
+  }
+
   const handleNext = () => {
+    // Validate current tab before moving to next
     if (currentTab === "personal") {
+      // Validate personal information
+      const personalErrors: Record<string, string> = {}
+      let hasPersonalErrors = false
+
+      if (!formData.firstName) {
+        personalErrors.firstName = "First name is required"
+        hasPersonalErrors = true
+      }
+      if (!formData.lastName) {
+        personalErrors.lastName = "Last name is required"
+        hasPersonalErrors = true
+      }
+      if (!formData.personalEmail) {
+        personalErrors.personalEmail = "Personal email is required"
+        hasPersonalErrors = true
+      } else if (!/\S+@\S+\.\S+/.test(formData.personalEmail)) {
+        personalErrors.personalEmail = "Personal email is invalid"
+        hasPersonalErrors = true
+      }
+      if (!formData.corporateEmail) {
+        personalErrors.corporateEmail = "Corporate email is required"
+        hasPersonalErrors = true
+      } else if (!/\S+@\S+\.\S+/.test(formData.corporateEmail)) {
+        personalErrors.corporateEmail = "Corporate email is invalid"
+        hasPersonalErrors = true
+      }
+      if (!formData.phone) {
+        personalErrors.phone = "Phone number is required"
+        hasPersonalErrors = true
+      }
+      if (!formData.dateOfBirth) {
+        personalErrors.dateOfBirth = "Date of birth is required"
+        hasPersonalErrors = true
+      }
+
+      if (hasPersonalErrors) {
+        setErrors(personalErrors)
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all required personal information fields correctly.",
+          variant: "destructive",
+        })
+        return
+      }
+      clearErrorsForTab("personal")
       setCurrentTab("employment")
     } else if (currentTab === "employment") {
+      // Validate employment information
+      const employmentErrors: Record<string, string> = {}
+      let hasEmploymentErrors = false
+
+      if (!formData.position) {
+        employmentErrors.position = "Position is required"
+        hasEmploymentErrors = true
+      }
+      if (!formData.department) {
+        employmentErrors.department = "Department is required"
+        hasEmploymentErrors = true
+      }
+      if (!formData.location) {
+        employmentErrors.location = "Location is required"
+        hasEmploymentErrors = true
+      }
+      if (!formData.status) {
+        employmentErrors.status = "Status is required"
+        hasEmploymentErrors = true
+      }
+
+      if (hasEmploymentErrors) {
+        setErrors(employmentErrors)
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all required employment information fields correctly.",
+          variant: "destructive",
+        })
+        return
+      }
+      clearErrorsForTab("employment")
       setCurrentTab("financial")
     } else if (currentTab === "financial") {
+      // Financial information is optional, so we can proceed
       setCurrentTab("documents")
     }
   }
 
   const handlePrevious = () => {
     if (currentTab === "employment") {
+      clearErrorsForTab("employment")
       setCurrentTab("personal")
     } else if (currentTab === "financial") {
       setCurrentTab("employment")
@@ -2563,8 +2853,10 @@ function AddEmployeeForm({
                   console.log("[v0] hasSubsidiary changed to:", value)
                   handleInputChange("hasSubsidiary", value)
                   if (value === "No") {
-                    console.log("[v0] Clearing subsidiary selection")
+                    console.log("[v0] Clearing subsidiary selection and loading parent company data")
                     handleInputChange("subsidiary", "")
+                    // Load parent company data immediately
+                    loadParentCompanyData()
                   }
                 }}
               >
@@ -2592,11 +2884,30 @@ function AddEmployeeForm({
                     <SelectValue placeholder="Select subsidiary" />
                   </SelectTrigger>
                   <SelectContent>
-                    {subsidiaries.map((subsidiary) => (
-                      <SelectItem key={subsidiary.id} value={subsidiary.id}>
-                        {subsidiary.name}
+                    <div className="p-2">
+                      <Input
+                        placeholder="Search subsidiaries..."
+                        value={subsidiarySearchTerm}
+                        onChange={(e) => setSubsidiarySearchTerm(e.target.value)}
+                        className="mb-2"
+                      />
+                    </div>
+                    {filteredSubsidiaries.length === 0 ? (
+                      <SelectItem value="__no_subsidiaries__" disabled>
+                        No subsidiaries found
                       </SelectItem>
-                    ))}
+                    ) : (
+                      filteredSubsidiaries.map((subsidiary) => (
+                        <SelectItem key={subsidiary.id} value={subsidiary.id}>
+                          <div className="flex flex-col">
+                            <span>{subsidiary.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {subsidiary.industry} • {subsidiary.location}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -2610,11 +2921,25 @@ function AddEmployeeForm({
                   <SelectValue placeholder="Select division" />
                 </SelectTrigger>
                 <SelectContent>
-                  {divisions.map((division) => (
-                    <SelectItem key={division} value={division}>
-                      {division}
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search divisions..."
+                      value={divisionSearchTerm}
+                      onChange={(e) => setDivisionSearchTerm(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
+                  {filteredDivisions.length === 0 ? (
+                    <SelectItem value="__no_divisions__" disabled>
+                      No divisions found
                     </SelectItem>
-                  ))}
+                  ) : (
+                    filteredDivisions.map((division) => (
+                      <SelectItem key={division} value={division}>
+                        {division}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -2630,11 +2955,25 @@ function AddEmployeeForm({
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {departments.map((department) => (
-                    <SelectItem key={department} value={department}>
-                      {department}
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search departments..."
+                      value={departmentSearchTerm}
+                      onChange={(e) => setDepartmentSearchTerm(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
+                  {filteredDepartments.length === 0 ? (
+                    <SelectItem value="__no_departments__" disabled>
+                      No departments found
                     </SelectItem>
-                  ))}
+                  ) : (
+                    filteredDepartments.map((department) => (
+                      <SelectItem key={department} value={department}>
+                        {department}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               {errors.department && <p className="text-red-500 text-sm mt-1">{errors.department}</p>}
@@ -2651,11 +2990,25 @@ function AddEmployeeForm({
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map((location) => (
-                    <SelectItem key={location} value={location}>
-                      {location}
+                  <div className="p-2">
+                    <Input
+                      placeholder="Search locations..."
+                      value={locationSearchTerm}
+                      onChange={(e) => setLocationSearchTerm(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
+                  {filteredLocations.length === 0 ? (
+                    <SelectItem value="__no_locations__" disabled>
+                      No locations found
                     </SelectItem>
-                  ))}
+                  ) : (
+                    filteredLocations.map((location) => (
+                      <SelectItem key={location} value={location}>
+                        {location}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               {errors.location && <p className="text-red-500 text-sm mt-1">{errors.location}</p>}
@@ -2774,18 +3127,51 @@ function AddEmployeeForm({
               <Select
                 value={formData.directSupervisor}
                 onValueChange={(value) => handleInputChange("directSupervisor", value)}
+                disabled={supervisors.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select supervisor" />
+                  <SelectValue placeholder={supervisors.length === 0 ? "No data available" : "Select supervisor"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {supervisors.map((supervisor) => (
-                    <SelectItem key={supervisor.id} value={supervisor.id}>
-                      {supervisor.display_name}
+                  {supervisors.length === 0 ? (
+                    <SelectItem value="__no_supervisors__" disabled>
+                      No supervisors available for this department
                     </SelectItem>
-                  ))}
+                  ) : (
+                    <>
+                      <div className="p-2">
+                        <Input
+                          placeholder="Search supervisors..."
+                          value={supervisorSearchTerm}
+                          onChange={(e) => setSupervisorSearchTerm(e.target.value)}
+                          className="mb-2"
+                        />
+                      </div>
+                      {filteredSupervisors.length === 0 ? (
+                        <SelectItem value="__no_supervisors_filtered__" disabled>
+                          No supervisors found
+                        </SelectItem>
+                      ) : (
+                        filteredSupervisors.map((supervisor) => (
+                          <SelectItem key={supervisor.id} value={supervisor.id}>
+                            <div className="flex flex-col">
+                              <span>{supervisor.display_name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {supervisor.position} • {supervisor.employee_id}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
+              {supervisors.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No employees with "Direct Supervisor" role found in this department
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -2793,18 +3179,51 @@ function AddEmployeeForm({
               <Select
                 value={formData.headOfDepartment}
                 onValueChange={(value) => handleInputChange("headOfDepartment", value)}
+                disabled={headsOfDepartment.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select head" />
+                  <SelectValue placeholder={headsOfDepartment.length === 0 ? "No data available" : "Select head"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {headsOfDepartment.map((head) => (
-                    <SelectItem key={head.id} value={head.id}>
-                      {head.display_name}
+                  {headsOfDepartment.length === 0 ? (
+                    <SelectItem value="__no_heads__" disabled>
+                      No heads available for this department
                     </SelectItem>
-                  ))}
+                  ) : (
+                    <>
+                      <div className="p-2">
+                        <Input
+                          placeholder="Search heads..."
+                          value={headSearchTerm}
+                          onChange={(e) => setHeadSearchTerm(e.target.value)}
+                          className="mb-2"
+                        />
+                      </div>
+                      {filteredHeads.length === 0 ? (
+                        <SelectItem value="__no_heads_filtered__" disabled>
+                          No heads found
+                        </SelectItem>
+                      ) : (
+                        filteredHeads.map((head) => (
+                          <SelectItem key={head.id} value={head.id}>
+                            <div className="flex flex-col">
+                              <span>{head.display_name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {head.position} • {head.employee_id}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
+              {headsOfDepartment.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No employees with "Head of Department" role found in this department
+                </p>
+              )}
             </div>
           </div>
         </TabsContent>

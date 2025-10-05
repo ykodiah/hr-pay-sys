@@ -599,6 +599,30 @@ export default function RecruitmentPage() {
     })
   }
 
+  // Handler functions for buttons
+  const handleCreateRequisition = () => {
+    // Add logic to create requisition
+    toast({
+      title: "Requisition Created",
+      description: "Job requisition has been created successfully.",
+    })
+    setShowRequisitionDialog(false)
+  }
+
+  const handlePublishJob = () => {
+    // Add logic to publish job
+    toast({
+      title: "Job Published",
+      description: "Job posting has been published successfully.",
+    })
+    setShowJobDialog(false)
+  }
+
+  const handlePostJob = () => {
+    // Add logic to post job
+    setShowJobDialog(true)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -643,12 +667,12 @@ export default function RecruitmentPage() {
                   <Button variant="outline" onClick={() => setShowRequisitionDialog(false)}>
                     Cancel
                   </Button>
-                  <Button>Create Requisition</Button>
+                  <Button onClick={handleCreateRequisition}>Create Requisition</Button>
                 </div>
               </div>
             </DialogContent>
           </Dialog>
-          <Button>
+          <Button onClick={handlePostJob}>
             <Plus className="w-4 h-4 mr-2" />
             Post Job
           </Button>
@@ -970,7 +994,7 @@ export default function RecruitmentPage() {
                   <Button variant="outline" onClick={() => setShowJobDialog(false)}>
                     Save as Draft
                   </Button>
-                  <Button>Publish Job</Button>
+                  <Button onClick={handlePublishJob}>Publish Job</Button>
                 </div>
               </DialogContent>
             </Dialog>
