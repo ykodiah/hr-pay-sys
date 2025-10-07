@@ -111,6 +111,28 @@ export default function ClientAppLayout({
   const [selectedNotification, setSelectedNotification] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState("")
 
+  // Service Worker registration with proper error handling
+  useEffect(() => {
+    // Only register Service Worker in production and if supported
+    if (typeof window !== "undefined" && "serviceWorker" in navigator && process.env.NODE_ENV === "production") {
+      // Wait for the page to be fully loaded
+      window.addEventListener("load", () => {
+        // Check if document is in a valid state
+        if (document.readyState === "complete") {
+          navigator.serviceWorker
+            .register("/sw.js")
+            .then((registration) => {
+              console.log("[v0] Service Worker registered successfully:", registration.scope)
+            })
+            .catch((error) => {
+              // Silently fail - Service Worker is optional
+              console.log("[v0] Service Worker registration skipped:", error.message)
+            })
+        }
+      })
+    }
+  }, [])
+
   useEffect(() => {
     const theme = themes[currentTheme as keyof typeof themes]
     const root = document.documentElement
