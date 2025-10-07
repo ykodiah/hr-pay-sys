@@ -7217,6 +7217,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       <Label htmlFor="smsAlerts">SMS Alerts</Label>
                     </div>
                   </div>
+                </div>
                 </CardContent>
               </Card>
             </TabsContent>
