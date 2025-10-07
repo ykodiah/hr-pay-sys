@@ -2681,9 +2681,8 @@ This document contains important information about ${document.name.toLowerCase()
 
 ---
 *This is a preview of the document content. The full document may contain additional sections and detailed information.*`
+    )
   }
-
-\
   // Parse document content based on document type and name
   const parseDocumentContent = (document: any) => {
     // If document has stored content from uploaded file, use that
@@ -7213,5 +7212,18 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         checked={notificationSettings.smsAlerts}
                         onCheckedChange={(checked) =>
                           setNotificationSettings({ ...notificationSettings, smsAlerts: checked })
-                        }\
+                        }
                       />
+                      <Label htmlFor="smsAlerts">SMS Alerts</Label>
+                    </div>
+                  </div>
+                </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+    </div>
+  )
+}
