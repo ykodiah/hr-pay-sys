@@ -6904,8 +6904,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            )}
 
             {/* Email Configuration */}
             <Card>
@@ -7220,7 +7220,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </div>
+          </TabsContent>
           </Tabs>
         </div>
       </div>
