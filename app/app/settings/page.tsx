@@ -4401,7 +4401,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
   }
 
   return (
-    <div className="space-y-6">
+    <div>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
