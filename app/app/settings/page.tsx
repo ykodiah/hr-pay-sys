@@ -4390,19 +4390,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
       generalIncrement: { type: "percentage", value: 0 },
       performanceIncrement: { type: "percentage", value: 0 },
     })
-  }
-
-  const handleDeleteUnstructuredGrade = (gradeId) => {
-    setUnstructuredGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
-    toast({
-      title: "Grade Deleted",
-      description: "Unstructured salary grade has been deleted successfully.",
-    })
-  }
 
   return (
-    <div>
-      {/* Header */}
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
