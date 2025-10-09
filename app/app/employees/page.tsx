@@ -1972,7 +1972,7 @@ function ImportDataDialog({
       </Tabs>
 
       <div className="flex justify-end space-x-3 pt-4 border-t">
-        <Button variant="outline" onClick={onClose} className="border-gray-300 hover:bg-gray-50">
+        <Button variant="outline" onClick={onClose} className="border-gray-300 hover:bg-gray-50 bg-transparent">
           Cancel
         </Button>
         <Button
@@ -2643,72 +2643,136 @@ function AddEmployeeForm({
   // Add new custom bank
   const addCustomBank = async () => {
     if (!newBankName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a bank name.",
+        variant: "destructive",
+      })
       return
     }
 
+    console.log("[v0] Starting addCustomBank:", { newBankName: newBankName.trim() })
     setIsAddingBank(true)
+
     try {
       if (isDemoMode()) {
         console.log("[v0] Demo mode: Adding custom bank:", newBankName)
         const bankToAdd = newBankName.trim()
+
+        // Add to custom banks list
         setCustomBanks((prev) => {
           const newBanks = [...prev, bankToAdd]
-          console.log("[DEBUG] Updated customBanks list:", newBanks)
+          console.log("[v0] Updated customBanks list (demo):", newBanks)
           return newBanks
         })
+
         // Set the newly added bank as selected
         handleInputChange("bankName", bankToAdd)
+
+        // Clear form and hide
         setNewBankName("")
         setShowAddBank(false)
+        setIsAddingBank(false)
 
         toast({
           title: "✅ Bank Added Successfully!",
-          description: `"${newBankName.trim()}" has been added to your company's bank list and is now available for selection.`,
+          description: `"${bankToAdd}" has been added to your company's bank list and is now selected.`,
         })
-        setIsAddingBank(false)
+
+        console.log("[v0] Demo bank added successfully")
         return
       }
 
-      const { error } = await createClient() // Fixed: supabase variable declared
-        .from("custom_banks")
-        .insert({
-          company_id: companySettings?.id,
-          bank_name: newBankName.trim(),
-          created_by: "user", // Fixed: user variable declared
-        })
+      // Get current user
+      const supabase = createClient()
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
 
-      if (error) {
-        console.error("Error adding custom bank:", error)
+      if (userError || !user) {
+        console.error("[v0] Error getting user:", userError)
         toast({
           title: "Error",
-          description: "Failed to add custom bank. Please try again.",
+          description: "Unable to verify user. Please try again.",
           variant: "destructive",
         })
         setIsAddingBank(false)
         return
       }
 
+      console.log("[v0] User verified:", { userId: user.id })
+
+      // Check if company settings exist
+      if (!companySettings?.id) {
+        console.error("[v0] No company settings found")
+        toast({
+          title: "Error",
+          description: "Company settings not found. Please refresh the page.",
+          variant: "destructive",
+        })
+        setIsAddingBank(false)
+        return
+      }
+
+      console.log("[v0] Inserting custom bank:", {
+        company_id: companySettings.id,
+        bank_name: newBankName.trim(),
+        created_by: user.id,
+      })
+
+      // Insert the custom bank
+      const { data: insertedBank, error: insertError } = await supabase
+        .from("custom_banks")
+        .insert({
+          company_id: companySettings.id,
+          bank_name: newBankName.trim(),
+          created_by: user.id,
+        })
+        .select()
+        .single()
+
+      if (insertError) {
+        console.error("[v0] Error adding custom bank:", insertError)
+        toast({
+          title: "Error",
+          description: `Failed to add custom bank: ${insertError.message}`,
+          variant: "destructive",
+        })
+        setIsAddingBank(false)
+        return
+      }
+
+      console.log("[v0] Custom bank inserted successfully:", insertedBank)
+
       const bankToAdd = newBankName.trim()
+
+      // Add to custom banks list
       setCustomBanks((prev) => {
         const newBanks = [...prev, bankToAdd]
-        console.log("[DEBUG] Updated customBanks list (Supabase):", newBanks)
+        console.log("[v0] Updated customBanks list (Supabase):", newBanks)
         return newBanks
       })
+
       // Set the newly added bank as selected
       handleInputChange("bankName", bankToAdd)
+
+      // Clear form and hide
       setNewBankName("")
       setShowAddBank(false)
+      setIsAddingBank(false)
 
       toast({
         title: "✅ Bank Added Successfully!",
-        description: `"${newBankName.trim()}" has been added to your company's bank list and is now available for selection.`,
+        description: `"${bankToAdd}" has been added to your company's bank list and is now selected.`,
       })
-      setIsAddingBank(false)
+
+      console.log("[v0] Bank added and form cleared successfully")
     } catch (error) {
-      console.error("Error adding custom bank:", error)
+      console.error("[v0] Unexpected error adding custom bank:", error)
       toast({
         title: "Error",
-        description: "Failed to add custom bank. Please try again.",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       })
       setIsAddingBank(false)
@@ -3540,9 +3604,25 @@ function AddEmployeeForm({
                       >
                         {isAddingBank ? (
                           <>
-                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            <svg
+                              className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              ></circle>
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              ></path>
                             </svg>
                             Adding...
                           </>
@@ -3809,7 +3889,11 @@ function AddEmployeeForm({
 
       <div className="flex justify-between">
         {currentTab !== "personal" && (
-          <Button variant="outline" onClick={handlePrevious} className="border-gray-300 hover:bg-gray-50">
+          <Button
+            variant="outline"
+            onClick={handlePrevious}
+            className="border-gray-300 hover:bg-gray-50 bg-transparent"
+          >
             Previous
           </Button>
         )}
@@ -3819,7 +3903,7 @@ function AddEmployeeForm({
           </Button>
         ) : (
           <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={onClose} className="border-gray-300 hover:bg-gray-50">
+            <Button variant="outline" onClick={onClose} className="border-gray-300 hover:bg-gray-50 bg-transparent">
               Cancel
             </Button>
             <Button onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700 text-white">
