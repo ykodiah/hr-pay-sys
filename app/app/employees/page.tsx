@@ -1972,13 +1972,13 @@ function ImportDataDialog({
       </Tabs>
 
       <div className="flex justify-end space-x-3 pt-4 border-t">
-        <Button variant="outline" onClick={onClose}>
+        <Button variant="outline" onClick={onClose} className="border-gray-300 hover:bg-gray-50">
           Cancel
         </Button>
         <Button
           onClick={handleImport}
           disabled={!selectedFile || previewData.length === 0 || importErrors.length > 0}
-          className="bg-emerald-600 hover:bg-emerald-700"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
         >
           <Upload className="w-4 h-4 mr-2" />
           Import Data ({previewData.length} records)
@@ -3474,15 +3474,18 @@ function AddEmployeeForm({
                         {bank}
                       </SelectItem>
                     ))}
+                    <SelectItem value="add_new_bank" className="text-blue-600 font-medium">
+                      + Add Custom Bank
+                    </SelectItem>
                   </SelectContent>
                 </Select>
 
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={() => setShowAddBank(!showAddBank)}
-                  className="w-full justify-start text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 h-auto"
+                  className="w-full justify-center text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 hover:border-blue-300 px-3 py-2 h-auto font-medium"
                 >
                   {showAddBank ? "− Hide Custom Bank Form" : "+ Add Custom Bank"}
                 </Button>
@@ -3512,7 +3515,7 @@ function AddEmployeeForm({
                         size="sm"
                         onClick={addCustomBank}
                         disabled={!newBankName.trim()}
-                        className="flex-1 bg-black hover:bg-gray-800 text-white"
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
                       >
                         Add Bank
                       </Button>
@@ -3524,7 +3527,7 @@ function AddEmployeeForm({
                           setShowAddBank(false)
                           setNewBankName("")
                         }}
-                        className="flex-1"
+                        className="flex-1 border-gray-300 hover:bg-gray-50"
                       >
                         Cancel
                       </Button>
@@ -3777,18 +3780,20 @@ function AddEmployeeForm({
 
       <div className="flex justify-between">
         {currentTab !== "personal" && (
-          <Button variant="secondary" onClick={handlePrevious}>
+          <Button variant="outline" onClick={handlePrevious} className="border-gray-300 hover:bg-gray-50">
             Previous
           </Button>
         )}
         {currentTab !== "documents" ? (
-          <Button onClick={handleNext}>Next</Button>
+          <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-700 text-white">
+            Next
+          </Button>
         ) : (
           <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} className="border-gray-300 hover:bg-gray-50">
               Cancel
             </Button>
-            <Button onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700 text-white">
               Submit
             </Button>
           </div>
