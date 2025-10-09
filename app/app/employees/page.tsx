@@ -2641,7 +2641,11 @@ function AddEmployeeForm({
 
   // Add new custom bank
   const addCustomBank = async () => {
-    if (!newBankName.trim()) return
+    console.log("[DEBUG] addCustomBank called, newBankName:", newBankName)
+    if (!newBankName.trim()) {
+      console.log("[DEBUG] newBankName is empty, returning")
+      return
+    }
 
     try {
       if (isDemoMode()) {
@@ -3510,27 +3514,29 @@ function AddEmployeeForm({
                       className="w-full"
                     />
                     <div className="flex gap-2">
-                      <Button
+                      <button
                         type="button"
-                        size="sm"
-                        onClick={addCustomBank}
-                        disabled={!newBankName.trim()}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        onClick={(e) => {
+                          console.log("[DEBUG] Add Bank button clicked, newBankName:", newBankName)
+                          alert("Add Bank button clicked!") // Temporary test
+                          e.preventDefault()
+                          e.stopPropagation()
+                          addCustomBank()
+                        }}
+                        className="flex-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
                       >
                         Add Bank
-                      </Button>
-                      <Button
+                      </button>
+                      <button
                         type="button"
-                        size="sm"
-                        variant="outline"
                         onClick={() => {
                           setShowAddBank(false)
                           setNewBankName("")
                         }}
-                        className="flex-1 border-gray-300 hover:bg-gray-50"
+                        className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                       >
                         Cancel
-                      </Button>
+                      </button>
                     </div>
                     <p className="text-xs text-gray-500">This bank will be added to your company's bank list</p>
                   </div>
