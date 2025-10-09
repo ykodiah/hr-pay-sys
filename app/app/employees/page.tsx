@@ -2686,6 +2686,7 @@ function AddEmployeeForm({
           description: "Failed to add custom bank. Please try again.",
           variant: "destructive",
         })
+        setIsAddingBank(false)
         return
       }
 
