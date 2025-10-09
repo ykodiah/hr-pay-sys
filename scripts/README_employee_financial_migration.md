@@ -29,7 +29,7 @@ The employee financial form has been updated with the following changes:
 
 Created `custom_banks` table to allow companies to add their own banks:
 
-```sql
+\`\`\`sql
 CREATE TABLE custom_banks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -39,7 +39,7 @@ CREATE TABLE custom_banks (
     created_by UUID REFERENCES auth.users(id),
     UNIQUE(company_id, bank_name)
 );
-```
+\`\`\`
 
 ### 3. Updated Bank List
 
@@ -96,9 +96,9 @@ The default bank list now includes:
 
 ### get_company_banks(company_uuid)
 Returns all available banks (default + custom) for a specific company:
-```sql
+\`\`\`sql
 SELECT * FROM get_company_banks('company-uuid-here');
-```
+\`\`\`
 
 ## Application Changes
 
@@ -144,7 +144,7 @@ The migration scripts include verification queries that check:
 
 ### Sample Data
 Optional sample data can be inserted for testing:
-```sql
+\`\`\`sql
 -- Uncomment in migration script to add sample custom banks
 INSERT INTO custom_banks (company_id, bank_name, created_by)
 SELECT 
@@ -153,7 +153,7 @@ SELECT
     (SELECT id FROM auth.users LIMIT 1) as created_by
 FROM companies c
 LIMIT 1;
-```
+\`\`\`
 
 ## Rollback Procedure
 

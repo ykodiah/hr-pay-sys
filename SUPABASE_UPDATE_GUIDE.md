@@ -20,7 +20,7 @@ This guide will help you update your Supabase database with the new employee fin
 
 ### Step 4: Verify the Changes
 Run this query to verify the changes:
-```sql
+\`\`\`sql
 -- Check if annual_salary column exists
 SELECT column_name, data_type 
 FROM information_schema.columns 
@@ -36,37 +36,37 @@ WHERE table_name = 'custom_banks';
 SELECT schemaname, tablename, policyname 
 FROM pg_policies 
 WHERE tablename = 'custom_banks';
-```
+\`\`\`
 
 ## Method 2: Using Supabase CLI
 
 ### Step 1: Install Supabase CLI
-```bash
+\`\`\`bash
 npm install -g supabase
-```
+\`\`\`
 
 ### Step 2: Login to Supabase
-```bash
+\`\`\`bash
 supabase login
-```
+\`\`\`
 
 ### Step 3: Link Your Project
-```bash
+\`\`\`bash
 supabase link --project-ref YOUR_PROJECT_REF
-```
+\`\`\`
 
 ### Step 4: Run Migration
-```bash
+\`\`\`bash
 supabase db push
-```
+\`\`\`
 
 ## Method 3: Using Direct SQL Connection
 
 If you have direct access to your PostgreSQL database:
 
-```bash
+\`\`\`bash
 psql -h YOUR_DB_HOST -U postgres -d postgres -f scripts/038_complete_employee_financial_migration.sql
-```
+\`\`\`
 
 ## What the Migration Does
 
@@ -117,13 +117,13 @@ After running the migration, test the functionality:
 ## Rollback (If Needed)
 
 If you need to rollback the changes, run:
-```sql
+\`\`\`sql
 -- Remove annual_salary column
 ALTER TABLE employee_financial DROP COLUMN IF EXISTS annual_salary;
 
 -- Drop custom_banks table
 DROP TABLE IF EXISTS custom_banks CASCADE;
-```
+\`\`\`
 
 ## Support
 
