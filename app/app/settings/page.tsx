@@ -39,8 +39,19 @@ import {
   Trash2,
   Send,
   Mail,
+  Shield,
+  Database,
+  FileText,
   EyeOff,
   Check,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  Maximize,
+  Minimize,
+  ChevronLeft,
+  ChevronRight,
+  Search,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -256,7 +267,6 @@ export default function SettingsPage() {
   const [selectedDocument, setSelectedDocument] = useState(null)
   const [uploadedFile, setUploadedFile] = useState(null)
   const [documentName, setDocumentName] = useState("")
-
   const [currentPolicies, setCurrentPolicies] = useState([
     { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Annual vacation leave" },
     { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness" },
@@ -277,7 +287,7 @@ export default function SettingsPage() {
   const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState(false)
   const [selectedSubsidiary, setSelectedSubsidiary] = useState<Subsidiary | null>(null)
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<boolean>(false)
-  const [showReactivateConfirm, setShowReactivateConfirm] = useState(false)
+  const [showReactivateConfirm, setShowReactivateConfirm] = useState<boolean>(false)
   const [subsidiaryToToggle, setSubsidiaryToToggle] = useState<Subsidiary | null>(null)
 
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string>("")
@@ -2424,265 +2434,144 @@ export default function SettingsPage() {
     if (!document) return ""
 
     const documentTemplates: Record<string, { content: string }> = {
-      "Employee Handbook": `# Employee Handbook
+      "Employee Handbook": {
+        content: `EMPLOYEE HANDBOOK
 
-## Welcome to Our Company
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
 
-We're delighted to have you as part of our team. This handbook contains important information about our company policies, procedures, and benefits.
+WELCOME TO OUR COMPANY
 
-## Company Overview
-Our company is committed to excellence and innovation in the HR and payroll management sector. We serve clients across Ghana with comprehensive HR solutions.
+This handbook serves as a guide to our company policies, procedures, and benefits. Please read it carefully and keep it for future reference.
 
-## Employment Policies
+TABLE OF CONTENTS
 
-### Working Hours
-- Standard working hours: 8:00 AM - 5:00 PM, Monday to Friday
-- Flexible working arrangements available upon approval
-- Overtime compensation as per Ghana Labour Act
+1. EMPLOYMENT POLICIES
+   - Equal Employment Opportunity
+   - Anti-Discrimination Policy
+   - Harassment Prevention
+   - Code of Conduct
 
-### Leave Policies
-- Annual Leave: 21 working days per year
-- Sick Leave: 10 working days per year
-- Maternity Leave: 84 calendar days
-- Paternity Leave: 7 calendar days
+2. WORK SCHEDULES AND ATTENDANCE
+   - Standard Work Hours
+   - Flexible Work Arrangements
+   - Attendance Policy
+   - Time Off Requests
 
-### Code of Conduct
-All employees are expected to:
-- Maintain professional behavior at all times
-- Respect colleagues and clients
-- Follow company policies and procedures
-- Maintain confidentiality of sensitive information
+3. COMPENSATION AND BENEFITS
+   - Salary Administration
+   - Performance Reviews
+   - Health Insurance
+   - Retirement Plans
+   - Paid Time Off
 
-## Benefits Package
-- Health Insurance Coverage
-- Provident Fund Contribution
-- Professional Development Opportunities
-- Annual Performance Bonuses
+4. WORKPLACE POLICIES
+   - Dress Code
+   - Technology Use
+   - Confidentiality
+   - Safety Procedures
 
-## Contact Information
-For questions about this handbook, please contact HR Department at hr@company.com or extension 1001.`,
-      
-      "Code of Conduct": `# Code of Conduct
+5. EMPLOYEE DEVELOPMENT
+   - Training Programs
+   - Career Advancement
+   - Performance Management
+   - Professional Development
 
-## Professional Standards
-All employees must maintain the highest standards of professional conduct.
+For questions about this handbook, please contact Human Resources.`,
+      },
+      "Code of Conduct": {
+        content: `COMPANY CODE OF CONDUCT
 
-### Core Values
-- Integrity and honesty
-- Respect for all individuals
-- Excellence in performance
-- Innovation and creativity
+EFFECTIVE DATE: January 1, 2024
+VERSION: 2.1
+APPROVED BY: Board of Directors
 
-### Workplace Behavior
-- Arrive on time and maintain regular attendance
-- Complete assigned tasks efficiently
-- Collaborate effectively with team members
-- Maintain confidentiality of sensitive information
+INTRODUCTION
 
-## Compliance Requirements
-- Follow all company policies and procedures
-- Comply with all applicable laws and regulations
-- Report violations immediately
-- Participate in required training programs
+Our Code of Conduct outlines the ethical standards and behavioral expectations for all employees, contractors, and business partners.
 
-## Contact Information
-For questions about this code of conduct, contact HR Department.`,
-      
-      "Safety Manual": `# Safety Manual
+CORE VALUES
 
-## General Safety Rules
-Safety is everyone's responsibility in our workplace.
+1. INTEGRITY
+   - Act honestly and transparently
+   - Keep commitments and promises
+   - Report violations without fear of retaliation
 
-### Emergency Procedures
-- Fire Emergency: Call 192
-- Medical Emergency: Call 193
-- Security Emergency: Call internal security
+2. RESPECT
+   - Treat all individuals with dignity
+   - Value diversity and inclusion
+   - Maintain professional relationships
 
-### Workplace Hazards
-- Chemical Safety
-- Electrical Safety
-- Ergonomic Guidelines
-- Equipment Operation
+3. ACCOUNTABILITY
+   - Take responsibility for actions
+   - Meet performance expectations
+   - Support team objectives
 
-## Training Requirements
+ETHICAL GUIDELINES
+
+• Conflict of Interest
+• Confidential Information
+• Fair Dealing
+• Compliance with Laws
+• Reporting Concerns
+
+ENFORCEMENT
+
+Violations of this Code may result in disciplinary action, up to and including termination of employment.
+
+For questions or to report concerns, contact the Ethics Hotline at ethics@company.com`,
+      },
+      "Safety Manual": {
+        content: `WORKPLACE SAFETY MANUAL
+
+EFFECTIVE DATE: January 1, 2024
+VERSION: 3.0
+APPROVED BY: Safety Committee
+
+SAFETY FIRST
+
+The safety and well-being of our employees is our top priority. This manual provides guidelines for maintaining a safe work environment.
+
+GENERAL SAFETY RULES
+
+1. Report all accidents and injuries immediately
+2. Use personal protective equipment when required
+3. Follow all safety procedures and protocols
+4. Keep work areas clean and organized
+5. Report unsafe conditions or practices
+
+EMERGENCY PROCEDURES
+
+• Fire Emergency
+• Medical Emergency
+• Evacuation Procedures
+• Emergency Contacts
+
+WORKPLACE HAZARDS
+
+• Chemical Safety
+• Electrical Safety
+• Ergonomic Guidelines
+• Equipment Operation
+
+TRAINING REQUIREMENTS
+
 All employees must complete safety training within 30 days of employment and annually thereafter.
 
-## Contact Information
 For safety concerns, contact the Safety Officer at safety@company.com`,
-      
-      "HR Policies": `# HR Policies and Procedures
-
-## Recruitment and Selection
-Our recruitment process ensures we hire the best talent while maintaining fairness and transparency.
-
-### Hiring Process
-1. Job Requisition Approval
-2. Job Posting and Advertisement
-3. Application Review and Screening
-4. Interview Process
-5. Reference Checks
-6. Offer and Onboarding
-
-### Equal Opportunity Employment
-We are committed to providing equal employment opportunities regardless of race, gender, religion, or background.
-
-## Performance Management
-Regular performance reviews help employees grow and contribute effectively to company goals.
-
-### Review Process
-- Quarterly performance discussions
-- Annual formal reviews
-- Goal setting and tracking
-- Development planning
-
-## Disciplinary Procedures
-Progressive disciplinary measures ensure fair treatment while maintaining workplace standards.
-
-### Disciplinary Steps
-1. Verbal Warning
-2. Written Warning
-3. Final Written Warning
-4. Suspension
-5. Termination
-
-## Grievance Procedures
-Employees have the right to raise concerns through proper channels.
-
-### Grievance Process
-1. Informal Discussion with Supervisor
-2. Formal Written Complaint
-3. HR Investigation
-4. Resolution and Follow-up`,
-      
-      "Payroll Procedures": `# Payroll Management Procedures
-
-## Payroll Processing Schedule
-- Monthly payroll processing: 25th of each month
-- Payment date: Last working day of the month
-- Cut-off date for changes: 20th of each month
-
-## Salary Components
-### Basic Salary
-- Fixed monthly amount
-- Subject to PAYE tax deductions
-- Basis for other calculations
-
-### Allowances
-- Transport Allowance: GHS 200/month
-- Communication Allowance: GHS 100/month
-- Meal Allowance: GHS 150/month
-
-### Deductions
-- PAYE Tax (as per Ghana Revenue Authority)
-- Social Security (SSNIT) - 5.5%
-- Provident Fund - 5%
-- Health Insurance - 2%
-
-## Overtime Calculations
-- Weekday overtime: 1.5x hourly rate
-- Weekend overtime: 2x hourly rate
-- Public holiday overtime: 2.5x hourly rate
-
-## Leave Encashment
-- Annual leave can be encashed up to 5 days
-- Sick leave encashment not permitted
-- Maternity leave encashment as per policy
-
-## Payroll Security
-- All payroll data encrypted
-- Access restricted to authorized personnel
-- Regular security audits conducted
-- Backup procedures in place
-
-## Contact Information
-Payroll Department: payroll@company.com
-Phone: +233-XXX-XXXX-XXX`,
-      
-      "Safety Guidelines": `# Workplace Safety Guidelines
-
-## General Safety Rules
-Safety is everyone's responsibility. All employees must follow these guidelines to maintain a safe working environment.
-
-### Emergency Procedures
-- Fire Emergency: Call 192 (Ghana Fire Service)
-- Medical Emergency: Call 193 (Ambulance Service)
-- Security Emergency: Call internal security at extension 999
-
-### Evacuation Procedures
-1. Sound the alarm
-2. Exit via nearest emergency exit
-3. Assemble at designated meeting point
-4. Account for all personnel
-5. Wait for all-clear signal
-
-## Workplace Hazards
-### Electrical Safety
-- Report damaged electrical equipment immediately
-- Don't overload power outlets
-- Use proper electrical safety equipment
-- Regular electrical inspections conducted
-
-### Office Safety
-- Keep walkways clear
-- Report slippery surfaces
-- Use proper lifting techniques
-- Maintain clean and organized workspace
-
-## Personal Protective Equipment (PPE)
-Required PPE for specific tasks:
-- Safety glasses for laboratory work
-- Hard hats for construction areas
-- Safety shoes for warehouse operations
-- High-visibility vests for outdoor work
-
-## Incident Reporting
-All workplace incidents must be reported within 24 hours:
-1. Immediate first aid if needed
-2. Report to supervisor
-3. Complete incident report form
-4. Investigation and corrective action
-
-## Health and Wellness
-- Regular health checkups encouraged
-- Mental health support available
-- Work-life balance initiatives
-- Stress management resources
-
-## Contact Information
-Safety Officer: safety@company.com
-Emergency Hotline: +233-XXX-XXXX-XXX`
+      },
     }
 
-    // Return template content or default content
     return (
       documentTemplates[document.name]?.content ||
-      `# ${document.name}
+      `Document: ${document.name}
 
-## Document Information
-- **Type:** ${document.type}
-- **Size:** ${document.size}
-- **Uploaded:** ${new Date(document.uploadedAt).toLocaleDateString()}
-- **Visibility:** ${document.visibleToAll ? 'Available to all employees' : 'Restricted access'}
-
-## Content Preview
-This document contains important information about ${document.name.toLowerCase()}. 
-
-### Key Sections:
-1. **Overview** - General information and purpose
-2. **Policy Details** - Specific rules and procedures
-3. **Implementation** - How to apply these guidelines
-4. **Contact Information** - Who to reach for questions
-
-### Important Notes:
-- This document is for internal use only
-- Please read carefully and follow all guidelines
-- Contact HR department for clarification
-- Regular updates will be communicated
-
----
-*This is a preview of the document content. The full document may contain additional sections and detailed information.*`
+This document contains important information about ${document.name.toLowerCase()}. The content would be displayed here in a real implementation.`
     )
   }
+
+
   // Parse document content based on document type and name
   const parseDocumentContent = (document: any) => {
     // If document has stored content from uploaded file, use that
@@ -2749,7 +2638,7 @@ All employees must maintain the highest standards of professional conduct.
 
 ## Compliance Requirements
 - Follow all company policies and procedures
-- Comply with all applicable laws and regulations
+- Comply with applicable laws and regulations
 - Report violations immediately
 - Participate in required training programs
 
@@ -2766,17 +2655,20 @@ Safety is everyone's responsibility in our workplace.
 - Medical Emergency: Call 193
 - Security Emergency: Call internal security
 
-### Workplace Hazards
-- Chemical Safety
-- Electrical Safety
-- Ergonomic Guidelines
-- Equipment Operation
+### Workplace Safety
+- Keep walkways clear
+- Report hazards immediately
+- Use proper safety equipment
+- Follow all safety protocols
 
-## Training Requirements
-All employees must complete safety training within 30 days of employment and annually thereafter.
+## Personal Protective Equipment
+Required PPE for specific tasks:
+- Safety glasses for laboratory work
+- Hard hats for construction areas
+- Safety shoes for warehouse operations
 
-## Contact Information
-For safety concerns, contact the Safety Officer at safety@company.com`,
+## Incident Reporting
+All workplace incidents must be reported within 24 hours.`,
       
       "HR Policies": `# HR Policies and Procedures
 
@@ -2922,8 +2814,7 @@ Emergency Hotline: +233-XXX-XXXX-XXX`
     }
 
     // Return template content or default content
-    return (
-      documentTemplates[document.name]?.content ||
+    return documentTemplates[document.name] || 
       `# ${document.name}
 
 ## Document Information
@@ -2949,9 +2840,7 @@ This document contains important information about ${document.name.toLowerCase()
 
 ---
 *This is a preview of the document content. The full document may contain additional sections and detailed information.*`
-  )
   }
-
 
   const handleDocumentView = (document: any) => {
     setSelectedDocument(document)
@@ -3107,7 +2996,7 @@ This document contains important information about ${document.name.toLowerCase()
     }
 
     // Clean and format the text
-    const formattedText = text
+    let formattedText = text
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
       .replace(/\n{3,}/g, '\n\n')
@@ -3126,7 +3015,7 @@ This document contains important information about ${document.name.toLowerCase()
     }
 
     // Convert HTML to markdown-like format
-    const formattedText = html
+    let formattedText = html
       .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n')
       .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n')
       .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n')
@@ -6363,7 +6252,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                               variant="outline"
                               size="sm"
                               onClick={checkAIModelUpdates}
-                              className="text-blue-600 border-blue-200 hover:bg-blue-100 bg-transparent"
+                              className="text-blue-600 border-blue-200 hover:bg-blue-100"
                             >
                               <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -6433,7 +6322,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 variant="outline"
                                 size="sm"
                                 onClick={simulateGPT5Upgrade}
-                                className="text-purple-600 border-purple-200 hover:bg-purple-100 w-full bg-transparent"
+                                className="text-purple-600 border-purple-200 hover:bg-purple-100 w-full"
                               >
                                 <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -6639,7 +6528,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                               variant="outline"
                               size="sm"
                               onClick={checkAIModelUpdates}
-                              className="text-blue-600 border-blue-200 hover:bg-blue-100 bg-transparent"
+                              className="text-blue-600 border-blue-200 hover:bg-blue-100"
                             >
                               <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -6709,7 +6598,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 variant="outline"
                                 size="sm"
                                 onClick={simulateGPT5Upgrade}
-                                className="text-purple-600 border-purple-200 hover:bg-purple-100 w-full bg-transparent"
+                                className="text-purple-600 border-purple-200 hover:bg-purple-100 w-full"
                               >
                                 <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -6904,8 +6793,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            )}
 
             {/* Email Configuration */}
             <Card>
@@ -7214,16 +7103,1437 @@ Format the response in a professional, actionable manner for HR decision-makers.
                           setNotificationSettings({ ...notificationSettings, smsAlerts: checked })
                         }
                       />
-                      <Label htmlFor="smsAlerts">SMS Alerts</Label>
+                      <div>
+                        <Label htmlFor="smsAlerts">SMS Alerts</Label>
+                        <p className="text-sm text-muted-foreground">Enable SMS notifications</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="pushNotifications"
+                        checked={notificationSettings.pushNotifications}
+                        onCheckedChange={(checked) =>
+                          setNotificationSettings({ ...notificationSettings, pushNotifications: checked })
+                        }
+                      />
+                      <div>
+                        <Label htmlFor="pushNotifications">Push Notifications</Label>
+                        <p className="text-sm text-muted-foreground">Enable browser push notifications</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => {
+                        setIsSaving(true) // Use the general saving state
+                        setTimeout(() => {
+                          setIsSaving(false)
+                          toast({
+                            title: "Preferences Saved",
+                            description: "Notification preferences have been updated successfully",
+                          })
+                        }, 1500)
+                      }}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                      Save Preferences
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="roles">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="w-5 h-5" />
+                  <span>Roles & Permissions</span>
+                </CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" onClick={handleAddRoleInner}>
+                    Add Role
+                  </Button>
+                </div>
+              </div>
+              <CardDescription>Manage user roles and permissions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                {roles.map((role) => (
+                  <Card key={role.id} className="border-l-4 border-l-indigo-500">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-base font-semibold">{role.name}</h3>
+                          <p className="text-xs text-gray-600">{role.description}</p>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <span className="text-sm text-gray-500">{role.user_count} Users</span>
+                          <Button variant="outline" size="sm" onClick={() => handleEditRoleInner(role.name)}>
+                            Edit
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Access Control Tab Content */}
+        <TabsContent value="access">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Shield className="w-5 h-5" />
+                <span>Access Control</span>
+              </CardTitle>
+              <CardDescription>Manage user access and authentication settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Authentication Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Authentication Settings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="twoFactor">Two-Factor Authentication</Label>
+                      <Switch
+                        id="twoFactor"
+                        checked={accessSettings.twoFactorEnabled}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, twoFactorEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="ssoEnabled">Single Sign-On (SSO)</Label>
+                      <Switch
+                        id="ssoEnabled"
+                        checked={accessSettings.ssoEnabled}
+                        onCheckedChange={(checked) => setAccessSettings({ ...accessSettings, ssoEnabled: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="passwordExpiry">Password Expiry</Label>
+                      <Switch
+                        id="passwordExpiry"
+                        checked={accessSettings.passwordExpiryEnabled}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordExpiryEnabled: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
+                      <Input
+                        id="sessionTimeout"
+                        type="number"
+                        value={accessSettings.sessionTimeout}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, sessionTimeout: Number.parseInt(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
+                      <Input
+                        id="maxLoginAttempts"
+                        type="number"
+                        value={accessSettings.maxLoginAttempts}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, maxLoginAttempts: Number.parseInt(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="passwordMinLength">Minimum Password Length</Label>
+                      <Input
+                        id="passwordMinLength"
+                        type="number"
+                        value={accessSettings.passwordMinLength}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, passwordMinLength: Number.parseInt(e.target.value) })
+                        }
+                      />
                     </div>
                   </div>
                 </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+              </div>
+
+              {/* IP Restrictions */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">IP Access Control</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="ipRestrictions">Enable IP Restrictions</Label>
+                    <Switch
+                      id="ipRestrictions"
+                      checked={accessSettings.ipRestrictionsEnabled}
+                      onCheckedChange={(checked) =>
+                        setAccessSettings({ ...accessSettings, ipRestrictionsEnabled: checked })
+                      }
+                    />
+                  </div>
+                  {accessSettings.ipRestrictionsEnabled && (
+                    <div className="space-y-2">
+                      <Label>Allowed IP Addresses</Label>
+                      {accessSettings.allowedIPs.map((ip, index) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <Input
+                            value={ip}
+                            onChange={(e) => {
+                              const newIPs = [...accessSettings.allowedIPs]
+                              newIPs[index] = e.target.value
+                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
+                            }}
+                            placeholder="192.168.1.0/24"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const newIPs = accessSettings.allowedIPs.filter((_, i) => i !== index)
+                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setAccessSettings({
+                            ...accessSettings,
+                            allowedIPs: [...accessSettings.allowedIPs, ""],
+                          })
+                        }
+                      >
+                        Add IP Range
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Active Sessions */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Active Sessions</h3>
+                  <Button variant="outline" onClick={handleRefreshSessions} disabled={isRefreshingSessions}>
+                    {isRefreshingSessions ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    Refresh
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {activeSessions.map((session) => (
+                    <Card key={session.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{session.user_email}</p>
+                            <p className="text-sm text-gray-600">
+                              {session.ip_address} • {session.device} • Last active:{" "}
+                              {new Date(session.last_activity).toLocaleString()}
+                            </p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => handleTerminateSession(session.id)}>
+                            Terminate
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveAccessSettings}
+                  disabled={isSavingAccessSettings}
+                >
+                  {isSavingAccessSettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Access Settings
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Security Tab Content */}
+        <TabsContent value="security">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="w-5 h-5" />
+                  <span>Security Settings</span>
+                </CardTitle>
+                <Button variant="outline" onClick={handleBackupNow} disabled={isBackingUp}>
+                  {isBackingUp ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Backing Up...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" />
+                      Backup Now
+                    </>
+                  )}
+                </Button>
+              </div>
+              <CardDescription>Manage security settings, backups, and audit logs</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Security Policies */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Security Policies</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="dataEncryption">Data Encryption at Rest</Label>
+                      <Switch
+                        id="dataEncryption"
+                        checked={securitySettings.dataEncryptionEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, dataEncryptionEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="auditLogging">Audit Logging</Label>
+                      <Switch
+                        id="auditLogging"
+                        checked={securitySettings.auditLoggingEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, auditLoggingEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="autoBackup">Automatic Backups</Label>
+                      <Switch
+                        id="autoBackup"
+                        checked={securitySettings.autoBackupEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, autoBackupEnabled: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="backupFrequency">Backup Frequency</Label>
+                      <Select
+                        value={securitySettings.backupFrequency}
+                        onValueChange={(value) => setSecuritySettings({ ...securitySettings, backupFrequency: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="retentionPeriod">Data Retention Period (days)</Label>
+                      <Input
+                        id="retentionPeriod"
+                        type="number"
+                        value={securitySettings.dataRetentionDays}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            dataRetentionDays: Number.parseInt(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Backup Status */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Backup Status</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <p className="text-sm font-medium">Last Backup</p>
+                          <p className="text-lg font-bold">
+                            {lastBackupTime ? new Date(lastBackupTime).toLocaleDateString() : "Never"}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Database className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="text-sm font-medium">Backup Size</p>
+                          <p className="text-lg font-bold">{backupSize || "0 MB"}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="w-5 h-5 text-emerald-600" />
+                        <div>
+                          <p className="text-sm font-medium">Status</p>
+                          <p className="text-lg font-bold">{backupStatus || "Ready"}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Audit Logs */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Recent Audit Logs</h3>
+                  <Button variant="outline" onClick={handleViewAllLogs}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    View All Logs
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {auditLogs.slice(0, 5).map((log) => (
+                    <Card key={log.id}>
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-sm">{log.action}</p>
+                            <p className="text-xs text-gray-600">
+                              {log.user_email} • {log.ip_address} •{new Date(log.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                          <Badge variant={log.severity === "high" ? "destructive" : "secondary"}>{log.severity}</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={handleExportSecurityReport} disabled={isExportingReport}>
+                  {isExportingReport ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4 mr-2" />
+                      Export Security Report
+                    </>
+                  )}
+                </Button>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveSecuritySettings}
+                  disabled={isSavingSecuritySettings}
+                >
+                  {isSavingSecuritySettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Security Settings
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {showDocumentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className={`bg-white rounded-lg p-6 w-full ${documentModalType === 'view' ? 'max-w-6xl max-h-[95vh]' : 'max-w-2xl max-h-[90vh]'} overflow-y-auto`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">
+                {documentModalType === 'add' && 'Add New Document'}
+                {documentModalType === 'edit' && 'Edit Document'}
+                {documentModalType === 'view' && `View Document: ${selectedDocument?.name}`}
+                {documentModalType === 'delete' && 'Delete Document'}
+              </h2>
+              <Button variant="ghost" size="sm" onClick={() => {
+                setShowDocumentModal(false)
+                handleResetViewer()
+              }}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Add Document Form */}
+            {documentModalType === 'add' && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="documentName">Document Name</Label>
+                  <Input
+                    id="documentName"
+                    value={documentName}
+                    onChange={(e) => setDocumentName(e.target.value)}
+                    placeholder="e.g., Employee Handbook"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="documentFile">Upload File</Label>
+                  <Input
+                    id="documentFile"
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleFileUpload}
+                  />
+                  {uploadedFile && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Selected: {uploadedFile.name} ({(uploadedFile.size / (1024 * 1024)).toFixed(2)}MB)
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <AlertTriangle className="w-5 h-5 text-blue-600" />
+                  <p className="text-sm text-blue-800">
+                    Supported formats: PDF, DOC, DOCX. Maximum file size: 10MB
+                  </p>
+                </div>
+
+                {/* File Content Preview */}
+                {(documentPreviewContent || isParsingFile) && (
+                  <div className="space-y-2">
+                    <Label>Content Preview</Label>
+                    <div className="border border-gray-300 rounded-md bg-gray-50 h-64 overflow-auto p-4">
+                      {isParsingFile ? (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center space-y-2">
+                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600" />
+                            <p className="text-sm text-gray-600">Parsing file content...</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="prose prose-sm max-w-none">
+                          <div 
+                            className="whitespace-pre-wrap text-gray-800 leading-relaxed text-sm"
+                            dangerouslySetInnerHTML={{
+                              __html: documentPreviewContent
+                                .replace(/# (.*)/g, '<h1 class="text-lg font-bold text-gray-900 mb-3 border-b border-gray-200 pb-1">$1</h1>')
+                                .replace(/## (.*)/g, '<h2 class="text-base font-semibold text-gray-800 mb-2 mt-4">$1</h2>')
+                                .replace(/### (.*)/g, '<h3 class="text-sm font-medium text-gray-700 mb-2 mt-3">$1</h3>')
+                                .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+                                .replace(/- (.*)/g, '<li class="mb-1 text-gray-700">$1</li>')
+                                .replace(/(\d+)\. (.*)/g, '<li class="mb-1 text-gray-700"><span class="font-medium">$1.</span> $2</li>')
+                                .replace(/\n\n/g, '</p><p class="mb-2 text-gray-700">')
+                                .replace(/^(?!<[h|l])/gm, '<p class="mb-2 text-gray-700">')
+                                .replace(/<li/g, '<ul class="list-disc list-inside mb-2"><li')
+                                .replace(/<\/li>/g, '</li></ul>')
+                                .replace(/<ul class="list-disc list-inside mb-2"><ul class="list-disc list-inside mb-2">/g, '<ul class="list-disc list-inside mb-2">')
+                                .replace(/<\/ul><\/ul>/g, '</ul>')
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    {!isParsingFile && (
+                      <p className="text-xs text-gray-500">
+                        This is a preview of the parsed content from your uploaded file.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <Button variant="outline" onClick={() => setShowDocumentModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveDocument}
+                    disabled={isSavingDocument}
+                    className="bg-black text-white hover:bg-gray-800"
+                  >
+                    {isSavingDocument ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Upload Document
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Edit Document Form */}
+            {documentModalType === 'edit' && selectedDocument && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="editDocumentName">Document Name</Label>
+                  <Input
+                    id="editDocumentName"
+                    value={documentName}
+                    onChange={(e) => setDocumentName(e.target.value)}
+                    placeholder="e.g., Employee Handbook"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="editDocumentFile">Replace File (Optional)</Label>
+                  <Input
+                    id="editDocumentFile"
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleFileUpload}
+                  />
+                  {uploadedFile && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      New file: {uploadedFile.name} ({(uploadedFile.size / (1024 * 1024)).toFixed(2)}MB)
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Current: {selectedDocument.name} ({selectedDocument.size})
+                  </p>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <Button variant="outline" onClick={() => setShowDocumentModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleEditDocument}
+                    disabled={isSavingDocument}
+                    className="bg-black text-white hover:bg-gray-800"
+                  >
+                    {isSavingDocument ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Update Document
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* View Document - Adobe-like PDF Viewer */}
+            {documentModalType === 'view' && selectedDocument && (
+              <div className="space-y-4">
+                {/* PDF Viewer Toolbar */}
+                <div className="flex items-center justify-between p-3 bg-gray-100 border border-gray-300 rounded-md">
+                  <div className="flex items-center space-x-2">
+                    {/* Page Navigation */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePreviousPage}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm font-medium px-2">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleNextPage}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    {/* Zoom Controls */}
+                    <Button variant="outline" size="sm" onClick={handleZoomOut} disabled={documentZoom <= 50}>
+                      <ZoomOut className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm font-medium px-2 min-w-[60px] text-center">
+                      {documentZoom}%
+                    </span>
+                    <Button variant="outline" size="sm" onClick={handleZoomIn} disabled={documentZoom >= 200}>
+                      <ZoomIn className="w-4 h-4" />
+                    </Button>
+
+                    {/* Rotate */}
+                    <Button variant="outline" size="sm" onClick={handleRotate}>
+                      <RotateCw className="w-4 h-4" />
+                    </Button>
+
+                    {/* Fullscreen */}
+                    <Button variant="outline" size="sm" onClick={handleToggleFullscreen}>
+                      {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                    </Button>
+
+                    {/* Search */}
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <Input
+                        type="text"
+                        placeholder="Search..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-8 w-40 h-8 text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Document Preview Area */}
+                <div className={`border border-gray-300 rounded-md bg-gray-50 ${isFullscreen ? 'h-[calc(100vh-200px)]' : 'h-[600px]'} overflow-auto`}>
+                  <div
+                    className="bg-white shadow-lg min-h-full"
+                    style={{
+                      transform: `scale(${documentZoom / 100}) rotate(${documentRotation}deg)`,
+                      transition: 'transform 0.3s ease',
+                    }}
+                  >
+                    {documentPreviewContent ? (
+                      <div className="p-8 max-w-4xl mx-auto">
+                        <div className="prose prose-lg max-w-none">
+                          <div 
+                            className="whitespace-pre-wrap text-gray-800 leading-relaxed"
+                            dangerouslySetInnerHTML={{
+                              __html: documentPreviewContent
+                                .replace(/# (.*)/g, '<h1 class="text-3xl font-bold text-gray-900 mb-6 border-b-2 border-gray-200 pb-2">$1</h1>')
+                                .replace(/## (.*)/g, '<h2 class="text-2xl font-semibold text-gray-800 mb-4 mt-8">$1</h2>')
+                                .replace(/### (.*)/g, '<h3 class="text-xl font-medium text-gray-700 mb-3 mt-6">$1</h3>')
+                                .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+                                .replace(/- (.*)/g, '<li class="mb-2 text-gray-700">$1</li>')
+                                .replace(/(\d+)\. (.*)/g, '<li class="mb-2 text-gray-700"><span class="font-medium">$1.</span> $2</li>')
+                                .replace(/\n\n/g, '</p><p class="mb-4 text-gray-700">')
+                                .replace(/^(?!<[h|l])/gm, '<p class="mb-4 text-gray-700">')
+                                .replace(/<li/g, '<ul class="list-disc list-inside mb-4"><li')
+                                .replace(/<\/li>/g, '</li></ul>')
+                                .replace(/<ul class="list-disc list-inside mb-4"><ul class="list-disc list-inside mb-4">/g, '<ul class="list-disc list-inside mb-4">')
+                                .replace(/<\/ul><\/ul>/g, '</ul>')
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="text-center space-y-4">
+                          <FileText className="w-16 h-16 mx-auto text-gray-400" />
+                          <div>
+                            <p className="text-lg font-semibold text-gray-700">{selectedDocument.name}</p>
+                            <p className="text-sm text-gray-500">Loading document preview...</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Viewer Info */}
+                <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <div className="flex items-center space-x-2">
+                    <Shield className="w-5 h-5 text-blue-600" />
+                    <p className="text-sm text-blue-800">
+                      This document is protected. Downloading is disabled for security purposes.
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleResetViewer}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Reset View
+                  </Button>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-4">
+                  <Button variant="outline" onClick={() => {
+                    setShowDocumentModal(false)
+                    handleResetViewer()
+                  }}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Delete Document Confirmation */}
+            {documentModalType === 'delete' && selectedDocument && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3 p-4 bg-red-50 border border-red-200 rounded-md">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                  <div>
+                    <p className="font-semibold text-red-800">Are you sure you want to delete this document?</p>
+                    <p className="text-sm text-red-700 mt-1">
+                      "{selectedDocument.name}" will be permanently removed. This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <Button variant="outline" onClick={() => setShowDocumentModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleDeleteDocument(selectedDocument.id)}
+                    disabled={isSavingDocument}
+                  >
+                    {isSavingDocument ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Document
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Add Subsidiary Modal */}
+      {showAddSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Add New Subsidiary</CardTitle>
+                <CardDescription>Enter the details for the new subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    <div className="flex items-center space-x-4">
+                      {subsidiaryLogoPreview ? (
+                        <div className="relative">
+                          <img
+                            src={subsidiaryLogoPreview || "/placeholder.svg"}
+                            alt="Subsidiary Logo"
+                            className="w-20 h-20 object-cover rounded-lg border"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                            onClick={() => setSubsidiaryLogoPreview("")}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                          <ImageIcon className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              handleLogoUpload(file, "subsidiary")
+                            }
+                          }}
+                          className="hidden"
+                          id="subsidiary-logo-upload"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById("subsidiary-logo-upload")?.click()}
+                          disabled={isUploadingLogo}
+                          className="flex items-center space-x-2"
+                        >
+                          {isUploadingLogo ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              <span>Upload Logo</span>
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="subsidiaryName">Subsidiary Name</Label>
+                      <Input id="subsidiaryName" placeholder="Enter subsidiary name" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryIndustry">Industry</Label>
+                      <Input id="subsidiaryIndustry" placeholder="Enter industry" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryTaxId">Tax ID</Label>
+                      <Input id="subsidiaryTaxId" placeholder="Enter tax ID" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiarySsnit">SSNIT Number</Label>
+                      <Input id="subsidiarySsnit" placeholder="Enter SSNIT number" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryEmail">Email Address</Label>
+                      <Input id="subsidiaryEmail" type="email" placeholder="Enter email address" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryPhone">Phone Number</Label>
+                      <Input id="subsidiaryPhone" placeholder="Enter phone number" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="subsidiaryAddress">Address</Label>
+                    <Textarea id="subsidiaryAddress" placeholder="Enter address" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter division" />
+                      <Button variant="outline" size="sm">
+                        Add Division
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter department" />
+                      <Button variant="outline" size="sm">
+                        Add Department
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter location name" />
+                      <Button variant="outline" size="sm">
+                        Add Location
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setShowAddSubsidiary(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => setShowAddSubsidiary(false)}>Add Subsidiary</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Subsidiary Modal */}
+      {showEditSubsidiary && selectedSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Edit Subsidiary</CardTitle>
+                <CardDescription>Edit the details for the selected subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    <div className="flex items-center space-x-4">
+                      {subsidiaryLogoPreview || selectedSubsidiary.logo_url ? (
+                        <div className="relative">
+                          <img
+                            src={subsidiaryLogoPreview || selectedSubsidiary.logo_url}
+                            alt="Subsidiary Logo"
+                            className="w-20 h-20 object-cover rounded-lg border"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                            onClick={() => setSubsidiaryLogoPreview("")}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                          <ImageIcon className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              handleLogoUpload(file, "subsidiary")
+                            }
+                          }}
+                          className="hidden"
+                          id="subsidiary-logo-upload-edit"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById("subsidiary-logo-upload-edit")?.click()}
+                          disabled={isUploadingLogo}
+                          className="flex items-center space-x-2"
+                        >
+                          {isUploadingLogo ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              <span>Upload Logo</span>
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="editSubsidiaryName">Subsidiary Name</Label>
+                      <Input
+                        id="editSubsidiaryName"
+                        placeholder="Enter subsidiary name"
+                        value={selectedSubsidiary.name}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryIndustry">Industry</Label>
+                      <Input
+                        id="editSubsidiaryIndustry"
+                        placeholder="Enter industry"
+                        value={selectedSubsidiary.industry}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, industry: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryTaxId">Tax ID</Label>
+                      <Input
+                        id="editSubsidiaryTaxId"
+                        placeholder="Enter tax ID"
+                        value={selectedSubsidiary.tax_id}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, tax_id: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiarySsnit">SSNIT Number</Label>
+                      <Input
+                        id="editSubsidiarySsnit"
+                        placeholder="Enter SSNIT number"
+                        value={selectedSubsidiary.ssnit_number}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, ssnit_number: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryEmail">Email Address</Label>
+                      <Input
+                        id="editSubsidiaryEmail"
+                        type="email"
+                        placeholder="Enter email address"
+                        value={selectedSubsidiary.email_address}
+                        onChange={(e) =>
+                          setSelectedSubsidiary({ ...selectedSubsidiary, email_address: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryPhone">Phone Number</Label>
+                      <Input
+                        id="editSubsidiaryPhone"
+                        placeholder="Enter phone number"
+                        value={selectedSubsidiary.phone_number}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, phone_number: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="editSubsidiaryAddress">Address</Label>
+                    <Textarea
+                      id="editSubsidiaryAddress"
+                      placeholder="Enter address"
+                      value={selectedSubsidiary.address}
+                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, address: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.divisions) ? (
+                        selectedSubsidiary.divisions.map((division, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={division}
+                              onChange={(e) => {
+                                const newDivisions = [...selectedSubsidiary.divisions]
+                                newDivisions[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newDivisions = selectedSubsidiary.divisions.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <Input placeholder="No divisions defined" disabled />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newDivisions = selectedSubsidiary.divisions
+                            ? [...selectedSubsidiary.divisions, "New Division"]
+                            : ["New Division"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                        }}
+                      >
+                        Add Division
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.departments) ? (
+                        selectedSubsidiary.departments.map((department, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={department}
+                              onChange={(e) => {
+                                const newDepartments = [...selectedSubsidiary.departments]
+                                newDepartments[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newDepartments = selectedSubsidiary.departments.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <Input placeholder="No departments defined" disabled />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newDepartments = selectedSubsidiary.departments
+                            ? [...selectedSubsidiary.departments, "New Department"]
+                            : ["New Department"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                        }}
+                      >
+                        Add Department
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.locations) ? (
+                        selectedSubsidiary.locations.map((location, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={location}
+                              onChange={(e) => {
+                                const newLocations = [...selectedSubsidiary.locations]
+                                newLocations[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newLocations = selectedSubsidiary.locations.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <Input placeholder="No locations defined" disabled />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newLocations = selectedSubsidiary.locations
+                            ? [...selectedSubsidiary.locations, "New Location"]
+                            : ["New Location"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                        }}
+                      >
+                        Add Location
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setShowEditSubsidiary(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (selectedSubsidiary) {
+                        await updateSubsidiary(selectedSubsidiary.id, {
+                          name: selectedSubsidiary.name,
+                          industry: selectedSubsidiary.industry,
+                          tax_id: selectedSubsidiary.tax_id,
+                          ssnit_number: selectedSubsidiary.ssnit_number,
+                          email_address: selectedSubsidiary.email_address,
+                          phone_number: selectedSubsidiary.phone_number,
+                          address: selectedSubsidiary.address,
+                          divisions: selectedSubsidiary.divisions,
+                          departments: selectedSubsidiary.departments,
+                          locations: selectedSubsidiary.locations,
+                          logo_url: subsidiaryLogoPreview || selectedSubsidiary.logo_url,
+                        })
+                        setShowEditSubsidiary(false)
+                        setSubsidiaryLogoPreview("")
+                      }
+                    }}
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Subsidiary Details Modal */}
+      {showSubsidiaryDetails && selectedSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Subsidiary Details</CardTitle>
+                <CardDescription>View the details for the selected subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    {selectedSubsidiary.logo_url ? (
+                      <img
+                        src={selectedSubsidiary.logo_url || "/placeholder.svg"}
+                        alt="Subsidiary Logo"
+                        className="w-20 h-20 object-cover rounded-lg border"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                        <ImageIcon className="w-8 h-8 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label>Subsidiary Name</Label>
+                      <Input value={selectedSubsidiary.name} disabled />
+                    </div>
+                    <div>
+                      <Label>Industry</Label>
+                      <Input value={selectedSubsidiary.industry} disabled />
+                    </div>
+                    <div>
+                      <Label>Tax ID</Label>
+                      <Input value={selectedSubsidiary.tax_id} disabled />
+                    </div>
+                    <div>
+                      <Label>SSNIT Number</Label>
+                      <Input value={selectedSubsidiary.ssnit_number} disabled />
+                    </div>
+                    <div>
+                      <Label>Email Address</Label>
+                      <Input value={selectedSubsidiary.email_address} disabled />
+                    </div>
+                    <div>
+                      <Label>Phone Number</Label>
+                      <Input value={selectedSubsidiary.phone_number} disabled />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Address</Label>
+                    <Textarea value={selectedSubsidiary.address} disabled />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    {Array.isArray(selectedSubsidiary.divisions) ? (
+                      selectedSubsidiary.divisions.map((division, index) => (
+                        <Input key={index} value={division} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No divisions defined" disabled />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    {Array.isArray(selectedSubsidiary.departments) ? (
+                      selectedSubsidiary.departments.map((department, index) => (
+                        <Input key={index} value={department} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No departments defined" disabled />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    {Array.isArray(selectedSubsidiary.locations) ? (
+                      selectedSubsidiary.locations.map((location, index) => (
+                        <Input key={index} value={location} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No locations defined" disabled />
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="ghost" onClick={() => setShowSubsidiaryDetails(false)}>
+                    Close
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate Confirmation Modal */}
+      {showDeactivateConfirm && subsidiaryToToggle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="max-w-md mx-auto">
+            <CardHeader>
+              <CardTitle className="text-xl">Confirm Action</CardTitle>
+              <CardDescription>
+                Are you sure you want to {subsidiaryToToggle.status === 'active' ? 'deactivate' : 'activate'} this subsidiary?
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-end space-x-2">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => {
+                    setShowDeactivateConfirm(false)
+                    setSubsidiaryToToggle(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant={subsidiaryToToggle.status === 'active' ? 'destructive' : 'default'}
+                  onClick={() => {
+                    handleToggleSubsidiaryStatus(subsidiaryToToggle.id)
+                    setShowDeactivateConfirm(false)
+                    setSubsidiaryToToggle(null)
+                  }}
+                >
+                  {subsidiaryToToggle.status === 'active' ? 'Deactivate' : 'Activate'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

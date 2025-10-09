@@ -33,7 +33,7 @@ import {
   AlertCircle,
   Info,
 } from "lucide-react"
-import { createBrowserClient } from "@supabase/ssr"
+import { createClient } from "@/lib/supabase/client"
 import {
   Bar,
   BarChart,
@@ -106,10 +106,7 @@ export default function PayrollHistoryPage() {
   const itemsPerPage = 10
   const { toast } = useToast()
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  )
+  const supabase = createClient()
 
   useEffect(() => {
     const fetchPayrollHistory = async () => {
