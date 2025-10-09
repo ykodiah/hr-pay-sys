@@ -25,7 +25,16 @@ import { useToast } from "@/hooks/use-toast"
 
 const isDemoMode = () => {
   if (typeof window !== "undefined") {
-    return localStorage.getItem("demo_mode") === "true"
+    // Check localStorage first
+    if (localStorage.getItem("demo_mode") === "true") {
+      return true
+    }
+    // Also check for demo-session cookie
+    const cookies = document.cookie.split(";")
+    const demoSessionCookie = cookies.find((cookie) => cookie.trim().startsWith("demo-session="))
+    if (demoSessionCookie && demoSessionCookie.includes("active")) {
+      return true
+    }
   }
   return false
 }
@@ -2651,13 +2660,15 @@ function AddEmployeeForm({
       return
     }
 
-    console.log("[v0] Starting addCustomBank:", { newBankName: newBankName.trim() })
+    console.log("[v0] Starting addCustomBank:", { newBankName: newBankName.trim(), isDemoMode: isDemoMode() })
     setIsAddingBank(true)
 
     try {
+      const bankToAdd = newBankName.trim()
+
+      // Check if we're in demo mode
       if (isDemoMode()) {
-        console.log("[v0] Demo mode: Adding custom bank:", newBankName)
-        const bankToAdd = newBankName.trim()
+        console.log("[v0] Demo mode: Adding custom bank:", bankToAdd)
 
         // Add to custom banks list
         setCustomBanks((prev) => {
@@ -2690,6 +2701,36 @@ function AddEmployeeForm({
         error: userError,
       } = await supabase.auth.getUser()
 
+      console.log("[v0] Auth check:", { hasUser: !!user, userError: userError?.message })
+
+      // If no user but we have company settings, treat as demo mode
+      if (!user && companySettings?.id) {
+        console.log("[v0] No auth user but have company settings, treating as demo mode")
+
+        // Add to custom banks list
+        setCustomBanks((prev) => {
+          const newBanks = [...prev, bankToAdd]
+          console.log("[v0] Updated customBanks list (fallback demo):", newBanks)
+          return newBanks
+        })
+
+        // Set the newly added bank as selected
+        handleInputChange("bankName", bankToAdd)
+
+        // Clear form and hide
+        setNewBankName("")
+        setShowAddBank(false)
+        setIsAddingBank(false)
+
+        toast({
+          title: "✅ Bank Added Successfully!",
+          description: `"${bankToAdd}" has been added to your company's bank list and is now selected.`,
+        })
+
+        console.log("[v0] Bank added successfully (fallback demo mode)")
+        return
+      }
+
       if (userError || !user) {
         console.error("[v0] Error getting user:", userError)
         toast({
@@ -2717,7 +2758,7 @@ function AddEmployeeForm({
 
       console.log("[v0] Inserting custom bank:", {
         company_id: companySettings.id,
-        bank_name: newBankName.trim(),
+        bank_name: bankToAdd,
         created_by: user.id,
       })
 
@@ -2726,7 +2767,7 @@ function AddEmployeeForm({
         .from("custom_banks")
         .insert({
           company_id: companySettings.id,
-          bank_name: newBankName.trim(),
+          bank_name: bankToAdd,
           created_by: user.id,
         })
         .select()
@@ -2744,8 +2785,6 @@ function AddEmployeeForm({
       }
 
       console.log("[v0] Custom bank inserted successfully:", insertedBank)
-
-      const bankToAdd = newBankName.trim()
 
       // Add to custom banks list
       setCustomBanks((prev) => {
