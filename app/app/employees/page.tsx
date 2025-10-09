@@ -251,6 +251,7 @@ export default function EmployeesPage() {
     noticePeriod: "",
     directSupervisor: "",
     headOfDepartment: "",
+    annualSalary: "",
     salary: "",
     transportAllowance: "",
     housingAllowance: "",
@@ -790,6 +791,7 @@ export default function EmployeesPage() {
 
       const financialRecord = {
         employee_id: employeeResult.id,
+        annual_salary: employeeData.annualSalary ? Number.parseFloat(employeeData.annualSalary) : null,
         monthly_salary: employeeData.salary ? Number.parseFloat(employeeData.salary) : null,
         transport_allowance: employeeData.transportAllowance
           ? Number.parseFloat(employeeData.transportAllowance)
@@ -808,11 +810,6 @@ export default function EmployeesPage() {
         loan_deduction: employeeData.loanDeduction ? Number.parseFloat(employeeData.loanDeduction) : null,
         advance_deduction: employeeData.advanceDeduction ? Number.parseFloat(employeeData.advanceDeduction) : null,
         other_deductions: employeeData.otherDeductions ? Number.parseFloat(employeeData.otherDeductions) : null,
-        loan_amount: employeeData.loanAmount ? Number.parseFloat(employeeData.loanAmount) : null,
-        loan_balance: employeeData.loanBalance ? Number.parseFloat(employeeData.loanBalance) : null,
-        loan_installment: employeeData.loanInstallment ? Number.parseFloat(employeeData.loanInstallment) : null,
-        loan_start_date: employeeData.loanStartDate || null,
-        loan_end_date: employeeData.loanEndDate || null,
         bank_name: employeeData.bankName || null,
         bank_account_number: employeeData.bankAccount || null,
         created_at: new Date().toISOString(),
@@ -2032,6 +2029,46 @@ function AddEmployeeForm({
   const [phoneCountryCode, setPhoneCountryCode] = useState("+233")
   const [emergencyCountryCode, setEmergencyCountryCode] = useState("+233")
 
+  const loadParentCompanyData = useCallback(() => {
+    console.log("[v0] Loading parent company data...")
+
+    if (companySettings) {
+      const companyDivisions = Array.isArray(companySettings.divisions)
+        ? companySettings.divisions
+        : companySettings.divisions
+          ? JSON.parse(companySettings.divisions)
+          : ["Head Office", "Regional Office"]
+
+      const companyDepartments = Array.isArray(companySettings.departments)
+        ? companySettings.departments
+        : companySettings.departments
+          ? JSON.parse(companySettings.departments)
+          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+
+      const companyLocations = Array.isArray(companySettings.locations)
+        ? companySettings.locations
+        : companySettings.locations
+          ? JSON.parse(companySettings.locations)
+          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
+
+      setDivisions(companyDivisions)
+      setDepartments(companyDepartments)
+      setLocations(companyLocations)
+
+      console.log("[v0] Parent company data loaded:", {
+        divisions: companyDivisions,
+        departments: companyDepartments,
+        locations: companyLocations,
+      })
+    } else {
+      console.log("[v0] No company settings available, using defaults")
+      setDivisions(["Head Office", "Regional Office"])
+      setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
+      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+    }
+  }, [companySettings])
+  // </CHANGE>
+
   // Filtered lists for searchable dropdowns
   const filteredDepartments = departments.filter((dept) =>
     dept.toLowerCase().includes(departmentSearchTerm.toLowerCase()),
@@ -2258,6 +2295,7 @@ function AddEmployeeForm({
         noticePeriod: employee.noticePeriod || "",
         directSupervisor: employee.direct_supervisor || "",
         headOfDepartment: employee.head_of_department || "",
+        annualSalary: employee.annual_salary || "",
         salary: employee.salary || "",
         transportAllowance: employee.transport_allowance || "",
         housingAllowance: employee.housing_allowance || "",
@@ -2272,11 +2310,6 @@ function AddEmployeeForm({
         loanDeduction: employee.loan_deduction || "",
         advanceDeduction: employee.advance_deduction || "",
         otherDeductions: employee.other_deductions || "",
-        loanAmount: employee.loan_amount || "",
-        loanBalance: employee.loan_balance || "",
-        loanInstallment: employee.loan_installment || "",
-        loanStartDate: employee.loan_start_date || "",
-        loanEndDate: employee.loan_end_date || "",
         startDate: employee.start_date || "",
         dateOfBirth: employee.date_of_birth || "",
         address: employee.address || "",
@@ -2391,6 +2424,14 @@ function AddEmployeeForm({
 
     if (formData.status === "Inactive" && !formData.inactiveReason) {
       newErrors.inactiveReason = "Inactive reason is required when status is Inactive"
+      isValid = false
+    }
+
+    if (!formData.annualSalary) {
+      newErrors.annualSalary = "Annual salary is required"
+      isValid = false
+    } else if (isNaN(Number(formData.annualSalary)) || Number(formData.annualSalary) <= 0) {
+      newErrors.annualSalary = "Annual salary must be a valid positive number"
       isValid = false
     }
 
@@ -2554,6 +2595,7 @@ function AddEmployeeForm({
     "Ecobank Ghana",
     "Fidelity Bank Ghana",
     "First Atlantic Bank",
+    "First National Bank Ghana Limited",
     "GCB Bank Limited",
     "Guaranty Trust Bank Ghana",
     "National Investment Bank",
@@ -2566,6 +2608,147 @@ function AddEmployeeForm({
     "United Bank for Africa Ghana",
     "Zenith Bank Ghana",
   ]
+
+  const [customBanks, setCustomBanks] = useState<string[]>([])
+  const [showAddBank, setShowAddBank] = useState(false)
+  const [newBankName, setNewBankName] = useState("")
+
+  // Load custom banks for the company
+  const loadCustomBanks = async () => {
+    try {
+      if (isDemoMode()) {
+        console.log("[v0] Demo mode: Using empty custom banks")
+        setCustomBanks([])
+        return
+      }
+
+      const { data: customBanksData, error } = await createClient() // Fixed: supabase variable declared
+        .from("custom_banks")
+        .select("bank_name")
+        .eq("company_id", companySettings?.id)
+
+      if (error) {
+        console.error("Error loading custom banks:", error)
+        return
+      }
+
+      const bankNames = customBanksData?.map((bank) => bank.bank_name) || []
+      setCustomBanks(bankNames)
+    } catch (error) {
+      console.error("Error loading custom banks:", error)
+    }
+  }
+
+  // Add new custom bank
+  const addCustomBank = async () => {
+    if (!newBankName.trim()) return
+
+    try {
+      if (isDemoMode()) {
+        console.log("[v0] Demo mode: Adding custom bank:", newBankName)
+        setCustomBanks((prev) => [...prev, newBankName.trim()])
+        // Set the newly added bank as selected
+        handleInputChange("bankName", newBankName.trim())
+        setNewBankName("")
+        setShowAddBank(false)
+
+        toast({
+          title: "Success",
+          description: "Custom bank added successfully (Demo Mode)",
+        })
+        return
+      }
+
+      const { error } = await createClient() // Fixed: supabase variable declared
+        .from("custom_banks")
+        .insert({
+          company_id: companySettings?.id,
+          bank_name: newBankName.trim(),
+          created_by: "user", // Fixed: user variable declared
+        })
+
+      if (error) {
+        console.error("Error adding custom bank:", error)
+        toast({
+          title: "Error",
+          description: "Failed to add custom bank. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setCustomBanks((prev) => [...prev, newBankName.trim()])
+      // Set the newly added bank as selected
+      handleInputChange("bankName", newBankName.trim())
+      setNewBankName("")
+      setShowAddBank(false)
+
+      toast({
+        title: "Success",
+        description: "Custom bank added successfully!",
+      })
+    } catch (error) {
+      console.error("Error adding custom bank:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add custom bank. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Calculate monthly salary from annual salary
+  const calculateMonthlySalary = (annualSalary: string) => {
+    if (!annualSalary || isNaN(Number(annualSalary)) || Number(annualSalary) <= 0) return ""
+    const monthly = Number(annualSalary) / 12
+    return monthly.toFixed(2)
+  }
+
+  // Handle annual salary change
+  const handleAnnualSalaryChange = (value: string) => {
+    // Update annual salary
+    setFormData((prev) => ({
+      ...prev,
+      annualSalary: value,
+    }))
+
+    // Calculate and update monthly salary
+    const monthlySalary = calculateMonthlySalary(value)
+    setFormData((prev) => ({
+      ...prev,
+      salary: monthlySalary,
+    }))
+
+    // Clear any existing errors for annual salary
+    if (errors.annualSalary) {
+      setErrors((prev) => ({
+        ...prev,
+        annualSalary: "",
+      }))
+    }
+  }
+
+  // Handle bank selection change
+  const handleBankSelectionChange = (value: string) => {
+    if (value === "add_new_bank") {
+      setShowAddBank(true)
+      // Reset the select value to show placeholder
+      setFormData((prev) => ({
+        ...prev,
+        bankName: "",
+      }))
+    } else {
+      handleInputChange("bankName", value)
+      setShowAddBank(false)
+    }
+  }
+
+  // Load custom banks on component mount
+  useEffect(() => {
+    if (companySettings?.id) {
+      loadCustomBanks()
+    }
+  }, [companySettings?.id])
 
   return (
     <div className="space-y-6">
@@ -2855,8 +3038,8 @@ function AddEmployeeForm({
                   if (value === "No") {
                     console.log("[v0] Clearing subsidiary selection and loading parent company data")
                     handleInputChange("subsidiary", "")
-                    // Load parent company data immediately
                     loadParentCompanyData()
+                    // </CHANGE>
                   }
                 }}
               >
@@ -3232,19 +3415,51 @@ function AddEmployeeForm({
             {/* Basic Financial Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="salary">Monthly Salary (GHS) *</Label>
+                <Label htmlFor="annualSalary">Annual Salary (GHS) *</Label>
                 <Input
                   type="number"
-                  id="salary"
-                  value={formData.salary}
-                  onChange={(e) => handleInputChange("salary", e.target.value)}
-                  placeholder="5000"
+                  id="annualSalary"
+                  value={formData.annualSalary}
+                  onChange={(e) => handleAnnualSalaryChange(e.target.value)}
+                  placeholder="60000"
                 />
+                {errors.annualSalary && <p className="text-red-500 text-sm mt-1">{errors.annualSalary}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="salary">Monthly Salary (GHS) *</Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    id="salary"
+                    value={formData.salary}
+                    onChange={(e) => handleInputChange("salary", e.target.value)}
+                    placeholder="5000"
+                    readOnly
+                    className="bg-gray-50 pr-8"
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                    <div className="w-4 h-4 text-green-500">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {formData.annualSalary
+                    ? `Auto-calculated from annual salary (${formData.annualSalary} ÷ 12)`
+                    : "Auto-calculated from annual salary"}
+                </p>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="bankName">Bank Name</Label>
-                <Select value={formData.bankName} onValueChange={(value) => handleInputChange("bankName", value)}>
+                <Select value={formData.bankName} onValueChange={handleBankSelectionChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select bank" />
                   </SelectTrigger>
@@ -3254,8 +3469,69 @@ function AddEmployeeForm({
                         {bank}
                       </SelectItem>
                     ))}
+                    {customBanks.map((bank) => (
+                      <SelectItem key={bank} value={bank}>
+                        {bank}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAddBank(!showAddBank)}
+                  className="w-full justify-start text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 h-auto"
+                >
+                  {showAddBank ? "− Hide Custom Bank Form" : "+ Add Custom Bank"}
+                </Button>
+
+                {showAddBank && (
+                  <div className="mt-2 p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+                    <Label htmlFor="newBankName" className="text-sm font-medium">
+                      Bank Name
+                    </Label>
+                    <Input
+                      id="newBankName"
+                      type="text"
+                      placeholder="Enter bank name"
+                      value={newBankName}
+                      onChange={(e) => setNewBankName(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter" && newBankName.trim()) {
+                          e.preventDefault()
+                          addCustomBank()
+                        }
+                      }}
+                      className="w-full"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={addCustomBank}
+                        disabled={!newBankName.trim()}
+                        className="flex-1 bg-black hover:bg-gray-800 text-white"
+                      >
+                        Add Bank
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setShowAddBank(false)
+                          setNewBankName("")
+                        }}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-500">This bank will be added to your company's bank list</p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -3431,65 +3707,6 @@ function AddEmployeeForm({
                     value={formData.otherDeductions}
                     onChange={(e) => handleInputChange("otherDeductions", e.target.value)}
                     placeholder="0"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Loan Details Section */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Loan Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="loanAmount">Loan Amount (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="loanAmount"
-                    value={formData.loanAmount}
-                    onChange={(e) => handleInputChange("loanAmount", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="loanBalance">Loan Balance (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="loanBalance"
-                    value={formData.loanBalance}
-                    onChange={(e) => handleInputChange("loanBalance", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="loanInstallment">Monthly Installment (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="loanInstallment"
-                    value={formData.loanInstallment}
-                    onChange={(e) => handleInputChange("loanInstallment", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="loanStartDate">Loan Start Date</Label>
-                  <Input
-                    type="date"
-                    id="loanStartDate"
-                    value={formData.loanStartDate}
-                    onChange={(e) => handleInputChange("loanStartDate", e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="loanEndDate">Loan End Date</Label>
-                  <Input
-                    type="date"
-                    id="loanEndDate"
-                    value={formData.loanEndDate}
-                    onChange={(e) => handleInputChange("loanEndDate", e.target.value)}
                   />
                 </div>
               </div>
