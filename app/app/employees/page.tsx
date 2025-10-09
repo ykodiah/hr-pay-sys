@@ -2612,6 +2612,8 @@ function AddEmployeeForm({
   const [customBanks, setCustomBanks] = useState<string[]>([])
   const [showAddBank, setShowAddBank] = useState(false)
   const [newBankName, setNewBankName] = useState("")
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
+  const [isAddingBank, setIsAddingBank] = useState(false)
 
   // Load custom banks for the company
   const loadCustomBanks = async () => {
@@ -2641,12 +2643,11 @@ function AddEmployeeForm({
 
   // Add new custom bank
   const addCustomBank = async () => {
-    console.log("[DEBUG] addCustomBank called, newBankName:", newBankName)
     if (!newBankName.trim()) {
-      console.log("[DEBUG] newBankName is empty, returning")
       return
     }
 
+    setIsAddingBank(true)
     try {
       if (isDemoMode()) {
         console.log("[v0] Demo mode: Adding custom bank:", newBankName)
@@ -2655,11 +2656,18 @@ function AddEmployeeForm({
         handleInputChange("bankName", newBankName.trim())
         setNewBankName("")
         setShowAddBank(false)
+        setShowSuccessMessage(true)
+
+        // Hide success message after 3 seconds
+        setTimeout(() => {
+          setShowSuccessMessage(false)
+        }, 3000)
 
         toast({
-          title: "Success",
-          description: "Custom bank added successfully (Demo Mode)",
+          title: "✅ Bank Added Successfully!",
+          description: `"${newBankName.trim()}" has been added to your company's bank list and is now available for selection.`,
         })
+        setIsAddingBank(false)
         return
       }
 
@@ -2686,11 +2694,18 @@ function AddEmployeeForm({
       handleInputChange("bankName", newBankName.trim())
       setNewBankName("")
       setShowAddBank(false)
+      setShowSuccessMessage(true)
+
+      // Hide success message after 3 seconds
+      setTimeout(() => {
+        setShowSuccessMessage(false)
+      }, 3000)
 
       toast({
-        title: "Success",
-        description: "Custom bank added successfully!",
+        title: "✅ Bank Added Successfully!",
+        description: `"${newBankName.trim()}" has been added to your company's bank list and is now available for selection.`,
       })
+      setIsAddingBank(false)
     } catch (error) {
       console.error("Error adding custom bank:", error)
       toast({
@@ -2698,6 +2713,7 @@ function AddEmployeeForm({
         description: "Failed to add custom bank. Please try again.",
         variant: "destructive",
       })
+      setIsAddingBank(false)
     }
   }
 
@@ -3496,6 +3512,22 @@ function AddEmployeeForm({
 
                 {showAddBank && (
                   <div className="mt-2 p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+                    {showSuccessMessage && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-green-800">
+                              Bank added successfully! It's now available in the dropdown.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <Label htmlFor="newBankName" className="text-sm font-medium">
                       Bank Name
                     </Label>
@@ -3517,15 +3549,24 @@ function AddEmployeeForm({
                       <button
                         type="button"
                         onClick={(e) => {
-                          console.log("[DEBUG] Add Bank button clicked, newBankName:", newBankName)
-                          alert("Add Bank button clicked!") // Temporary test
                           e.preventDefault()
                           e.stopPropagation()
                           addCustomBank()
                         }}
-                        className="flex-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        disabled={isAddingBank || !newBankName.trim()}
+                        className="flex-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
                       >
-                        Add Bank
+                        {isAddingBank ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Adding...
+                          </>
+                        ) : (
+                          "Add Bank"
+                        )}
                       </button>
                       <button
                         type="button"
