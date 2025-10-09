@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrency } from "@/lib/currency-context"
-import { Plus, Search, Filter, Download, Upload, MoreHorizontal, Edit, Trash2, Eye, Mail } from "lucide-react"
+import { Plus, Search, Filter, Download, Upload, MoreHorizontal, Edit, Trash2, Eye, Mail, X } from "lucide-react"
 
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 import { useToast } from "@/hooks/use-toast"
@@ -294,6 +294,100 @@ export default function EmployeesPage() {
     profilePicture: "",
     profilePictureFile: null,
   })
+
+  const [companyAllowances, setCompanyAllowances] = useState([
+    { code: "TRANS", description: "Transport Allowance", taxable: true, recurring: true },
+    { code: "HOUSE", description: "Housing Allowance", taxable: true, recurring: true },
+    { code: "MED", description: "Medical Allowance", taxable: false, recurring: true },
+    { code: "MEAL", description: "Meal Allowance", taxable: false, recurring: true },
+    { code: "UNIFORM", description: "Uniform Allowance", taxable: false, recurring: true },
+    { code: "COMM", description: "Communication Allowance", taxable: false, recurring: true },
+  ])
+
+  const [companyDeductions, setCompanyDeductions] = useState([
+    { code: "TAX", description: "Tax Deduction", recurring: true },
+    { code: "SSNIT", description: "SSNIT Deduction", recurring: true },
+    { code: "TIER3", description: "Tier 3 Contribution", recurring: true },
+    { code: "LOAN", description: "Loan Deduction", recurring: true },
+    { code: "ADVANCE", description: "Advance Deduction", recurring: true },
+  ])
+
+  const [selectedAllowances, setSelectedAllowances] = useState<Array<{ code: string; amount: string }>>([])
+  const [selectedDeductions, setSelectedDeductions] = useState<Array<{ code: string; amount: string }>>([])
+  const [showAllowanceSelector, setShowAllowanceSelector] = useState(false)
+  const [showDeductionSelector, setShowDeductionSelector] = useState(false)
+
+  const handleAddAllowance = (allowanceCode: string) => {
+    const allowance = companyAllowances.find((a) => a.code === allowanceCode)
+    if (allowance && !selectedAllowances.find((a) => a.code === allowanceCode)) {
+      setSelectedAllowances([...selectedAllowances, { code: allowanceCode, amount: "0" }])
+      setShowAllowanceSelector(false)
+    }
+  }
+
+  const handleRemoveAllowance = (allowanceCode: string) => {
+    setSelectedAllowances(selectedAllowances.filter((a) => a.code !== allowanceCode))
+  }
+
+  const handleAllowanceAmountChange = (allowanceCode: string, amount: string) => {
+    setSelectedAllowances(selectedAllowances.map((a) => (a.code === allowanceCode ? { ...a, amount } : a)))
+  }
+
+  const handleAddDeduction = (deductionCode: string) => {
+    const deduction = companyDeductions.find((d) => d.code === deductionCode)
+    if (deduction && !selectedDeductions.find((d) => d.code === deductionCode)) {
+      setSelectedDeductions([...selectedDeductions, { code: deductionCode, amount: "0" }])
+      setShowDeductionSelector(false)
+    }
+  }
+
+  const handleRemoveDeduction = (deductionCode: string) => {
+    setSelectedDeductions(selectedDeductions.filter((d) => d.code !== deductionCode))
+  }
+
+  const handleDeductionAmountChange = (deductionCode: string, amount: string) => {
+    setSelectedDeductions(selectedDeductions.map((d) => (d.code === deductionCode ? { ...d, amount } : d)))
+  }
+  // </CHANGE>
+
+  const loadParentCompanyData = useCallback(() => {
+    console.log("[v0] Loading parent company data...")
+
+    if (companySettings) {
+      const companyDivisions = Array.isArray(companySettings.divisions)
+        ? companySettings.divisions
+        : companySettings.divisions
+          ? JSON.parse(companySettings.divisions)
+          : ["Head Office", "Regional Office"]
+
+      const companyDepartments = Array.isArray(companySettings.departments)
+        ? companySettings.departments
+        : companySettings.departments
+          ? JSON.parse(companySettings.departments)
+          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+
+      const companyLocations = Array.isArray(companySettings.locations)
+        ? companySettings.locations
+        : companySettings.locations
+          ? JSON.parse(companySettings.locations)
+          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
+
+      setDivisions(companyDivisions)
+      setDepartments(companyDepartments)
+      setLocations(companyLocations)
+
+      console.log("[v0] Parent company data loaded:", {
+        divisions: companyDivisions,
+        departments: companyDepartments,
+        locations: companyLocations,
+      })
+    } else {
+      console.log("[v0] No company settings available, using defaults")
+      setDivisions(["Head Office", "Regional Office"])
+      setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
+      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+    }
+  }, [companySettings])
 
   const loadSubsidiaries = async () => {
     try {
@@ -582,44 +676,7 @@ export default function EmployeesPage() {
     }
   }, [formData.department, employees])
 
-  const loadParentCompanyData = () => {
-    console.log("[v0] Loading parent company data...")
-
-    if (companySettings) {
-      const companyDivisions = Array.isArray(companySettings.divisions)
-        ? companySettings.divisions
-        : companySettings.divisions
-          ? JSON.parse(companySettings.divisions)
-          : ["Head Office", "Regional Office"]
-
-      const companyDepartments = Array.isArray(companySettings.departments)
-        ? companySettings.departments
-        : companySettings.departments
-          ? JSON.parse(companySettings.departments)
-          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
-
-      const companyLocations = Array.isArray(companySettings.locations)
-        ? companySettings.locations
-        : companySettings.locations
-          ? JSON.parse(companySettings.locations)
-          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
-
-      setDivisions(companyDivisions)
-      setDepartments(companyDepartments)
-      setLocations(companyLocations)
-
-      console.log("[v0] Parent company data loaded:", {
-        divisions: companyDivisions,
-        departments: companyDepartments,
-        locations: companyLocations,
-      })
-    } else {
-      console.log("[v0] No company settings available, using defaults")
-      setDivisions(["Head Office", "Regional Office"])
-      setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
-      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-    }
-  }
+  // Removed the duplicate loadParentCompanyData function. The useCallback version above is used.
 
   const loadEmployees = async () => {
     try {
@@ -2038,6 +2095,61 @@ function AddEmployeeForm({
   const [phoneCountryCode, setPhoneCountryCode] = useState("+233")
   const [emergencyCountryCode, setEmergencyCountryCode] = useState("+233")
 
+  const [companyAllowances, setCompanyAllowances] = useState([
+    { code: "TRANS", description: "Transport Allowance", taxable: true, recurring: true },
+    { code: "HOUSE", description: "Housing Allowance", taxable: true, recurring: true },
+    { code: "MED", description: "Medical Allowance", taxable: false, recurring: true },
+    { code: "MEAL", description: "Meal Allowance", taxable: false, recurring: true },
+    { code: "UNIFORM", description: "Uniform Allowance", taxable: false, recurring: true },
+    { code: "COMM", description: "Communication Allowance", taxable: false, recurring: true },
+  ])
+
+  const [companyDeductions, setCompanyDeductions] = useState([
+    { code: "TAX", description: "Tax Deduction", recurring: true },
+    { code: "SSNIT", description: "SSNIT Deduction", recurring: true },
+    { code: "TIER3", description: "Tier 3 Contribution", recurring: true },
+    { code: "LOAN", description: "Loan Deduction", recurring: true },
+    { code: "ADVANCE", description: "Advance Deduction", recurring: true },
+  ])
+
+  const [selectedAllowances, setSelectedAllowances] = useState<Array<{ code: string; amount: string }>>([])
+  const [selectedDeductions, setSelectedDeductions] = useState<Array<{ code: string; amount: string }>>([])
+  const [showAllowanceSelector, setShowAllowanceSelector] = useState(false)
+  const [showDeductionSelector, setShowDeductionSelector] = useState(false)
+
+  const handleAddAllowance = (allowanceCode: string) => {
+    const allowance = companyAllowances.find((a) => a.code === allowanceCode)
+    if (allowance && !selectedAllowances.find((a) => a.code === allowanceCode)) {
+      setSelectedAllowances([...selectedAllowances, { code: allowanceCode, amount: "0" }])
+      setShowAllowanceSelector(false)
+    }
+  }
+
+  const handleRemoveAllowance = (allowanceCode: string) => {
+    setSelectedAllowances(selectedAllowances.filter((a) => a.code !== allowanceCode))
+  }
+
+  const handleAllowanceAmountChange = (allowanceCode: string, amount: string) => {
+    setSelectedAllowances(selectedAllowances.map((a) => (a.code === allowanceCode ? { ...a, amount } : a)))
+  }
+
+  const handleAddDeduction = (deductionCode: string) => {
+    const deduction = companyDeductions.find((d) => d.code === deductionCode)
+    if (deduction && !selectedDeductions.find((d) => d.code === deductionCode)) {
+      setSelectedDeductions([...selectedDeductions, { code: deductionCode, amount: "0" }])
+      setShowDeductionSelector(false)
+    }
+  }
+
+  const handleRemoveDeduction = (deductionCode: string) => {
+    setSelectedDeductions(selectedDeductions.filter((d) => d.code !== deductionCode))
+  }
+
+  const handleDeductionAmountChange = (deductionCode: string, amount: string) => {
+    setSelectedDeductions(selectedDeductions.map((d) => (d.code === deductionCode ? { ...d, amount } : d)))
+  }
+  // </CHANGE>
+
   const loadParentCompanyData = useCallback(() => {
     console.log("[v0] Loading parent company data...")
 
@@ -2303,7 +2415,7 @@ function AddEmployeeForm({
         confirmationDate: employee.confirmation_date || "",
         noticePeriod: employee.noticePeriod || "",
         directSupervisor: employee.direct_supervisor || "",
-        headOfDepartment: employee.head_of_department || "",
+        headOfDepartment: employee.headOfDepartment || "",
         annualSalary: employee.annual_salary || "",
         salary: employee.salary || "",
         transportAllowance: employee.transport_allowance || "",
@@ -2727,7 +2839,7 @@ function AddEmployeeForm({
           description: `"${bankToAdd}" has been added to your company's bank list and is now selected.`,
         })
 
-        console.log("[v0] Bank added successfully (fallback demo mode)")
+        console.log("[v0] Bank added and form cleared successfully")
         return
       }
 
@@ -3721,146 +3833,304 @@ function AddEmployeeForm({
 
             {/* Allowances Section */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Allowances</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="transportAllowance">Transport Allowance (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="transportAllowance"
-                    value={formData.transportAllowance}
-                    onChange={(e) => handleInputChange("transportAllowance", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="housingAllowance">Housing Allowance (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="housingAllowance"
-                    value={formData.housingAllowance}
-                    onChange={(e) => handleInputChange("housingAllowance", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="medicalAllowance">Medical Allowance (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="medicalAllowance"
-                    value={formData.medicalAllowance}
-                    onChange={(e) => handleInputChange("medicalAllowance", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="mealAllowance">Meal Allowance (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="mealAllowance"
-                    value={formData.mealAllowance}
-                    onChange={(e) => handleInputChange("mealAllowance", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="uniformAllowance">Uniform Allowance (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="uniformAllowance"
-                    value={formData.uniformAllowance}
-                    onChange={(e) => handleInputChange("uniformAllowance", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="communicationAllowance">Communication Allowance (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="communicationAllowance"
-                    value={formData.communicationAllowance}
-                    onChange={(e) => handleInputChange("communicationAllowance", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="otherAllowances">Other Allowances (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="otherAllowances"
-                    value={formData.otherAllowances}
-                    onChange={(e) => handleInputChange("otherAllowances", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Allowances</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAllowanceSelector(!showAllowanceSelector)}
+                  className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Allowance
+                </Button>
               </div>
+
+              {showAllowanceSelector && (
+                <Card className="p-4 bg-emerald-50 border-emerald-200">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-emerald-900">Select Allowance Type</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {companyAllowances
+                        .filter((allowance) => !selectedAllowances.find((a) => a.code === allowance.code))
+                        .map((allowance) => (
+                          <button
+                            key={allowance.code}
+                            type="button"
+                            onClick={() => handleAddAllowance(allowance.code)}
+                            className="flex items-center justify-between p-3 bg-white border border-emerald-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition-colors text-left"
+                          >
+                            <div>
+                              <div className="font-medium text-sm text-emerald-900">{allowance.description}</div>
+                              <div className="text-xs text-emerald-600">{allowance.code}</div>
+                            </div>
+                            <Plus className="w-4 h-4 text-emerald-600" />
+                          </button>
+                        ))}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAllowanceSelector(false)}
+                      className="w-full text-emerald-600 hover:text-emerald-700"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </Card>
+              )}
+
+              {selectedAllowances.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {selectedAllowances.map((selectedAllowance) => {
+                    const allowance = companyAllowances.find((a) => a.code === selectedAllowance.code)
+                    return (
+                      <div key={selectedAllowance.code} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor={`allowance-${selectedAllowance.code}`}>{allowance?.description} (GHS)</Label>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAllowance(selectedAllowance.code)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <Input
+                          type="number"
+                          id={`allowance-${selectedAllowance.code}`}
+                          value={selectedAllowance.amount}
+                          onChange={(e) => handleAllowanceAmountChange(selectedAllowance.code, e.target.value)}
+                          placeholder="0"
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {selectedAllowances.length === 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="transportAllowance">Transport Allowance (GHS)</Label>
+                    <Input
+                      type="number"
+                      id="transportAllowance"
+                      value={formData.transportAllowance}
+                      onChange={(e) => handleInputChange("transportAllowance", e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="housingAllowance">Housing Allowance (GHS)</Label>
+                    <Input
+                      type="number"
+                      id="housingAllowance"
+                      value={formData.housingAllowance}
+                      onChange={(e) => handleInputChange("housingAllowance", e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="medicalAllowance">Medical Allowance (GHS)</Label>
+                    <Input
+                      type="number"
+                      id="medicalAllowance"
+                      value={formData.medicalAllowance}
+                      onChange={(e) => handleInputChange("medicalAllowance", e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="mealAllowance">Meal Allowance (GHS)</Label>
+                    <Input
+                      type="number"
+                      id="mealAllowance"
+                      value={formData.mealAllowance}
+                      onChange={(e) => handleInputChange("mealAllowance", e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="uniformAllowance">Uniform Allowance (GHS)</Label>
+                    <Input
+                      type="number"
+                      id="uniformAllowance"
+                      value={formData.uniformAllowance}
+                      onChange={(e) => handleInputChange("uniformAllowance", e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="communicationAllowance">Communication Allowance (GHS)</Label>
+                    <Input
+                      type="number"
+                      id="communicationAllowance"
+                      value={formData.communicationAllowance}
+                      onChange={(e) => handleInputChange("communicationAllowance", e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="otherAllowances">Other Allowances (GHS)</Label>
+                    <Input
+                      type="number"
+                      id="otherAllowances"
+                      value={formData.otherAllowances}
+                      onChange={(e) => handleInputChange("otherAllowances", e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Deductions Section */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Deductions</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="taxDeduction">Tax Deduction (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="taxDeduction"
-                    value={formData.taxDeduction}
-                    onChange={(e) => handleInputChange("taxDeduction", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="tier3">Tier 3 Contribution (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="tier3"
-                    value={formData.tier3}
-                    onChange={(e) => handleInputChange("tier3", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="loanDeduction">Loan Deduction (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="loanDeduction"
-                    value={formData.loanDeduction}
-                    onChange={(e) => handleInputChange("loanDeduction", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="advanceDeduction">Advance Deduction (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="advanceDeduction"
-                    value={formData.advanceDeduction}
-                    onChange={(e) => handleInputChange("advanceDeduction", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="otherDeductions">Other Deductions (GHS)</Label>
-                  <Input
-                    type="number"
-                    id="otherDeductions"
-                    value={formData.otherDeductions}
-                    onChange={(e) => handleInputChange("otherDeductions", e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Deductions</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDeductionSelector(!showDeductionSelector)}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Deduction
+                </Button>
               </div>
+
+              {showDeductionSelector && (
+                <Card className="p-4 bg-red-50 border-red-200">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-red-900">Select Deduction Type</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {companyDeductions
+                        .filter((deduction) => !selectedDeductions.find((d) => d.code === deduction.code))
+                        .map((deduction) => (
+                          <button
+                            key={deduction.code}
+                            type="button"
+                            onClick={() => handleAddDeduction(deduction.code)}
+                            className="flex items-center justify-between p-3 bg-white border border-red-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors text-left"
+                          >
+                            <div>
+                              <div className="font-medium text-sm text-red-900">{deduction.description}</div>
+                              <div className="text-xs text-red-600">{deduction.code}</div>
+                            </div>
+                            <Plus className="w-4 h-4 text-red-600" />
+                          </button>
+                        ))}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowDeductionSelector(false)}
+                      className="w-full text-red-600 hover:text-red-700"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </Card>
+              )}
+
+              {selectedDeductions.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {selectedDeductions.map((selectedDeduction) => {
+                    const deduction = companyDeductions.find((d) => d.code === selectedDeduction.code)
+                    return (
+                      <div key={selectedDeduction.code} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor={`deduction-${selectedDeduction.code}`}>{deduction?.description} (GHS)</Label>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveDeduction(selectedDeduction.code)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <Input
+                          type="number"
+                          id={`deduction-${selectedDeduction.code}`}
+                          value={selectedDeduction.amount}
+                          onChange={(e) => handleDeductionAmountChange(selectedDeduction.code, e.target.value)}
+                          placeholder="0"
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {selectedDeductions.length === 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="taxDeduction">Tax Deduction (GHS)</Label>
+                    <Input
+                      type="number"
+                      id="taxDeduction"
+                      value={formData.taxDeduction}
+                      onChange={(e) => handleInputChange("taxDeduction", e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="tier3">Tier 3 Contribution (GHS)</Label>
+                    <Input
+                      type="number"
+                      id="tier3"
+                      value={formData.tier3}
+                      onChange={(e) => handleInputChange("tier3", e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="loanDeduction">Loan Deduction (GHS)</Label>
+                    <Input
+                      type="number"
+                      id="loanDeduction"
+                      value={formData.loanDeduction}
+                      onChange={(e) => handleInputChange("loanDeduction", e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="advanceDeduction">Advance Deduction (GHS)</Label>
+                    <Input
+                      type="number"
+                      id="advanceDeduction"
+                      value={formData.advanceDeduction}
+                      onChange={(e) => handleInputChange("advanceDeduction", e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="otherDeductions">Other Deductions (GHS)</Label>
+                    <Input
+                      type="number"
+                      id="otherDeductions"
+                      value={formData.otherDeductions}
+                      onChange={(e) => handleInputChange("otherDeductions", e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </TabsContent>
