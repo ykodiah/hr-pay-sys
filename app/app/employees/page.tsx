@@ -2606,9 +2606,16 @@ function AddEmployeeForm({
     try {
       if (isDemoMode()) {
         console.log("[v0] Demo mode: Adding custom bank:", newBankName)
-        setCustomBanks(prev => [...prev, newBankName])
+        setCustomBanks(prev => [...prev, newBankName.trim()])
+        // Set the newly added bank as selected
+        handleInputChange("bankName", newBankName.trim())
         setNewBankName("")
         setShowAddBank(false)
+        
+        toast({
+          title: "Success",
+          description: "Custom bank added successfully (Demo Mode)",
+        })
         return
       }
 
@@ -2622,29 +2629,78 @@ function AddEmployeeForm({
 
       if (error) {
         console.error("Error adding custom bank:", error)
+        toast({
+          title: "Error",
+          description: "Failed to add custom bank. Please try again.",
+          variant: "destructive",
+        })
         return
       }
 
       setCustomBanks(prev => [...prev, newBankName.trim()])
+      // Set the newly added bank as selected
+      handleInputChange("bankName", newBankName.trim())
       setNewBankName("")
       setShowAddBank(false)
+      
+      toast({
+        title: "Success",
+        description: "Custom bank added successfully!",
+      })
     } catch (error) {
       console.error("Error adding custom bank:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add custom bank. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
   // Calculate monthly salary from annual salary
   const calculateMonthlySalary = (annualSalary: string) => {
-    if (!annualSalary || isNaN(Number(annualSalary))) return ""
+    if (!annualSalary || isNaN(Number(annualSalary)) || Number(annualSalary) <= 0) return ""
     const monthly = Number(annualSalary) / 12
     return monthly.toFixed(2)
   }
 
   // Handle annual salary change
   const handleAnnualSalaryChange = (value: string) => {
-    handleInputChange("annualSalary", value)
+    // Update annual salary
+    setFormData(prev => ({
+      ...prev,
+      annualSalary: value
+    }))
+    
+    // Calculate and update monthly salary
     const monthlySalary = calculateMonthlySalary(value)
-    handleInputChange("salary", monthlySalary)
+    setFormData(prev => ({
+      ...prev,
+      salary: monthlySalary
+    }))
+    
+    // Clear any existing errors for annual salary
+    if (errors.annualSalary) {
+      setErrors(prev => ({
+        ...prev,
+        annualSalary: ""
+      }))
+    }
+  }
+
+  // Handle bank selection change
+  const handleBankSelectionChange = (value: string) => {
+    if (value === "add_new_bank") {
+      setShowAddBank(true)
+      // Reset the select value to show placeholder
+      setFormData(prev => ({
+        ...prev,
+        bankName: ""
+      }))
+    } else {
+      handleInputChange("bankName", value)
+      setShowAddBank(false)
+    }
   }
 
   // Load custom banks on component mount
@@ -3332,27 +3388,38 @@ function AddEmployeeForm({
 
               <div className="space-y-2">
                 <Label htmlFor="salary">Monthly Salary (GHS) *</Label>
-                <Input
-                  type="number"
-                  id="salary"
-                  value={formData.salary}
-                  onChange={(e) => handleInputChange("salary", e.target.value)}
-                  placeholder="5000"
-                  readOnly
-                  className="bg-gray-50"
-                />
-                <p className="text-xs text-gray-500">Auto-calculated from annual salary</p>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    id="salary"
+                    value={formData.salary}
+                    onChange={(e) => handleInputChange("salary", e.target.value)}
+                    placeholder="5000"
+                    readOnly
+                    className="bg-gray-50 pr-8"
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                    <div className="w-4 h-4 text-green-500">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {formData.annualSalary ? 
+                    `Auto-calculated from annual salary (${formData.annualSalary} ÷ 12)` : 
+                    "Auto-calculated from annual salary"
+                  }
+                </p>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="bankName">Bank Name</Label>
-                <Select value={formData.bankName} onValueChange={(value) => {
-                  if (value === "add_new_bank") {
-                    setShowAddBank(true)
-                  } else {
-                    handleInputChange("bankName", value)
-                  }
-                }}>
+                <Select 
+                  value={formData.bankName} 
+                  onValueChange={handleBankSelectionChange}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select bank" />
                   </SelectTrigger>
@@ -3374,33 +3441,51 @@ function AddEmployeeForm({
                 </Select>
                 
                 {showAddBank && (
-                  <div className="flex gap-2 mt-2">
-                    <Input
-                      type="text"
-                      placeholder="Enter bank name"
-                      value={newBankName}
-                      onChange={(e) => setNewBankName(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && addCustomBank()}
-                    />
-                    <Button 
-                      type="button" 
-                      size="sm" 
-                      onClick={addCustomBank}
-                      disabled={!newBankName.trim()}
-                    >
-                      Add
-                    </Button>
-                    <Button 
-                      type="button" 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => {
-                        setShowAddBank(false)
-                        setNewBankName("")
-                      }}
-                    >
-                      Cancel
-                    </Button>
+                  <div className="mt-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="space-y-2">
+                      <Label htmlFor="newBankName" className="text-sm font-medium">
+                        Add Custom Bank
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="newBankName"
+                          type="text"
+                          placeholder="Enter bank name"
+                          value={newBankName}
+                          onChange={(e) => setNewBankName(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter' && newBankName.trim()) {
+                              addCustomBank()
+                            }
+                          }}
+                          className="flex-1"
+                        />
+                        <Button 
+                          type="button" 
+                          size="sm" 
+                          onClick={addCustomBank}
+                          disabled={!newBankName.trim()}
+                          className="px-4"
+                        >
+                          Add Bank
+                        </Button>
+                        <Button 
+                          type="button" 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => {
+                            setShowAddBank(false)
+                            setNewBankName("")
+                          }}
+                          className="px-4"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        This bank will be added to your company's bank list
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
