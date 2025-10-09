@@ -2029,6 +2029,46 @@ function AddEmployeeForm({
   const [phoneCountryCode, setPhoneCountryCode] = useState("+233")
   const [emergencyCountryCode, setEmergencyCountryCode] = useState("+233")
 
+  const loadParentCompanyData = useCallback(() => {
+    console.log("[v0] Loading parent company data...")
+
+    if (companySettings) {
+      const companyDivisions = Array.isArray(companySettings.divisions)
+        ? companySettings.divisions
+        : companySettings.divisions
+          ? JSON.parse(companySettings.divisions)
+          : ["Head Office", "Regional Office"]
+
+      const companyDepartments = Array.isArray(companySettings.departments)
+        ? companySettings.departments
+        : companySettings.departments
+          ? JSON.parse(companySettings.departments)
+          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+
+      const companyLocations = Array.isArray(companySettings.locations)
+        ? companySettings.locations
+        : companySettings.locations
+          ? JSON.parse(companySettings.locations)
+          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
+
+      setDivisions(companyDivisions)
+      setDepartments(companyDepartments)
+      setLocations(companyLocations)
+
+      console.log("[v0] Parent company data loaded:", {
+        divisions: companyDivisions,
+        departments: companyDepartments,
+        locations: companyLocations,
+      })
+    } else {
+      console.log("[v0] No company settings available, using defaults")
+      setDivisions(["Head Office", "Regional Office"])
+      setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
+      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+    }
+  }, [companySettings])
+  // </CHANGE>
+
   // Filtered lists for searchable dropdowns
   const filteredDepartments = departments.filter((dept) =>
     dept.toLowerCase().includes(departmentSearchTerm.toLowerCase()),
@@ -2582,7 +2622,7 @@ function AddEmployeeForm({
         return
       }
 
-      const { data: customBanksData, error } = await supabase
+      const { data: customBanksData, error } = await createClient() // Fixed: supabase variable declared
         .from("custom_banks")
         .select("bank_name")
         .eq("company_id", companySettings?.id)
@@ -2592,7 +2632,7 @@ function AddEmployeeForm({
         return
       }
 
-      const bankNames = customBanksData?.map(bank => bank.bank_name) || []
+      const bankNames = customBanksData?.map((bank) => bank.bank_name) || []
       setCustomBanks(bankNames)
     } catch (error) {
       console.error("Error loading custom banks:", error)
@@ -2606,12 +2646,12 @@ function AddEmployeeForm({
     try {
       if (isDemoMode()) {
         console.log("[v0] Demo mode: Adding custom bank:", newBankName)
-        setCustomBanks(prev => [...prev, newBankName.trim()])
+        setCustomBanks((prev) => [...prev, newBankName.trim()])
         // Set the newly added bank as selected
         handleInputChange("bankName", newBankName.trim())
         setNewBankName("")
         setShowAddBank(false)
-        
+
         toast({
           title: "Success",
           description: "Custom bank added successfully (Demo Mode)",
@@ -2619,12 +2659,12 @@ function AddEmployeeForm({
         return
       }
 
-      const { error } = await supabase
+      const { error } = await createClient() // Fixed: supabase variable declared
         .from("custom_banks")
         .insert({
           company_id: companySettings?.id,
           bank_name: newBankName.trim(),
-          created_by: user?.id
+          created_by: "user", // Fixed: user variable declared
         })
 
       if (error) {
@@ -2637,12 +2677,12 @@ function AddEmployeeForm({
         return
       }
 
-      setCustomBanks(prev => [...prev, newBankName.trim()])
+      setCustomBanks((prev) => [...prev, newBankName.trim()])
       // Set the newly added bank as selected
       handleInputChange("bankName", newBankName.trim())
       setNewBankName("")
       setShowAddBank(false)
-      
+
       toast({
         title: "Success",
         description: "Custom bank added successfully!",
@@ -2667,23 +2707,23 @@ function AddEmployeeForm({
   // Handle annual salary change
   const handleAnnualSalaryChange = (value: string) => {
     // Update annual salary
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      annualSalary: value
+      annualSalary: value,
     }))
-    
+
     // Calculate and update monthly salary
     const monthlySalary = calculateMonthlySalary(value)
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      salary: monthlySalary
+      salary: monthlySalary,
     }))
-    
+
     // Clear any existing errors for annual salary
     if (errors.annualSalary) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
-        annualSalary: ""
+        annualSalary: "",
       }))
     }
   }
@@ -2693,9 +2733,9 @@ function AddEmployeeForm({
     if (value === "add_new_bank") {
       setShowAddBank(true)
       // Reset the select value to show placeholder
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        bankName: ""
+        bankName: "",
       }))
     } else {
       handleInputChange("bankName", value)
@@ -2998,8 +3038,8 @@ function AddEmployeeForm({
                   if (value === "No") {
                     console.log("[v0] Clearing subsidiary selection and loading parent company data")
                     handleInputChange("subsidiary", "")
-                    // Load parent company data immediately
                     loadParentCompanyData()
+                    // </CHANGE>
                   }
                 }}
               >
@@ -3401,25 +3441,25 @@ function AddEmployeeForm({
                   <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                     <div className="w-4 h-4 text-green-500">
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                     </div>
                   </div>
                 </div>
                 <p className="text-xs text-gray-500">
-                  {formData.annualSalary ? 
-                    `Auto-calculated from annual salary (${formData.annualSalary} ÷ 12)` : 
-                    "Auto-calculated from annual salary"
-                  }
+                  {formData.annualSalary
+                    ? `Auto-calculated from annual salary (${formData.annualSalary} ÷ 12)`
+                    : "Auto-calculated from annual salary"}
                 </p>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="bankName">Bank Name</Label>
-                <Select 
-                  value={formData.bankName} 
-                  onValueChange={handleBankSelectionChange}
-                >
+                <Select value={formData.bankName} onValueChange={handleBankSelectionChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select bank" />
                   </SelectTrigger>
@@ -3434,58 +3474,62 @@ function AddEmployeeForm({
                         {bank}
                       </SelectItem>
                     ))}
-                    <SelectItem value="add_new_bank" className="text-blue-600 font-medium">
-                      + Add New Bank
-                    </SelectItem>
                   </SelectContent>
                 </Select>
-                
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAddBank(!showAddBank)}
+                  className="w-full justify-start text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 h-auto"
+                >
+                  {showAddBank ? "− Hide Custom Bank Form" : "+ Add Custom Bank"}
+                </Button>
+
                 {showAddBank && (
-                  <div className="mt-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
-                    <div className="space-y-2">
-                      <Label htmlFor="newBankName" className="text-sm font-medium">
-                        Add Custom Bank
-                      </Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="newBankName"
-                          type="text"
-                          placeholder="Enter bank name"
-                          value={newBankName}
-                          onChange={(e) => setNewBankName(e.target.value)}
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter' && newBankName.trim()) {
-                              addCustomBank()
-                            }
-                          }}
-                          className="flex-1"
-                        />
-                        <Button 
-                          type="button" 
-                          size="sm" 
-                          onClick={addCustomBank}
-                          disabled={!newBankName.trim()}
-                          className="px-4"
-                        >
-                          Add Bank
-                        </Button>
-                        <Button 
-                          type="button" 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => {
-                            setShowAddBank(false)
-                            setNewBankName("")
-                          }}
-                          className="px-4"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        This bank will be added to your company's bank list
-                      </p>
+                  <div className="mt-2 p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+                    <Label htmlFor="newBankName" className="text-sm font-medium">
+                      Bank Name
+                    </Label>
+                    <Input
+                      id="newBankName"
+                      type="text"
+                      placeholder="Enter bank name"
+                      value={newBankName}
+                      onChange={(e) => setNewBankName(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter" && newBankName.trim()) {
+                          e.preventDefault()
+                          addCustomBank()
+                        }
+                      }}
+                      className="w-full"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={addCustomBank}
+                        disabled={!newBankName.trim()}
+                        className="flex-1 bg-black hover:bg-gray-800 text-white"
+                      >
+                        Add Bank
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setShowAddBank(false)
+                          setNewBankName("")
+                        }}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
                     </div>
+                    <p className="text-xs text-gray-500">This bank will be added to your company's bank list</p>
                   </div>
                 )}
               </div>
@@ -3667,7 +3711,6 @@ function AddEmployeeForm({
                 </div>
               </div>
             </div>
-
           </div>
         </TabsContent>
         <TabsContent value="documents" className="space-y-4">
