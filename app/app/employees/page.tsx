@@ -2656,12 +2656,6 @@ function AddEmployeeForm({
         handleInputChange("bankName", newBankName.trim())
         setNewBankName("")
         setShowAddBank(false)
-        setShowSuccessMessage(true)
-
-        // Hide success message after 3 seconds
-        setTimeout(() => {
-          setShowSuccessMessage(false)
-        }, 3000)
 
         toast({
           title: "✅ Bank Added Successfully!",
@@ -2695,12 +2689,6 @@ function AddEmployeeForm({
       handleInputChange("bankName", newBankName.trim())
       setNewBankName("")
       setShowAddBank(false)
-      setShowSuccessMessage(true)
-
-      // Hide success message after 3 seconds
-      setTimeout(() => {
-        setShowSuccessMessage(false)
-      }, 3000)
 
       toast({
         title: "✅ Bank Added Successfully!",
