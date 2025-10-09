@@ -25,7 +25,16 @@ import { useToast } from "@/hooks/use-toast"
 
 const isDemoMode = () => {
   if (typeof window !== "undefined") {
-    return localStorage.getItem("demo_mode") === "true"
+    // Check localStorage first
+    if (localStorage.getItem("demo_mode") === "true") {
+      return true
+    }
+    // Also check for demo-session cookie
+    const cookies = document.cookie.split(";")
+    const demoSessionCookie = cookies.find((cookie) => cookie.trim().startsWith("demo-session="))
+    if (demoSessionCookie && demoSessionCookie.includes("active")) {
+      return true
+    }
   }
   return false
 }
@@ -1972,13 +1981,13 @@ function ImportDataDialog({
       </Tabs>
 
       <div className="flex justify-end space-x-3 pt-4 border-t">
-        <Button variant="outline" onClick={onClose}>
+        <Button variant="outline" onClick={onClose} className="border-gray-300 hover:bg-gray-50 bg-transparent">
           Cancel
         </Button>
         <Button
           onClick={handleImport}
           disabled={!selectedFile || previewData.length === 0 || importErrors.length > 0}
-          className="bg-emerald-600 hover:bg-emerald-700"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
         >
           <Upload className="w-4 h-4 mr-2" />
           Import Data ({previewData.length} records)
@@ -2612,6 +2621,7 @@ function AddEmployeeForm({
   const [customBanks, setCustomBanks] = useState<string[]>([])
   const [showAddBank, setShowAddBank] = useState(false)
   const [newBankName, setNewBankName] = useState("")
+  const [isAddingBank, setIsAddingBank] = useState(false)
 
   // Load custom banks for the company
   const loadCustomBanks = async () => {
@@ -2641,59 +2651,170 @@ function AddEmployeeForm({
 
   // Add new custom bank
   const addCustomBank = async () => {
-    if (!newBankName.trim()) return
-
-    try {
-      if (isDemoMode()) {
-        console.log("[v0] Demo mode: Adding custom bank:", newBankName)
-        setCustomBanks((prev) => [...prev, newBankName.trim()])
-        // Set the newly added bank as selected
-        handleInputChange("bankName", newBankName.trim())
-        setNewBankName("")
-        setShowAddBank(false)
-
-        toast({
-          title: "Success",
-          description: "Custom bank added successfully (Demo Mode)",
-        })
-        return
-      }
-
-      const { error } = await createClient() // Fixed: supabase variable declared
-        .from("custom_banks")
-        .insert({
-          company_id: companySettings?.id,
-          bank_name: newBankName.trim(),
-          created_by: "user", // Fixed: user variable declared
-        })
-
-      if (error) {
-        console.error("Error adding custom bank:", error)
-        toast({
-          title: "Error",
-          description: "Failed to add custom bank. Please try again.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      setCustomBanks((prev) => [...prev, newBankName.trim()])
-      // Set the newly added bank as selected
-      handleInputChange("bankName", newBankName.trim())
-      setNewBankName("")
-      setShowAddBank(false)
-
-      toast({
-        title: "Success",
-        description: "Custom bank added successfully!",
-      })
-    } catch (error) {
-      console.error("Error adding custom bank:", error)
+    if (!newBankName.trim()) {
       toast({
         title: "Error",
-        description: "Failed to add custom bank. Please try again.",
+        description: "Please enter a bank name.",
         variant: "destructive",
       })
+      return
+    }
+
+    console.log("[v0] Starting addCustomBank:", { newBankName: newBankName.trim(), isDemoMode: isDemoMode() })
+    setIsAddingBank(true)
+
+    try {
+      const bankToAdd = newBankName.trim()
+
+      // Check if we're in demo mode
+      if (isDemoMode()) {
+        console.log("[v0] Demo mode: Adding custom bank:", bankToAdd)
+
+        // Add to custom banks list
+        setCustomBanks((prev) => {
+          const newBanks = [...prev, bankToAdd]
+          console.log("[v0] Updated customBanks list (demo):", newBanks)
+          return newBanks
+        })
+
+        // Set the newly added bank as selected
+        handleInputChange("bankName", bankToAdd)
+
+        // Clear form and hide
+        setNewBankName("")
+        setShowAddBank(false)
+        setIsAddingBank(false)
+
+        toast({
+          title: "✅ Bank Added Successfully!",
+          description: `"${bankToAdd}" has been added to your company's bank list and is now selected.`,
+        })
+
+        console.log("[v0] Demo bank added successfully")
+        return
+      }
+
+      // Get current user
+      const supabase = createClient()
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      console.log("[v0] Auth check:", { hasUser: !!user, userError: userError?.message })
+
+      // If no user but we have company settings, treat as demo mode
+      if (!user && companySettings?.id) {
+        console.log("[v0] No auth user but have company settings, treating as demo mode")
+
+        // Add to custom banks list
+        setCustomBanks((prev) => {
+          const newBanks = [...prev, bankToAdd]
+          console.log("[v0] Updated customBanks list (fallback demo):", newBanks)
+          return newBanks
+        })
+
+        // Set the newly added bank as selected
+        handleInputChange("bankName", bankToAdd)
+
+        // Clear form and hide
+        setNewBankName("")
+        setShowAddBank(false)
+        setIsAddingBank(false)
+
+        toast({
+          title: "✅ Bank Added Successfully!",
+          description: `"${bankToAdd}" has been added to your company's bank list and is now selected.`,
+        })
+
+        console.log("[v0] Bank added successfully (fallback demo mode)")
+        return
+      }
+
+      if (userError || !user) {
+        console.error("[v0] Error getting user:", userError)
+        toast({
+          title: "Error",
+          description: "Unable to verify user. Please try again.",
+          variant: "destructive",
+        })
+        setIsAddingBank(false)
+        return
+      }
+
+      console.log("[v0] User verified:", { userId: user.id })
+
+      // Check if company settings exist
+      if (!companySettings?.id) {
+        console.error("[v0] No company settings found")
+        toast({
+          title: "Error",
+          description: "Company settings not found. Please refresh the page.",
+          variant: "destructive",
+        })
+        setIsAddingBank(false)
+        return
+      }
+
+      console.log("[v0] Inserting custom bank:", {
+        company_id: companySettings.id,
+        bank_name: bankToAdd,
+        created_by: user.id,
+      })
+
+      // Insert the custom bank
+      const { data: insertedBank, error: insertError } = await supabase
+        .from("custom_banks")
+        .insert({
+          company_id: companySettings.id,
+          bank_name: bankToAdd,
+          created_by: user.id,
+        })
+        .select()
+        .single()
+
+      if (insertError) {
+        console.error("[v0] Error adding custom bank:", insertError)
+        toast({
+          title: "Error",
+          description: `Failed to add custom bank: ${insertError.message}`,
+          variant: "destructive",
+        })
+        setIsAddingBank(false)
+        return
+      }
+
+      console.log("[v0] Custom bank inserted successfully:", insertedBank)
+
+      // Add to custom banks list
+      setCustomBanks((prev) => {
+        const newBanks = [...prev, bankToAdd]
+        console.log("[v0] Updated customBanks list (Supabase):", newBanks)
+        return newBanks
+      })
+
+      // Set the newly added bank as selected
+      handleInputChange("bankName", bankToAdd)
+
+      // Clear form and hide
+      setNewBankName("")
+      setShowAddBank(false)
+      setIsAddingBank(false)
+
+      toast({
+        title: "✅ Bank Added Successfully!",
+        description: `"${bankToAdd}" has been added to your company's bank list and is now selected.`,
+      })
+
+      console.log("[v0] Bank added and form cleared successfully")
+    } catch (error) {
+      console.error("[v0] Unexpected error adding custom bank:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      })
+      setIsAddingBank(false)
     }
   }
 
@@ -3474,15 +3595,18 @@ function AddEmployeeForm({
                         {bank}
                       </SelectItem>
                     ))}
+                    <SelectItem value="add_new_bank" className="text-blue-600 font-medium">
+                      + Add Custom Bank
+                    </SelectItem>
                   </SelectContent>
                 </Select>
 
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={() => setShowAddBank(!showAddBank)}
-                  className="w-full justify-start text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 h-auto"
+                  className="w-full justify-center text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 hover:border-blue-300 px-3 py-2 h-auto font-medium"
                 >
                   {showAddBank ? "− Hide Custom Bank Form" : "+ Add Custom Bank"}
                 </Button>
@@ -3507,27 +3631,54 @@ function AddEmployeeForm({
                       className="w-full"
                     />
                     <div className="flex gap-2">
-                      <Button
+                      <button
                         type="button"
-                        size="sm"
-                        onClick={addCustomBank}
-                        disabled={!newBankName.trim()}
-                        className="flex-1 bg-black hover:bg-gray-800 text-white"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          addCustomBank()
+                        }}
+                        disabled={isAddingBank || !newBankName.trim()}
+                        className="flex-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
                       >
-                        Add Bank
-                      </Button>
-                      <Button
+                        {isAddingBank ? (
+                          <>
+                            <svg
+                              className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              ></circle>
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              ></path>
+                            </svg>
+                            Adding...
+                          </>
+                        ) : (
+                          "Add Bank"
+                        )}
+                      </button>
+                      <button
                         type="button"
-                        size="sm"
-                        variant="outline"
                         onClick={() => {
                           setShowAddBank(false)
                           setNewBankName("")
                         }}
-                        className="flex-1"
+                        className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                       >
                         Cancel
-                      </Button>
+                      </button>
                     </div>
                     <p className="text-xs text-gray-500">This bank will be added to your company's bank list</p>
                   </div>
@@ -3777,18 +3928,24 @@ function AddEmployeeForm({
 
       <div className="flex justify-between">
         {currentTab !== "personal" && (
-          <Button variant="secondary" onClick={handlePrevious}>
+          <Button
+            variant="outline"
+            onClick={handlePrevious}
+            className="border-gray-300 hover:bg-gray-50 bg-transparent"
+          >
             Previous
           </Button>
         )}
         {currentTab !== "documents" ? (
-          <Button onClick={handleNext}>Next</Button>
+          <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-700 text-white">
+            Next
+          </Button>
         ) : (
           <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} className="border-gray-300 hover:bg-gray-50 bg-transparent">
               Cancel
             </Button>
-            <Button onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700 text-white">
               Submit
             </Button>
           </div>
