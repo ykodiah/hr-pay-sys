@@ -114,7 +114,6 @@ auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
 enabled = false
 provider = "hcaptcha"
 secret = "env(SUPABASE_AUTH_CAPTCHA_SECRET)"
-site_key = "env(SUPABASE_AUTH_CAPTCHA_SITE_KEY)"
 
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin`, `notion`, `twitch`,

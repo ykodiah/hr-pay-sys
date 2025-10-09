@@ -11,18 +11,19 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
-# Install Supabase CLI if not already installed
-if ! command -v supabase &> /dev/null; then
-    echo "📦 Installing Supabase CLI..."
-    npm install -g supabase
+# Check if Supabase CLI is available via npx
+echo "📦 Using Supabase CLI via npx..."
+if ! npx supabase --version &> /dev/null; then
+    echo "❌ Supabase CLI not available via npx"
+    exit 1
 else
-    echo "✅ Supabase CLI already installed"
+    echo "✅ Supabase CLI available via npx"
 fi
 
 # Initialize Supabase if not already initialized
 if [ ! -f "supabase/config.toml" ]; then
     echo "🔧 Initializing Supabase project..."
-    supabase init
+    npx supabase init
 else
     echo "✅ Supabase project already initialized"
 fi
@@ -41,26 +42,26 @@ fi
 
 # Start Supabase local development
 echo "🏃 Starting Supabase local development..."
-supabase start
+npx supabase start
 
 # Generate TypeScript types
 echo "📝 Generating TypeScript types..."
-supabase gen types typescript --local > types/supabase.ts
+npx supabase gen types typescript --local > types/supabase.ts
 
 echo ""
 echo "🎉 Supabase setup complete!"
 echo ""
 echo "Next steps:"
 echo "1. Update .env.local with your actual Supabase credentials"
-echo "2. Link to your remote project: supabase link --project-ref YOUR_PROJECT_REF"
-echo "3. Push migrations to remote: supabase db push"
+echo "2. Link to your remote project: npx supabase link --project-ref YOUR_PROJECT_REF"
+echo "3. Push migrations to remote: npx supabase db push"
 echo "4. Start your Next.js app: npm run dev"
 echo ""
 echo "Useful commands:"
-echo "- supabase start     # Start local Supabase"
-echo "- supabase stop      # Stop local Supabase"
-echo "- supabase status    # Check status"
-echo "- supabase db push   # Push migrations to remote"
-echo "- supabase studio    # Open Supabase Studio"
+echo "- npx supabase start     # Start local Supabase"
+echo "- npx supabase stop      # Stop local Supabase"
+echo "- npx supabase status    # Check status"
+echo "- npx supabase db push   # Push migrations to remote"
+echo "- npx supabase studio    # Open Supabase Studio"
 echo ""
 echo "Your Supabase CLI is now ready to use! 🚀"
