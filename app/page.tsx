@@ -6,6 +6,8 @@ import Link from "next/link"
 import { Logo } from "@/components/logo"
 
 export default function HomePage() {
+  console.log("[v0] Homepage is rendering successfully")
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       {/* Header */}
@@ -26,12 +28,12 @@ export default function HomePage() {
               </Link>
             </nav>
             <div className="flex items-center space-x-4">
-              <Link href="/login">
+              <Link href="/auth/login">
                 <Button variant="ghost" className="text-gray-600">
                   Sign In
                 </Button>
               </Link>
-              <Link href="/setup">
+              <Link href="/get-started">
                 <Button className="bg-emerald-600 hover:bg-emerald-700">Get Started</Button>
               </Link>
             </div>
@@ -54,7 +56,7 @@ export default function HomePage() {
                 subsidiaries with multi-location controls.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                <Link href="/launch">
+                <Link href="/auth/login">
                   <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-lg px-8 py-4 w-full sm:w-auto">
                     Launch App
                   </Button>
@@ -79,7 +81,7 @@ export default function HomePage() {
             <div className="relative">
               <div className="relative z-10">
                 <img
-                  src="/ghana-payroll-dashboard.png"
+                  src="/professional-ghana-payroll-dashboard-showing-paye-.png"
                   alt="Professional Ghana payroll dashboard showing PAYE and SSNIT calculations"
                   className="rounded-2xl shadow-2xl"
                 />
@@ -102,11 +104,11 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <Link href="/features/payroll" className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
+            <div className="block">
+              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
                 <CardContent className="p-0">
                   <img
-                    src="/ghana-payroll-dashboard.png"
+                    src="/ghana-payroll-engine-dashboard.png"
                     alt="Ghana Payroll Engine"
                     className="w-full h-32 object-cover rounded-lg mb-4"
                   />
@@ -129,10 +131,10 @@ export default function HomePage() {
                   </ul>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
 
-            <Link href="/features/hr" className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
+            <div className="block">
+              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
                 <CardContent className="p-0">
                   <img
                     src="/employee-management-dashboard.png"
@@ -158,10 +160,10 @@ export default function HomePage() {
                   </ul>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
 
-            <Link href="/features/analytics" className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
+            <div className="block">
+              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
                 <CardContent className="p-0">
                   <img
                     src="/hr-analytics-dashboard.png"
@@ -187,13 +189,13 @@ export default function HomePage() {
                   </ul>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
 
-            <Link href="/features/multi-location" className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
+            <div className="block">
+              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
                 <CardContent className="p-0">
                   <img
-                    src="/ghana-office-dashboard.png"
+                    src="/ghana-office-dashboard-multi-location.png"
                     alt="Multi-Location Management"
                     className="w-full h-32 object-cover rounded-lg mb-4"
                   />
@@ -216,13 +218,13 @@ export default function HomePage() {
                   </ul>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
 
-            <Link href="/features/mobile" className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
+            <div className="block">
+              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
                 <CardContent className="p-0">
                   <img
-                    src="/employee-self-service-app.png"
+                    src="/employee-self-service-mobile-app.png"
                     alt="Mobile App"
                     className="w-full h-32 object-cover rounded-lg mb-4"
                   />
@@ -245,13 +247,13 @@ export default function HomePage() {
                   </ul>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
 
-            <Link href="/features/security" className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
+            <div className="block">
+              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
                 <CardContent className="p-0">
                   <img
-                    src="/security-dashboard-encryption-access.png"
+                    src="/security-dashboard-with-encryption-and-access-cont.png"
                     alt="Enterprise Security"
                     className="w-full h-32 object-cover rounded-lg mb-4"
                   />
@@ -274,7 +276,7 @@ export default function HomePage() {
                   </ul>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -507,7 +509,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
               <img
-                src="/ghanaian-business-owner.png"
+                src="/professional-ghanaian-business-owner.png"
                 alt="Ghanaian business owner"
                 className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
               />
@@ -518,7 +520,7 @@ export default function HomePage() {
             </div>
             <div className="text-center">
               <img
-                src="/professional-ghanaian-woman.png"
+                src="/professional-ghanaian-woman-hr-manager.png"
                 alt="Ghanaian HR manager"
                 className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
               />
@@ -529,7 +531,7 @@ export default function HomePage() {
             </div>
             <div className="text-center">
               <img
-                src="/placeholder-xuqky.png"
+                src="/professional-ghanaian-finance-manager.png"
                 alt="Ghanaian finance manager"
                 className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
               />
@@ -550,16 +552,20 @@ export default function HomePage() {
             Join hundreds of Ghanaian businesses already saving time and ensuring compliance with AkwaabaHRPay.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-white text-emerald-600 hover:bg-gray-100 text-lg px-8 py-4">
-              Start Free Trial
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="border-white text-white hover:bg-white hover:text-emerald-600 text-lg px-8 py-4 bg-transparent"
-            >
-              Schedule Demo
-            </Button>
+            <Link href="/get-started">
+              <Button size="lg" className="bg-white text-emerald-600 hover:bg-gray-100 text-lg px-8 py-4">
+                Start Free Trial
+              </Button>
+            </Link>
+            <Link href="/contact">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white text-white hover:bg-white hover:text-emerald-600 text-lg px-8 py-4 bg-transparent"
+              >
+                Schedule Demo
+              </Button>
+            </Link>
           </div>
           <p className="text-emerald-200 text-sm mt-4">
             30-day free trial • No credit card required • Setup in minutes

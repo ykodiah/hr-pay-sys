@@ -331,6 +331,13 @@ export default function PerformancePage() {
     }
   }
 
+  // Handler functions for buttons
+  const handleCreateGoal = () => {
+    // Add logic to create goal
+    console.log("Creating new goal...")
+    setShowGoalDialog(false)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -415,7 +422,7 @@ export default function PerformancePage() {
                   <Button variant="outline" onClick={() => setShowGoalDialog(false)}>
                     Cancel
                   </Button>
-                  <Button>Create Goal</Button>
+                  <Button onClick={handleCreateGoal}>Create Goal</Button>
                 </div>
               </div>
             </DialogContent>

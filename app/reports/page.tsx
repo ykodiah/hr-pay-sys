@@ -427,7 +427,7 @@ YAW ADJEI             | EMP005      | 4,200.00     | 5.0%          | 210.00     
 TOTALS                |             | 32,200.00    |               | 1,494.00        |               | 1,494.00        | 2,988.00
 
 Note: Contribution rates are configurable per employee based on their preference and company policy.
-Maximum contribution rate is 20% of basic salary as per Ghana pension regulations.
+Maximum contribution rate is 16.5% of basic salary as per Ghana pension regulations.
 
 Company: MIKADDO HOLDINGS LIMITED
 Prepared by: AkwaabaHRPay - Welcome to Growth

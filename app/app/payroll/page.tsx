@@ -28,6 +28,7 @@ import {
   RefreshCw,
   Filter,
   Search,
+  FileSpreadsheet,
 } from "lucide-react"
 
 const calculateSSNIT = (basicSalary: number) => {
@@ -54,7 +55,6 @@ const calculatePAYE = (
   // Calculate taxable income: (basic + allowances) - SSNIT Employee - Tier3 (both employee and employer)
   const taxableIncome = Math.max(0, basicSalary + allowances - ssnitEmployee - tier3Employee - tier3Employer)
 
-  // Ghana PAYE tax bands for 2024/2025 (monthly rates)
   const taxBands = [
     { min: 0, max: 490, rate: 0 }, // First GH₵ 490: 0%
     { min: 490, max: 600, rate: 0.05 }, // Next GH₵ 110: 5%
@@ -62,7 +62,7 @@ const calculatePAYE = (
     { min: 730, max: 3896.67, rate: 0.175 }, // Next GH₵ 3,166.67: 17.5%
     { min: 3896.67, max: 19896.67, rate: 0.25 }, // Next GH₵ 16,000: 25%
     { min: 19896.67, max: 50416.67, rate: 0.3 }, // Next GH₵ 30,520: 30%
-    { min: 50416.67, max: Number.POSITIVE_INFINITY, rate: 0.35 }, // Exceeding GH₵ 50,000: 35%
+    { min: 50416.67, max: Number.POSITIVE_INFINITY, rate: 0.35 }, // Exceeding GH₵ 50,416.67: 35%
   ]
 
   let tax = 0
@@ -316,6 +316,16 @@ export default function PayrollPage() {
 
   const selectedCount = employeePayroll.filter((e) => e.selected).length
 
+  const handleExportPayslips = (format: string) => {
+    // Placeholder function for exporting payslips
+    console.log(`Exporting payslips in ${format} format`)
+  }
+
+  const handlePreviewReport = () => {
+    // Placeholder function for previewing report
+    console.log("Previewing report")
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -517,11 +527,15 @@ export default function PayrollPage() {
                   Calculate Selected ({selectedCount})
                 </Button>
               )}
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => handleExportPayslips("pdf")}>
                 <Download className="w-4 h-4 mr-2" />
-                Export Payslips
+                Export Payslips (PDF)
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => handleExportPayslips("excel")}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Export Payslips (Excel)
+              </Button>
+              <Button variant="outline" size="sm" onClick={handlePreviewReport}>
                 <Eye className="w-4 h-4 mr-2" />
                 Preview Report
               </Button>

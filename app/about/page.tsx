@@ -54,7 +54,7 @@ export default function AboutPage() {
             <p className="text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
               As your CTO, I founded AkwaabaHRPay with a simple mission: to eliminate the complexity of HR and payroll
               management for Ghanaian businesses. We understand the unique challenges of operating in Ghana's business
-              environment, from PAYE calculations to SSNIT compliance, and we've built the most comprehensive solution
+              environment, from Employee Onboarding to Statutory compliance, and we've built the most comprehensive solution
               to address these needs.
             </p>
           </div>

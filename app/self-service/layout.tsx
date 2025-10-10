@@ -14,6 +14,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { EmployeeAIChatbox } from "@/components/employee-ai-chatbox"
 import {
   User,
   FileText,
@@ -29,6 +30,8 @@ import {
   Award,
   ChevronDown,
   X,
+  AlertTriangle,
+  DoorOpen,
 } from "lucide-react"
 import { Logo } from "@/components/logo"
 
@@ -196,10 +199,10 @@ export default function SelfServiceLayout({
                 <X className="h-4 w-4" />
               </Button>
             </DialogTitle>
-            <DialogDescription className="text-left">
+            <DialogDescription asChild className="text-left">
               <div className="space-y-3">
-                <p className="text-sm text-gray-600">{selectedNotification?.fullMessage}</p>
-                <p className="text-xs text-gray-400">{selectedNotification?.time}</p>
+                <div className="text-sm text-gray-600">{selectedNotification?.fullMessage}</div>
+                <div className="text-xs text-gray-400">{selectedNotification?.time}</div>
               </div>
             </DialogDescription>
           </DialogHeader>
@@ -252,7 +255,7 @@ export default function SelfServiceLayout({
                 <span>My Goals</span>
               </a>
               <a
-                href="/self-service/reviews"
+                href="/self-service/performance"
                 className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <Star className="w-5 h-5" />
@@ -294,6 +297,24 @@ export default function SelfServiceLayout({
                 <CreditCard className="w-5 h-5" />
                 <span>Loan Requests</span>
               </a>
+              <a
+                href="/self-service/grievances"
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <AlertTriangle className="w-5 h-5" />
+                <span>Grievances</span>
+              </a>
+            </div>
+
+            <div className="pt-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Support</p>
+              <a
+                href="/self-service/exit-process"
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <DoorOpen className="w-5 h-5" />
+                <span>Exit Process</span>
+              </a>
             </div>
 
             <div className="pt-4">
@@ -323,6 +344,8 @@ export default function SelfServiceLayout({
         {/* Main Content */}
         <main className="flex-1 p-6">{children}</main>
       </div>
+
+      <EmployeeAIChatbox />
     </div>
   )
 }

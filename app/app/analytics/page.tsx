@@ -1,503 +1,70 @@
 "use client"
-import { useState, useEffect } from "react"
+
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Progress } from "@/components/ui/progress"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
-import {
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  AreaChart,
-  Area,
-  ComposedChart,
-  Legend,
-  ScatterChart,
-  Scatter,
-  RadialBarChart,
-  RadialBar,
-  LineChart,
-} from "recharts"
-import {
-  TrendingUp,
-  Users,
-  DollarSign,
-  Calculator,
-  Download,
-  Filter,
-  BarChart3,
-  PieChartIcon,
-  RefreshCw,
-  Target,
-  Clock,
-  TrendingDown,
-  Brain,
-  Calendar,
-  Settings,
-  Eye,
-  Plus,
-  Save,
-  Zap,
-} from "lucide-react"
+import { TrendingUp, Users, DollarSign, Calculator, Download, RefreshCw } from "lucide-react"
 
-const payrollTrends = [
-  {
-    period: "2024-08",
-    gross: 420000,
-    paye: 63000,
-    ssnit: 37800,
-    tier3: 21000,
-    net: 298200,
-    employees: 235,
-    predicted: false,
-  },
-  {
-    period: "2024-09",
-    gross: 435000,
-    paye: 65250,
-    ssnit: 39150,
-    tier3: 21750,
-    net: 308850,
-    employees: 240,
-    predicted: false,
-  },
-  {
-    period: "2024-10",
-    gross: 448000,
-    paye: 67200,
-    ssnit: 40320,
-    tier3: 22400,
-    net: 318080,
-    employees: 245,
-    predicted: false,
-  },
-  {
-    period: "2024-11",
-    gross: 462000,
-    paye: 69300,
-    ssnit: 41580,
-    tier3: 23100,
-    net: 328020,
-    employees: 250,
-    predicted: false,
-  },
-  {
-    period: "2024-12",
-    gross: 478900,
-    paye: 71835,
-    ssnit: 43101,
-    tier3: 23945,
-    net: 340019,
-    employees: 245,
-    predicted: false,
-  },
-  {
-    period: "2025-01",
-    gross: 485200,
-    paye: 72780,
-    ssnit: 43668,
-    tier3: 24260,
-    net: 344492,
-    employees: 247,
-    predicted: false,
-  },
-  {
-    period: "2025-02",
-    gross: 492000,
-    paye: 73800,
-    ssnit: 44280,
-    tier3: 24600,
-    net: 349320,
-    employees: 250,
-    predicted: true,
-  },
-  {
-    period: "2025-03",
-    gross: 498500,
-    paye: 74775,
-    ssnit: 44910,
-    tier3: 24925,
-    net: 353890,
-    employees: 252,
-    predicted: true,
-  },
-  {
-    period: "2025-04",
-    gross: 505200,
-    paye: 75780,
-    ssnit: 45468,
-    tier3: 25260,
-    net: 358692,
-    employees: 255,
-    predicted: true,
-  },
-]
+const basicMetrics = {
+  totalPayroll: 325000,
+  netPay: 224000,
+  employees: 54,
+  avgSalary: 6019,
+}
 
-const departmentCosts = [
+const simpleReports = [
   {
-    department: "Technology",
-    employees: 45,
-    cost: 156000,
-    avgSalary: 8500,
-    turnover: 8.2,
-    productivity: 92,
-    satisfaction: 4.3,
-    budget: 160000,
-    utilization: 97.5,
-  },
-  {
-    department: "Sales",
-    employees: 62,
-    cost: 142000,
-    avgSalary: 5800,
-    turnover: 15.3,
-    productivity: 88,
-    satisfaction: 3.9,
-    budget: 145000,
-    utilization: 97.9,
-  },
-  {
-    department: "Marketing",
-    employees: 28,
-    cost: 98000,
-    avgSalary: 6200,
-    turnover: 12.1,
-    productivity: 85,
-    satisfaction: 4.1,
-    budget: 100000,
-    utilization: 98.0,
-  },
-  {
-    department: "Finance",
-    employees: 18,
-    cost: 87000,
-    avgSalary: 7200,
-    turnover: 5.6,
-    productivity: 94,
-    satisfaction: 4.4,
-    budget: 90000,
-    utilization: 96.7,
-  },
-  {
-    department: "HR",
-    employees: 12,
-    cost: 54000,
-    avgSalary: 6800,
-    turnover: 8.3,
-    productivity: 89,
-    satisfaction: 4.2,
-    budget: 55000,
-    utilization: 98.2,
-  },
-  {
-    department: "Operations",
-    employees: 82,
-    cost: 168000,
-    avgSalary: 4800,
-    turnover: 18.7,
-    productivity: 82,
-    satisfaction: 3.7,
-    budget: 170000,
-    utilization: 98.8,
-  },
-]
-
-const leaveAnalytics = [
-  { month: "Aug", annual: 45, sick: 12, personal: 8, emergency: 3, maternity: 2, paternity: 1 },
-  { month: "Sep", annual: 52, sick: 18, personal: 6, emergency: 2, maternity: 1, paternity: 2 },
-  { month: "Oct", annual: 38, sick: 15, personal: 9, emergency: 4, maternity: 3, paternity: 1 },
-  { month: "Nov", annual: 41, sick: 22, personal: 7, emergency: 1, maternity: 2, paternity: 0 },
-  { month: "Dec", annual: 67, sick: 19, personal: 12, emergency: 5, maternity: 1, paternity: 3 },
-  { month: "Jan", annual: 28, sick: 14, personal: 5, emergency: 2, maternity: 4, paternity: 1 },
-]
-
-const performanceMetrics = [
-  { metric: "Employee Satisfaction", current: 4.1, target: 4.5, trend: "up" },
-  { metric: "Retention Rate", current: 87.3, target: 90, trend: "up" },
-  { metric: "Time to Hire", current: 28, target: 21, trend: "down" },
-  { metric: "Training Hours", current: 32, target: 40, trend: "up" },
-  { metric: "Productivity Index", current: 88.5, target: 92, trend: "up" },
-  { metric: "Absenteeism Rate", current: 3.2, target: 2.5, trend: "down" },
-]
-
-const salaryBenchmarks = [
-  { position: "Software Engineer", internal: 8500, market: 9200, variance: -7.6 },
-  { position: "HR Manager", internal: 7200, market: 7800, variance: -7.7 },
-  { position: "Sales Rep", internal: 5800, market: 5500, variance: 5.5 },
-  { position: "Finance Officer", internal: 6500, market: 6800, variance: -4.4 },
-  { position: "Marketing Specialist", internal: 6200, market: 6400, variance: -3.1 },
-]
-
-const diversityMetrics = [
-  { category: "Gender", male: 58, female: 42 },
-  { category: "Age Groups", "20-30": 35, "31-40": 42, "41-50": 18, "50+": 5 },
-  { category: "Education", Bachelor: 45, Master: 35, PhD: 8, Diploma: 12 },
-]
-
-const complianceData = [
-  { name: "PAYE Compliant", value: 247, total: 247, color: "#10b981", status: "compliant" },
-  { name: "SSNIT Registered", value: 247, total: 247, color: "#3b82f6", status: "compliant" },
-  { name: "Tier 3 Enrolled", value: 235, total: 247, color: "#8b5cf6", status: "warning" },
-  { name: "Min Wage Review", value: 3, total: 247, color: "#f59e0b", status: "action_required" },
-]
-
-const executiveMetrics = [
-  { metric: "Revenue per Employee", current: 125000, target: 130000, trend: "up", benchmark: 118000 },
-  { metric: "Employee Lifetime Value", current: 450000, target: 500000, trend: "up", benchmark: 420000 },
-  { metric: "Cost per Hire", current: 3200, target: 2800, trend: "down", benchmark: 3500 },
-  { metric: "Training ROI", current: 340, target: 400, trend: "up", benchmark: 280 },
-  { metric: "Engagement Score", current: 78, target: 85, trend: "up", benchmark: 72 },
-  { metric: "Productivity Index", current: 88.5, target: 92, trend: "up", benchmark: 85 },
-]
-
-const predictiveInsights = [
-  {
-    title: "Attrition Risk Alert",
-    description: "15 employees identified as high flight risk based on engagement patterns",
-    probability: 85,
-    impact: "High",
-    timeframe: "Next 3 months",
-    action: "Schedule retention interviews",
-    category: "workforce",
-  },
-  {
-    title: "Budget Variance Prediction",
-    description: "Q2 payroll costs projected to exceed budget by 8.5%",
-    probability: 72,
-    impact: "Medium",
-    timeframe: "Next quarter",
-    action: "Review hiring plans and salary adjustments",
-    category: "financial",
-  },
-  {
-    title: "Skills Gap Analysis",
-    description: "Critical shortage in data analytics skills projected for Q3",
-    probability: 90,
-    impact: "High",
-    timeframe: "6 months",
-    action: "Initiate training programs or external hiring",
-    category: "skills",
-  },
-]
-
-const customReports = [
-  {
-    id: "1",
-    name: "Executive Dashboard",
-    description: "High-level KPIs and trends for leadership team",
-    schedule: "Weekly",
-    recipients: ["CEO", "CFO", "CHRO"],
-    lastRun: "2025-01-20",
+    id: 1,
+    name: "Monthly Payroll Summary",
+    description: "Complete payroll breakdown with 2024 PAYE calculations",
+    category: "Payroll",
     status: "active",
+    records: 54,
+    totalAmount: "GHS 325,000",
   },
   {
-    id: "2",
-    name: "Department Performance Report",
-    description: "Detailed analysis of departmental metrics and costs",
-    schedule: "Monthly",
-    recipients: ["Department Heads"],
-    lastRun: "2025-01-15",
+    id: 2,
+    name: "PAYE Tax Report",
+    description: "Tax calculations using 2024 Ghana tax bands",
+    category: "Tax",
     status: "active",
-  },
-  {
-    id: "3",
-    name: "Compliance Audit Report",
-    description: "Comprehensive compliance status across all regulations",
-    schedule: "Quarterly",
-    recipients: ["Legal Team", "HR Manager"],
-    lastRun: "2025-01-01",
-    status: "active",
+    records: 54,
+    totalAmount: "GHS 48,700",
   },
 ]
 
 export default function AnalyticsPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState("last-6-months")
-  const [selectedView, setSelectedView] = useState("overview")
-  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([])
-  const [isRealTimeEnabled, setIsRealTimeEnabled] = useState(true)
-  const [lastUpdated, setLastUpdated] = useState(new Date())
   const [activeTab, setActiveTab] = useState("overview")
-  const [selectedMetric, setSelectedMetric] = useState<string | null>(null)
-  const [showReportBuilder, setShowReportBuilder] = useState(false)
-  const [showScheduleDialog, setShowScheduleDialog] = useState(false)
-
-  useEffect(() => {
-    if (isRealTimeEnabled) {
-      const interval = setInterval(() => {
-        setLastUpdated(new Date())
-        console.log("[v0] Real-time analytics data updated")
-      }, 30000)
-      return () => clearInterval(interval)
-    }
-  }, [isRealTimeEnabled])
-
-  const currentMonth = payrollTrends.filter((p) => !p.predicted)[payrollTrends.filter((p) => !p.predicted).length - 1]
-  const previousMonth = payrollTrends.filter((p) => !p.predicted)[payrollTrends.filter((p) => !p.predicted).length - 2]
-  const grossChange = ((currentMonth.gross - previousMonth.gross) / previousMonth.gross) * 100
-  const netChange = ((currentMonth.net - previousMonth.net) / previousMonth.net) * 100
-  const employeeChange = currentMonth.employees - previousMonth.employees
-
-  const filteredDepartmentData =
-    selectedDepartments.length > 0
-      ? departmentCosts.filter((dept) => selectedDepartments.includes(dept.department))
-      : departmentCosts
-
-  const handleDepartmentToggle = (department: string) => {
-    setSelectedDepartments((prev) =>
-      prev.includes(department) ? prev.filter((d) => d !== department) : [...prev, department],
-    )
-  }
 
   const handleRefreshData = () => {
-    setLastUpdated(new Date())
     toast({
       title: "Data Refreshed",
-      description: "Analytics data has been updated with the latest information.",
+      description: "Analytics data has been updated.",
     })
   }
 
-  const handleCreateReport = () => {
+  const handleDownloadReport = (reportId: number) => {
     toast({
-      title: "Report Created",
-      description: "Your custom report has been saved and scheduled successfully.",
+      title: "Download Started",
+      description: "Report is being generated.",
     })
-    setShowReportBuilder(false)
   }
 
   return (
     <div className="space-y-6">
-      {/* Enhanced Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Advanced HR Analytics</h1>
-          <div className="flex items-center space-x-2 mt-1">
-            <p className="text-gray-600">AI-powered insights and predictive analytics</p>
-            <div className="flex items-center space-x-1 text-xs text-gray-500">
-              <Clock className="w-3 h-3" />
-              <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-900">HR Analytics & Reports</h1>
+          <p className="text-gray-600">Comprehensive HR insights and payroll reports</p>
         </div>
         <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-2">
-            <Checkbox id="realtime" checked={isRealTimeEnabled} onCheckedChange={setIsRealTimeEnabled} />
-            <Label htmlFor="realtime" className="text-sm">
-              Real-time updates
-            </Label>
-          </div>
           <Button variant="outline" onClick={handleRefreshData}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-48">
-              <Filter className="w-4 h-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="last-6-months">Last 6 Months</SelectItem>
-              <SelectItem value="last-12-months">Last 12 Months</SelectItem>
-              <SelectItem value="ytd">Year to Date</SelectItem>
-              <SelectItem value="custom">Custom Range</SelectItem>
-            </SelectContent>
-          </Select>
-          <Dialog open={showReportBuilder} onOpenChange={setShowReportBuilder}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Create Report
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Custom Report Builder</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Report Name</Label>
-                    <Input placeholder="Enter report name" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Report Type</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="executive">Executive Summary</SelectItem>
-                        <SelectItem value="departmental">Departmental Analysis</SelectItem>
-                        <SelectItem value="compliance">Compliance Report</SelectItem>
-                        <SelectItem value="custom">Custom Dashboard</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea placeholder="Describe the report purpose and content..." />
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Schedule</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select frequency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="quarterly">Quarterly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Recipients</Label>
-                    <Input placeholder="Enter email addresses" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Metrics to Include</Label>
-                  <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                    {executiveMetrics.map((metric, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <Checkbox id={`metric-${index}`} />
-                        <Label htmlFor={`metric-${index}`} className="text-sm">
-                          {metric.metric}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setShowReportBuilder(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateReport}>
-                    <Save className="w-4 h-4 mr-2" />
-                    Create Report
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
           <Button variant="outline">
             <Download className="w-4 h-4 mr-2" />
             Export
@@ -506,29 +73,22 @@ export default function AnalyticsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-8">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="executive">Executive</TabsTrigger>
-          <TabsTrigger value="predictive">Predictive</TabsTrigger>
-          <TabsTrigger value="payroll">Payroll</TabsTrigger>
-          <TabsTrigger value="workforce">Workforce</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {/* Enhanced Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveTab("payroll")}>
+            <Card>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Total Payroll</p>
-                    <p className="text-2xl font-bold text-gray-900">GHS {currentMonth.gross.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-gray-900">GHS {basicMetrics.totalPayroll.toLocaleString()}</p>
                     <div className="flex items-center mt-1">
                       <TrendingUp className="w-3 h-3 text-emerald-600 mr-1" />
-                      <span className="text-xs text-emerald-600">+{grossChange.toFixed(1)}% from last month</span>
+                      <span className="text-xs text-emerald-600">+4.2% from last month</span>
                     </div>
                   </div>
                   <DollarSign className="w-8 h-8 text-emerald-600" />
@@ -536,15 +96,15 @@ export default function AnalyticsPage() {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveTab("payroll")}>
+            <Card>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Net Pay</p>
-                    <p className="text-2xl font-bold text-gray-900">GHS {currentMonth.net.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-gray-900">GHS {basicMetrics.netPay.toLocaleString()}</p>
                     <div className="flex items-center mt-1">
                       <TrendingUp className="w-3 h-3 text-emerald-600 mr-1" />
-                      <span className="text-xs text-emerald-600">+{netChange.toFixed(1)}% from last month</span>
+                      <span className="text-xs text-emerald-600">+3.8% from last month</span>
                     </div>
                   </div>
                   <Calculator className="w-8 h-8 text-blue-600" />
@@ -552,25 +112,15 @@ export default function AnalyticsPage() {
               </CardContent>
             </Card>
 
-            <Card
-              className="hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => setActiveTab("workforce")}
-            >
+            <Card>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Active Employees</p>
-                    <p className="text-2xl font-bold text-gray-900">{currentMonth.employees}</p>
+                    <p className="text-2xl font-bold text-gray-900">{basicMetrics.employees}</p>
                     <div className="flex items-center mt-1">
-                      {employeeChange >= 0 ? (
-                        <TrendingUp className="w-3 h-3 text-emerald-600 mr-1" />
-                      ) : (
-                        <TrendingDown className="w-3 h-3 text-red-600 mr-1" />
-                      )}
-                      <span className={`text-xs ${employeeChange >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                        {employeeChange >= 0 ? "+" : ""}
-                        {employeeChange} from last month
-                      </span>
+                      <TrendingUp className="w-3 h-3 text-emerald-600 mr-1" />
+                      <span className="text-xs text-emerald-600">+2 from last month</span>
                     </div>
                   </div>
                   <Users className="w-8 h-8 text-purple-600" />
@@ -578,970 +128,103 @@ export default function AnalyticsPage() {
               </CardContent>
             </Card>
 
-            <Card
-              className="hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => setActiveTab("performance")}
-            >
+            <Card>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Avg. Salary</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      GHS {Math.round(currentMonth.gross / currentMonth.employees).toLocaleString()}
-                    </p>
+                    <p className="text-2xl font-bold text-gray-900">GHS {basicMetrics.avgSalary.toLocaleString()}</p>
                     <div className="flex items-center mt-1">
                       <TrendingUp className="w-3 h-3 text-emerald-600 mr-1" />
                       <span className="text-xs text-emerald-600">+3.2% from last month</span>
                     </div>
                   </div>
-                  <BarChart3 className="w-8 h-8 text-orange-600" />
+                  <Calculator className="w-8 h-8 text-orange-600" />
                 </div>
               </CardContent>
             </Card>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Target className="w-5 h-5" />
-                <span>Key Performance Indicators</span>
-                <Badge variant="secondary">vs Industry Benchmark</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {performanceMetrics.map((metric, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700">{metric.metric}</span>
-                      <div className="flex items-center space-x-1">
-                        {metric.trend === "up" ? (
-                          <TrendingUp className="w-3 h-3 text-emerald-600" />
-                        ) : (
-                          <TrendingDown className="w-3 h-3 text-red-600" />
-                        )}
-                        <span className="text-xs text-gray-500">
-                          {metric.current}
-                          {metric.metric.includes("Rate") || metric.metric.includes("Index")
-                            ? "%"
-                            : metric.metric.includes("Time")
-                              ? " days"
-                              : metric.metric.includes("Hours")
-                                ? " hrs"
-                                : ""}
-                        </span>
-                      </div>
-                    </div>
-                    <Progress value={(metric.current / metric.target) * 100} className="h-2" />
-                    <div className="flex justify-between text-xs text-gray-500">
-                      <span>Current: {metric.current}</span>
-                      <span>Target: {metric.target}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
 
           <div className="grid lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <TrendingUp className="w-5 h-5" />
-                  <span>Payroll Trends & Predictions</span>
-                  <Badge variant="outline">3-month forecast</Badge>
-                </CardTitle>
+                <CardTitle>Payroll Trends</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <ComposedChart data={payrollTrends}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="period" />
-                    <YAxis yAxisId="left" />
-                    <YAxis yAxisId="right" orientation="right" />
-                    <Tooltip
-                      formatter={(value, name) => [
-                        `${name === "employees" ? "" : "GHS "}${Number(value).toLocaleString()}`,
-                        name === "employees" ? "Employees" : name,
-                      ]}
-                    />
-                    <Legend />
-                    <Bar yAxisId="left" dataKey="gross" fill="#10b981" name="Gross Pay" />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="employees"
-                      stroke="#ef4444"
-                      strokeWidth={2}
-                      strokeDashArray={(entry: any) => (entry.predicted ? "5 5" : "0")}
-                      name="Employees"
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
+                <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+                  <div className="text-center">
+                    <TrendingUp className="w-12 h-12 text-emerald-600 mx-auto mb-2" />
+                    <p className="text-gray-600">Payroll trending upward</p>
+                    <p className="text-sm text-gray-500">+4.2% growth this month</p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <PieChartIcon className="w-5 h-5" />
-                  <span>Department Distribution</span>
-                </CardTitle>
+                <CardTitle>Department Overview</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={filteredDepartmentData}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="employees"
-                      label={({ department, employees }) => `${department}: ${employees}`}
-                    >
-                      {filteredDepartmentData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={`hsl(${index * 60}, 70%, 50%)`} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                    <span className="font-medium">Technology</span>
+                    <Badge>18 employees</Badge>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                    <span className="font-medium">Operations</span>
+                    <Badge>15 employees</Badge>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                    <span className="font-medium">Sales</span>
+                    <Badge>12 employees</Badge>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="executive" className="space-y-6">
-          <ExecutiveDashboard metrics={executiveMetrics} />
-        </TabsContent>
-
-        <TabsContent value="predictive" className="space-y-6">
-          <PredictiveAnalytics insights={predictiveInsights} payrollData={payrollTrends} />
-        </TabsContent>
-
-        <TabsContent value="payroll" className="space-y-6">
-          <PayrollAnalytics data={payrollTrends} departments={filteredDepartmentData} />
-        </TabsContent>
-
-        <TabsContent value="workforce" className="space-y-6">
-          <WorkforceAnalytics
-            departments={filteredDepartmentData}
-            selectedDepartments={selectedDepartments}
-            onDepartmentToggle={handleDepartmentToggle}
-            diversityData={diversityMetrics}
-          />
-        </TabsContent>
-
-        <TabsContent value="performance" className="space-y-6">
-          <PerformanceAnalytics
-            metrics={performanceMetrics}
-            salaryBenchmarks={salaryBenchmarks}
-            departments={filteredDepartmentData}
-          />
-        </TabsContent>
-
-        <TabsContent value="compliance" className="space-y-6">
-          <ComplianceAnalytics data={complianceData} />
-        </TabsContent>
-
         <TabsContent value="reports" className="space-y-6">
-          <ReportsManagement reports={customReports} />
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
-}
-
-function ExecutiveDashboard({ metrics }: { metrics: any[] }) {
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {metrics.map((metric, index) => (
-          <Card key={index} className="relative overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-lg">{metric.metric}</h3>
-                <Badge variant={metric.current >= metric.target ? "default" : "secondary"}>
-                  {metric.current >= metric.target ? "On Track" : "Below Target"}
-                </Badge>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-end">
-                  <span className="text-3xl font-bold text-gray-900">
-                    {metric.metric.includes("Cost") ? "GHS " : ""}
-                    {metric.current.toLocaleString()}
-                  </span>
-                  <div className="text-right">
-                    <div className="flex items-center space-x-1">
-                      {metric.trend === "up" ? (
-                        <TrendingUp className="w-4 h-4 text-emerald-600" />
-                      ) : (
-                        <TrendingDown className="w-4 h-4 text-red-600" />
-                      )}
-                      <span className="text-sm text-gray-600">vs Target</span>
-                    </div>
-                  </div>
-                </div>
-                <Progress value={(metric.current / metric.target) * 100} className="h-3" />
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>Target: {metric.target.toLocaleString()}</span>
-                  <span>Benchmark: {metric.benchmark.toLocaleString()}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function PredictiveAnalytics({ insights, payrollData }: { insights: any[]; payrollData: any[] }) {
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Brain className="w-5 h-5" />
-            <span>AI-Powered Predictions</span>
-            <Badge variant="outline">Machine Learning</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4">
-            {insights.map((insight, index) => (
-              <div key={index} className="p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <h4 className="font-semibold">{insight.title}</h4>
-                      <Badge variant={insight.impact === "High" ? "destructive" : "secondary"}>
-                        {insight.impact} Impact
-                      </Badge>
-                      <Badge variant="outline">{insight.probability}% Confidence</Badge>
-                    </div>
-                    <p className="text-sm text-gray-700 mb-2">{insight.description}</p>
-                    <div className="flex items-center space-x-4 text-sm text-gray-600">
-                      <span className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        {insight.timeframe}
-                      </span>
-                      <span className="flex items-center">
-                        <Target className="w-4 h-4 mr-1" />
-                        {insight.category}
-                      </span>
-                    </div>
-                    <div className="mt-3 p-2 bg-white rounded border-l-4 border-l-blue-500">
-                      <p className="text-sm font-medium text-blue-900">Recommended Action:</p>
-                      <p className="text-sm text-blue-800">{insight.action}</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    <Eye className="w-4 h-4 mr-2" />
-                    Details
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Predictive Payroll Modeling</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={payrollData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="period" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="gross"
-                stroke="#10b981"
-                strokeWidth={2}
-                strokeDashArray={(entry: any) => (entry.predicted ? "5 5" : "0")}
-                name="Gross Payroll"
-              />
-              <Line
-                type="monotone"
-                dataKey="net"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                strokeDashArray={(entry: any) => (entry.predicted ? "5 5" : "0")}
-                name="Net Payroll"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-function ReportsManagement({ reports }: { reports: any[] }) {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Scheduled Reports</h2>
-        <Button>
-          <Plus className="w-4 h-4 mr-2" />
-          Schedule New Report
-        </Button>
-      </div>
-
-      <div className="grid gap-4">
-        {reports.map((report) => (
-          <Card key={report.id}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <h3 className="font-semibold text-lg">{report.name}</h3>
-                    <Badge
-                      className={
-                        report.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
-                      }
-                    >
-                      {report.status}
-                    </Badge>
-                  </div>
-                  <p className="text-gray-600 mb-3">{report.description}</p>
-                  <div className="flex items-center space-x-6 text-sm text-gray-500">
-                    <span className="flex items-center">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      {report.schedule}
-                    </span>
-                    <span className="flex items-center">
-                      <Users className="w-4 h-4 mr-1" />
-                      {report.recipients.length} recipients
-                    </span>
-                    <span className="flex items-center">
-                      <Clock className="w-4 h-4 mr-1" />
-                      Last run: {report.lastRun}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm">
-                    <Eye className="w-4 h-4 mr-2" />
-                    Preview
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Settings className="w-4 h-4 mr-2" />
-                    Configure
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Zap className="w-4 h-4 mr-2" />
-                    Run Now
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function PayrollAnalytics({ data, departments }: { data: any[]; departments: any[] }) {
-  const actualData = data.filter((d) => !d.predicted)
-  const predictedData = data.filter((d) => d.predicted)
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-emerald-600">
-              GHS {actualData[actualData.length - 1].gross.toLocaleString()}
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-xl font-semibold">Available Reports</h2>
+              <p className="text-gray-600">Generate and download payroll reports</p>
             </div>
-            <p className="text-sm text-gray-600">Current Gross Payroll</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600">
-              GHS {actualData[actualData.length - 1].paye.toLocaleString()}
-            </div>
-            <p className="text-sm text-gray-600">PAYE Tax</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">
-              GHS {actualData[actualData.length - 1].ssnit.toLocaleString()}
-            </div>
-            <p className="text-sm text-gray-600">SSNIT Contributions</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-purple-600">
-              GHS {actualData[actualData.length - 1].tier3.toLocaleString()}
-            </div>
-            <p className="text-sm text-gray-600">Tier 3 Contributions</p>
-          </CardContent>
-        </Card>
-      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Payroll Breakdown Over Time</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={400}>
-            <AreaChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="period" />
-              <YAxis />
-              <Tooltip formatter={(value) => [`GHS ${Number(value).toLocaleString()}`, ""]} />
-              <Legend />
-              <Area type="monotone" dataKey="gross" stackId="1" stroke="#10b981" fill="#10b981" name="Gross Pay" />
-              <Area type="monotone" dataKey="paye" stackId="2" stroke="#ef4444" fill="#ef4444" name="PAYE" />
-              <Area type="monotone" dataKey="ssnit" stackId="2" stroke="#3b82f6" fill="#3b82f6" name="SSNIT" />
-              <Area type="monotone" dataKey="tier3" stackId="2" stroke="#8b5cf6" fill="#8b5cf6" name="Tier 3" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Department Payroll Analysis</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Department</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-900">Total Cost</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-900">Budget</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-900">Utilization</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-900">Variance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {departments.map((dept, index) => {
-                  const variance = ((dept.cost - dept.budget) / dept.budget) * 100
-                  return (
-                    <tr key={index} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4 font-medium text-gray-900">{dept.department}</td>
-                      <td className="py-3 px-4 text-right">GHS {dept.cost.toLocaleString()}</td>
-                      <td className="py-3 px-4 text-right text-gray-600">GHS {dept.budget.toLocaleString()}</td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <div className="w-16 bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-emerald-600 h-2 rounded-full"
-                              style={{ width: `${dept.utilization}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-sm">{dept.utilization}%</span>
+            <div className="grid gap-4">
+              {simpleReports.map((report) => (
+                <Card key={report.id}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h3 className="font-semibold text-lg">{report.name}</h3>
+                          <Badge className="bg-blue-100 text-blue-700">{report.category}</Badge>
+                          <Badge className="bg-green-100 text-green-700">{report.status}</Badge>
                         </div>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <Badge variant={variance > 0 ? "destructive" : "default"}>
-                          {variance > 0 ? "+" : ""}
-                          {variance.toFixed(1)}%
-                        </Badge>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-function WorkforceAnalytics({
-  departments,
-  selectedDepartments,
-  onDepartmentToggle,
-  diversityData,
-}: {
-  departments: any[]
-  selectedDepartments: string[]
-  onDepartmentToggle: (dept: string) => void
-  diversityData: any[]
-}) {
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Department Filter</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {departments.map((dept) => (
-              <div key={dept.department} className="flex items-center space-x-2">
-                <Checkbox
-                  id={dept.department}
-                  checked={selectedDepartments.includes(dept.department)}
-                  onCheckedChange={() => onDepartmentToggle(dept.department)}
-                />
-                <Label htmlFor={dept.department} className="text-sm">
-                  {dept.department} ({dept.employees})
-                </Label>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Turnover Rate by Department</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={departments} layout="horizontal">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis dataKey="department" type="category" width={80} />
-                <Tooltip formatter={(value) => [`${value}%`, "Turnover Rate"]} />
-                <Bar dataKey="turnover" fill="#ef4444" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Employee Satisfaction</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <RadialBarChart cx="50%" cy="50%" innerRadius="20%" outerRadius="90%" data={departments}>
-                <RadialBar dataKey="satisfaction" cornerRadius={10} fill="#10b981" />
-                <Tooltip formatter={(value) => [`${value}/5`, "Satisfaction"]} />
-              </RadialBarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Productivity Index</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {departments.map((dept, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium">{dept.department}</span>
-                    <span className="text-sm text-gray-600">{dept.productivity}%</span>
-                  </div>
-                  <Progress value={dept.productivity} className="h-2" />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Workforce Diversity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {diversityData.map((category, index) => (
-              <div key={index}>
-                <h4 className="font-medium mb-3">{category.category}</h4>
-                <div className="space-y-2">
-                  {Object.entries(category)
-                    .filter(([key]) => key !== "category")
-                    .map(([key, value]) => (
-                      <div key={key} className="flex justify-between items-center">
-                        <span className="text-sm">{key}</span>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-20 bg-gray-200 rounded-full h-2">
-                            <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${value}%` }}></div>
-                          </div>
-                          <span className="text-sm w-8">{value}%</span>
+                        <p className="text-gray-600 mb-3">{report.description}</p>
+                        <div className="flex items-center space-x-6 text-sm text-gray-500">
+                          <span>{report.records} records</span>
+                          <span>{report.totalAmount}</span>
                         </div>
                       </div>
-                    ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-function PerformanceAnalytics({
-  metrics,
-  salaryBenchmarks,
-  departments,
-}: {
-  metrics: any[]
-  salaryBenchmarks: any[]
-  departments: any[]
-}) {
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Performance Metrics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {metrics.map((metric, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{metric.metric}</p>
-                    <p className="text-sm text-gray-600">
-                      Current: {metric.current} | Target: {metric.target}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {metric.trend === "up" ? (
-                      <TrendingUp className="w-5 h-5 text-emerald-600" />
-                    ) : (
-                      <TrendingDown className="w-5 h-5 text-red-600" />
-                    )}
-                    <Progress value={(metric.current / metric.target) * 100} className="w-20 h-2" />
-                  </div>
-                </div>
+                      <div className="flex items-center space-x-2">
+                        <Button variant="outline" size="sm">
+                          Preview
+                        </Button>
+                        <Button size="sm" onClick={() => handleDownloadReport(report.id)}>
+                          Download
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Salary Benchmarking</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <ScatterChart data={salaryBenchmarks}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="internal" name="Internal Salary" />
-                <YAxis dataKey="market" name="Market Rate" />
-                <Tooltip
-                  cursor={{ strokeDasharray: "3 3" }}
-                  formatter={(value, name) => [`GHS ${value}`, name === "internal" ? "Internal" : "Market"]}
-                />
-                <Scatter dataKey="market" fill="#8884d8" />
-              </ScatterChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Salary Variance Analysis</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Position</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-900">Internal Salary</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-900">Market Rate</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-900">Variance</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-900">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {salaryBenchmarks.map((position, index) => (
-                  <tr key={index} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4 font-medium text-gray-900">{position.position}</td>
-                    <td className="py-3 px-4 text-right">GHS {position.internal.toLocaleString()}</td>
-                    <td className="py-3 px-4 text-right text-gray-600">GHS {position.market.toLocaleString()}</td>
-                    <td className="py-3 px-4 text-right">
-                      <span className={position.variance > 0 ? "text-emerald-600" : "text-red-600"}>
-                        {position.variance > 0 ? "+" : ""}
-                        {position.variance.toFixed(1)}%
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <Badge variant={Math.abs(position.variance) > 10 ? "destructive" : "default"}>
-                        {Math.abs(position.variance) > 10 ? "Review" : "Competitive"}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-function ComplianceAnalytics({ data }: { data: any[] }) {
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {data.map((item, index) => (
-          <Card
-            key={index}
-            className={`border-l-4 ${
-              item.status === "compliant"
-                ? "border-l-emerald-500"
-                : item.status === "warning"
-                  ? "border-l-yellow-500"
-                  : "border-l-red-500"
-            }`}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{item.name}</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {item.value}/{item.total}
-                  </p>
-                  <div className="flex items-center mt-1">
-                    <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                      <div
-                        className="h-2 rounded-full"
-                        style={{
-                          width: `${(item.value / item.total) * 100}%`,
-                          backgroundColor: item.color,
-                        }}
-                      ></div>
-                    </div>
-                    <span className="text-xs text-gray-600">{Math.round((item.value / item.total) * 100)}%</span>
-                  </div>
-                </div>
-                <Badge
-                  variant={
-                    item.status === "compliant" ? "default" : item.status === "warning" ? "secondary" : "destructive"
-                  }
-                >
-                  {item.status === "compliant"
-                    ? "Compliant"
-                    : item.status === "warning"
-                      ? "Warning"
-                      : "Action Required"}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Compliance Overview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" fill="#10b981" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Compliance Action Items</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {data
-              .filter((item) => item.status !== "compliant")
-              .map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-sm text-gray-600">{item.total - item.value} employees need attention</p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Take Action
-                  </Button>
-                </div>
-              ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-function InsightsAnalytics({
-  payrollData,
-  departmentData,
-  performanceData,
-}: {
-  payrollData: any[]
-  departmentData: any[]
-  performanceData: any[]
-}) {
-  const insights = [
-    {
-      title: "Payroll Growth Trend",
-      description: "Monthly payroll has increased by 14.2% over the last 6 months, indicating business growth.",
-      type: "positive",
-      impact: "high",
-      recommendation: "Consider salary benchmarking to ensure competitive compensation.",
-    },
-    {
-      title: "High Turnover in Operations",
-      description: "Operations department shows 18.7% turnover rate, significantly above company average.",
-      type: "warning",
-      impact: "high",
-      recommendation: "Investigate working conditions and implement retention strategies.",
-    },
-    {
-      title: "Technology Department Performance",
-      description: "Tech team shows highest productivity (92%) and satisfaction (4.3/5) scores.",
-      type: "positive",
-      impact: "medium",
-      recommendation: "Use as best practice model for other departments.",
-    },
-    {
-      title: "Tier 3 Enrollment Gap",
-      description: "12 employees not enrolled in Tier 3 pension scheme, affecting compliance.",
-      type: "warning",
-      impact: "medium",
-      recommendation: "Conduct enrollment drive and provide education on pension benefits.",
-    },
-  ]
-
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>AI-Powered Insights</CardTitle>
-          <p className="text-sm text-gray-600">
-            Automated analysis of your HR and payroll data with actionable recommendations
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {insights.map((insight, index) => (
-              <div
-                key={index}
-                className={`p-4 border rounded-lg ${
-                  insight.type === "positive"
-                    ? "border-emerald-200 bg-emerald-50"
-                    : insight.type === "warning"
-                      ? "border-yellow-200 bg-yellow-50"
-                      : "border-red-200 bg-red-50"
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <h4 className="font-medium">{insight.title}</h4>
-                      <Badge
-                        variant={
-                          insight.impact === "high"
-                            ? "destructive"
-                            : insight.impact === "medium"
-                              ? "secondary"
-                              : "default"
-                        }
-                      >
-                        {insight.impact} impact
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-gray-700 mb-2">{insight.description}</p>
-                    <p className="text-sm font-medium text-gray-900">Recommendation: {insight.recommendation}</p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    View Details
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Predictive Analytics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="p-3 border rounded-lg">
-                <h4 className="font-medium mb-1">Projected Payroll Growth</h4>
-                <p className="text-sm text-gray-600 mb-2">Based on current trends, expect 8-12% growth next quarter</p>
-                <Progress value={75} className="h-2" />
-              </div>
-              <div className="p-3 border rounded-lg">
-                <h4 className="font-medium mb-1">Turnover Risk</h4>
-                <p className="text-sm text-gray-600 mb-2">15 employees identified as high turnover risk</p>
-                <Progress value={60} className="h-2" />
-              </div>
-              <div className="p-3 border rounded-lg">
-                <h4 className="font-medium mb-1">Budget Utilization</h4>
-                <p className="text-sm text-gray-600 mb-2">On track to utilize 97.8% of annual HR budget</p>
-                <Progress value={98} className="h-2" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Benchmarking</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-3 border rounded-lg">
-                <div>
-                  <p className="font-medium">Industry Average Salary</p>
-                  <p className="text-sm text-gray-600">Technology Sector</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-emerald-600">+12%</p>
-                  <p className="text-xs text-gray-500">Above average</p>
-                </div>
-              </div>
-              <div className="flex justify-between items-center p-3 border rounded-lg">
-                <div>
-                  <p className="font-medium">Employee Satisfaction</p>
-                  <p className="text-sm text-gray-600">Ghana Market</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-emerald-600">+8%</p>
-                  <p className="text-xs text-gray-500">Above average</p>
-                </div>
-              </div>
-              <div className="flex justify-between items-center p-3 border rounded-lg">
-                <div>
-                  <p className="font-medium">Turnover Rate</p>
-                  <p className="text-sm text-gray-600">Similar Companies</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-red-600">+3%</p>
-                  <p className="text-xs text-gray-500">Above average</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
