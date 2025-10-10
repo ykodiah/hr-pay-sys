@@ -1,7 +1,7 @@
 "use client"
 
-import SimpleEnhancedDocumentVaultPage from "./simple-enhanced"
+import FullyFunctionalDocumentVaultPage from "./fully-functional"
 
 export default function DocumentVaultPage() {
-  return <SimpleEnhancedDocumentVaultPage />
+  return <FullyFunctionalDocumentVaultPage />
 }
