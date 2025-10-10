@@ -1,0 +1,181 @@
+/* Responsive Navigation Optimizations */
+
+/* Mobile Navigation Improvements */
+@media (max-width: 768px) {
+  /* Ensure mobile menu is full height */
+  .mobile-menu-content {
+    height: 100vh;
+    overflow-y: auto;
+  }
+  
+  /* Optimize touch targets for mobile */
+  .mobile-nav-item {
+    min-height: 44px;
+    padding: 12px 16px;
+  }
+  
+  /* Improve mobile search */
+  .mobile-search {
+    width: 100%;
+    margin: 0 16px;
+  }
+  
+  /* Better mobile spacing */
+  .mobile-header {
+    padding: 12px 16px;
+  }
+  
+  /* Optimize mobile breadcrumbs */
+  .mobile-breadcrumbs {
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+  
+  /* Mobile content padding */
+  .mobile-content {
+    padding: 16px;
+  }
+}
+
+/* Tablet Navigation Improvements */
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Collapsible sidebar for tablets */
+  .tablet-sidebar {
+    width: 200px;
+  }
+  
+  /* Optimize tablet content */
+  .tablet-content {
+    padding: 20px;
+  }
+}
+
+/* Desktop Navigation Improvements */
+@media (min-width: 1025px) {
+  /* Smooth sidebar transitions */
+  .desktop-sidebar {
+    transition: width 0.3s ease-in-out;
+  }
+  
+  /* Hover effects for desktop */
+  .desktop-nav-item:hover {
+    transform: translateX(2px);
+    transition: transform 0.2s ease-in-out;
+  }
+  
+  /* Quick actions hover effects */
+  .quick-action:hover {
+    transform: scale(1.05);
+    transition: transform 0.2s ease-in-out;
+  }
+}
+
+/* High DPI Display Optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Ensure crisp icons on retina displays */
+  .nav-icon {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}
+
+/* Accessibility Improvements */
+@media (prefers-reduced-motion: reduce) {
+  /* Disable animations for users who prefer reduced motion */
+  .nav-transition,
+  .sidebar-transition,
+  .hover-transition {
+    transition: none;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .dark-mode-nav {
+    background-color: #1f2937;
+    border-color: #374151;
+  }
+  
+  .dark-mode-nav-item {
+    color: #f9fafb;
+  }
+  
+  .dark-mode-nav-item:hover {
+    background-color: #374151;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-content {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Focus Management for Keyboard Navigation */
+.nav-item:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Loading States */
+.nav-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Error States */
+.nav-error {
+  border-left: 4px solid #ef4444;
+  background-color: #fef2f2;
+}
+
+/* Success States */
+.nav-success {
+  border-left: 4px solid #10b981;
+  background-color: #f0fdf4;
+}
+
+/* Responsive Typography */
+@media (max-width: 640px) {
+  .mobile-text-sm {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  
+  .mobile-text-xs {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+}
+
+/* Touch-friendly button sizes */
+@media (hover: none) and (pointer: coarse) {
+  .touch-button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px 16px;
+  }
+}
+
+/* Landscape mobile optimization */
+@media (max-width: 768px) and (orientation: landscape) {
+  .landscape-mobile {
+    height: 100vh;
+    overflow-y: auto;
+  }
+  
+  .landscape-header {
+    height: 60px;
+  }
+  
+  .landscape-content {
+    height: calc(100vh - 60px);
+    overflow-y: auto;
+  }
+}
