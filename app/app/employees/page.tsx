@@ -3,7 +3,7 @@
 import { DialogDescription } from "@/components/ui/dialog"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrency } from "@/lib/currency-context"
-import { Plus, Search, Filter, Download, Upload, MoreHorizontal, Edit, Trash2, Eye, Mail, X } from "lucide-react"
+import { Plus, Search, Filter, Download, Upload, MoreHorizontal, Edit, Trash2, Eye, Mail, X, CheckCircle, FileText } from "lucide-react"
 
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 import { useToast } from "@/hooks/use-toast"
@@ -338,6 +338,66 @@ export default function EmployeesPage() {
   }>>([])
   const [showAllowanceSelector, setShowAllowanceSelector] = useState(false)
   const [showDeductionSelector, setShowDeductionSelector] = useState(false)
+
+  // Document upload states
+  const [uploadedDocuments, setUploadedDocuments] = useState([])
+  const [uploadingDocuments, setUploadingDocuments] = useState([])
+  const [uploadProgress, setUploadProgress] = useState({})
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+  const [previewDocument, setPreviewDocument] = useState(null)
+  const fileInputRefs = useRef({})
+
+  // Required documents configuration
+  const requiredDocuments = [
+    {
+      id: "academic",
+      title: "1. Academic Certificate(s)",
+      description: "Educational certificates and transcripts",
+      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png"
+    },
+    {
+      id: "passport-picture",
+      title: "2. Passport Picture",
+      description: "Professional passport-sized photograph",
+      acceptTypes: ".jpg,.jpeg,.png"
+    },
+    {
+      id: "resume",
+      title: "3. Resume & Application Letter",
+      description: "Current CV and cover letter",
+      acceptTypes: ".pdf,.doc,.docx"
+    },
+    {
+      id: "passport",
+      title: "4. Passport",
+      description: "Valid passport copy",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+    },
+    {
+      id: "national-id",
+      title: "5. National ID",
+      description: "Ghana Card or Voter ID",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+    },
+    {
+      id: "medical",
+      title: "6. Medical Report",
+      description: "Health clearance certificate",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+    },
+    {
+      id: "police",
+      title: "7. Police Report",
+      description: "Criminal background check",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+    },
+    {
+      id: "other",
+      title: "8. Other Uploads",
+      description: "Additional supporting documents",
+      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png"
+    }
+  ]
 
   const handleAddAllowance = (allowanceCode: string) => {
     const allowance = companyAllowances.find((a) => a.code === allowanceCode)
@@ -2188,6 +2248,66 @@ function AddEmployeeForm({
   }>>([])
   const [showAllowanceSelector, setShowAllowanceSelector] = useState(false)
   const [showDeductionSelector, setShowDeductionSelector] = useState(false)
+
+  // Document upload states
+  const [uploadedDocuments, setUploadedDocuments] = useState([])
+  const [uploadingDocuments, setUploadingDocuments] = useState([])
+  const [uploadProgress, setUploadProgress] = useState({})
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+  const [previewDocument, setPreviewDocument] = useState(null)
+  const fileInputRefs = useRef({})
+
+  // Required documents configuration
+  const requiredDocuments = [
+    {
+      id: "academic",
+      title: "1. Academic Certificate(s)",
+      description: "Educational certificates and transcripts",
+      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png"
+    },
+    {
+      id: "passport-picture",
+      title: "2. Passport Picture",
+      description: "Professional passport-sized photograph",
+      acceptTypes: ".jpg,.jpeg,.png"
+    },
+    {
+      id: "resume",
+      title: "3. Resume & Application Letter",
+      description: "Current CV and cover letter",
+      acceptTypes: ".pdf,.doc,.docx"
+    },
+    {
+      id: "passport",
+      title: "4. Passport",
+      description: "Valid passport copy",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+    },
+    {
+      id: "national-id",
+      title: "5. National ID",
+      description: "Ghana Card or Voter ID",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+    },
+    {
+      id: "medical",
+      title: "6. Medical Report",
+      description: "Health clearance certificate",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+    },
+    {
+      id: "police",
+      title: "7. Police Report",
+      description: "Criminal background check",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+    },
+    {
+      id: "other",
+      title: "8. Other Uploads",
+      description: "Additional supporting documents",
+      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png"
+    }
+  ]
 
   const handleAddAllowance = (allowanceCode: string) => {
     const allowance = companyAllowances.find((a) => a.code === allowanceCode)
@@ -4378,64 +4498,165 @@ function AddEmployeeForm({
             </div>
           </div>
         </TabsContent>
-        <TabsContent value="documents" className="space-y-4">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Required Documents</h3>
-            <div className="space-y-4">
-              {[
-                {
-                  id: "academicCertificate",
-                  title: "1. Academic Certificate(s)",
-                  description: "Educational certificates and transcripts",
-                },
-                {
-                  id: "passportPicture",
-                  title: "2. Passport Picture",
-                  description: "Professional passport-sized photograph",
-                },
-                {
-                  id: "resumeApplication",
-                  title: "3. Resume & Application Letter",
-                  description: "Current CV and cover letter",
-                },
-                {
-                  id: "passport",
-                  title: "4. Passport",
-                  description: "Valid passport copy",
-                },
-                {
-                  id: "nationalId",
-                  title: "5. National ID",
-                  description: "Ghana Card or Voter ID",
-                },
-                {
-                  id: "medicalReport",
-                  title: "6. Medical Report",
-                  description: "Health clearance certificate",
-                },
-                {
-                  id: "policeReport",
-                  title: "7. Police Report",
-                  description: "Criminal background check",
-                },
-                {
-                  id: "otherUploads",
-                  title: "8. Other Uploads",
-                  description: "Additional supporting documents",
-                },
-              ].map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <h4 className="font-medium">{doc.title}</h4>
-                    <p className="text-sm text-gray-600">{doc.description}</p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
-              ))}
+        <TabsContent value="documents" className="space-y-6">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Required Documents</h3>
+              <div className="text-sm text-gray-500">
+                {uploadedDocuments.length} of {requiredDocuments.length} documents uploaded
+              </div>
             </div>
+            
+            <div className="space-y-4">
+              {requiredDocuments.map((doc) => {
+                const uploadedDoc = uploadedDocuments.find((d) => d.documentType === doc.id)
+                const isUploaded = !!uploadedDoc
+                const isUploading = uploadingDocuments.includes(doc.id)
+                
+                return (
+                  <Card key={doc.id} className={`p-4 border-2 transition-all ${
+                    isUploaded 
+                      ? 'border-green-200 bg-green-50' 
+                      : isUploading 
+                        ? 'border-blue-200 bg-blue-50' 
+                        : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            isUploaded 
+                              ? 'bg-green-100 text-green-600' 
+                              : isUploading 
+                                ? 'bg-blue-100 text-blue-600' 
+                                : 'bg-gray-100 text-gray-400'
+                          }`}>
+                            {isUploaded ? (
+                              <CheckCircle className="w-5 h-5" />
+                            ) : isUploading ? (
+                              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <FileText className="w-5 h-5" />
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-gray-900">{doc.title}</h4>
+                            <p className="text-sm text-gray-600">{doc.description}</p>
+                            {isUploaded && uploadedDoc && (
+                              <div className="mt-2 flex items-center space-x-2">
+                                <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  {uploadedDoc.fileName}
+                                </Badge>
+                                <span className="text-xs text-gray-500">
+                                  {formatFileSize(uploadedDoc.fileSize)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveDocument(doc.id)}
+                                  className="text-red-500 hover:text-red-700 text-xs"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        {isUploaded ? (
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePreviewDocument(uploadedDoc!)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              View
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleReplaceDocument(doc.id)}
+                              className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                            >
+                              <Upload className="w-4 h-4 mr-2" />
+                              Replace
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <input
+                              ref={(el) => {
+                                if (el) fileInputRefs.current[doc.id] = el
+                              }}
+                              type="file"
+                              accept={doc.acceptTypes}
+                              onChange={(e) => handleFileSelect(doc.id, e)}
+                              className="hidden"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUploadClick(doc.id)}
+                              disabled={isUploading}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              {isUploading ? (
+                                <>
+                                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2" />
+                                  Uploading...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-4 h-4 mr-2" />
+                                  Choose File
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {isUploading && (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
+                          <span>Uploading...</span>
+                          <span>{uploadProgress[doc.id] || 0}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${uploadProgress[doc.id] || 0}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                )
+              })}
+            </div>
+            
+            {uploadedDocuments.length > 0 && (
+              <Card className="p-4 bg-blue-50 border-blue-200">
+                <div className="flex items-center space-x-3">
+                  <CheckCircle className="w-6 h-6 text-blue-600" />
+                  <div>
+                    <h4 className="font-medium text-blue-900">Documents Ready for Review</h4>
+                    <p className="text-sm text-blue-700">
+                      {uploadedDocuments.length} document{uploadedDocuments.length !== 1 ? 's' : ''} uploaded successfully. 
+                      All documents will be saved to the document vault and labeled with the employee's name.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            )}
           </div>
         </TabsContent>
       </Tabs>
@@ -4465,6 +4686,69 @@ function AddEmployeeForm({
           </div>
         )}
       </div>
+
+      {/* Document Preview Dialog */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Document Preview</DialogTitle>
+          </DialogHeader>
+          {previewDocument && (
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                  {previewDocument.fileType.startsWith('image/') ? (
+                    <img 
+                      src={previewDocument.fileUrl} 
+                      alt={previewDocument.fileName}
+                      className="w-8 h-8 object-cover rounded"
+                    />
+                  ) : (
+                    <FileText className="w-6 h-6 text-gray-600" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-900">{previewDocument.fileName}</h3>
+                  <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
+                    <span>{formatFileSize(previewDocument.fileSize)}</span>
+                    <span>{previewDocument.fileType}</span>
+                    <span>{new Date(previewDocument.uploadDate).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </div>
+              
+              {previewDocument.fileType.startsWith('image/') && (
+                <div className="border rounded-lg p-4">
+                  <img 
+                    src={previewDocument.fileUrl} 
+                    alt={previewDocument.fileName}
+                    className="max-w-full h-auto rounded"
+                  />
+                </div>
+              )}
+              
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>
+                  Close
+                </Button>
+                <Button 
+                  onClick={() => {
+                    // In production, this would trigger actual download
+                    toast({
+                      title: "Download Started",
+                      description: `${previewDocument.fileName} is being downloaded.`
+                    })
+                    setIsPreviewOpen(false)
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

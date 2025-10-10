@@ -28,6 +28,7 @@ import {
   Calendar,
   FolderOpen,
   Archive,
+  X,
 } from "lucide-react"
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 
@@ -49,6 +50,10 @@ export default function DocumentVaultPage() {
   const [selectedEmployee, setSelectedEmployee] = useState("all")
   const [selectedDocumentType, setSelectedDocumentType] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("all")
+  const [selectedDateRange, setSelectedDateRange] = useState("all")
+  const [selectedFileSize, setSelectedFileSize] = useState("all")
+  const [selectedSource, setSelectedSource] = useState("all")
+  const [selectedCategory, setSelectedCategory] = useState("all")
   const [selectedDocument, setSelectedDocument] = useState<any>(null)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
@@ -61,15 +66,67 @@ export default function DocumentVaultPage() {
 
   const filteredDocuments = documents.filter((doc) => {
     const matchesSearch =
-      doc.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doc.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
+      doc.employeeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.fileType.toLowerCase().includes(searchTerm.toLowerCase())
+    
     const matchesEmployee = selectedEmployee === "all" || doc.employeeId === selectedEmployee
     const matchesDocumentType = selectedDocumentType === "all" || doc.documentType === selectedDocumentType
     const matchesStatus = selectedStatus === "all" || doc.status === selectedStatus
     const matchesTab = activeTab === "all" || doc.status === activeTab
+    
+    // Date range filtering
+    const matchesDateRange = (() => {
+      if (selectedDateRange === "all") return true
+      const now = new Date()
+      const docDate = new Date(doc.uploadDate)
+      
+      switch (selectedDateRange) {
+        case "today":
+          return docDate.toDateString() === now.toDateString()
+        case "week":
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          return docDate >= weekAgo
+        case "month":
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          return docDate >= monthAgo
+        case "quarter":
+          const quarterAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+          return docDate >= quarterAgo
+        case "year":
+          const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+          return docDate >= yearAgo
+        default:
+          return true
+      }
+    })()
+    
+    // File size filtering
+    const matchesFileSize = (() => {
+      if (selectedFileSize === "all") return true
+      const sizeInMB = doc.fileSize / (1024 * 1024)
+      
+      switch (selectedFileSize) {
+        case "small":
+          return sizeInMB < 1
+        case "medium":
+          return sizeInMB >= 1 && sizeInMB <= 10
+        case "large":
+          return sizeInMB > 10
+        default:
+          return true
+      }
+    })()
+    
+    // Source filtering
+    const matchesSource = selectedSource === "all" || doc.source === selectedSource
+    
+    // Category filtering
+    const matchesCategory = selectedCategory === "all" || doc.category === selectedCategory
 
-    return matchesSearch && matchesEmployee && matchesDocumentType && matchesStatus && matchesTab
+    return matchesSearch && matchesEmployee && matchesDocumentType && matchesStatus && 
+           matchesTab && matchesDateRange && matchesFileSize && matchesSource && matchesCategory
   })
 
   const employees = [...new Set(documents.map((doc) => ({ id: doc.employeeId, name: doc.employeeName })))]
@@ -226,56 +283,177 @@ export default function DocumentVaultPage() {
         </Card>
       </div>
 
-      {/* Filters and Search */}
+      {/* Enhanced Filters and Search */}
       <Card>
         <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1">
+          <div className="space-y-4">
+            {/* Search Bar */}
+            <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <Input
-                placeholder="Search by employee name, document name, or employee ID..."
+                placeholder="Search by employee name, document name, employee ID, or file type..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-              <SelectTrigger className="w-full lg:w-48">
-                <SelectValue placeholder="Filter by employee" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Employees</SelectItem>
-                {employees.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id}>
-                    {emp.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedDocumentType} onValueChange={setSelectedDocumentType}>
-              <SelectTrigger className="w-full lg:w-48">
-                <SelectValue placeholder="Document type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                {documentTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {documentTypeLabels[type as keyof typeof documentTypeLabels]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-full lg:w-48">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
+            
+            {/* Filter Row 1 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Employees</SelectItem>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={selectedDocumentType} onValueChange={setSelectedDocumentType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Document type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {documentTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {documentTypeLabels[type as keyof typeof documentTypeLabels]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={selectedDateRange} onValueChange={setSelectedDateRange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Date range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">This Week</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                  <SelectItem value="quarter">This Quarter</SelectItem>
+                  <SelectItem value="year">This Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Filter Row 2 - Advanced Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Select value={selectedFileSize} onValueChange={setSelectedFileSize}>
+                <SelectTrigger>
+                  <SelectValue placeholder="File size" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sizes</SelectItem>
+                  <SelectItem value="small">Small (&lt; 1MB)</SelectItem>
+                  <SelectItem value="medium">Medium (1-10MB)</SelectItem>
+                  <SelectItem value="large">Large (&gt; 10MB)</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={selectedSource} onValueChange={setSelectedSource}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Upload source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  <SelectItem value="employee-onboarding">Employee Onboarding</SelectItem>
+                  <SelectItem value="settings">Settings</SelectItem>
+                  <SelectItem value="training">Training</SelectItem>
+                  <SelectItem value="recruitment">Recruitment</SelectItem>
+                  <SelectItem value="manual-upload">Manual Upload</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="employee-document">Employee Documents</SelectItem>
+                  <SelectItem value="company-asset">Company Assets</SelectItem>
+                  <SelectItem value="system-data">System Data</SelectItem>
+                  <SelectItem value="training-content">Training Content</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Active Filters Display */}
+            {(selectedEmployee !== "all" || selectedDocumentType !== "all" || selectedStatus !== "all" || 
+              selectedDateRange !== "all" || selectedFileSize !== "all" || selectedSource !== "all" || 
+              selectedCategory !== "all" || searchTerm) && (
+              <div className="flex flex-wrap gap-2 pt-2 border-t">
+                <span className="text-sm text-gray-600">Active filters:</span>
+                {selectedEmployee !== "all" && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    Employee: {employees.find(e => e.id === selectedEmployee)?.name}
+                    <button onClick={() => setSelectedEmployee("all")} className="ml-1 hover:text-red-600">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                )}
+                {selectedDocumentType !== "all" && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    Type: {documentTypeLabels[selectedDocumentType as keyof typeof documentTypeLabels]}
+                    <button onClick={() => setSelectedDocumentType("all")} className="ml-1 hover:text-red-600">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                )}
+                {selectedStatus !== "all" && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    Status: {selectedStatus}
+                    <button onClick={() => setSelectedStatus("all")} className="ml-1 hover:text-red-600">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                )}
+                {searchTerm && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    Search: "{searchTerm}"
+                    <button onClick={() => setSearchTerm("")} className="ml-1 hover:text-red-600">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                )}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setSelectedEmployee("all")
+                    setSelectedDocumentType("all")
+                    setSelectedStatus("all")
+                    setSelectedDateRange("all")
+                    setSelectedFileSize("all")
+                    setSelectedSource("all")
+                    setSelectedCategory("all")
+                    setSearchTerm("")
+                  }}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  Clear All
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
