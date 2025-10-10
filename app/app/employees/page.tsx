@@ -312,15 +312,49 @@ export default function EmployeesPage() {
     { code: "ADVANCE", description: "Advance Deduction", recurring: true },
   ])
 
-  const [selectedAllowances, setSelectedAllowances] = useState<Array<{ code: string; amount: string }>>([])
-  const [selectedDeductions, setSelectedDeductions] = useState<Array<{ code: string; amount: string }>>([])
+  const [selectedAllowances, setSelectedAllowances] = useState<Array<{
+    id: string;
+    code: string;
+    description: string;
+    taxable: boolean;
+    recurring: boolean;
+    amount: string;
+    percentage: string;
+    calculationType: 'AMOUNT' | 'PERCENTAGE';
+    effectiveDate: string;
+    endDate?: string;
+  }>>([])
+  const [selectedDeductions, setSelectedDeductions] = useState<Array<{
+    id: string;
+    code: string;
+    description: string;
+    taxable: boolean;
+    recurring: boolean;
+    amount: string;
+    percentage: string;
+    calculationType: 'AMOUNT' | 'PERCENTAGE';
+    effectiveDate: string;
+    endDate?: string;
+  }>>([])
   const [showAllowanceSelector, setShowAllowanceSelector] = useState(false)
   const [showDeductionSelector, setShowDeductionSelector] = useState(false)
 
   const handleAddAllowance = (allowanceCode: string) => {
     const allowance = companyAllowances.find((a) => a.code === allowanceCode)
     if (allowance && !selectedAllowances.find((a) => a.code === allowanceCode)) {
-      setSelectedAllowances([...selectedAllowances, { code: allowanceCode, amount: "0" }])
+      const newAllowance = {
+        id: allowance.id,
+        code: allowance.code,
+        description: allowance.description,
+        taxable: allowance.taxable,
+        recurring: allowance.recurring,
+        amount: "0",
+        percentage: "0",
+        calculationType: 'AMOUNT' as 'AMOUNT' | 'PERCENTAGE',
+        effectiveDate: new Date().toISOString().split('T')[0],
+        endDate: undefined
+      }
+      setSelectedAllowances([...selectedAllowances, newAllowance])
       setShowAllowanceSelector(false)
     }
   }
@@ -329,14 +363,28 @@ export default function EmployeesPage() {
     setSelectedAllowances(selectedAllowances.filter((a) => a.code !== allowanceCode))
   }
 
-  const handleAllowanceAmountChange = (allowanceCode: string, amount: string) => {
-    setSelectedAllowances(selectedAllowances.map((a) => (a.code === allowanceCode ? { ...a, amount } : a)))
+  const handleAllowanceChange = (allowanceCode: string, field: string, value: any) => {
+    setSelectedAllowances(selectedAllowances.map((a) => 
+      a.code === allowanceCode ? { ...a, [field]: value } : a
+    ))
   }
 
   const handleAddDeduction = (deductionCode: string) => {
     const deduction = companyDeductions.find((d) => d.code === deductionCode)
     if (deduction && !selectedDeductions.find((d) => d.code === deductionCode)) {
-      setSelectedDeductions([...selectedDeductions, { code: deductionCode, amount: "0" }])
+      const newDeduction = {
+        id: deduction.id,
+        code: deduction.code,
+        description: deduction.description,
+        taxable: deduction.taxable,
+        recurring: deduction.recurring,
+        amount: "0",
+        percentage: "0",
+        calculationType: 'AMOUNT' as 'AMOUNT' | 'PERCENTAGE',
+        effectiveDate: new Date().toISOString().split('T')[0],
+        endDate: undefined
+      }
+      setSelectedDeductions([...selectedDeductions, newDeduction])
       setShowDeductionSelector(false)
     }
   }
@@ -345,8 +393,10 @@ export default function EmployeesPage() {
     setSelectedDeductions(selectedDeductions.filter((d) => d.code !== deductionCode))
   }
 
-  const handleDeductionAmountChange = (deductionCode: string, amount: string) => {
-    setSelectedDeductions(selectedDeductions.map((d) => (d.code === deductionCode ? { ...d, amount } : d)))
+  const handleDeductionChange = (deductionCode: string, field: string, value: any) => {
+    setSelectedDeductions(selectedDeductions.map((d) => 
+      d.code === deductionCode ? { ...d, [field]: value } : d
+    ))
   }
   // </CHANGE>
 
@@ -2112,15 +2162,49 @@ function AddEmployeeForm({
     { code: "ADVANCE", description: "Advance Deduction", recurring: true },
   ])
 
-  const [selectedAllowances, setSelectedAllowances] = useState<Array<{ code: string; amount: string }>>([])
-  const [selectedDeductions, setSelectedDeductions] = useState<Array<{ code: string; amount: string }>>([])
+  const [selectedAllowances, setSelectedAllowances] = useState<Array<{
+    id: string;
+    code: string;
+    description: string;
+    taxable: boolean;
+    recurring: boolean;
+    amount: string;
+    percentage: string;
+    calculationType: 'AMOUNT' | 'PERCENTAGE';
+    effectiveDate: string;
+    endDate?: string;
+  }>>([])
+  const [selectedDeductions, setSelectedDeductions] = useState<Array<{
+    id: string;
+    code: string;
+    description: string;
+    taxable: boolean;
+    recurring: boolean;
+    amount: string;
+    percentage: string;
+    calculationType: 'AMOUNT' | 'PERCENTAGE';
+    effectiveDate: string;
+    endDate?: string;
+  }>>([])
   const [showAllowanceSelector, setShowAllowanceSelector] = useState(false)
   const [showDeductionSelector, setShowDeductionSelector] = useState(false)
 
   const handleAddAllowance = (allowanceCode: string) => {
     const allowance = companyAllowances.find((a) => a.code === allowanceCode)
     if (allowance && !selectedAllowances.find((a) => a.code === allowanceCode)) {
-      setSelectedAllowances([...selectedAllowances, { code: allowanceCode, amount: "0" }])
+      const newAllowance = {
+        id: allowance.id,
+        code: allowance.code,
+        description: allowance.description,
+        taxable: allowance.taxable,
+        recurring: allowance.recurring,
+        amount: "0",
+        percentage: "0",
+        calculationType: 'AMOUNT' as 'AMOUNT' | 'PERCENTAGE',
+        effectiveDate: new Date().toISOString().split('T')[0],
+        endDate: undefined
+      }
+      setSelectedAllowances([...selectedAllowances, newAllowance])
       setShowAllowanceSelector(false)
     }
   }
@@ -2129,14 +2213,28 @@ function AddEmployeeForm({
     setSelectedAllowances(selectedAllowances.filter((a) => a.code !== allowanceCode))
   }
 
-  const handleAllowanceAmountChange = (allowanceCode: string, amount: string) => {
-    setSelectedAllowances(selectedAllowances.map((a) => (a.code === allowanceCode ? { ...a, amount } : a)))
+  const handleAllowanceChange = (allowanceCode: string, field: string, value: any) => {
+    setSelectedAllowances(selectedAllowances.map((a) => 
+      a.code === allowanceCode ? { ...a, [field]: value } : a
+    ))
   }
 
   const handleAddDeduction = (deductionCode: string) => {
     const deduction = companyDeductions.find((d) => d.code === deductionCode)
     if (deduction && !selectedDeductions.find((d) => d.code === deductionCode)) {
-      setSelectedDeductions([...selectedDeductions, { code: deductionCode, amount: "0" }])
+      const newDeduction = {
+        id: deduction.id,
+        code: deduction.code,
+        description: deduction.description,
+        taxable: deduction.taxable,
+        recurring: deduction.recurring,
+        amount: "0",
+        percentage: "0",
+        calculationType: 'AMOUNT' as 'AMOUNT' | 'PERCENTAGE',
+        effectiveDate: new Date().toISOString().split('T')[0],
+        endDate: undefined
+      }
+      setSelectedDeductions([...selectedDeductions, newDeduction])
       setShowDeductionSelector(false)
     }
   }
@@ -2145,8 +2243,10 @@ function AddEmployeeForm({
     setSelectedDeductions(selectedDeductions.filter((d) => d.code !== deductionCode))
   }
 
-  const handleDeductionAmountChange = (deductionCode: string, amount: string) => {
-    setSelectedDeductions(selectedDeductions.map((d) => (d.code === deductionCode ? { ...d, amount } : d)))
+  const handleDeductionChange = (deductionCode: string, field: string, value: any) => {
+    setSelectedDeductions(selectedDeductions.map((d) => 
+      d.code === deductionCode ? { ...d, [field]: value } : d
+    ))
   }
   // </CHANGE>
 
@@ -3831,8 +3931,8 @@ function AddEmployeeForm({
               </div>
             </div>
 
-            {/* Allowances Section */}
-            <div className="space-y-4">
+            {/* Enhanced Allowances Section */}
+            <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Allowances</h3>
                 <Button
@@ -3849,9 +3949,9 @@ function AddEmployeeForm({
 
               {showAllowanceSelector && (
                 <Card className="p-4 bg-emerald-50 border-emerald-200">
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <Label className="text-sm font-medium text-emerald-900">Select Allowance Type</Label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {companyAllowances
                         .filter((allowance) => !selectedAllowances.find((a) => a.code === allowance.code))
                         .map((allowance) => (
@@ -3859,7 +3959,7 @@ function AddEmployeeForm({
                             key={allowance.code}
                             type="button"
                             onClick={() => handleAddAllowance(allowance.code)}
-                            className="flex items-center justify-between p-3 bg-white border border-emerald-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition-colors text-left"
+                            className="flex items-center justify-between p-4 bg-white border border-emerald-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition-colors text-left"
                           >
                             <div>
                               <div className="font-medium text-sm text-emerald-900">{allowance.description}</div>
@@ -3883,118 +3983,179 @@ function AddEmployeeForm({
               )}
 
               {selectedAllowances.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedAllowances.map((selectedAllowance) => {
-                    const allowance = companyAllowances.find((a) => a.code === selectedAllowance.code)
-                    return (
-                      <div key={selectedAllowance.code} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor={`allowance-${selectedAllowance.code}`}>{allowance?.description} (GHS)</Label>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveAllowance(selectedAllowance.code)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <Input
-                          type="number"
-                          id={`allowance-${selectedAllowance.code}`}
-                          value={selectedAllowance.amount}
-                          onChange={(e) => handleAllowanceAmountChange(selectedAllowance.code, e.target.value)}
-                          placeholder="0"
-                        />
-                      </div>
-                    )
-                  })}
+                <div className="space-y-4">
+                  <div className="text-sm font-medium text-gray-700">
+                    Selected Allowances ({selectedAllowances.length})
+                  </div>
+                  <div className="space-y-4">
+                    {selectedAllowances.map((selectedAllowance) => {
+                      const allowance = companyAllowances.find((a) => a.code === selectedAllowance.code)
+                      return (
+                        <Card key={selectedAllowance.code} className="p-4 border border-emerald-200">
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-medium text-emerald-900">{allowance?.description}</h4>
+                                <p className="text-sm text-emerald-600">{allowance?.code}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveAllowance(selectedAllowance.code)}
+                                className="text-red-500 hover:text-red-700 p-1"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Taxable/Non-taxable Toggle */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Tax Status</Label>
+                                <div className="flex space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAllowanceChange(selectedAllowance.code, 'taxable', true)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedAllowance.taxable
+                                        ? 'bg-red-100 text-red-700 border-red-300'
+                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                    }`}
+                                  >
+                                    Taxable
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAllowanceChange(selectedAllowance.code, 'taxable', false)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      !selectedAllowance.taxable
+                                        ? 'bg-green-100 text-green-700 border-green-300'
+                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                    }`}
+                                  >
+                                    Non-taxable
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Recurring/Non-recurring Toggle */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Frequency</Label>
+                                <div className="flex space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAllowanceChange(selectedAllowance.code, 'recurring', true)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedAllowance.recurring
+                                        ? 'bg-blue-100 text-blue-700 border-blue-300'
+                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                    }`}
+                                  >
+                                    Recurring
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAllowanceChange(selectedAllowance.code, 'recurring', false)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      !selectedAllowance.recurring
+                                        ? 'bg-orange-100 text-orange-700 border-orange-300'
+                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                    }`}
+                                  >
+                                    One-time
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Amount/Percentage Toggle */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Calculation Type</Label>
+                                <div className="flex space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAllowanceChange(selectedAllowance.code, 'calculationType', 'AMOUNT')}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedAllowance.calculationType === 'AMOUNT'
+                                        ? 'bg-purple-100 text-purple-700 border-purple-300'
+                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                    }`}
+                                  >
+                                    Amount
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAllowanceChange(selectedAllowance.code, 'calculationType', 'PERCENTAGE')}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedAllowance.calculationType === 'PERCENTAGE'
+                                        ? 'bg-purple-100 text-purple-700 border-purple-300'
+                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                    }`}
+                                  >
+                                    Percentage
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Value Input */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">
+                                  {selectedAllowance.calculationType === 'AMOUNT' ? 'Amount (GHS)' : 'Percentage (%)'}
+                                </Label>
+                                <Input
+                                  type="number"
+                                  step={selectedAllowance.calculationType === 'PERCENTAGE' ? '0.01' : '1'}
+                                  value={selectedAllowance.calculationType === 'AMOUNT' ? selectedAllowance.amount : selectedAllowance.percentage}
+                                  onChange={(e) => handleAllowanceChange(
+                                    selectedAllowance.code, 
+                                    selectedAllowance.calculationType === 'AMOUNT' ? 'amount' : 'percentage', 
+                                    e.target.value
+                                  )}
+                                  placeholder={selectedAllowance.calculationType === 'AMOUNT' ? '0' : '0.00'}
+                                />
+                              </div>
+
+                              {/* Effective Date */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Effective Date</Label>
+                                <Input
+                                  type="date"
+                                  value={selectedAllowance.effectiveDate}
+                                  onChange={(e) => handleAllowanceChange(selectedAllowance.code, 'effectiveDate', e.target.value)}
+                                />
+                              </div>
+
+                              {/* End Date (if not recurring) */}
+                              {!selectedAllowance.recurring && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm font-medium">End Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={selectedAllowance.endDate || ''}
+                                    onChange={(e) => handleAllowanceChange(selectedAllowance.code, 'endDate', e.target.value)}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
 
               {selectedAllowances.length === 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="transportAllowance">Transport Allowance (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="transportAllowance"
-                      value={formData.transportAllowance}
-                      onChange={(e) => handleInputChange("transportAllowance", e.target.value)}
-                      placeholder="0"
-                    />
+                <div className="text-center py-8 text-gray-500">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                    <Plus className="w-8 h-8 text-gray-400" />
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="housingAllowance">Housing Allowance (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="housingAllowance"
-                      value={formData.housingAllowance}
-                      onChange={(e) => handleInputChange("housingAllowance", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="medicalAllowance">Medical Allowance (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="medicalAllowance"
-                      value={formData.medicalAllowance}
-                      onChange={(e) => handleInputChange("medicalAllowance", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="mealAllowance">Meal Allowance (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="mealAllowance"
-                      value={formData.mealAllowance}
-                      onChange={(e) => handleInputChange("mealAllowance", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="uniformAllowance">Uniform Allowance (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="uniformAllowance"
-                      value={formData.uniformAllowance}
-                      onChange={(e) => handleInputChange("uniformAllowance", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="communicationAllowance">Communication Allowance (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="communicationAllowance"
-                      value={formData.communicationAllowance}
-                      onChange={(e) => handleInputChange("communicationAllowance", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="otherAllowances">Other Allowances (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="otherAllowances"
-                      value={formData.otherAllowances}
-                      onChange={(e) => handleInputChange("otherAllowances", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
+                  <p className="text-sm">No allowances added yet</p>
+                  <p className="text-xs text-gray-400">Click "Add Allowance" to get started</p>
                 </div>
               )}
             </div>
 
-            {/* Deductions Section */}
-            <div className="space-y-4">
+            {/* Enhanced Deductions Section */}
+            <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Deductions</h3>
                 <Button
@@ -4011,9 +4172,9 @@ function AddEmployeeForm({
 
               {showDeductionSelector && (
                 <Card className="p-4 bg-red-50 border-red-200">
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <Label className="text-sm font-medium text-red-900">Select Deduction Type</Label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {companyDeductions
                         .filter((deduction) => !selectedDeductions.find((d) => d.code === deduction.code))
                         .map((deduction) => (
@@ -4021,7 +4182,7 @@ function AddEmployeeForm({
                             key={deduction.code}
                             type="button"
                             onClick={() => handleAddDeduction(deduction.code)}
-                            className="flex items-center justify-between p-3 bg-white border border-red-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors text-left"
+                            className="flex items-center justify-between p-4 bg-white border border-red-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors text-left"
                           >
                             <div>
                               <div className="font-medium text-sm text-red-900">{deduction.description}</div>
@@ -4045,90 +4206,173 @@ function AddEmployeeForm({
               )}
 
               {selectedDeductions.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedDeductions.map((selectedDeduction) => {
-                    const deduction = companyDeductions.find((d) => d.code === selectedDeduction.code)
-                    return (
-                      <div key={selectedDeduction.code} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor={`deduction-${selectedDeduction.code}`}>{deduction?.description} (GHS)</Label>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveDeduction(selectedDeduction.code)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <Input
-                          type="number"
-                          id={`deduction-${selectedDeduction.code}`}
-                          value={selectedDeduction.amount}
-                          onChange={(e) => handleDeductionAmountChange(selectedDeduction.code, e.target.value)}
-                          placeholder="0"
-                        />
-                      </div>
-                    )
-                  })}
+                <div className="space-y-4">
+                  <div className="text-sm font-medium text-gray-700">
+                    Selected Deductions ({selectedDeductions.length})
+                  </div>
+                  <div className="space-y-4">
+                    {selectedDeductions.map((selectedDeduction) => {
+                      const deduction = companyDeductions.find((d) => d.code === selectedDeduction.code)
+                      return (
+                        <Card key={selectedDeduction.code} className="p-4 border border-red-200">
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-medium text-red-900">{deduction?.description}</h4>
+                                <p className="text-sm text-red-600">{deduction?.code}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveDeduction(selectedDeduction.code)}
+                                className="text-red-500 hover:text-red-700 p-1"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Taxable/Non-taxable Toggle */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Tax Status</Label>
+                                <div className="flex space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeductionChange(selectedDeduction.code, 'taxable', true)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedDeduction.taxable
+                                        ? 'bg-red-100 text-red-700 border-red-300'
+                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                    }`}
+                                  >
+                                    Taxable
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeductionChange(selectedDeduction.code, 'taxable', false)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      !selectedDeduction.taxable
+                                        ? 'bg-green-100 text-green-700 border-green-300'
+                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                    }`}
+                                  >
+                                    Non-taxable
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Recurring/Non-recurring Toggle */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Frequency</Label>
+                                <div className="flex space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeductionChange(selectedDeduction.code, 'recurring', true)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedDeduction.recurring
+                                        ? 'bg-blue-100 text-blue-700 border-blue-300'
+                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                    }`}
+                                  >
+                                    Recurring
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeductionChange(selectedDeduction.code, 'recurring', false)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      !selectedDeduction.recurring
+                                        ? 'bg-orange-100 text-orange-700 border-orange-300'
+                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                    }`}
+                                  >
+                                    One-time
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Amount/Percentage Toggle */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Calculation Type</Label>
+                                <div className="flex space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeductionChange(selectedDeduction.code, 'calculationType', 'AMOUNT')}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedDeduction.calculationType === 'AMOUNT'
+                                        ? 'bg-purple-100 text-purple-700 border-purple-300'
+                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                    }`}
+                                  >
+                                    Amount
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeductionChange(selectedDeduction.code, 'calculationType', 'PERCENTAGE')}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedDeduction.calculationType === 'PERCENTAGE'
+                                        ? 'bg-purple-100 text-purple-700 border-purple-300'
+                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                    }`}
+                                  >
+                                    Percentage
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Value Input */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">
+                                  {selectedDeduction.calculationType === 'AMOUNT' ? 'Amount (GHS)' : 'Percentage (%)'}
+                                </Label>
+                                <Input
+                                  type="number"
+                                  step={selectedDeduction.calculationType === 'PERCENTAGE' ? '0.01' : '1'}
+                                  value={selectedDeduction.calculationType === 'AMOUNT' ? selectedDeduction.amount : selectedDeduction.percentage}
+                                  onChange={(e) => handleDeductionChange(
+                                    selectedDeduction.code, 
+                                    selectedDeduction.calculationType === 'AMOUNT' ? 'amount' : 'percentage', 
+                                    e.target.value
+                                  )}
+                                  placeholder={selectedDeduction.calculationType === 'AMOUNT' ? '0' : '0.00'}
+                                />
+                              </div>
+
+                              {/* Effective Date */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Effective Date</Label>
+                                <Input
+                                  type="date"
+                                  value={selectedDeduction.effectiveDate}
+                                  onChange={(e) => handleDeductionChange(selectedDeduction.code, 'effectiveDate', e.target.value)}
+                                />
+                              </div>
+
+                              {/* End Date (if not recurring) */}
+                              {!selectedDeduction.recurring && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm font-medium">End Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={selectedDeduction.endDate || ''}
+                                    onChange={(e) => handleDeductionChange(selectedDeduction.code, 'endDate', e.target.value)}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
 
               {selectedDeductions.length === 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="taxDeduction">Tax Deduction (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="taxDeduction"
-                      value={formData.taxDeduction}
-                      onChange={(e) => handleInputChange("taxDeduction", e.target.value)}
-                      placeholder="0"
-                    />
+                <div className="text-center py-8 text-gray-500">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                    <Plus className="w-8 h-8 text-gray-400" />
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="tier3">Tier 3 Contribution (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="tier3"
-                      value={formData.tier3}
-                      onChange={(e) => handleInputChange("tier3", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="loanDeduction">Loan Deduction (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="loanDeduction"
-                      value={formData.loanDeduction}
-                      onChange={(e) => handleInputChange("loanDeduction", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="advanceDeduction">Advance Deduction (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="advanceDeduction"
-                      value={formData.advanceDeduction}
-                      onChange={(e) => handleInputChange("advanceDeduction", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="otherDeductions">Other Deductions (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="otherDeductions"
-                      value={formData.otherDeductions}
-                      onChange={(e) => handleInputChange("otherDeductions", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
+                  <p className="text-sm">No deductions added yet</p>
+                  <p className="text-xs text-gray-400">Click "Add Deduction" to get started</p>
                 </div>
               )}
             </div>
