@@ -1760,38 +1760,36 @@ function ImportDataDialog({
 
   // Document upload handlers
   const handleUploadClick = (documentType: string) => {
-    // Try ref first
-    const fileInput = fileInputRefs.current[documentType]
-    if (fileInput) {
-      fileInput.value = ''
-      fileInput.click()
-      return
-    }
-    
-    // Fallback: try to find the input by ID
-    const fallbackInput = document.getElementById(`file-input-${documentType}`) as HTMLInputElement
-    if (fallbackInput) {
-      fallbackInput.value = ''
-      fallbackInput.click()
-      return
-    }
-    
-    // Last resort: create a temporary input for mobile compatibility
+    // Create a new file input dynamically for better mobile compatibility
     const tempInput = document.createElement('input')
     tempInput.type = 'file'
     tempInput.accept = requiredDocuments.find(doc => doc.id === documentType)?.acceptTypes || '*/*'
-    tempInput.style.display = 'none'
+    tempInput.style.position = 'absolute'
+    tempInput.style.left = '-9999px'
+    tempInput.style.opacity = '0'
+    tempInput.style.pointerEvents = 'none'
+    
+    // Add to DOM temporarily
     document.body.appendChild(tempInput)
     
+    // Set up change handler
     tempInput.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
-        handleFileSelect(documentType, e as any)
+        // Create a synthetic event for handleFileSelect
+        const syntheticEvent = {
+          target: { files: [file] }
+        } as React.ChangeEvent<HTMLInputElement>
+        handleFileSelect(documentType, syntheticEvent)
       }
+      // Clean up
       document.body.removeChild(tempInput)
     }
     
-    tempInput.click()
+    // Trigger click with a small delay for mobile
+    setTimeout(() => {
+      tempInput.click()
+    }, 10)
   }
 
   const handleFileSelect = async (documentType: string, event: React.ChangeEvent<HTMLInputElement>) => {
@@ -4780,6 +4778,7 @@ function AddEmployeeForm({
                           </div>
                         ) : (
                           <div className="flex items-center space-x-2">
+                            {/* Hidden file input for desktop */}
                             <input
                               ref={(el) => {
                                 if (el) {
@@ -4789,26 +4788,38 @@ function AddEmployeeForm({
                               type="file"
                               accept={doc.acceptTypes}
                               onChange={(e) => handleFileSelect(doc.id, e)}
-                              className="sr-only"
+                              className="hidden md:block sr-only"
                               id={`file-input-${doc.id}`}
                               style={{ position: 'absolute', left: '-9999px', opacity: 0 }}
                             />
-                            <div 
-                              className="relative"
-                              onClick={() => handleUploadClick(doc.id)}
+                            
+                            {/* Mobile file input - visible but styled */}
+                            <input
+                              type="file"
+                              accept={doc.acceptTypes}
+                              onChange={(e) => handleFileSelect(doc.id, e)}
+                              className="block md:hidden w-full min-h-[44px] text-sm text-blue-600 border border-blue-300 rounded-md bg-white hover:bg-blue-50 active:bg-blue-100 file:mr-4 file:py-2 file:px-4 file:rounded-l-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                              id={`mobile-file-input-${doc.id}`}
+                            />
+                            
+                            {/* Desktop button */}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleUploadClick(doc.id)
+                              }}
                               onTouchEnd={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
                                 handleUploadClick(doc.id)
                               }}
+                              disabled={isUploading}
+                              className="hidden md:flex text-blue-600 hover:text-blue-700 hover:bg-blue-50 active:bg-blue-100 touch-manipulation min-h-[44px] min-w-[120px] text-sm font-medium"
                             >
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={isUploading}
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 active:bg-blue-100 touch-manipulation min-h-[44px] min-w-[120px] text-sm font-medium w-full"
-                              >
                               {isUploading ? (
                                 <>
                                   <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2" />
@@ -4821,7 +4832,6 @@ function AddEmployeeForm({
                                 </>
                               )}
                             </Button>
-                            </div>
                           </div>
                         )}
                       </div>
