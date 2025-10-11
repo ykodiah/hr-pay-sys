@@ -1741,7 +1741,7 @@ function ImportDataDialog({
   const [previewData, setPreviewData] = useState<any[]>([])
   const [importErrors, setImportErrors] = useState<string[]>([])
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCSVFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
       const documentService = CentralDocumentService.getInstance()
@@ -1756,6 +1756,135 @@ function ImportDataDialog({
       setSelectedFile(file)
       console.log("[v0] CSV file selected:", file.name)
     }
+  }
+
+  // Document upload handlers
+  const handleUploadClick = (documentType: string) => {
+    const fileInput = fileInputRefs.current[documentType]
+    if (fileInput) {
+      fileInput.click()
+    }
+  }
+
+  const handleFileSelect = async (documentType: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    const doc = requiredDocuments.find(d => d.id === documentType)
+    if (!doc) return
+
+    const acceptedTypes = doc.acceptTypes.split(',').map(type => type.trim())
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
+    const mimeType = file.type
+
+    const isValidType = acceptedTypes.some(type => 
+      type.startsWith('.') ? fileExtension === type : mimeType.includes(type.replace('.', ''))
+    )
+
+    if (!isValidType) {
+      toast({
+        title: "Invalid File Type",
+        description: `Please select a file with one of these types: ${doc.acceptTypes}`,
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    if (file.size > maxSize) {
+      toast({
+        title: "File Too Large",
+        description: "Please select a file smaller than 10MB",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Start upload process
+    setUploadingDocuments(prev => [...prev, documentType])
+    setUploadProgress(prev => ({ ...prev, [documentType]: 0 }))
+
+    try {
+      // Simulate upload progress
+      for (let progress = 0; progress <= 100; progress += 10) {
+        setUploadProgress(prev => ({ ...prev, [documentType]: progress }))
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+
+      // Upload to document service
+      const documentService = CentralDocumentService.getInstance()
+      const documentId = await documentService.uploadDocument({
+        file,
+        employeeId: formData.employee_id || 'temp-id',
+        employeeName: `${formData.first_name} ${formData.last_name}`.trim() || 'New Employee',
+        documentType,
+        source: "employee-onboarding",
+        uploadedBy: "HR Admin",
+        notes: `Uploaded during employee onboarding - ${doc.title}`
+      })
+
+      // Add to uploaded documents
+      const uploadedDoc = {
+        id: documentId,
+        documentType,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        uploadDate: new Date(),
+        uploadedBy: "HR Admin"
+      }
+
+      setUploadedDocuments(prev => {
+        const filtered = prev.filter(doc => doc.documentType !== documentType)
+        return [...filtered, uploadedDoc]
+      })
+
+      toast({
+        title: "Upload Successful",
+        description: `${file.name} has been uploaded successfully`,
+      })
+
+    } catch (error) {
+      console.error("Upload error:", error)
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload document. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setUploadingDocuments(prev => prev.filter(doc => doc !== documentType))
+      setUploadProgress(prev => ({ ...prev, [documentType]: 0 }))
+    }
+  }
+
+  const handleRemoveDocument = (documentType: string) => {
+    setUploadedDocuments(prev => prev.filter(doc => doc.documentType !== documentType))
+    toast({
+      title: "Document Removed",
+      description: "Document has been removed successfully",
+    })
+  }
+
+  const handleReplaceDocument = (documentType: string) => {
+    const fileInput = fileInputRefs.current[documentType]
+    if (fileInput) {
+      fileInput.click()
+    }
+  }
+
+  const handlePreviewDocument = (document: any) => {
+    setPreviewDocument(document)
+    setIsPreviewOpen(true)
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
   const processFile = (file: File) => {
@@ -1940,7 +2069,7 @@ function ImportDataDialog({
                     <input
                       type="file"
                       accept=".csv"
-                      onChange={handleFileSelect}
+                      onChange={handleCSVFileSelect}
                       className="hidden"
                       id="employee-file-upload"
                     />
@@ -2780,7 +2909,7 @@ function AddEmployeeForm({
     return isValid
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (validateForm()) {
       const fullName = `${formData.firstName} ${formData.otherNames} ${formData.lastName}`
       const displayName = `${formData.firstName} ${formData.lastName}`
@@ -2790,6 +2919,38 @@ function AddEmployeeForm({
         fullName: fullName,
         displayName: displayName,
         employeeId: formData.employeeId, // Ensure employeeId is passed
+      }
+
+      // Save uploaded documents to document vault
+      if (uploadedDocuments.length > 0) {
+        try {
+          const documentService = CentralDocumentService.getInstance()
+          
+          // Update all uploaded documents with final employee information
+          for (const doc of uploadedDocuments) {
+            await documentService.uploadDocument({
+              file: new File([], doc.fileName, { type: doc.fileType }), // Create a placeholder file
+              employeeId: formData.employeeId || 'temp-id',
+              employeeName: displayName,
+              documentType: doc.documentType,
+              source: "employee-onboarding",
+              uploadedBy: "HR Admin",
+              notes: `Employee onboarding document - ${doc.fileName}`
+            })
+          }
+
+          toast({
+            title: "Documents Saved",
+            description: `${uploadedDocuments.length} documents have been saved to the document vault`,
+          })
+        } catch (error) {
+          console.error("Error saving documents:", error)
+          toast({
+            title: "Document Save Warning",
+            description: "Employee created but some documents may not have been saved to the vault",
+            variant: "destructive",
+          })
+        }
       }
 
       onSubmit(employeeData)
