@@ -4701,7 +4701,7 @@ function AddEmployeeForm({
             </div>
           </div>
         </TabsContent>
-        <TabsContent value="documents" className="space-y-6">
+        <TabsContent value="documents" className="space-y-6 max-w-none">
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Required Documents</h3>
@@ -4710,7 +4710,7 @@ function AddEmployeeForm({
               </div>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-6">
               {requiredDocuments.map((doc) => {
                 const uploadedDoc = uploadedDocuments.find((d) => d.documentType === doc.id)
                 const isUploaded = !!uploadedDoc
@@ -4718,12 +4718,12 @@ function AddEmployeeForm({
                 
                 
                 return (
-                  <Card key={doc.id} className={`p-4 border-2 transition-all ${
+                  <Card key={doc.id} className={`p-6 border-2 transition-all ${
                     isUploaded 
-                      ? 'border-green-200 bg-green-50' 
+                      ? 'border-green-200 bg-green-50 shadow-sm' 
                       : isUploading 
-                        ? 'border-blue-200 bg-blue-50' 
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-blue-200 bg-blue-50 shadow-sm' 
+                        : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
                   }`}>
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
@@ -4747,8 +4747,8 @@ function AddEmployeeForm({
                             <h4 className="font-medium text-gray-900">{doc.title}</h4>
                             <p className="text-sm text-gray-600">{doc.description}</p>
                             {isUploaded && uploadedDoc && (
-                              <div className="mt-2 flex items-center space-x-2">
-                                <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50">
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50 text-xs">
                                   <CheckCircle className="w-3 h-3 mr-1" />
                                   {uploadedDoc.fileName}
                                 </Badge>
@@ -4758,7 +4758,7 @@ function AddEmployeeForm({
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveDocument(doc.id)}
-                                  className="text-red-500 hover:text-red-700 text-xs"
+                                  className="text-red-500 hover:text-red-700 text-xs hover:underline"
                                 >
                                   Remove
                                 </button>
@@ -4768,15 +4768,15 @@ function AddEmployeeForm({
                         </div>
                       </div>
                       
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-3">
                         {isUploaded ? (
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-3">
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
                               onClick={() => handlePreviewDocument(uploadedDoc!)}
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 min-w-[80px]"
                             >
                               <Eye className="w-4 h-4 mr-2" />
                               View
@@ -4786,7 +4786,7 @@ function AddEmployeeForm({
                               variant="outline"
                               size="sm"
                               onClick={() => handleReplaceDocument(doc.id)}
-                              className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                              className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 min-w-[90px]"
                             >
                               <Upload className="w-4 h-4 mr-2" />
                               Replace
@@ -4850,7 +4850,7 @@ function AddEmployeeForm({
                                 }
                               }}
                               disabled={isUploading}
-                              className="hidden md:flex text-blue-600 hover:text-blue-700 hover:bg-blue-50 active:bg-blue-100 touch-manipulation min-h-[44px] min-w-[120px] text-sm font-medium"
+                              className="hidden md:flex text-blue-600 hover:text-blue-700 hover:bg-blue-50 active:bg-blue-100 touch-manipulation min-h-[44px] min-w-[140px] text-sm font-medium border-2 hover:border-blue-400"
                             >
                               {isUploading ? (
                                 <>
@@ -4885,29 +4885,52 @@ function AddEmployeeForm({
                       </div>
                     )}
                     
-                    {/* Show uploaded document info - shown for all devices */}
+                    {/* Show uploaded document info - enhanced for full-screen desktop visibility */}
                     {isUploaded && uploadedDoc && (
-                      <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-center space-x-2">
-                          <CheckCircle className="w-5 h-5 text-green-600" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-green-900">
-                              {uploadedDoc.fileName}
+                      <div className="mt-4 p-4 bg-green-50 border-2 border-green-200 rounded-lg shadow-sm">
+                        <div className="flex items-start space-x-3">
+                          <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-green-900 truncate">
+                              ✓ {uploadedDoc.fileName}
                             </p>
-                            <p className="text-xs text-green-700">
+                            <p className="text-xs text-green-700 mt-1">
                               {(uploadedDoc.fileSize / 1024 / 1024).toFixed(2)} MB • 
-                              {uploadedDoc.uploadDate.toLocaleDateString()}
+                              Uploaded on {uploadedDoc.uploadDate.toLocaleDateString()}
                             </p>
+                            <div className="mt-2 flex items-center space-x-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handlePreviewDocument(uploadedDoc)}
+                                className="text-green-700 border-green-300 hover:bg-green-100 text-xs h-7"
+                              >
+                                <Eye className="w-3 h-3 mr-1" />
+                                Preview
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleReplaceDocument(doc.id)}
+                                className="text-orange-700 border-orange-300 hover:bg-orange-100 text-xs h-7"
+                              >
+                                <Upload className="w-3 h-3 mr-1" />
+                                Replace
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveDocument(doc.id)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs h-7"
+                              >
+                                <X className="w-3 h-3 mr-1" />
+                                Remove
+                              </Button>
+                            </div>
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveDocument(doc.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
                         </div>
                       </div>
                     )}
