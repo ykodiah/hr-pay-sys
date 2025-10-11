@@ -2404,6 +2404,8 @@ function AddEmployeeForm({
   }>>([])
   const [showAllowanceSelector, setShowAllowanceSelector] = useState(false)
   const [showDeductionSelector, setShowDeductionSelector] = useState(false)
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [showInactiveReason, setShowInactiveReason] = useState(false)
 
   // Document upload states
   const [uploadedDocuments, setUploadedDocuments] = useState([])
@@ -3888,10 +3890,8 @@ function AddEmployeeForm({
                       ...prev,
                       inactiveReason: ""
                     }))
-                    // Force re-render by updating a dummy state
-                    setTimeout(() => {
-                      setShowInactiveReason(false)
-                    }, 0)
+                    // Force re-render by updating state
+                    setShowInactiveReason(false)
                   } else if (value === "Inactive") {
                     setShowInactiveReason(true)
                   }
@@ -3908,7 +3908,7 @@ function AddEmployeeForm({
               {errors.status && <p className="text-red-500 text-sm mt-1">{errors.status}</p>}
             </div>
 
-            {(formData.status === "Inactive" || showInactiveReason) && (
+            {formData.status === "Inactive" && (
               <div className="space-y-2" key={`inactive-reason-${formData.status}-${Date.now()}`}>
                 <Label htmlFor="inactiveReason">9a. Inactive Reason *</Label>
                 <Select
