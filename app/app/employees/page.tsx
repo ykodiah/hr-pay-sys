@@ -1762,7 +1762,16 @@ function ImportDataDialog({
   const handleUploadClick = (documentType: string) => {
     const fileInput = fileInputRefs.current[documentType]
     if (fileInput) {
+      // Reset the input value to allow selecting the same file again
+      fileInput.value = ''
       fileInput.click()
+    } else {
+      // Fallback: try to find the input by ID
+      const fallbackInput = document.getElementById(`file-input-${documentType}`) as HTMLInputElement
+      if (fallbackInput) {
+        fallbackInput.value = ''
+        fallbackInput.click()
+      }
     }
   }
 
@@ -4674,6 +4683,7 @@ function AddEmployeeForm({
                 const isUploaded = !!uploadedDoc
                 const isUploading = uploadingDocuments.includes(doc.id)
                 
+                
                 return (
                   <Card key={doc.id} className={`p-4 border-2 transition-all ${
                     isUploaded 
@@ -4753,12 +4763,15 @@ function AddEmployeeForm({
                           <div className="flex items-center space-x-2">
                             <input
                               ref={(el) => {
-                                if (el) fileInputRefs.current[doc.id] = el
+                                if (el) {
+                                  fileInputRefs.current[doc.id] = el
+                                }
                               }}
                               type="file"
                               accept={doc.acceptTypes}
                               onChange={(e) => handleFileSelect(doc.id, e)}
                               className="hidden"
+                              id={`file-input-${doc.id}`}
                             />
                             <Button
                               type="button"
