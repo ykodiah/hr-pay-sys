@@ -3878,8 +3878,12 @@ function AddEmployeeForm({
               <Select
                 value={formData.status}
                 onValueChange={(value) => {
+                  console.log("Status changing from", formData.status, "to", value)
                   handleInputChange("status", value)
+                  
+                  // Force state update for inactive reason
                   if (value === "Active") {
+                    console.log("Setting inactive reason to empty")
                     handleInputChange("inactiveReason", "")
                     // Clear any validation errors for inactive reason
                     setErrors(prev => ({
@@ -3901,11 +3905,14 @@ function AddEmployeeForm({
             </div>
 
             {formData.status === "Inactive" && (
-              <div className="space-y-2" key={`inactive-reason-${formData.status}`}>
+              <div className="space-y-2" key={`inactive-reason-${formData.status}-${Date.now()}`}>
                 <Label htmlFor="inactiveReason">9a. Inactive Reason *</Label>
                 <Select
                   value={formData.inactiveReason}
-                  onValueChange={(value) => handleInputChange("inactiveReason", value)}
+                  onValueChange={(value) => {
+                    console.log("Inactive reason changing to:", value)
+                    handleInputChange("inactiveReason", value)
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select reason" />
@@ -4859,6 +4866,7 @@ function AddEmployeeForm({
                       </div>
                     </div>
                     
+                    {/* Upload progress and document confirmation - shown for all devices */}
                     {isUploading && (
                       <div className="mt-3">
                         <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
@@ -4874,7 +4882,7 @@ function AddEmployeeForm({
                       </div>
                     )}
                     
-                    {/* Show uploaded document info */}
+                    {/* Show uploaded document info - shown for all devices */}
                     {isUploaded && uploadedDoc && (
                       <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                         <div className="flex items-center space-x-2">
