@@ -1900,6 +1900,7 @@ function ImportDataDialog({
     }
   }
 
+
   const handlePreviewDocument = (document: any) => {
     setPreviewDocument(document)
     setIsPreviewOpen(true)
@@ -3880,6 +3881,11 @@ function AddEmployeeForm({
                   handleInputChange("status", value)
                   if (value === "Active") {
                     handleInputChange("inactiveReason", "")
+                    // Clear any validation errors for inactive reason
+                    setErrors(prev => ({
+                      ...prev,
+                      inactiveReason: ""
+                    }))
                   }
                 }}
               >
@@ -3895,7 +3901,7 @@ function AddEmployeeForm({
             </div>
 
             {formData.status === "Inactive" && (
-              <div className="space-y-2">
+              <div className="space-y-2" key={`inactive-reason-${formData.status}`}>
                 <Label htmlFor="inactiveReason">9a. Inactive Reason *</Label>
                 <Select
                   value={formData.inactiveReason}
@@ -4864,6 +4870,33 @@ function AddEmployeeForm({
                             className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${uploadProgress[doc.id] || 0}%` }}
                           />
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Show uploaded document info */}
+                    {isUploaded && uploadedDoc && (
+                      <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center space-x-2">
+                          <CheckCircle className="w-5 h-5 text-green-600" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-green-900">
+                              {uploadedDoc.fileName}
+                            </p>
+                            <p className="text-xs text-green-700">
+                              {(uploadedDoc.fileSize / 1024 / 1024).toFixed(2)} MB • 
+                              {uploadedDoc.uploadDate.toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveDocument(doc.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
                     )}
