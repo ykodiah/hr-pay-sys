@@ -4788,9 +4788,9 @@ function AddEmployeeForm({
                               type="file"
                               accept={doc.acceptTypes}
                               onChange={(e) => handleFileSelect(doc.id, e)}
-                              className="hidden md:block sr-only"
+                              className="hidden md:block"
                               id={`file-input-${doc.id}`}
-                              style={{ position: 'absolute', left: '-9999px', opacity: 0 }}
+                              style={{ position: 'absolute', left: '-9999px', opacity: 0, pointerEvents: 'none' }}
                             />
                             
                             {/* Mobile file input - visible but styled */}
@@ -4810,12 +4810,28 @@ function AddEmployeeForm({
                               onClick={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                handleUploadClick(doc.id)
+                                // For desktop, trigger the hidden file input directly
+                                const hiddenInput = document.getElementById(`file-input-${doc.id}`) as HTMLInputElement
+                                if (hiddenInput) {
+                                  hiddenInput.value = ''
+                                  hiddenInput.click()
+                                } else {
+                                  // Fallback to dynamic creation
+                                  handleUploadClick(doc.id)
+                                }
                               }}
                               onTouchEnd={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                handleUploadClick(doc.id)
+                                // For desktop, trigger the hidden file input directly
+                                const hiddenInput = document.getElementById(`file-input-${doc.id}`) as HTMLInputElement
+                                if (hiddenInput) {
+                                  hiddenInput.value = ''
+                                  hiddenInput.click()
+                                } else {
+                                  // Fallback to dynamic creation
+                                  handleUploadClick(doc.id)
+                                }
                               }}
                               disabled={isUploading}
                               className="hidden md:flex text-blue-600 hover:text-blue-700 hover:bg-blue-50 active:bg-blue-100 touch-manipulation min-h-[44px] min-w-[120px] text-sm font-medium"
