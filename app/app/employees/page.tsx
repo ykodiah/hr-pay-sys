@@ -1767,20 +1767,23 @@ function ImportDataDialog({
     tempInput.style.position = 'absolute'
     tempInput.style.left = '-9999px'
     tempInput.style.opacity = '0'
-    tempInput.style.pointerEvents = 'none'
     
     // Add to DOM temporarily
     document.body.appendChild(tempInput)
     
     // Set up change handler
     tempInput.onchange = (e) => {
+      console.log('[v0] handleUploadClick tempInput onchange triggered for:', documentType)
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
+        console.log('[v0] File selected via handleUploadClick:', file.name)
         // Create a synthetic event for handleFileSelect
         const syntheticEvent = {
           target: { files: [file] }
         } as React.ChangeEvent<HTMLInputElement>
         handleFileSelect(documentType, syntheticEvent)
+      } else {
+        console.log('[v0] No file selected via handleUploadClick')
       }
       // Clean up
       document.body.removeChild(tempInput)
@@ -1793,12 +1796,21 @@ function ImportDataDialog({
   }
 
   const handleFileSelect = async (documentType: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[v0] handleFileSelect called for:', documentType, 'Files:', event.target.files)
     const file = event.target.files?.[0]
-    if (!file) return
+    if (!file) {
+      console.log('[v0] No file selected')
+      return
+    }
+
+    console.log('[v0] File selected:', file.name, 'Size:', file.size, 'Type:', file.type)
 
     // Validate file type
     const doc = requiredDocuments.find(d => d.id === documentType)
-    if (!doc) return
+    if (!doc) {
+      console.log('[v0] Document type not found:', documentType)
+      return
+    }
 
     const acceptedTypes = doc.acceptTypes.split(',').map(type => type.trim())
     const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
@@ -4806,7 +4818,7 @@ function AddEmployeeForm({
                               onChange={(e) => handleFileSelect(doc.id, e)}
                               className="hidden md:block"
                               id={`file-input-${doc.id}`}
-                              style={{ position: 'absolute', left: '-9999px', opacity: 0, pointerEvents: 'none' }}
+                              style={{ position: 'absolute', left: '-9999px', opacity: 0 }}
                             />
                             
                             {/* Mobile file input - visible but styled */}
@@ -4826,12 +4838,16 @@ function AddEmployeeForm({
                               onClick={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                // For desktop, trigger the hidden file input directly
+                                console.log('[v0] Desktop upload button clicked for:', doc.id)
+                                
+                                // Try the hidden input first
                                 const hiddenInput = document.getElementById(`file-input-${doc.id}`) as HTMLInputElement
                                 if (hiddenInput) {
+                                  console.log('[v0] Using hidden input for:', doc.id)
                                   hiddenInput.value = ''
                                   hiddenInput.click()
                                 } else {
+                                  console.log('[v0] Using handleUploadClick for:', doc.id)
                                   // Fallback to dynamic creation
                                   handleUploadClick(doc.id)
                                 }
@@ -4839,12 +4855,16 @@ function AddEmployeeForm({
                               onTouchEnd={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                // For desktop, trigger the hidden file input directly
+                                console.log('[v0] Desktop upload button touch end for:', doc.id)
+                                
+                                // Try the hidden input first
                                 const hiddenInput = document.getElementById(`file-input-${doc.id}`) as HTMLInputElement
                                 if (hiddenInput) {
+                                  console.log('[v0] Using hidden input (touch) for:', doc.id)
                                   hiddenInput.value = ''
                                   hiddenInput.click()
                                 } else {
+                                  console.log('[v0] Using handleUploadClick (touch) for:', doc.id)
                                   // Fallback to dynamic creation
                                   handleUploadClick(doc.id)
                                 }
