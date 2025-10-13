@@ -535,7 +535,7 @@ export default function EmployeesPage() {
     loadEmployees()
     loadSubsidiaries()
     loadCompanyData()
-  }, [])
+  }, [loadEmployees, loadSubsidiaries, loadCompanyData])
 
   useEffect(() => {
     if (isDemoMode()) {
@@ -556,7 +556,7 @@ export default function EmployeesPage() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [loadEmployees])
 
   const generateEmployeeId = useCallback(() => {
     // Get company name initials
@@ -1417,7 +1417,7 @@ export default function EmployeesPage() {
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Employee</DialogTitle>
-                <DialogDescription>Enter the employee's information below.</DialogDescription>
+                <DialogDescription>Enter the employee&apos;s information below.</DialogDescription>
               </DialogHeader>
               <AddEmployeeForm
                 onSubmit={handleAddEmployee}
@@ -1549,7 +1549,7 @@ export default function EmployeesPage() {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Employee Directory ({filteredEmployees.length} employees)</span>
-            {searchTerm && <div className="text-sm text-muted-foreground">Showing results for "{searchTerm}"</div>}
+            {searchTerm && <div className="text-sm text-muted-foreground">Showing results for &quot;{searchTerm}&quot;</div>}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -2827,7 +2827,7 @@ function AddEmployeeForm({
         profilePictureFile: null,
       })
     }
-  }, [employee])
+  }, [employee, setFormData])
 
   useEffect(() => {
     if (formData.subsidiary) {
@@ -3394,7 +3394,7 @@ function AddEmployeeForm({
     if (companySettings?.id) {
       loadCustomBanks()
     }
-  }, [companySettings?.id])
+  }, [companySettings?.id, loadCustomBanks])
 
   return (
     <div className="space-y-6">
@@ -4011,7 +4011,7 @@ function AddEmployeeForm({
               </Select>
               {supervisors.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  No employees with "Direct Supervisor" role found in this department
+                  No employees with &quot;Direct Supervisor&quot; role found in this department
                 </p>
               )}
             </div>
@@ -4063,7 +4063,7 @@ function AddEmployeeForm({
               </Select>
               {headsOfDepartment.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  No employees with "Head of Department" role found in this department
+                  No employees with &quot;Head of Department&quot; role found in this department
                 </p>
               )}
             </div>
@@ -4218,7 +4218,7 @@ function AddEmployeeForm({
                         Cancel
                       </button>
                     </div>
-                    <p className="text-xs text-gray-500">This bank will be added to your company's bank list</p>
+                    <p className="text-xs text-gray-500">This bank will be added to your company&apos;s bank list</p>
                   </div>
                 )}
               </div>
@@ -4475,7 +4475,7 @@ function AddEmployeeForm({
                     <Plus className="w-8 h-8 text-gray-400" />
                   </div>
                   <p className="text-sm">No allowances added yet</p>
-                  <p className="text-xs text-gray-400">Click "Add Allowance" to get started</p>
+                  <p className="text-xs text-gray-400">Click &quot;Add Allowance&quot; to get started</p>
                 </div>
               )}
             </div>
@@ -4698,7 +4698,7 @@ function AddEmployeeForm({
                     <Plus className="w-8 h-8 text-gray-400" />
                   </div>
                   <p className="text-sm">No deductions added yet</p>
-                  <p className="text-xs text-gray-400">Click "Add Deduction" to get started</p>
+                  <p className="text-xs text-gray-400">Click &quot;Add Deduction&quot; to get started</p>
                 </div>
               )}
             </div>
@@ -4958,7 +4958,7 @@ function AddEmployeeForm({
                     <h4 className="font-medium text-blue-900">Documents Ready for Review</h4>
                     <p className="text-sm text-blue-700">
                       {uploadedDocuments.length} document{uploadedDocuments.length !== 1 ? 's' : ''} uploaded successfully. 
-                      All documents will be saved to the document vault and labeled with the employee's name.
+                      All documents will be saved to the document vault and labeled with the employee&apos;s name.
                     </p>
                   </div>
                 </div>
