@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
-import { Loader2, Eye, Save, Download, Sparkles } from "lucide-react"
+import { Loader2, Eye, Save, Download, Sparkles, Users, Building2, TrendingUp } from "lucide-react"
 
 interface Employee {
   id: string
@@ -22,6 +23,7 @@ interface Employee {
   direct_supervisor?: string
   head_of_department?: string
   subsidiary_id?: string
+  profile_picture?: string
 }
 
 interface OrgChart {
@@ -39,6 +41,93 @@ interface OrgChart {
   user_id?: string
 }
 
+interface OrgChartNodeProps {
+  employee: Employee
+  level: number
+  style: string
+  children?: Employee[]
+}
+
+function OrgChartNode({ employee, level, style, children }: OrgChartNodeProps) {
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
+  const getNodeStyle = () => {
+    const isHead = level === 0
+    const isSupervisor = level === 1
+
+    const styles = {
+      modern: {
+        head: "bg-blue-700 text-white border-blue-800",
+        supervisor: "bg-blue-500 text-white border-blue-600",
+        employee: "bg-gray-100 text-gray-800 border-gray-300",
+      },
+      classic: {
+        head: "bg-amber-800 text-white border-amber-900",
+        supervisor: "bg-amber-600 text-white border-amber-700",
+        employee: "bg-gray-50 text-gray-900 border-gray-300",
+      },
+      minimal: {
+        head: "bg-white text-gray-900 border-2 border-gray-900",
+        supervisor: "bg-white text-gray-700 border border-gray-700",
+        employee: "bg-white text-gray-600 border border-gray-300",
+      },
+      corporate: {
+        head: "bg-emerald-700 text-white border-emerald-800",
+        supervisor: "bg-emerald-500 text-white border-emerald-600",
+        employee: "bg-emerald-50 text-emerald-900 border-emerald-200",
+      },
+    }
+
+    const styleGroup = styles[style as keyof typeof styles] || styles.modern
+    if (isHead) return styleGroup.head
+    if (isSupervisor) return styleGroup.supervisor
+    return styleGroup.employee
+  }
+
+  return (
+    <div className="flex flex-col items-center">
+      <div className={`flex flex-col items-center p-4 rounded-lg border-2 shadow-md min-w-[180px] ${getNodeStyle()}`}>
+        <Avatar className="w-16 h-16 mb-2 border-2 border-white">
+          <AvatarImage
+            src={
+              employee.profile_picture ||
+              `https://api.dicebear.com/7.x/avataaars/svg?seed=${employee.full_name || "/placeholder.svg"}`
+            }
+            alt={employee.full_name}
+          />
+          <AvatarFallback className="text-lg font-semibold">{getInitials(employee.full_name)}</AvatarFallback>
+        </Avatar>
+        <div className="text-center">
+          <p className="font-semibold text-sm">{employee.full_name}</p>
+          <p className="text-xs opacity-90 mt-1">{employee.position}</p>
+          <p className="text-xs opacity-75 mt-0.5">{employee.department}</p>
+        </div>
+      </div>
+
+      {children && children.length > 0 && (
+        <div className="flex flex-col items-center mt-4">
+          <div className="w-0.5 h-8 bg-gray-400" />
+          <div className="flex gap-8">
+            {children.map((child) => (
+              <div key={child.id} className="flex flex-col items-center">
+                <div className="w-0.5 h-8 bg-gray-400" />
+                <OrgChartNode employee={child} level={level + 1} style={style} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function OrganizationalChartPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [subsidiaries, setSubsidiaries] = useState<any[]>([])
@@ -52,6 +141,8 @@ export default function OrganizationalChartPage() {
   const [previewChart, setPreviewChart] = useState<any>(null)
   const [showPreview, setShowPreview] = useState(false)
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [viewingChart, setViewingChart] = useState<OrgChart | null>(null)
+  const [showChartView, setShowChartView] = useState(false)
 
   useEffect(() => {
     checkDemoMode()
@@ -87,6 +178,7 @@ export default function OrganizationalChartPage() {
         position: "Chief Executive Officer",
         department: "Executive",
         head_of_department: "true",
+        profile_picture: "https://api.dicebear.com/7.x/avataaars/svg?seed=Kwame",
       },
       {
         id: "emp-002",
@@ -96,6 +188,7 @@ export default function OrganizationalChartPage() {
         department: "Technology",
         direct_supervisor: "emp-001",
         head_of_department: "true",
+        profile_picture: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ama",
       },
       {
         id: "emp-003",
@@ -105,6 +198,7 @@ export default function OrganizationalChartPage() {
         department: "Human Resources",
         direct_supervisor: "emp-001",
         head_of_department: "true",
+        profile_picture: "https://api.dicebear.com/7.x/avataaars/svg?seed=Kofi",
       },
       {
         id: "emp-004",
@@ -113,6 +207,7 @@ export default function OrganizationalChartPage() {
         position: "Senior Developer",
         department: "Technology",
         direct_supervisor: "emp-002",
+        profile_picture: "https://api.dicebear.com/7.x/avataaars/svg?seed=Akosua",
       },
       {
         id: "emp-005",
@@ -121,6 +216,25 @@ export default function OrganizationalChartPage() {
         position: "HR Manager",
         department: "Human Resources",
         direct_supervisor: "emp-003",
+        profile_picture: "https://api.dicebear.com/7.x/avataaars/svg?seed=Yaw",
+      },
+      {
+        id: "emp-006",
+        employee_id: "EMP006",
+        full_name: "Abena Owusu",
+        position: "Junior Developer",
+        department: "Technology",
+        direct_supervisor: "emp-004",
+        profile_picture: "https://api.dicebear.com/7.x/avataaars/svg?seed=Abena",
+      },
+      {
+        id: "emp-007",
+        employee_id: "EMP007",
+        full_name: "Kwesi Darko",
+        position: "HR Assistant",
+        department: "Human Resources",
+        direct_supervisor: "emp-005",
+        profile_picture: "https://api.dicebear.com/7.x/avataaars/svg?seed=Kwesi",
       },
     ]
 
@@ -145,7 +259,7 @@ export default function OrganizationalChartPage() {
         chart_type: "hierarchical",
         chart_style: "modern",
         company_id: "00000000-0000-0000-0000-000000000001",
-        chart_data: { nodes: mockEmployees, edges: [] },
+        chart_data: { employees: mockEmployees },
         is_active: true,
         created_at: new Date().toISOString(),
       },
@@ -215,8 +329,20 @@ export default function OrganizationalChartPage() {
           ? employees.filter((emp) => !emp.subsidiary_id)
           : employees.filter((emp) => emp.subsidiary_id === selectedSubsidiary)
 
-      // Generate chart structure using AI/ML logic
-      const chartData = await generateChartStructure(filteredEmployees, chartType, chartStyle)
+      if (filteredEmployees.length === 0) {
+        toast({
+          title: "No Employees",
+          description: "No employees found for the selected subsidiary.",
+          variant: "destructive",
+        })
+        setIsGenerating(false)
+        return
+      }
+
+      const chartData = {
+        employees: filteredEmployees,
+        hierarchy: buildHierarchy(filteredEmployees),
+      }
 
       setPreviewChart({
         name: chartName,
@@ -225,7 +351,6 @@ export default function OrganizationalChartPage() {
         chart_style: chartStyle,
         subsidiary_id: selectedSubsidiary === "all" ? null : selectedSubsidiary,
         chart_data: chartData,
-        preview_image: generatePreviewImage(chartData, chartStyle),
       })
 
       setShowPreview(true)
@@ -246,297 +371,42 @@ export default function OrganizationalChartPage() {
     }
   }
 
-  const generateChartStructure = async (employees: Employee[], type: string, style: string) => {
-    const structure: any = {
-      type,
-      style,
-      nodes: [],
-      edges: [],
-      layout: {},
-    }
+  const buildHierarchy = (employees: Employee[]) => {
+    const employeeMap = new Map(employees.map((emp) => [emp.id, { ...emp, children: [] as Employee[] }]))
 
-    const departments = [...new Set(employees.map((emp) => emp.department))]
-    const hierarchy: any = {}
+    const roots: Employee[] = []
 
     employees.forEach((emp) => {
-      if (!hierarchy[emp.department]) {
-        hierarchy[emp.department] = {
-          department: emp.department,
-          head: null,
-          supervisors: [],
-          employees: [],
-        }
-      }
+      const employee = employeeMap.get(emp.id)
+      if (!employee) return
 
-      if (emp.head_of_department && !hierarchy[emp.department].head) {
-        hierarchy[emp.department].head = emp
-      } else if (emp.direct_supervisor) {
-        hierarchy[emp.department].supervisors.push(emp)
+      if (emp.direct_supervisor) {
+        const supervisor = employeeMap.get(emp.direct_supervisor)
+        if (supervisor) {
+          supervisor.children.push(employee)
+        } else {
+          roots.push(employee)
+        }
       } else {
-        hierarchy[emp.department].employees.push(emp)
+        roots.push(employee)
       }
     })
 
-    let nodeId = 0
-    Object.values(hierarchy).forEach((dept: any) => {
-      if (dept.head) {
-        structure.nodes.push({
-          id: `node-${nodeId++}`,
-          data: {
-            label: dept.head.full_name,
-            position: dept.head.position,
-            department: dept.head.department,
-            type: "head",
-            employee_id: dept.head.id,
-          },
-          position: { x: 0, y: 0 },
-          style: getNodeStyle(style, "head"),
-        })
-      }
-
-      dept.supervisors.forEach((supervisor: Employee) => {
-        structure.nodes.push({
-          id: `node-${nodeId++}`,
-          data: {
-            label: supervisor.full_name,
-            position: supervisor.position,
-            department: supervisor.department,
-            type: "supervisor",
-            employee_id: supervisor.id,
-          },
-          position: { x: 0, y: 0 },
-          style: getNodeStyle(style, "supervisor"),
-        })
-      })
-
-      dept.employees.forEach((employee: Employee) => {
-        structure.nodes.push({
-          id: `node-${nodeId++}`,
-          data: {
-            label: employee.full_name,
-            position: employee.position,
-            department: employee.department,
-            type: "employee",
-            employee_id: employee.id,
-          },
-          position: { x: 0, y: 0 },
-          style: getNodeStyle(style, "employee"),
-        })
-      })
-    })
-
-    structure.nodes.forEach((node: any) => {
-      const employee = employees.find((emp) => emp.id === node.data.employee_id)
-      if (employee?.direct_supervisor) {
-        const supervisorNode = structure.nodes.find((n: any) => n.data.employee_id === employee.direct_supervisor)
-        if (supervisorNode) {
-          structure.edges.push({
-            id: `edge-${node.id}-${supervisorNode.id}`,
-            source: supervisorNode.id,
-            target: node.id,
-            style: getEdgeStyle(style),
-          })
-        }
-      }
-    })
-
-    structure.layout = calculateLayout(structure.nodes, structure.edges, type)
-
-    return structure
+    return roots
   }
 
-  const getNodeStyle = (style: string, nodeType: string) => {
-    const baseStyles = {
-      modern: {
-        head: {
-          backgroundColor: "#1e40af",
-          color: "#ffffff",
-          borderRadius: "12px",
-          padding: "16px",
-          border: "none",
-          minWidth: "120px",
-          textAlign: "center" as const,
-        },
-        supervisor: {
-          backgroundColor: "#3b82f6",
-          color: "#ffffff",
-          borderRadius: "8px",
-          padding: "12px",
-          border: "none",
-          minWidth: "100px",
-          textAlign: "center" as const,
-        },
-        employee: {
-          backgroundColor: "#e5e7eb",
-          color: "#374151",
-          borderRadius: "6px",
-          padding: "8px",
-          border: "1px solid #d1d5db",
-          minWidth: "80px",
-          textAlign: "center" as const,
-        },
-      },
-      classic: {
-        head: {
-          backgroundColor: "#7c2d12",
-          color: "#ffffff",
-          borderRadius: "4px",
-          padding: "16px",
-          border: "none",
-          minWidth: "120px",
-          textAlign: "center" as const,
-        },
-        supervisor: {
-          backgroundColor: "#a16207",
-          color: "#ffffff",
-          borderRadius: "4px",
-          padding: "12px",
-          border: "none",
-          minWidth: "100px",
-          textAlign: "center" as const,
-        },
-        employee: {
-          backgroundColor: "#f3f4f6",
-          color: "#1f2937",
-          borderRadius: "4px",
-          padding: "8px",
-          border: "1px solid #d1d5db",
-          minWidth: "80px",
-          textAlign: "center" as const,
-        },
-      },
-      minimal: {
-        head: {
-          backgroundColor: "#ffffff",
-          color: "#111827",
-          border: "2px solid #111827",
-          padding: "16px",
-          borderRadius: "4px",
-          minWidth: "120px",
-          textAlign: "center" as const,
-        },
-        supervisor: {
-          backgroundColor: "#ffffff",
-          color: "#374151",
-          border: "1px solid #374151",
-          padding: "12px",
-          borderRadius: "4px",
-          minWidth: "100px",
-          textAlign: "center" as const,
-        },
-        employee: {
-          backgroundColor: "#ffffff",
-          color: "#6b7280",
-          border: "1px solid #d1d5db",
-          padding: "8px",
-          borderRadius: "4px",
-          minWidth: "80px",
-          textAlign: "center" as const,
-        },
-      },
-      corporate: {
-        head: {
-          backgroundColor: "#059669",
-          color: "#ffffff",
-          borderRadius: "8px",
-          padding: "16px",
-          border: "none",
-          minWidth: "120px",
-          textAlign: "center" as const,
-        },
-        supervisor: {
-          backgroundColor: "#10b981",
-          color: "#ffffff",
-          borderRadius: "6px",
-          padding: "12px",
-          border: "none",
-          minWidth: "100px",
-          textAlign: "center" as const,
-        },
-        employee: {
-          backgroundColor: "#ecfdf5",
-          color: "#065f46",
-          borderRadius: "4px",
-          padding: "8px",
-          border: "1px solid #a7f3d0",
-          minWidth: "80px",
-          textAlign: "center" as const,
-        },
-      },
-    }
+  const renderHierarchy = (employees: Employee[], style: string) => {
+    const hierarchy = buildHierarchy(employees)
 
-    const styleGroup = baseStyles[style as keyof typeof baseStyles] || baseStyles.modern
-    const nodeStyle = styleGroup[nodeType as keyof typeof styleGroup] || styleGroup.employee
-
-    return {
-      ...nodeStyle,
-      fontSize: "14px",
-      fontFamily: "Arial, sans-serif",
-      display: "block",
-      boxSizing: "border-box" as const,
-    }
-  }
-
-  const getEdgeStyle = (style: string) => {
-    const edgeStyles = {
-      modern: {
-        stroke: "#3b82f6",
-        strokeWidth: "2px",
-        fill: "none",
-      },
-      classic: {
-        stroke: "#a16207",
-        strokeWidth: "1px",
-        fill: "none",
-      },
-      minimal: {
-        stroke: "#6b7280",
-        strokeWidth: "1px",
-        strokeDasharray: "5,5",
-        fill: "none",
-      },
-      corporate: {
-        stroke: "#10b981",
-        strokeWidth: "2px",
-        fill: "none",
-      },
-    }
-
-    return edgeStyles[style as keyof typeof edgeStyles] || edgeStyles.modern
-  }
-
-  const calculateLayout = (nodes: any[], edges: any[], type: string) => {
-    const layout = { algorithm: type, spacing: { x: 200, y: 150 } }
-
-    nodes.forEach((node, index) => {
-      const row = Math.floor(index / 3)
-      const col = index % 3
-      node.position = {
-        x: col * layout.spacing.x,
-        y: row * layout.spacing.y,
-      }
-    })
-
-    return layout
-  }
-
-  const generatePreviewImage = (chartData: any, style: string) => {
-    const nodeCount = chartData?.nodes?.length || 0
-    const styleText = style || "modern"
-
-    const svgContent = `
-      <svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
-        <rect width="400" height="300" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1"/>
-        <text x="200" y="140" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="16" fill="#374151">
-          ${nodeCount} Employees
-        </text>
-        <text x="200" y="160" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="14" fill="#6b7280">
-          ${styleText.charAt(0).toUpperCase() + styleText.slice(1)} Style
-        </text>
-      </svg>
-    `
-
-    return `data:image/svg+xml;base64,${btoa(svgContent)}`
+    return (
+      <div className="flex justify-center items-start p-8 overflow-auto">
+        <div className="flex gap-12">
+          {hierarchy.map((root) => (
+            <OrgChartNode key={root.id} employee={root} level={0} style={style} children={(root as any).children} />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   const saveChart = async () => {
@@ -579,7 +449,6 @@ export default function OrganizationalChartPage() {
           company_id: "00000000-0000-0000-0000-000000000001",
           subsidiary_id: previewChart.subsidiary_id,
           chart_data: previewChart.chart_data,
-          preview_image: previewChart.preview_image,
           is_active: false,
           user_id: user.id,
         },
@@ -599,7 +468,7 @@ export default function OrganizationalChartPage() {
       if (!isDemoMode) {
         loadData()
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving chart:", error)
       toast({
         title: "Save Error",
@@ -660,17 +529,83 @@ export default function OrganizationalChartPage() {
     }
   }
 
+  const viewChart = (chart: OrgChart) => {
+    setViewingChart(chart)
+    setShowChartView(true)
+  }
+
+  const exportChart = (chart: OrgChart) => {
+    toast({
+      title: "Export Started",
+      description: "Your organizational chart is being prepared for download.",
+    })
+
+    setTimeout(() => {
+      const dataStr = JSON.stringify(chart, null, 2)
+      const dataBlob = new Blob([dataStr], { type: "application/json" })
+      const url = URL.createObjectURL(dataBlob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `${chart.name.replace(/\s+/g, "_")}.json`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Export Complete",
+        description: "Your organizational chart has been downloaded.",
+      })
+    }, 1000)
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Organizational Charts</h1>
-          <p className="text-gray-600">Create and manage AI-powered organizational charts</p>
+          <p className="text-muted-foreground">Create and manage AI-powered organizational charts</p>
         </div>
         <Badge variant="secondary" className="flex items-center gap-2">
           <Sparkles className="w-4 h-4" />
           AI-Powered
         </Badge>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Employees</p>
+                <p className="text-2xl font-bold">{employees.length}</p>
+              </div>
+              <Users className="w-8 h-8 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Departments</p>
+                <p className="text-2xl font-bold">{new Set(employees.map((e) => e.department)).size}</p>
+              </div>
+              <Building2 className="w-8 h-8 text-emerald-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Saved Charts</p>
+                <p className="text-2xl font-bold">{orgCharts.length}</p>
+              </div>
+              <TrendingUp className="w-8 h-8 text-teal-500" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="create" className="space-y-6">
@@ -690,7 +625,9 @@ export default function OrganizationalChartPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="chartName">Chart Name *</Label>
+                  <Label htmlFor="chartName">
+                    Chart Name <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="chartName"
                     placeholder="e.g., Company Org Chart 2024"
@@ -750,7 +687,7 @@ export default function OrganizationalChartPage() {
                   placeholder="Brief description of this organizational chart..."
                   value={chartDescription}
                   onChange={(e) => setChartDescription(e.target.value)}
-                  className="w-full min-h-[80px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full min-h-[80px] px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
               <Button
@@ -790,7 +727,7 @@ export default function OrganizationalChartPage() {
                   <CardDescription>{chart.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2 text-sm text-gray-600">
+                  <div className="space-y-2 text-sm text-muted-foreground">
                     <p>
                       <strong>Type:</strong> {chart.chart_type}
                     </p>
@@ -798,14 +735,14 @@ export default function OrganizationalChartPage() {
                       <strong>Style:</strong> {chart.chart_style}
                     </p>
                     <p>
-                      <strong>Employees:</strong> {chart.chart_data?.nodes?.length || 0}
+                      <strong>Employees:</strong> {chart.chart_data?.employees?.length || 0}
                     </p>
                     <p>
                       <strong>Created:</strong> {new Date(chart.created_at).toLocaleDateString()}
                     </p>
                   </div>
                   <div className="flex gap-2 mt-4">
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => viewChart(chart)}>
                       <Eye className="w-4 h-4 mr-1" />
                       Preview
                     </Button>
@@ -819,7 +756,7 @@ export default function OrganizationalChartPage() {
                         Activate
                       </Button>
                     )}
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => exportChart(chart)}>
                       <Download className="w-4 h-4 mr-1" />
                       Export
                     </Button>
@@ -832,16 +769,16 @@ export default function OrganizationalChartPage() {
       </Tabs>
 
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Chart Preview</DialogTitle>
             <DialogDescription>Review your generated organizational chart before saving</DialogDescription>
           </DialogHeader>
           {previewChart && (
-            <div className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+              <div className="bg-muted p-4 rounded-lg">
                 <h3 className="font-semibold">{previewChart.name}</h3>
-                <p className="text-sm text-gray-600">{previewChart.description}</p>
+                <p className="text-sm text-muted-foreground">{previewChart.description}</p>
                 <div className="flex gap-4 mt-2 text-sm">
                   <span>
                     <strong>Type:</strong> {previewChart.chart_type}
@@ -850,23 +787,12 @@ export default function OrganizationalChartPage() {
                     <strong>Style:</strong> {previewChart.chart_style}
                   </span>
                   <span>
-                    <strong>Employees:</strong> {previewChart.chart_data?.nodes?.length || 0}
+                    <strong>Employees:</strong> {previewChart.chart_data?.employees?.length || 0}
                   </span>
                 </div>
               </div>
-              <div className="border rounded-lg p-4 bg-white min-h-[300px] flex items-center justify-center">
-                {previewChart.preview_image ? (
-                  <img
-                    src={previewChart.preview_image || "/placeholder.svg"}
-                    alt="Chart Preview"
-                    className="max-w-full max-h-[300px]"
-                  />
-                ) : (
-                  <div className="text-center text-gray-500">
-                    <p>Chart preview will be displayed here</p>
-                    <p className="text-sm">Generated with {previewChart.chart_data?.nodes?.length || 0} employees</p>
-                  </div>
-                )}
+              <div className="border rounded-lg bg-white flex-1 overflow-auto">
+                {renderHierarchy(previewChart.chart_data?.employees || [], previewChart.chart_style)}
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowPreview(false)}>
@@ -875,6 +801,47 @@ export default function OrganizationalChartPage() {
                 <Button onClick={saveChart} className="bg-teal-600 hover:bg-teal-700">
                   <Save className="w-4 h-4 mr-2" />
                   Save Chart
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showChartView} onOpenChange={setShowChartView}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{viewingChart?.name}</DialogTitle>
+            <DialogDescription>{viewingChart?.description}</DialogDescription>
+          </DialogHeader>
+          {viewingChart && (
+            <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+              <div className="bg-muted p-4 rounded-lg">
+                <div className="flex gap-4 text-sm">
+                  <span>
+                    <strong>Type:</strong> {viewingChart.chart_type}
+                  </span>
+                  <span>
+                    <strong>Style:</strong> {viewingChart.chart_style}
+                  </span>
+                  <span>
+                    <strong>Employees:</strong> {viewingChart.chart_data?.employees?.length || 0}
+                  </span>
+                  <span>
+                    <strong>Created:</strong> {new Date(viewingChart.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+              <div className="border rounded-lg bg-white flex-1 overflow-auto">
+                {renderHierarchy(viewingChart.chart_data?.employees || [], viewingChart.chart_style)}
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowChartView(false)}>
+                  Close
+                </Button>
+                <Button onClick={() => exportChart(viewingChart)} className="bg-teal-600 hover:bg-teal-700">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Chart
                 </Button>
               </div>
             </div>
