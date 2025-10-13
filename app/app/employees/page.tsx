@@ -2416,16 +2416,7 @@ function AddEmployeeForm({
   }>>([])
   const [showAllowanceSelector, setShowAllowanceSelector] = useState(false)
   const [showDeductionSelector, setShowDeductionSelector] = useState(false)
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [showInactiveReason, setShowInactiveReason] = useState(false)
-
-  // Document upload states
-  const [uploadedDocuments, setUploadedDocuments] = useState([])
-  const [uploadingDocuments, setUploadingDocuments] = useState([])
-  const [uploadProgress, setUploadProgress] = useState({})
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
-  const [previewDocument, setPreviewDocument] = useState(null)
-  const fileInputRefs = useRef({})
 
   // Required documents configuration
   const requiredDocuments = [
