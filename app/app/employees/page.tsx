@@ -647,7 +647,7 @@ export default function EmployeesPage() {
     loadEmployees()
     loadSubsidiaries()
     loadCompanyData()
-  }, [loadEmployees, loadSubsidiaries, loadCompanyData])
+  }, [])
 
   useEffect(() => {
     if (isDemoMode()) {
@@ -668,7 +668,7 @@ export default function EmployeesPage() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [loadEmployees])
+  }, [])
 
   const generateEmployeeId = useCallback(() => {
     // Get company name initials
@@ -3615,7 +3615,7 @@ function AddEmployeeForm({
     if (companySettings?.id) {
       loadCustomBanks()
     }
-  }, [companySettings?.id, loadCustomBanks])
+  }, [companySettings?.id])
 
   return (
     <div className="space-y-8 p-6">
