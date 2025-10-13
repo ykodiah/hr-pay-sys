@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
-import { Loader2, Eye, Save, Download, Sparkles } from "lucide-react"
+import { Loader2, Eye, Save, Download, Sparkles, ZoomIn, ZoomOut } from "lucide-react"
 
 interface Employee {
   id: string
@@ -39,10 +39,103 @@ interface OrgChart {
   user_id?: string
 }
 
+function OrgChartVisualization({ chartData, style }: { chartData: any; style: string }) {
+  const [zoom, setZoom] = useState(1)
+  const nodes: any[] = chartData?.nodes || []
+  const edges: any[] = chartData?.edges || []
+
+  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.1, 2))
+  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.1, 0.5))
+
+  return (
+    <div className="relative border rounded-lg bg-gray-50 overflow-hidden">
+      {/* Zoom controls */}
+      <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <Button variant="outline" size="sm" onClick={handleZoomOut}>
+          <ZoomOut className="w-4 h-4" />
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleZoomIn}>
+          <ZoomIn className="w-4 h-4" />
+        </Button>
+      </div>
+
+      {/* Chart container */}
+      <div className="p-8 overflow-auto" style={{ minHeight: "500px", maxHeight: "600px" }}>
+        <div
+          style={{
+            transform: `scale(${zoom})`,
+            transformOrigin: "top left",
+            transition: "transform 0.2s ease",
+          }}
+        >
+          <svg width="100%" height="600" className="overflow-visible">
+            {/* Draw edges first (connections) */}
+            {edges.map((edge) => {
+              const sourceNode = nodes.find((n) => n.id === edge.source)
+              const targetNode = nodes.find((n) => n.id === edge.target)
+
+              if (!sourceNode || !targetNode) return null
+
+              const x1 = sourceNode.position.x + 100
+              const y1 = sourceNode.position.y + 40
+              const x2 = targetNode.position.x + 100
+              const y2 = targetNode.position.y
+
+              return (
+                <g key={edge.id}>
+                  <line
+                    x1={x1}
+                    y1={y1}
+                    x2={x2}
+                    y2={y2}
+                    stroke={edge.style.stroke}
+                    strokeWidth={edge.style.strokeWidth}
+                    strokeDasharray={edge.style.strokeDasharray}
+                  />
+                </g>
+              )
+            })}
+
+            {/* Draw nodes */}
+            {nodes.map((node) => {
+              const nodeStyle = node.style
+              const width = 200
+              const height = 80
+
+              return (
+                <g key={node.id}>
+                  <foreignObject x={node.position.x} y={node.position.y} width={width} height={height}>
+                    <div
+                      style={{
+                        ...nodeStyle,
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                      }}
+                    >
+                      <div style={{ fontWeight: "600", fontSize: "14px", marginBottom: "4px" }}>{node.data.label}</div>
+                      <div style={{ fontSize: "12px", opacity: 0.8 }}>{node.data.position}</div>
+                      <div style={{ fontSize: "11px", opacity: 0.6, marginTop: "2px" }}>{node.data.department}</div>
+                    </div>
+                  </foreignObject>
+                </g>
+              )
+            })}
+          </svg>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function OrganizationalChartPage() {
-  const [employees, setEmployees] = useState<Employee[]>([])
+  const [employees, setEmployees] = useState<any[]>([])
   const [subsidiaries, setSubsidiaries] = useState<any[]>([])
-  const [orgCharts, setOrgCharts] = useState<OrgChart[]>([])
+  const [orgCharts, setOrgCharts] = useState<any[]>([])
   const [selectedSubsidiary, setSelectedSubsidiary] = useState<string>("all")
   const [chartType, setChartType] = useState<string>("hierarchical")
   const [chartStyle, setChartStyle] = useState<string>("modern")
@@ -79,7 +172,7 @@ export default function OrganizationalChartPage() {
   const loadMockData = () => {
     console.log("[v0] Demo mode detected, using mock org chart data")
 
-    const mockEmployees: Employee[] = [
+    const mockEmployees = [
       {
         id: "emp-001",
         employee_id: "EMP001",
@@ -137,7 +230,7 @@ export default function OrganizationalChartPage() {
       },
     ]
 
-    const mockOrgCharts: OrgChart[] = [
+    const mockOrgCharts = [
       {
         id: "chart-001",
         name: "Company Organizational Chart 2024",
@@ -246,7 +339,7 @@ export default function OrganizationalChartPage() {
     }
   }
 
-  const generateChartStructure = async (employees: Employee[], type: string, style: string) => {
+  const generateChartStructure = async (employees: any[], type: string, style: string) => {
     const structure: any = {
       type,
       style,
@@ -294,7 +387,7 @@ export default function OrganizationalChartPage() {
         })
       }
 
-      dept.supervisors.forEach((supervisor: Employee) => {
+      dept.supervisors.forEach((supervisor: any) => {
         structure.nodes.push({
           id: `node-${nodeId++}`,
           data: {
@@ -309,7 +402,7 @@ export default function OrganizationalChartPage() {
         })
       })
 
-      dept.employees.forEach((employee: Employee) => {
+      dept.employees.forEach((employee: any) => {
         structure.nodes.push({
           id: `node-${nodeId++}`,
           data: {
@@ -521,22 +614,7 @@ export default function OrganizationalChartPage() {
   }
 
   const generatePreviewImage = (chartData: any, style: string) => {
-    const nodeCount = chartData?.nodes?.length || 0
-    const styleText = style || "modern"
-
-    const svgContent = `
-      <svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
-        <rect width="400" height="300" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1"/>
-        <text x="200" y="140" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="16" fill="#374151">
-          ${nodeCount} Employees
-        </text>
-        <text x="200" y="160" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="14" fill="#6b7280">
-          ${styleText.charAt(0).toUpperCase() + styleText.slice(1)} Style
-        </text>
-      </svg>
-    `
-
-    return `data:image/svg+xml;base64,${btoa(svgContent)}`
+    return null
   }
 
   const saveChart = async () => {
@@ -832,7 +910,7 @@ export default function OrganizationalChartPage() {
       </Tabs>
 
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-6xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Chart Preview</DialogTitle>
             <DialogDescription>Review your generated organizational chart before saving</DialogDescription>
@@ -840,35 +918,27 @@ export default function OrganizationalChartPage() {
           {previewChart && (
             <div className="space-y-4">
               <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-semibold">{previewChart.name}</h3>
-                <p className="text-sm text-gray-600">{previewChart.description}</p>
-                <div className="flex gap-4 mt-2 text-sm">
-                  <span>
-                    <strong>Type:</strong> {previewChart.chart_type}
+                <h3 className="font-semibold text-lg">{previewChart.name}</h3>
+                <p className="text-sm text-gray-600 mt-1">{previewChart.description}</p>
+                <div className="flex gap-6 mt-3 text-sm">
+                  <span className="flex items-center gap-1">
+                    <strong>Type:</strong>
+                    <Badge variant="outline">{previewChart.chart_type}</Badge>
                   </span>
-                  <span>
-                    <strong>Style:</strong> {previewChart.chart_style}
+                  <span className="flex items-center gap-1">
+                    <strong>Style:</strong>
+                    <Badge variant="outline">{previewChart.chart_style}</Badge>
                   </span>
-                  <span>
-                    <strong>Employees:</strong> {previewChart.chart_data?.nodes?.length || 0}
+                  <span className="flex items-center gap-1">
+                    <strong>Employees:</strong>
+                    <Badge variant="secondary">{previewChart.chart_data?.nodes?.length || 0}</Badge>
                   </span>
                 </div>
               </div>
-              <div className="border rounded-lg p-4 bg-white min-h-[300px] flex items-center justify-center">
-                {previewChart.preview_image ? (
-                  <img
-                    src={previewChart.preview_image || "/placeholder.svg"}
-                    alt="Chart Preview"
-                    className="max-w-full max-h-[300px]"
-                  />
-                ) : (
-                  <div className="text-center text-gray-500">
-                    <p>Chart preview will be displayed here</p>
-                    <p className="text-sm">Generated with {previewChart.chart_data?.nodes?.length || 0} employees</p>
-                  </div>
-                )}
-              </div>
-              <div className="flex justify-end gap-2">
+
+              <OrgChartVisualization chartData={previewChart.chart_data} style={previewChart.chart_style} />
+
+              <div className="flex justify-end gap-2 pt-4 border-t">
                 <Button variant="outline" onClick={() => setShowPreview(false)}>
                   Cancel
                 </Button>
