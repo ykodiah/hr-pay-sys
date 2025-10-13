@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Progress } from "@/components/ui/progress"
 import { toast } from "@/hooks/use-toast"
 import {
   Search,
@@ -22,226 +21,47 @@ import {
   MoreHorizontal,
   FileText,
   ImageIcon,
-  File,
   CheckCircle,
   XCircle,
   Clock,
   Upload,
-  Trash2,
   Edit,
   Calendar,
   FolderOpen,
   Archive,
-  X,
   Shield,
   UserCheck,
   PenTool,
   Share2,
   MessageSquare,
   Settings,
-  Filter,
   SortAsc,
   SortDesc,
   Lock,
-  Unlock,
-  AlertTriangle,
   CheckSquare,
   Square,
   Users,
-  Key,
   History,
-  Zap,
-  Star,
-  Flag,
   Tag,
-  Bookmark,
-  Copy,
-  ExternalLink,
-  RefreshCw,
   Plus,
-  Minus,
-  ChevronDown,
-  ChevronRight,
-  Play,
-  Pause,
-  Stop,
-  RotateCcw,
-  Save,
-  Send,
-  Mail,
-  Bell,
-  AlertCircle,
-  Info,
-  HelpCircle,
-  TrendingUp,
-  BarChart3,
-  PieChart,
   Activity,
-  Target,
-  Award,
   Globe,
-  Database,
-  HardDrive,
-  Cloud,
-  Wifi,
-  WifiOff,
-  Signal,
-  Battery,
-  BatteryLow,
-  Volume2,
-  VolumeX,
-  Sun,
-  Moon,
-  Monitor,
-  Smartphone,
-  Tablet,
-  Laptop,
-  Desktop,
-  Server,
-  Router,
-  Cpu,
-  MemoryStick,
-  HardDriveIcon,
-  Disc,
-  Disc3,
-  Music,
-  Video,
-  Camera,
-  Mic,
-  MicOff,
-  Headphones,
-  Speaker,
-  Radio,
-  Tv,
-  Gamepad2,
-  Joystick,
-  Mouse,
-  Keyboard,
-  Printer,
-  Scanner,
-  Fax,
-  Phone,
-  PhoneCall,
-  PhoneIncoming,
-  PhoneOutgoing,
-  PhoneMissed,
-  Voicemail,
-  MessageCircle,
-  MessageSquare as MessageSquareIcon,
-  Mail as MailIcon,
-  Inbox,
-  Outbox,
-  Send as SendIcon,
-  Reply,
-  ReplyAll,
-  Forward,
-  Archive as ArchiveIcon,
-  Trash as TrashIcon,
-  Star as StarIcon,
-  Heart,
-  ThumbsUp,
-  ThumbsDown,
-  Smile,
-  Frown,
-  Meh,
-  Laugh,
-  Angry,
-  Surprised,
-  Confused,
-  Wink,
-  Kiss,
-  Tongue,
-  Eye as EyeIcon,
-  EyeOff,
-  Maximize,
-  Minimize,
-  Move,
-  RotateCw,
-  RotateCcw as RotateCcwIcon,
-  ZoomIn,
-  ZoomOut,
-  Focus,
-  Crop,
-  Scissors,
-  Palette,
-  Brush,
-  Eraser,
-  Paintbrush,
-  Pen as PenIcon,
-  Pencil,
-  Highlighter,
-  Marker,
-  Crayon,
-  PaintBucket,
-  Gradient,
-  Layers,
+  TrashIcon,
   Grid,
-  Layout,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  AlignJustify,
-  Bold,
-  Italic,
-  Underline,
-  Strikethrough,
-  Subscript,
-  Superscript,
-  Code,
-  Link,
-  Unlink,
-  Image as ImageIcon,
-  Video as VideoIcon,
-  Music as MusicIcon,
-  File as FileIcon,
-  Folder as FolderIcon,
-  FolderOpen as FolderOpenIcon,
-  FolderPlus,
-  FolderMinus,
-  FolderX,
-  FolderCheck,
-  FolderLock,
-  FolderUnlock,
-  FolderHeart,
-  FolderStar,
-  FolderArchive,
-  FolderTrash,
-  FolderDownload,
-  FolderUpload,
-  FolderSync,
-  FolderSearch,
-  FolderSettings,
-  FolderCog,
-  FolderWrench,
-  FolderShield,
-  FolderKey,
-  FolderEye,
-  FolderEyeOff,
-  FolderPlus as FolderPlusIcon,
-  FolderMinus as FolderMinusIcon,
-  FolderX as FolderXIcon,
-  FolderCheck as FolderCheckIcon,
-  FolderLock as FolderLockIcon,
-  FolderUnlock as FolderUnlockIcon,
-  FolderHeart as FolderHeartIcon,
-  FolderStar as FolderStarIcon,
-  FolderArchive as FolderArchiveIcon,
-  FolderTrash as FolderTrashIcon,
-  FolderDownload as FolderDownloadIcon,
-  FolderUpload as FolderUploadIcon,
-  FolderSync as FolderSyncIcon,
-  FolderSearch as FolderSearchIcon,
-  FolderSettings as FolderSettingsIcon,
-  FolderCog as FolderCogIcon,
-  FolderWrench as FolderWrenchIcon,
-  FolderShield as FolderShieldIcon,
-  FolderKey as FolderKeyIcon,
-  FolderEye as FolderEyeIcon,
-  FolderEyeOff as FolderEyeOffIcon,
+  VideoIcon,
+  MusicIcon,
+  FileIcon,
   List,
-  Grid,
 } from "lucide-react"
-import { AdvancedDocumentService, AdvancedDocument, DocumentAccessLog, DocumentSignature, RetentionPolicy, DocumentWorkflow, DocumentComment, DocumentSharing } from "@/lib/storage/advancedDocumentService"
+import {
+  AdvancedDocumentService,
+  type AdvancedDocument,
+  type DocumentAccessLog,
+  type DocumentSignature,
+  type RetentionPolicy,
+  type DocumentWorkflow,
+  type DocumentComment,
+} from "@/lib/storage/advancedDocumentService"
 
 // Enhanced document type labels
 const documentTypeLabels = {
@@ -286,7 +106,7 @@ export default function EnhancedDocumentVaultPage() {
   const [workflows, setWorkflows] = useState<DocumentWorkflow[]>([])
   const [comments, setComments] = useState<DocumentComment[]>([])
   const [retentionPolicies, setRetentionPolicies] = useState<RetentionPolicy[]>([])
-  
+
   // Filter states
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedEmployee, setSelectedEmployee] = useState("all")
@@ -298,7 +118,7 @@ export default function EnhancedDocumentVaultPage() {
   const [selectedFileSize, setSelectedFileSize] = useState("all")
   const [selectedSource, setSelectedSource] = useState("all")
   const [selectedCategory, setSelectedCategory] = useState("all")
-  
+
   // UI states
   const [selectedDocument, setSelectedDocument] = useState<AdvancedDocument | null>(null)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
@@ -326,17 +146,17 @@ export default function EnhancedDocumentVaultPage() {
       const docs = documentService.getAllDocuments()
       const policies = documentService.getRetentionPolicies()
       const workflows = documentService.getWorkflows()
-      
+
       setDocuments(docs)
       setRetentionPolicies(policies)
       setWorkflows(workflows)
-      
+
       // Load additional data for selected document
       if (selectedDocument) {
         const logs = await documentService.getDocumentAccessLogs(selectedDocument.id)
         const sigs = await documentService.getDocumentSignatures(selectedDocument.id)
         const comms = await documentService.getDocumentComments(selectedDocument.id)
-        
+
         setAccessLogs(logs)
         setSignatures(sigs)
         setComments(comms)
@@ -346,91 +166,105 @@ export default function EnhancedDocumentVaultPage() {
       toast({
         title: "Error",
         description: "Failed to load document data",
-        variant: "destructive"
+        variant: "destructive",
       })
     }
   }
 
-  const filteredDocuments = documents.filter((doc) => {
-    const matchesSearch =
-      doc.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.employeeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.fileType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-    
-    const matchesEmployee = selectedEmployee === "all" || doc.employeeId === selectedEmployee
-    const matchesDocumentType = selectedDocumentType === "all" || doc.documentType === selectedDocumentType
-    const matchesStatus = selectedStatus === "all" || doc.status === selectedStatus
-    const matchesAccessLevel = selectedAccessLevel === "all" || doc.accessLevel === selectedAccessLevel
-    const matchesSignatureStatus = selectedSignatureStatus === "all" || doc.signatureStatus === selectedSignatureStatus
-    const matchesTab = activeTab === "all" || doc.status === activeTab
-    const matchesArchived = showArchived ? doc.isArchived : !doc.isArchived
-    const matchesDeleted = showDeleted ? doc.status === "deleted" : doc.status !== "deleted"
-    
-    // Date range filtering
-    const matchesDateRange = (() => {
-      if (selectedDateRange === "all") return true
-      const now = new Date()
-      const docDate = new Date(doc.uploadDate)
-      
-      switch (selectedDateRange) {
-        case "today":
-          return docDate.toDateString() === now.toDateString()
-        case "week":
-          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-          return docDate >= weekAgo
-        case "month":
-          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-          return docDate >= monthAgo
-        case "quarter":
-          const quarterAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-          return docDate >= quarterAgo
-        case "year":
-          const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
-          return docDate >= yearAgo
-        default:
-          return true
-      }
-    })()
-    
-    // File size filtering
-    const matchesFileSize = (() => {
-      if (selectedFileSize === "all") return true
-      const sizeInMB = doc.fileSize / (1024 * 1024)
-      
-      switch (selectedFileSize) {
-        case "small":
-          return sizeInMB < 1
-        case "medium":
-          return sizeInMB >= 1 && sizeInMB <= 10
-        case "large":
-          return sizeInMB > 10
-        default:
-          return true
-      }
-    })()
-    
-    // Source filtering
-    const matchesSource = selectedSource === "all" || doc.source === selectedSource
-    
-    // Category filtering
-    const matchesCategory = selectedCategory === "all" || doc.category === selectedCategory
+  const filteredDocuments = documents
+    .filter((doc) => {
+      const matchesSearch =
+        doc.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.employeeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.fileType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()))
 
-    return matchesSearch && matchesEmployee && matchesDocumentType && matchesStatus && 
-           matchesTab && matchesDateRange && matchesFileSize && matchesSource && 
-           matchesCategory && matchesAccessLevel && matchesSignatureStatus && 
-           matchesArchived && matchesDeleted
-  }).sort((a, b) => {
-    const aValue = a[sortBy as keyof AdvancedDocument]
-    const bValue = b[sortBy as keyof AdvancedDocument]
-    
-    if (sortOrder === "asc") {
-      return aValue > bValue ? 1 : -1
-    } else {
-      return aValue < bValue ? 1 : -1
-    }
-  })
+      const matchesEmployee = selectedEmployee === "all" || doc.employeeId === selectedEmployee
+      const matchesDocumentType = selectedDocumentType === "all" || doc.documentType === selectedDocumentType
+      const matchesStatus = selectedStatus === "all" || doc.status === selectedStatus
+      const matchesAccessLevel = selectedAccessLevel === "all" || doc.accessLevel === selectedAccessLevel
+      const matchesSignatureStatus =
+        selectedSignatureStatus === "all" || doc.signatureStatus === selectedSignatureStatus
+      const matchesTab = activeTab === "all" || doc.status === activeTab
+      const matchesArchived = showArchived ? doc.isArchived : !doc.isArchived
+      const matchesDeleted = showDeleted ? doc.status === "deleted" : doc.status !== "deleted"
+
+      // Date range filtering
+      const matchesDateRange = (() => {
+        if (selectedDateRange === "all") return true
+        const now = new Date()
+        const docDate = new Date(doc.uploadDate)
+
+        switch (selectedDateRange) {
+          case "today":
+            return docDate.toDateString() === now.toDateString()
+          case "week":
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+            return docDate >= weekAgo
+          case "month":
+            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+            return docDate >= monthAgo
+          case "quarter":
+            const quarterAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+            return docDate >= quarterAgo
+          case "year":
+            const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+            return docDate >= yearAgo
+          default:
+            return true
+        }
+      })()
+
+      // File size filtering
+      const matchesFileSize = (() => {
+        if (selectedFileSize === "all") return true
+        const sizeInMB = doc.fileSize / (1024 * 1024)
+
+        switch (selectedFileSize) {
+          case "small":
+            return sizeInMB < 1
+          case "medium":
+            return sizeInMB >= 1 && sizeInMB <= 10
+          case "large":
+            return sizeInMB > 10
+          default:
+            return true
+        }
+      })()
+
+      // Source filtering
+      const matchesSource = selectedSource === "all" || doc.source === selectedSource
+
+      // Category filtering
+      const matchesCategory = selectedCategory === "all" || doc.category === selectedCategory
+
+      return (
+        matchesSearch &&
+        matchesEmployee &&
+        matchesDocumentType &&
+        matchesStatus &&
+        matchesTab &&
+        matchesDateRange &&
+        matchesFileSize &&
+        matchesSource &&
+        matchesCategory &&
+        matchesAccessLevel &&
+        matchesSignatureStatus &&
+        matchesArchived &&
+        matchesDeleted
+      )
+    })
+    .sort((a, b) => {
+      const aValue = a[sortBy as keyof AdvancedDocument]
+      const bValue = b[sortBy as keyof AdvancedDocument]
+
+      if (sortOrder === "asc") {
+        return aValue > bValue ? 1 : -1
+      } else {
+        return aValue < bValue ? 1 : -1
+      }
+    })
 
   const employees = [...new Set(documents.map((doc) => ({ id: doc.employeeId, name: doc.employeeName })))]
   const documentTypes = [...new Set(documents.map((doc) => doc.documentType))]
@@ -482,10 +316,10 @@ export default function EnhancedDocumentVaultPage() {
   const handleDocumentAction = async (documentId: string, action: string, data?: any) => {
     try {
       await documentService.logDocumentAccess(documentId, action, data)
-      
+
       switch (action) {
         case "view":
-          const doc = documents.find(d => d.id === documentId)
+          const doc = documents.find((d) => d.id === documentId)
           if (doc) {
             setSelectedDocument(doc)
             setIsPreviewOpen(true)
@@ -498,28 +332,28 @@ export default function EnhancedDocumentVaultPage() {
           })
           break
         case "sign":
-          const signDoc = documents.find(d => d.id === documentId)
+          const signDoc = documents.find((d) => d.id === documentId)
           if (signDoc) {
             setSelectedDocument(signDoc)
             setIsSignatureOpen(true)
           }
           break
         case "comment":
-          const commentDoc = documents.find(d => d.id === documentId)
+          const commentDoc = documents.find((d) => d.id === documentId)
           if (commentDoc) {
             setSelectedDocument(commentDoc)
             setIsCommentOpen(true)
           }
           break
         case "share":
-          const shareDoc = documents.find(d => d.id === documentId)
+          const shareDoc = documents.find((d) => d.id === documentId)
           if (shareDoc) {
             setSelectedDocument(shareDoc)
             setIsShareOpen(true)
           }
           break
         case "audit":
-          const auditDoc = documents.find(d => d.id === documentId)
+          const auditDoc = documents.find((d) => d.id === documentId)
           if (auditDoc) {
             setSelectedDocument(auditDoc)
             setIsAuditOpen(true)
@@ -527,7 +361,7 @@ export default function EnhancedDocumentVaultPage() {
           }
           break
         case "workflow":
-          const workflowDoc = documents.find(d => d.id === documentId)
+          const workflowDoc = documents.find((d) => d.id === documentId)
           if (workflowDoc) {
             setSelectedDocument(workflowDoc)
             setIsWorkflowOpen(true)
@@ -571,7 +405,7 @@ export default function EnhancedDocumentVaultPage() {
       toast({
         title: "Error",
         description: "Failed to perform action",
-        variant: "destructive"
+        variant: "destructive",
       })
     }
   }
@@ -586,7 +420,7 @@ export default function EnhancedDocumentVaultPage() {
     const signed = documents.filter((doc) => doc.signatureStatus === "signed").length
     const confidential = documents.filter((doc) => doc.accessLevel === "confidential").length
     const restricted = documents.filter((doc) => doc.accessLevel === "restricted").length
-    
+
     return { total, approved, pending, rejected, archived, requiresSignature, signed, confidential, restricted }
   }
 
@@ -598,7 +432,9 @@ export default function EnhancedDocumentVaultPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Advanced Document Vault</h1>
-          <p className="text-gray-600">Enterprise-grade document management with RBAC, audit trails, and e-signatures</p>
+          <p className="text-gray-600">
+            Enterprise-grade document management with RBAC, audit trails, and e-signatures
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
@@ -708,7 +544,7 @@ export default function EnhancedDocumentVaultPage() {
                 className="pl-10"
               />
             </div>
-            
+
             {/* Filter Row 1 */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
@@ -724,7 +560,7 @@ export default function EnhancedDocumentVaultPage() {
                   ))}
                 </SelectContent>
               </Select>
-              
+
               <Select value={selectedDocumentType} onValueChange={setSelectedDocumentType}>
                 <SelectTrigger>
                   <SelectValue placeholder="Document type" />
@@ -738,7 +574,7 @@ export default function EnhancedDocumentVaultPage() {
                   ))}
                 </SelectContent>
               </Select>
-              
+
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                 <SelectTrigger>
                   <SelectValue placeholder="Status" />
@@ -751,7 +587,7 @@ export default function EnhancedDocumentVaultPage() {
                   <SelectItem value="archived">Archived</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               <Select value={selectedAccessLevel} onValueChange={setSelectedAccessLevel}>
                 <SelectTrigger>
                   <SelectValue placeholder="Access Level" />
@@ -764,7 +600,7 @@ export default function EnhancedDocumentVaultPage() {
                   <SelectItem value="restricted">Restricted</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               <Select value={selectedSignatureStatus} onValueChange={setSelectedSignatureStatus}>
                 <SelectTrigger>
                   <SelectValue placeholder="Signature Status" />
@@ -779,7 +615,7 @@ export default function EnhancedDocumentVaultPage() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             {/* Filter Row 2 - Advanced Filters */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Select value={selectedDateRange} onValueChange={setSelectedDateRange}>
@@ -795,7 +631,7 @@ export default function EnhancedDocumentVaultPage() {
                   <SelectItem value="year">This Year</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               <Select value={selectedFileSize} onValueChange={setSelectedFileSize}>
                 <SelectTrigger>
                   <SelectValue placeholder="File size" />
@@ -807,7 +643,7 @@ export default function EnhancedDocumentVaultPage() {
                   <SelectItem value="large">Large (&gt; 10MB)</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               <Select value={selectedSource} onValueChange={setSelectedSource}>
                 <SelectTrigger>
                   <SelectValue placeholder="Upload source" />
@@ -821,7 +657,7 @@ export default function EnhancedDocumentVaultPage() {
                   <SelectItem value="manual-upload">Manual Upload</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger>
                   <SelectValue placeholder="Category" />
@@ -835,27 +671,19 @@ export default function EnhancedDocumentVaultPage() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             {/* Additional Controls */}
             <div className="flex flex-wrap gap-4 items-center">
               <div className="flex items-center space-x-2">
-                <Switch
-                  id="show-archived"
-                  checked={showArchived}
-                  onCheckedChange={setShowArchived}
-                />
+                <Switch id="show-archived" checked={showArchived} onCheckedChange={setShowArchived} />
                 <Label htmlFor="show-archived">Show Archived</Label>
               </div>
-              
+
               <div className="flex items-center space-x-2">
-                <Switch
-                  id="show-deleted"
-                  checked={showDeleted}
-                  onCheckedChange={setShowDeleted}
-                />
+                <Switch id="show-deleted" checked={showDeleted} onCheckedChange={setShowDeleted} />
                 <Label htmlFor="show-deleted">Show Deleted</Label>
               </div>
-              
+
               <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Sort by" />
@@ -868,20 +696,12 @@ export default function EnhancedDocumentVaultPage() {
                   <SelectItem value="accessLevel">Access Level</SelectItem>
                 </SelectContent>
               </Select>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-              >
+
+              <Button variant="outline" size="sm" onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}>
                 {sortOrder === "asc" ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
               </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-              >
+
+              <Button variant="outline" size="sm" onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}>
                 {viewMode === "grid" ? <List className="w-4 h-4" /> : <Grid className="w-4 h-4" />}
               </Button>
             </div>
@@ -916,7 +736,7 @@ export default function EnhancedDocumentVaultPage() {
                   filteredDocuments.map((document) => {
                     const AccessLevelIcon = accessLevelConfig[document.accessLevel].icon
                     const SignatureStatusIcon = signatureStatusConfig[document.signatureStatus].icon
-                    
+
                     return (
                       <div
                         key={document.id}
@@ -931,7 +751,9 @@ export default function EnhancedDocumentVaultPage() {
                               <h3 className="font-semibold text-gray-900">{document.fileName}</h3>
                               <Badge className={getStatusBadge(document.status)}>
                                 {getStatusIcon(document.status)}
-                                <span className="ml-1">{document.status.charAt(0).toUpperCase() + document.status.slice(1)}</span>
+                                <span className="ml-1">
+                                  {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
+                                </span>
                               </Badge>
                               <Badge className={accessLevelConfig[document.accessLevel].color}>
                                 <AccessLevelIcon className="w-3 h-3 mr-1" />
@@ -1044,7 +866,10 @@ export default function EnhancedDocumentVaultPage() {
                                   Archive
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem className="text-red-600" onClick={() => handleDocumentAction(document.id, "delete")}>
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => handleDocumentAction(document.id, "delete")}
+                              >
                                 <TrashIcon className="w-4 h-4 mr-2" />
                                 Delete
                               </DropdownMenuItem>
@@ -1230,7 +1055,7 @@ export default function EnhancedDocumentVaultPage() {
                 <h3 className="text-lg font-semibold">Sign Document</h3>
                 <p className="text-gray-600">{selectedDocument.fileName}</p>
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="signature-type">Signature Type</Label>
@@ -1245,7 +1070,7 @@ export default function EnhancedDocumentVaultPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
                   <Label htmlFor="signature-canvas">Draw Your Signature</Label>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
@@ -1253,7 +1078,7 @@ export default function EnhancedDocumentVaultPage() {
                     <p className="text-sm text-gray-400 mt-2">Draw your signature using mouse or touch</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
                   <input type="checkbox" id="signature-agreement" />
                   <Label htmlFor="signature-agreement" className="text-sm">
@@ -1261,15 +1086,17 @@ export default function EnhancedDocumentVaultPage() {
                   </Label>
                 </div>
               </div>
-              
+
               <div className="flex justify-end space-x-3">
                 <Button variant="outline" onClick={() => setIsSignatureOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={() => {
-                  handleDocumentAction(selectedDocument.id, "sign", { signatureType: "electronic" })
-                  setIsSignatureOpen(false)
-                }}>
+                <Button
+                  onClick={() => {
+                    handleDocumentAction(selectedDocument.id, "sign", { signatureType: "electronic" })
+                    setIsSignatureOpen(false)
+                  }}
+                >
                   <PenTool className="w-4 h-4 mr-2" />
                   Sign Document
                 </Button>
@@ -1302,31 +1129,29 @@ export default function EnhancedDocumentVaultPage() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div>
                 <Label htmlFor="comment-text">Comment</Label>
-                <Textarea
-                  id="comment-text"
-                  placeholder="Enter your comment..."
-                  className="min-h-[100px]"
-                />
+                <Textarea id="comment-text" placeholder="Enter your comment..." className="min-h-[100px]" />
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <input type="checkbox" id="internal-comment" defaultChecked />
                 <Label htmlFor="internal-comment" className="text-sm">
                   Internal comment (not visible to employee)
                 </Label>
               </div>
-              
+
               <div className="flex justify-end space-x-3">
                 <Button variant="outline" onClick={() => setIsCommentOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={() => {
-                  handleDocumentAction(selectedDocument.id, "comment")
-                  setIsCommentOpen(false)
-                }}>
+                <Button
+                  onClick={() => {
+                    handleDocumentAction(selectedDocument.id, "comment")
+                    setIsCommentOpen(false)
+                  }}
+                >
                   <MessageSquare className="w-4 h-4 mr-2" />
                   Add Comment
                 </Button>
@@ -1346,12 +1171,9 @@ export default function EnhancedDocumentVaultPage() {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="share-user">Share with User</Label>
-                <Input
-                  id="share-user"
-                  placeholder="Enter user email or ID"
-                />
+                <Input id="share-user" placeholder="Enter user email or ID" />
               </div>
-              
+
               <div>
                 <Label htmlFor="permission-level">Permission Level</Label>
                 <Select defaultValue="view">
@@ -1366,23 +1188,22 @@ export default function EnhancedDocumentVaultPage() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div>
                 <Label htmlFor="expiry-date">Expiry Date (Optional)</Label>
-                <Input
-                  id="expiry-date"
-                  type="date"
-                />
+                <Input id="expiry-date" type="date" />
               </div>
-              
+
               <div className="flex justify-end space-x-3">
                 <Button variant="outline" onClick={() => setIsShareOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={() => {
-                  handleDocumentAction(selectedDocument.id, "share")
-                  setIsShareOpen(false)
-                }}>
+                <Button
+                  onClick={() => {
+                    handleDocumentAction(selectedDocument.id, "share")
+                    setIsShareOpen(false)
+                  }}
+                >
                   <Share2 className="w-4 h-4 mr-2" />
                   Share Document
                 </Button>
@@ -1409,7 +1230,7 @@ export default function EnhancedDocumentVaultPage() {
                   <p className="text-sm text-gray-600">Complete access history</p>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 {accessLogs.map((log) => (
                   <div key={log.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -1418,20 +1239,20 @@ export default function EnhancedDocumentVaultPage() {
                         <UserCheck className="w-4 h-4 text-blue-600" />
                       </div>
                       <div>
-                        <p className="font-medium">{log.action.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}</p>
+                        <p className="font-medium">
+                          {log.action.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                        </p>
                         <p className="text-sm text-gray-600">User: {log.userId}</p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-600">{new Date(log.accessedAt).toLocaleString()}</p>
-                      {log.ipAddress && (
-                        <p className="text-xs text-gray-500">IP: {log.ipAddress}</p>
-                      )}
+                      {log.ipAddress && <p className="text-xs text-gray-500">IP: {log.ipAddress}</p>}
                     </div>
                   </div>
                 ))}
               </div>
-              
+
               <div className="flex justify-end">
                 <Button variant="outline" onClick={() => setIsAuditOpen(false)}>
                   Close
@@ -1459,7 +1280,7 @@ export default function EnhancedDocumentVaultPage() {
                   <p className="text-sm text-gray-600">Workflow progress and steps</p>
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="flex items-center space-x-4">
                   <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -1471,7 +1292,7 @@ export default function EnhancedDocumentVaultPage() {
                   </div>
                   <Badge className="bg-green-100 text-green-800">Completed</Badge>
                 </div>
-                
+
                 <div className="flex items-center space-x-4">
                   <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
                     <Clock className="w-4 h-4 text-yellow-600" />
@@ -1482,7 +1303,7 @@ export default function EnhancedDocumentVaultPage() {
                   </div>
                   <Badge className="bg-yellow-100 text-yellow-800">In Progress</Badge>
                 </div>
-                
+
                 <div className="flex items-center space-x-4">
                   <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
                     <Square className="w-4 h-4 text-gray-600" />
@@ -1494,7 +1315,7 @@ export default function EnhancedDocumentVaultPage() {
                   <Badge className="bg-gray-100 text-gray-800">Pending</Badge>
                 </div>
               </div>
-              
+
               <div className="flex justify-end">
                 <Button variant="outline" onClick={() => setIsWorkflowOpen(false)}>
                   Close
@@ -1519,7 +1340,7 @@ export default function EnhancedDocumentVaultPage() {
                 <TabsTrigger value="workflows">Workflows</TabsTrigger>
                 <TabsTrigger value="integrations">Integrations</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="retention" className="space-y-4">
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Retention Policies</h3>
@@ -1530,8 +1351,7 @@ export default function EnhancedDocumentVaultPage() {
                           <h4 className="font-medium">{policy.name}</h4>
                           <p className="text-sm text-gray-600">{policy.description}</p>
                           <p className="text-xs text-gray-500">
-                            Retention: {policy.retentionPeriodDays} days | 
-                            Archive: {policy.archiveAfterDays} days | 
+                            Retention: {policy.retentionPeriodDays} days | Archive: {policy.archiveAfterDays} days |
                             Delete: {policy.deleteAfterDays} days
                           </p>
                         </div>
@@ -1548,7 +1368,7 @@ export default function EnhancedDocumentVaultPage() {
                   </div>
                 </div>
               </TabsContent>
-              
+
               <TabsContent value="security" className="space-y-4">
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Security Settings</h3>
@@ -1577,14 +1397,14 @@ export default function EnhancedDocumentVaultPage() {
                   </div>
                 </div>
               </TabsContent>
-              
+
               <TabsContent value="workflows" className="space-y-4">
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Workflow Settings</h3>
                   <p className="text-gray-600">Configure document approval workflows and automation rules.</p>
                 </div>
               </TabsContent>
-              
+
               <TabsContent value="integrations" className="space-y-4">
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Integrations</h3>
@@ -1592,14 +1412,12 @@ export default function EnhancedDocumentVaultPage() {
                 </div>
               </TabsContent>
             </Tabs>
-            
+
             <div className="flex justify-end space-x-3 pt-4 border-t">
               <Button variant="outline" onClick={() => setIsSettingsOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={() => setIsSettingsOpen(false)}>
-                Save Settings
-              </Button>
+              <Button onClick={() => setIsSettingsOpen(false)}>Save Settings</Button>
             </div>
           </div>
         </DialogContent>
