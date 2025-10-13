@@ -3,7 +3,7 @@
 import { DialogDescription } from "@/components/ui/dialog"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,7 +17,21 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrency } from "@/lib/currency-context"
-import { Plus, Search, Filter, Download, Upload, MoreHorizontal, Edit, Trash2, Eye, Mail, X } from "lucide-react"
+import {
+  Plus,
+  Search,
+  Filter,
+  Download,
+  Upload,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Eye,
+  Mail,
+  X,
+  CheckCircle,
+  FileText,
+} from "lucide-react"
 
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 import { useToast } from "@/hooks/use-toast"
@@ -213,7 +227,6 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<any[]>([])
   const [showAddEmployee, setShowAddEmployee] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -312,15 +325,113 @@ export default function EmployeesPage() {
     { code: "ADVANCE", description: "Advance Deduction", recurring: true },
   ])
 
-  const [selectedAllowances, setSelectedAllowances] = useState<Array<{ code: string; amount: string }>>([])
-  const [selectedDeductions, setSelectedDeductions] = useState<Array<{ code: string; amount: string }>>([])
+  const [selectedAllowances, setSelectedAllowances] = useState<
+    Array<{
+      id: string
+      code: string
+      description: string
+      taxable: boolean
+      recurring: boolean
+      amount: string
+      percentage: string
+      calculationType: "AMOUNT" | "PERCENTAGE"
+      effectiveDate: string
+      endDate?: string
+    }>
+  >([])
+  const [selectedDeductions, setSelectedDeductions] = useState<
+    Array<{
+      id: string
+      code: string
+      description: string
+      taxable: boolean
+      recurring: boolean
+      amount: string
+      percentage: string
+      calculationType: "AMOUNT" | "PERCENTAGE"
+      effectiveDate: string
+      endDate?: string
+    }>
+  >([])
   const [showAllowanceSelector, setShowAllowanceSelector] = useState(false)
   const [showDeductionSelector, setShowDeductionSelector] = useState(false)
+
+  // Document upload states
+  const [uploadedDocuments, setUploadedDocuments] = useState<any[]>([])
+  const [uploadingDocuments, setUploadingDocuments] = useState<string[]>([])
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({})
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+  const [previewDocument, setPreviewDocument] = useState<any>(null)
+  const fileInputRefs = useRef<Record<string, HTMLInputElement>>({})
+
+  // Required documents configuration
+  const requiredDocuments = [
+    {
+      id: "academic",
+      title: "1. Academic Certificate(s)",
+      description: "Educational certificates and transcripts",
+      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png",
+    },
+    {
+      id: "passport-picture",
+      title: "2. Passport Picture",
+      description: "Professional passport-sized photograph",
+      acceptTypes: ".jpg,.jpeg,.png",
+    },
+    {
+      id: "resume",
+      title: "3. Resume & Application Letter",
+      description: "Current CV and cover letter",
+      acceptTypes: ".pdf,.doc,.docx",
+    },
+    {
+      id: "passport",
+      title: "4. Passport",
+      description: "Valid passport copy",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
+    },
+    {
+      id: "national-id",
+      title: "5. National ID",
+      description: "Ghana Card or Voter ID",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
+    },
+    {
+      id: "medical",
+      title: "6. Medical Report",
+      description: "Health clearance certificate",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
+    },
+    {
+      id: "police",
+      title: "7. Police Report",
+      description: "Criminal background check",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
+    },
+    {
+      id: "other",
+      title: "8. Other Uploads",
+      description: "Additional supporting documents",
+      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png",
+    },
+  ]
 
   const handleAddAllowance = (allowanceCode: string) => {
     const allowance = companyAllowances.find((a) => a.code === allowanceCode)
     if (allowance && !selectedAllowances.find((a) => a.code === allowanceCode)) {
-      setSelectedAllowances([...selectedAllowances, { code: allowanceCode, amount: "0" }])
+      const newAllowance = {
+        id: allowance.id,
+        code: allowance.code,
+        description: allowance.description,
+        taxable: allowance.taxable,
+        recurring: allowance.recurring,
+        amount: "0",
+        percentage: "0",
+        calculationType: "AMOUNT" as "AMOUNT" | "PERCENTAGE",
+        effectiveDate: new Date().toISOString().split("T")[0],
+        endDate: undefined,
+      }
+      setSelectedAllowances([...selectedAllowances, newAllowance])
       setShowAllowanceSelector(false)
     }
   }
@@ -329,14 +440,26 @@ export default function EmployeesPage() {
     setSelectedAllowances(selectedAllowances.filter((a) => a.code !== allowanceCode))
   }
 
-  const handleAllowanceAmountChange = (allowanceCode: string, amount: string) => {
-    setSelectedAllowances(selectedAllowances.map((a) => (a.code === allowanceCode ? { ...a, amount } : a)))
+  const handleAllowanceChange = (allowanceCode: string, field: string, value: any) => {
+    setSelectedAllowances(selectedAllowances.map((a) => (a.code === allowanceCode ? { ...a, [field]: value } : a)))
   }
 
   const handleAddDeduction = (deductionCode: string) => {
     const deduction = companyDeductions.find((d) => d.code === deductionCode)
     if (deduction && !selectedDeductions.find((d) => d.code === deductionCode)) {
-      setSelectedDeductions([...selectedDeductions, { code: deductionCode, amount: "0" }])
+      const newDeduction = {
+        id: deduction.id,
+        code: deduction.code,
+        description: deduction.description,
+        taxable: deduction.taxable,
+        recurring: deduction.recurring,
+        amount: "0",
+        percentage: "0",
+        calculationType: "AMOUNT" as "AMOUNT" | "PERCENTAGE",
+        effectiveDate: new Date().toISOString().split("T")[0],
+        endDate: undefined,
+      }
+      setSelectedDeductions([...selectedDeductions, newDeduction])
       setShowDeductionSelector(false)
     }
   }
@@ -345,8 +468,8 @@ export default function EmployeesPage() {
     setSelectedDeductions(selectedDeductions.filter((d) => d.code !== deductionCode))
   }
 
-  const handleDeductionAmountChange = (deductionCode: string, amount: string) => {
-    setSelectedDeductions(selectedDeductions.map((d) => (d.code === deductionCode ? { ...d, amount } : d)))
+  const handleDeductionChange = (deductionCode: string, field: string, value: any) => {
+    setSelectedDeductions(selectedDeductions.map((d) => (d.code === deductionCode ? { ...d, [field]: value } : d)))
   }
   // </CHANGE>
 
@@ -388,8 +511,56 @@ export default function EmployeesPage() {
       setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
     }
   }, [companySettings])
+  // </CHANGE>
 
-  const loadSubsidiaries = async () => {
+  const loadEmployees = useCallback(async () => {
+    try {
+      console.log("[v0] Loading employees from database...")
+
+      if (isDemoMode()) {
+        console.log("[v0] Demo mode: Using mock employees")
+        setEmployees(mockEmployees)
+        setIsLoading(false)
+        return
+      }
+
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("employees")
+        .select(`
+          *,
+          subsidiaries (
+            name,
+            id
+          )
+        `)
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        console.error("Error loading employees:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load employees from database.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      console.log("[v0] Loaded employees:", data?.length || 0)
+      setEmployees(data || [])
+    } catch (error) {
+      console.error("Error loading employees:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load employees from database.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [toast])
+
+  const loadSubsidiaries = useCallback(async () => {
     try {
       if (isDemoMode()) {
         console.log("[v0] Demo mode: Using mock subsidiaries")
@@ -419,13 +590,64 @@ export default function EmployeesPage() {
         variant: "destructive",
       })
     }
-  }
+  }, [toast])
+
+  const loadCompanyData = useCallback(async () => {
+    try {
+      console.log("[v0] Loading company data...")
+      const supabase = createClient()
+
+      // Load company settings
+      const { data, error } = await supabase.from("companies").select("*").eq("id", MAIN_COMPANY_ID).maybeSingle()
+
+      if (error) {
+        console.error("[v0] Error loading company data:", error)
+      } else if (data) {
+        setCompanySettings(data)
+        console.log("[v0] Company data loaded:", data)
+
+        const companyDivisions = Array.isArray(data.divisions)
+          ? data.divisions
+          : data.divisions
+            ? JSON.parse(data.divisions)
+            : ["Head Office", "Regional Office"]
+
+        const companyDepartments = Array.isArray(data.departments)
+          ? data.departments
+          : data.departments
+            ? JSON.parse(data.departments)
+            : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+
+        const companyLocations = Array.isArray(data.locations)
+          ? data.locations
+          : data.locations
+            ? JSON.parse(data.locations)
+            : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
+
+        setDivisions(companyDivisions)
+        setDepartments(companyDepartments)
+        setLocations(companyLocations)
+
+        console.log("[v0] Set company divisions:", companyDivisions)
+        console.log("[v0] Set company departments:", companyDepartments)
+        console.log("[v0] Set company locations:", companyLocations)
+      } else {
+        console.log("[v0] No company data found, using default values")
+        setDivisions(["Head Office", "Regional Office"])
+        setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
+        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+      }
+    } catch (error) {
+      console.error("[v0] Error in loadCompanyData:", error)
+    }
+  }, [])
+  // </CHANGE>
 
   useEffect(() => {
     loadEmployees()
     loadSubsidiaries()
     loadCompanyData()
-  }, [])
+  }, [loadEmployees, loadSubsidiaries, loadCompanyData])
 
   useEffect(() => {
     if (isDemoMode()) {
@@ -446,7 +668,7 @@ export default function EmployeesPage() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [loadEmployees])
 
   const generateEmployeeId = useCallback(() => {
     // Get company name initials
@@ -515,55 +737,212 @@ export default function EmployeesPage() {
   }, [formData.hasSubsidiary, formData.subsidiary, generateEmployeeId])
   // </CHANGE>
 
-  const loadCompanyData = async () => {
-    try {
-      console.log("[v0] Loading company data...")
-      const supabase = createClient()
+  // Load supervisors and heads of department based on department selection
+  useEffect(() => {
+    const loadSupervisorsAndHeads = () => {
+      console.log("[v0] Loading supervisors and heads for department:", formData.department)
 
-      // Load company settings
-      const { data, error } = await supabase.from("companies").select("*").eq("id", MAIN_COMPANY_ID).maybeSingle()
+      // Filter employees based on department and special roles
+      const departmentEmployees = employees.filter(
+        (emp) => emp.department === formData.department && emp.status === "Active",
+      )
 
-      if (error) {
-        console.error("[v0] Error loading company data:", error)
-      } else if (data) {
-        setCompanySettings(data)
-        console.log("[v0] Company data loaded:", data)
+      // Get employees with "Direct Supervisor" special role
+      const supervisorsList = departmentEmployees.filter((emp) => emp.specialRole === "Direct Supervisor")
 
-        const companyDivisions = Array.isArray(data.divisions)
-          ? data.divisions
-          : data.divisions
-            ? JSON.parse(data.divisions)
-            : ["Head Office", "Regional Office"]
+      // Get employees with "Head of Department" special role
+      const headsList = departmentEmployees.filter((emp) => emp.specialRole === "Head of Department")
 
-        const companyDepartments = Array.isArray(data.departments)
-          ? data.departments
-          : data.departments
-            ? JSON.parse(data.departments)
-            : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+      // If no specific roles found, show all department employees as options
+      const finalSupervisors = supervisorsList.length > 0 ? supervisorsList : departmentEmployees
+      const finalHeads = headsList.length > 0 ? headsList : departmentEmployees
 
-        const companyLocations = Array.isArray(data.locations)
-          ? data.locations
-          : data.locations
-            ? JSON.parse(data.locations)
-            : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
+      setSupervisors(finalSupervisors)
+      setHeadsOfDepartment(finalHeads)
 
-        setDivisions(companyDivisions)
-        setDepartments(companyDepartments)
-        setLocations(companyLocations)
+      console.log("[v0] Loaded supervisors:", finalSupervisors.length)
+      console.log("[v0] Loaded heads of department:", finalHeads.length)
 
-        console.log("[v0] Set company divisions:", companyDivisions)
-        console.log("[v0] Set company departments:", companyDepartments)
-        console.log("[v0] Set company locations:", companyLocations)
-      } else {
-        console.log("[v0] No company data found, using default values")
-        setDivisions(["Head Office", "Regional Office"])
-        setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
-        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+      // Show "No data" message if no employees found
+      if (departmentEmployees.length === 0) {
+        console.log("[v0] No employees found for department:", formData.department)
+        setSupervisors([])
+        setHeadsOfDepartment([])
       }
+    }
+
+    if (formData.department && employees.length > 0) {
+      loadSupervisorsAndHeads()
+    }
+  }, [formData.department, employees])
+
+  // Removed the duplicate loadParentCompanyData function. The useCallback version above is used.
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  }
+
+  const handleUploadClick = (documentType: string) => {
+    // Create a new file input dynamically for better mobile compatibility
+    const tempInput = document.createElement("input")
+    tempInput.type = "file"
+    tempInput.accept = requiredDocuments.find((doc) => doc.id === documentType)?.acceptTypes || "*/*"
+    tempInput.style.position = "absolute"
+    tempInput.style.left = "-9999px"
+    tempInput.style.opacity = "0"
+
+    // Add to DOM temporarily
+    document.body.appendChild(tempInput)
+
+    // Set up change handler
+    tempInput.onchange = (e) => {
+      console.log("[v0] handleUploadClick tempInput onchange triggered for:", documentType)
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (file) {
+        console.log("[v0] File selected via handleUploadClick:", file.name)
+        // Create a synthetic event for handleFileSelect
+        const syntheticEvent = {
+          target: { files: [file] },
+        } as React.ChangeEvent<HTMLInputElement>
+        handleFileSelect(documentType, syntheticEvent)
+      } else {
+        console.log("[v0] No file selected via handleUploadClick")
+      }
+      // Clean up
+      document.body.removeChild(tempInput)
+    }
+
+    // Trigger click with a small delay for mobile
+    setTimeout(() => {
+      tempInput.click()
+    }, 10)
+  }
+
+  const handleFileSelect = async (documentType: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("[v0] handleFileSelect called for:", documentType, "Files:", event.target.files)
+    const file = event.target.files?.[0]
+    if (!file) {
+      console.log("[v0] No file selected")
+      return
+    }
+
+    console.log("[v0] File selected:", file.name, "Size:", file.size, "Type:", file.type)
+
+    // Validate file type
+    const doc = requiredDocuments.find((d) => d.id === documentType)
+    if (!doc) {
+      console.log("[v0] Document type not found:", documentType)
+      return
+    }
+
+    const acceptedTypes = doc.acceptTypes.split(",").map((type) => type.trim())
+    const fileExtension = "." + file.name.split(".").pop()?.toLowerCase()
+    const mimeType = file.type
+
+    const isValidType = acceptedTypes.some((type) =>
+      type.startsWith(".") ? fileExtension === type : mimeType.includes(type.replace(".", "")),
+    )
+
+    if (!isValidType) {
+      toast({
+        title: "Invalid File Type",
+        description: `Please select a file with one of these types: ${doc.acceptTypes}`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    if (file.size > maxSize) {
+      toast({
+        title: "File Too Large",
+        description: "Please select a file smaller than 10MB",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Start upload process
+    setUploadingDocuments((prev) => [...prev, documentType])
+    setUploadProgress((prev) => ({ ...prev, [documentType]: 0 }))
+
+    try {
+      // Simulate upload progress
+      for (let progress = 0; progress <= 100; progress += 10) {
+        setUploadProgress((prev) => ({ ...prev, [documentType]: progress }))
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+
+      // Upload to document service
+      const documentService = CentralDocumentService.getInstance()
+      const documentId = await documentService.uploadDocument({
+        file,
+        employeeId: formData.employee_id || "temp-id",
+        employeeName: `${formData.first_name} ${formData.last_name}`.trim() || "New Employee",
+        documentType,
+        source: "employee-onboarding",
+        uploadedBy: "HR Admin",
+        notes: `Uploaded during employee onboarding - ${doc.title}`,
+      })
+
+      // Add to uploaded documents
+      const uploadedDoc = {
+        id: documentId,
+        documentType,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        uploadDate: new Date(),
+        uploadedBy: "HR Admin",
+      }
+
+      setUploadedDocuments((prev) => {
+        const filtered = prev.filter((doc) => doc.documentType !== documentType)
+        return [...filtered, uploadedDoc]
+      })
+
+      toast({
+        title: "Upload Successful",
+        description: `${file.name} has been uploaded successfully`,
+      })
     } catch (error) {
-      console.error("[v0] Error in loadCompanyData:", error)
+      console.error("Upload error:", error)
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload document. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setUploadingDocuments((prev) => prev.filter((doc) => doc !== documentType))
+      setUploadProgress((prev) => ({ ...prev, [documentType]: 0 }))
     }
   }
+
+  const handleRemoveDocument = (documentType: string) => {
+    setUploadedDocuments((prev) => prev.filter((doc) => doc.documentType !== documentType))
+    toast({
+      title: "Document Removed",
+      description: "Document has been removed successfully",
+    })
+  }
+
+  const handleReplaceDocument = (documentType: string) => {
+    const fileInput = fileInputRefs.current[documentType]
+    if (fileInput) {
+      fileInput.click()
+    }
+  }
+
+  const handlePreviewDocument = (document: any) => {
+    setPreviewDocument(document)
+    setIsPreviewOpen(true)
+  }
+  // </CHANGE>
 
   useEffect(() => {
     console.log("[v0] Subsidiary selection changed:", {
@@ -677,53 +1056,6 @@ export default function EmployeesPage() {
   }, [formData.department, employees])
 
   // Removed the duplicate loadParentCompanyData function. The useCallback version above is used.
-
-  const loadEmployees = async () => {
-    try {
-      console.log("[v0] Loading employees from database...")
-
-      if (isDemoMode()) {
-        console.log("[v0] Demo mode: Using mock employees")
-        setEmployees(mockEmployees)
-        setIsLoading(false)
-        return
-      }
-
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("employees")
-        .select(`
-          *,
-          subsidiaries (
-            name,
-            id
-          )
-        `)
-        .order("created_at", { ascending: false })
-
-      if (error) {
-        console.error("Error loading employees:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load employees from database.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      console.log("[v0] Loaded employees:", data?.length || 0)
-      setEmployees(data || [])
-    } catch (error) {
-      console.error("Error loading employees:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load employees from database.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const handleAddEmployee = async (employeeData: any) => {
     try {
@@ -917,7 +1249,6 @@ export default function EmployeesPage() {
         description: `Employee ${employeeData.displayName} has been added successfully!`,
       })
 
-      setIsAddDialogOpen(false)
     } catch (error) {
       console.error("Error adding employee:", error)
       toast({
@@ -1297,21 +1628,21 @@ export default function EmployeesPage() {
             <Upload className="w-4 h-4 mr-2" />
             Import
           </Button>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <Dialog>
             <DialogTrigger asChild>
               <Button className="bg-emerald-600 hover:bg-emerald-700">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Employee
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Employee</DialogTitle>
-                <DialogDescription>Enter the employee's information below.</DialogDescription>
+                <DialogDescription>Enter the employee&apos;s information below.</DialogDescription>
               </DialogHeader>
               <AddEmployeeForm
                 onSubmit={handleAddEmployee}
-                onClose={() => setIsAddDialogOpen(false)}
+                onClose={() => {}}
                 subsidiaries={subsidiaries}
                 setFormData={setFormData}
                 formData={formData}
@@ -1439,7 +1770,9 @@ export default function EmployeesPage() {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Employee Directory ({filteredEmployees.length} employees)</span>
-            {searchTerm && <div className="text-sm text-muted-foreground">Showing results for "{searchTerm}"</div>}
+            {searchTerm && (
+              <div className="text-sm text-muted-foreground">Showing results for &quot;{searchTerm}&quot;</div>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1631,7 +1964,7 @@ function ImportDataDialog({
   const [previewData, setPreviewData] = useState<any[]>([])
   const [importErrors, setImportErrors] = useState<string[]>([])
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCSVFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
       const documentService = CentralDocumentService.getInstance()
@@ -1646,6 +1979,172 @@ function ImportDataDialog({
       setSelectedFile(file)
       console.log("[v0] CSV file selected:", file.name)
     }
+  }
+
+  // Document upload handlers
+  const handleUploadClick = (documentType: string) => {
+    // Create a new file input dynamically for better mobile compatibility
+    const tempInput = document.createElement("input")
+    tempInput.type = "file"
+    tempInput.accept = requiredDocuments.find((doc) => doc.id === documentType)?.acceptTypes || "*/*"
+    tempInput.style.position = "absolute"
+    tempInput.style.left = "-9999px"
+    tempInput.style.opacity = "0"
+
+    // Add to DOM temporarily
+    document.body.appendChild(tempInput)
+
+    // Set up change handler
+    tempInput.onchange = (e) => {
+      console.log("[v0] handleUploadClick tempInput onchange triggered for:", documentType)
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (file) {
+        console.log("[v0] File selected via handleUploadClick:", file.name)
+        // Create a synthetic event for handleFileSelect
+        const syntheticEvent = {
+          target: { files: [file] },
+        } as React.ChangeEvent<HTMLInputElement>
+        handleFileSelect(documentType, syntheticEvent)
+      } else {
+        console.log("[v0] No file selected via handleUploadClick")
+      }
+      // Clean up
+      document.body.removeChild(tempInput)
+    }
+
+    // Trigger click with a small delay for mobile
+    setTimeout(() => {
+      tempInput.click()
+    }, 10)
+  }
+
+  const handleFileSelect = async (documentType: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("[v0] handleFileSelect called for:", documentType, "Files:", event.target.files)
+    const file = event.target.files?.[0]
+    if (!file) {
+      console.log("[v0] No file selected")
+      return
+    }
+
+    console.log("[v0] File selected:", file.name, "Size:", file.size, "Type:", file.type)
+
+    // Validate file type
+    const doc = requiredDocuments.find((d) => d.id === documentType)
+    if (!doc) {
+      console.log("[v0] Document type not found:", documentType)
+      return
+    }
+
+    const acceptedTypes = doc.acceptTypes.split(",").map((type) => type.trim())
+    const fileExtension = "." + file.name.split(".").pop()?.toLowerCase()
+    const mimeType = file.type
+
+    const isValidType = acceptedTypes.some((type) =>
+      type.startsWith(".") ? fileExtension === type : mimeType.includes(type.replace(".", "")),
+    )
+
+    if (!isValidType) {
+      toast({
+        title: "Invalid File Type",
+        description: `Please select a file with one of these types: ${doc.acceptTypes}`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    if (file.size > maxSize) {
+      toast({
+        title: "File Too Large",
+        description: "Please select a file smaller than 10MB",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Start upload process
+    setUploadingDocuments((prev) => [...prev, documentType])
+    setUploadProgress((prev) => ({ ...prev, [documentType]: 0 }))
+
+    try {
+      // Simulate upload progress
+      for (let progress = 0; progress <= 100; progress += 10) {
+        setUploadProgress((prev) => ({ ...prev, [documentType]: progress }))
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+
+      // Upload to document service
+      const documentService = CentralDocumentService.getInstance()
+      const documentId = await documentService.uploadDocument({
+        file,
+        employeeId: formData.employee_id || "temp-id",
+        employeeName: `${formData.first_name} ${formData.last_name}`.trim() || "New Employee",
+        documentType,
+        source: "employee-onboarding",
+        uploadedBy: "HR Admin",
+        notes: `Uploaded during employee onboarding - ${doc.title}`,
+      })
+
+      // Add to uploaded documents
+      const uploadedDoc = {
+        id: documentId,
+        documentType,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        uploadDate: new Date(),
+        uploadedBy: "HR Admin",
+      }
+
+      setUploadedDocuments((prev) => {
+        const filtered = prev.filter((doc) => doc.documentType !== documentType)
+        return [...filtered, uploadedDoc]
+      })
+
+      toast({
+        title: "Upload Successful",
+        description: `${file.name} has been uploaded successfully`,
+      })
+    } catch (error) {
+      console.error("Upload error:", error)
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload document. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setUploadingDocuments((prev) => prev.filter((doc) => doc !== documentType))
+      setUploadProgress((prev) => ({ ...prev, [documentType]: 0 }))
+    }
+  }
+
+  const handleRemoveDocument = (documentType: string) => {
+    setUploadedDocuments((prev) => prev.filter((doc) => doc.documentType !== documentType))
+    toast({
+      title: "Document Removed",
+      description: "Document has been removed successfully",
+    })
+  }
+
+  const handleReplaceDocument = (documentType: string) => {
+    const fileInput = fileInputRefs.current[documentType]
+    if (fileInput) {
+      fileInput.click()
+    }
+  }
+
+  const handlePreviewDocument = (document: any) => {
+    setPreviewDocument(document)
+    setIsPreviewOpen(true)
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
   const processFile = (file: File) => {
@@ -1830,7 +2329,7 @@ function ImportDataDialog({
                     <input
                       type="file"
                       accept=".csv"
-                      onChange={handleFileSelect}
+                      onChange={handleCSVFileSelect}
                       className="hidden"
                       id="employee-file-upload"
                     />
@@ -2112,15 +2611,106 @@ function AddEmployeeForm({
     { code: "ADVANCE", description: "Advance Deduction", recurring: true },
   ])
 
-  const [selectedAllowances, setSelectedAllowances] = useState<Array<{ code: string; amount: string }>>([])
-  const [selectedDeductions, setSelectedDeductions] = useState<Array<{ code: string; amount: string }>>([])
+  const [selectedAllowances, setSelectedAllowances] = useState<
+    Array<{
+      id: string
+      code: string
+      description: string
+      taxable: boolean
+      recurring: boolean
+      amount: string
+      percentage: string
+      calculationType: "AMOUNT" | "PERCENTAGE"
+      effectiveDate: string
+      endDate?: string
+    }>
+  >([])
+  const [selectedDeductions, setSelectedDeductions] = useState<
+    Array<{
+      id: string
+      code: string
+      description: string
+      taxable: boolean
+      recurring: boolean
+      amount: string
+      percentage: string
+      calculationType: "AMOUNT" | "PERCENTAGE"
+      effectiveDate: string
+      endDate?: string
+    }>
+  >([])
   const [showAllowanceSelector, setShowAllowanceSelector] = useState(false)
   const [showDeductionSelector, setShowDeductionSelector] = useState(false)
+  const [showInactiveReason, setShowInactiveReason] = useState(false)
+
+  // Required documents configuration
+  const requiredDocuments = [
+    {
+      id: "academic",
+      title: "1. Academic Certificate(s)",
+      description: "Educational certificates and transcripts",
+      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png",
+    },
+    {
+      id: "passport-picture",
+      title: "2. Passport Picture",
+      description: "Professional passport-sized photograph",
+      acceptTypes: ".jpg,.jpeg,.png",
+    },
+    {
+      id: "resume",
+      title: "3. Resume & Application Letter",
+      description: "Current CV and cover letter",
+      acceptTypes: ".pdf,.doc,.docx",
+    },
+    {
+      id: "passport",
+      title: "4. Passport",
+      description: "Valid passport copy",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
+    },
+    {
+      id: "national-id",
+      title: "5. National ID",
+      description: "Ghana Card or Voter ID",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
+    },
+    {
+      id: "medical",
+      title: "6. Medical Report",
+      description: "Health clearance certificate",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
+    },
+    {
+      id: "police",
+      title: "7. Police Report",
+      description: "Criminal background check",
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
+    },
+    {
+      id: "other",
+      title: "8. Other Uploads",
+      description: "Additional supporting documents",
+      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png",
+    },
+  ]
 
   const handleAddAllowance = (allowanceCode: string) => {
     const allowance = companyAllowances.find((a) => a.code === allowanceCode)
     if (allowance && !selectedAllowances.find((a) => a.code === allowanceCode)) {
-      setSelectedAllowances([...selectedAllowances, { code: allowanceCode, amount: "0" }])
+      const newAllowance = {
+        id: allowance.id,
+        code: allowance.code,
+        description: allowance.description,
+        taxable: allowance.taxable,
+        recurring: allowance.recurring,
+        amount: "0",
+        percentage: "0",
+        calculationType: "AMOUNT" as "AMOUNT" | "PERCENTAGE",
+        effectiveDate: new Date().toISOString().split("T")[0],
+        endDate: undefined,
+      }
+      setSelectedAllowances([...selectedAllowances, newAllowance])
       setShowAllowanceSelector(false)
     }
   }
@@ -2129,14 +2719,26 @@ function AddEmployeeForm({
     setSelectedAllowances(selectedAllowances.filter((a) => a.code !== allowanceCode))
   }
 
-  const handleAllowanceAmountChange = (allowanceCode: string, amount: string) => {
-    setSelectedAllowances(selectedAllowances.map((a) => (a.code === allowanceCode ? { ...a, amount } : a)))
+  const handleAllowanceChange = (allowanceCode: string, field: string, value: any) => {
+    setSelectedAllowances(selectedAllowances.map((a) => (a.code === allowanceCode ? { ...a, [field]: value } : a)))
   }
 
   const handleAddDeduction = (deductionCode: string) => {
     const deduction = companyDeductions.find((d) => d.code === deductionCode)
     if (deduction && !selectedDeductions.find((d) => d.code === deductionCode)) {
-      setSelectedDeductions([...selectedDeductions, { code: deductionCode, amount: "0" }])
+      const newDeduction = {
+        id: deduction.id,
+        code: deduction.code,
+        description: deduction.description,
+        taxable: deduction.taxable,
+        recurring: deduction.recurring,
+        amount: "0",
+        percentage: "0",
+        calculationType: "AMOUNT" as "AMOUNT" | "PERCENTAGE",
+        effectiveDate: new Date().toISOString().split("T")[0],
+        endDate: undefined,
+      }
+      setSelectedDeductions([...selectedDeductions, newDeduction])
       setShowDeductionSelector(false)
     }
   }
@@ -2145,8 +2747,8 @@ function AddEmployeeForm({
     setSelectedDeductions(selectedDeductions.filter((d) => d.code !== deductionCode))
   }
 
-  const handleDeductionAmountChange = (deductionCode: string, amount: string) => {
-    setSelectedDeductions(selectedDeductions.map((d) => (d.code === deductionCode ? { ...d, amount } : d)))
+  const handleDeductionChange = (deductionCode: string, field: string, value: any) => {
+    setSelectedDeductions(selectedDeductions.map((d) => (d.code === deductionCode ? { ...d, [field]: value } : d)))
   }
   // </CHANGE>
 
@@ -2446,7 +3048,7 @@ function AddEmployeeForm({
         profilePictureFile: null,
       })
     }
-  }, [employee])
+  }, [employee, setFormData])
 
   useEffect(() => {
     if (formData.subsidiary) {
@@ -2560,7 +3162,7 @@ function AddEmployeeForm({
     return isValid
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (validateForm()) {
       const fullName = `${formData.firstName} ${formData.otherNames} ${formData.lastName}`
       const displayName = `${formData.firstName} ${formData.lastName}`
@@ -2570,6 +3172,38 @@ function AddEmployeeForm({
         fullName: fullName,
         displayName: displayName,
         employeeId: formData.employeeId, // Ensure employeeId is passed
+      }
+
+      // Save uploaded documents to document vault
+      if (uploadedDocuments.length > 0) {
+        try {
+          const documentService = CentralDocumentService.getInstance()
+
+          // Update all uploaded documents with final employee information
+          for (const doc of uploadedDocuments) {
+            await documentService.uploadDocument({
+              file: new File([], doc.fileName, { type: doc.fileType }), // Create a placeholder file
+              employeeId: formData.employeeId || "temp-id",
+              employeeName: displayName,
+              documentType: doc.documentType,
+              source: "employee-onboarding",
+              uploadedBy: "HR Admin",
+              notes: `Employee onboarding document - ${doc.fileName}`,
+            })
+          }
+
+          toast({
+            title: "Documents Saved",
+            description: `${uploadedDocuments.length} documents have been saved to the document vault`,
+          })
+        } catch (error) {
+          console.error("Error saving documents:", error)
+          toast({
+            title: "Document Save Warning",
+            description: "Employee created but some documents may not have been saved to the vault",
+            variant: "destructive",
+          })
+        }
       }
 
       onSubmit(employeeData)
@@ -2736,7 +3370,7 @@ function AddEmployeeForm({
   const [isAddingBank, setIsAddingBank] = useState(false)
 
   // Load custom banks for the company
-  const loadCustomBanks = async () => {
+  const loadCustomBanks = useCallback(async () => {
     try {
       if (isDemoMode()) {
         console.log("[v0] Demo mode: Using empty custom banks")
@@ -2759,7 +3393,7 @@ function AddEmployeeForm({
     } catch (error) {
       console.error("Error loading custom banks:", error)
     }
-  }
+  }, [companySettings?.id])
 
   // Add new custom bank
   const addCustomBank = async () => {
@@ -2981,18 +3615,18 @@ function AddEmployeeForm({
     if (companySettings?.id) {
       loadCustomBanks()
     }
-  }, [companySettings?.id])
+  }, [companySettings?.id, loadCustomBanks])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 p-6">
       <Tabs value={currentTab} onValueChange={setCurrentTab}>
-        <TabsList className="flex justify-between">
+        <TabsList className="flex justify-between w-full p-1">
           <TabsTrigger value="personal">Personal</TabsTrigger>
           <TabsTrigger value="employment">Employment</TabsTrigger>
           <TabsTrigger value="financial">Financial</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
         </TabsList>
-        <TabsContent value="personal" className="space-y-4">
+        <TabsContent value="personal" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="prefix">1. Prefix</Label>
@@ -3216,7 +3850,7 @@ function AddEmployeeForm({
             </div>
           </div>
         </TabsContent>
-        <TabsContent value="employment" className="space-y-4">
+        <TabsContent value="employment" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="position">1. Position *</Label>
@@ -3471,8 +4105,19 @@ function AddEmployeeForm({
                 value={formData.status}
                 onValueChange={(value) => {
                   handleInputChange("status", value)
+
+                  // Force state update for inactive reason
                   if (value === "Active") {
                     handleInputChange("inactiveReason", "")
+                    // Clear any validation errors for inactive reason
+                    setErrors((prev) => ({
+                      ...prev,
+                      inactiveReason: "",
+                    }))
+                    // Force re-render by updating state
+                    setShowInactiveReason(false)
+                  } else if (value === "Inactive") {
+                    setShowInactiveReason(true)
                   }
                 }}
               >
@@ -3488,11 +4133,13 @@ function AddEmployeeForm({
             </div>
 
             {formData.status === "Inactive" && (
-              <div className="space-y-2">
+              <div className="space-y-2" key={`inactive-reason-${formData.status}-${Date.now()}`}>
                 <Label htmlFor="inactiveReason">9a. Inactive Reason *</Label>
                 <Select
                   value={formData.inactiveReason}
-                  onValueChange={(value) => handleInputChange("inactiveReason", value)}
+                  onValueChange={(value) => {
+                    handleInputChange("inactiveReason", value)
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select reason" />
@@ -3585,7 +4232,7 @@ function AddEmployeeForm({
               </Select>
               {supervisors.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  No employees with "Direct Supervisor" role found in this department
+                  No employees with &quot;Direct Supervisor&quot; role found in this department
                 </p>
               )}
             </div>
@@ -3637,13 +4284,13 @@ function AddEmployeeForm({
               </Select>
               {headsOfDepartment.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  No employees with "Head of Department" role found in this department
+                  No employees with &quot;Head of Department&quot; role found in this department
                 </p>
               )}
             </div>
           </div>
         </TabsContent>
-        <TabsContent value="financial" className="space-y-4">
+        <TabsContent value="financial" className="space-y-6">
           <div className="space-y-6">
             {/* Basic Financial Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3792,7 +4439,7 @@ function AddEmployeeForm({
                         Cancel
                       </button>
                     </div>
-                    <p className="text-xs text-gray-500">This bank will be added to your company's bank list</p>
+                    <p className="text-xs text-gray-500">This bank will be added to your company&apos;s bank list</p>
                   </div>
                 )}
               </div>
@@ -3831,8 +4478,8 @@ function AddEmployeeForm({
               </div>
             </div>
 
-            {/* Allowances Section */}
-            <div className="space-y-4">
+            {/* Enhanced Allowances Section */}
+            <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Allowances</h3>
                 <Button
@@ -3849,9 +4496,9 @@ function AddEmployeeForm({
 
               {showAllowanceSelector && (
                 <Card className="p-4 bg-emerald-50 border-emerald-200">
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <Label className="text-sm font-medium text-emerald-900">Select Allowance Type</Label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {companyAllowances
                         .filter((allowance) => !selectedAllowances.find((a) => a.code === allowance.code))
                         .map((allowance) => (
@@ -3859,7 +4506,7 @@ function AddEmployeeForm({
                             key={allowance.code}
                             type="button"
                             onClick={() => handleAddAllowance(allowance.code)}
-                            className="flex items-center justify-between p-3 bg-white border border-emerald-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition-colors text-left"
+                            className="flex items-center justify-between p-4 bg-white border border-emerald-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition-colors text-left"
                           >
                             <div>
                               <div className="font-medium text-sm text-emerald-900">{allowance.description}</div>
@@ -3883,118 +4530,193 @@ function AddEmployeeForm({
               )}
 
               {selectedAllowances.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedAllowances.map((selectedAllowance) => {
-                    const allowance = companyAllowances.find((a) => a.code === selectedAllowance.code)
-                    return (
-                      <div key={selectedAllowance.code} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor={`allowance-${selectedAllowance.code}`}>{allowance?.description} (GHS)</Label>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveAllowance(selectedAllowance.code)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <Input
-                          type="number"
-                          id={`allowance-${selectedAllowance.code}`}
-                          value={selectedAllowance.amount}
-                          onChange={(e) => handleAllowanceAmountChange(selectedAllowance.code, e.target.value)}
-                          placeholder="0"
-                        />
-                      </div>
-                    )
-                  })}
+                <div className="space-y-4">
+                  <div className="text-sm font-medium text-gray-700">
+                    Selected Allowances ({selectedAllowances.length})
+                  </div>
+                  <div className="space-y-4">
+                    {selectedAllowances.map((selectedAllowance) => {
+                      const allowance = companyAllowances.find((a) => a.code === selectedAllowance.code)
+                      return (
+                        <Card key={selectedAllowance.code} className="p-4 border border-emerald-200">
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-medium text-emerald-900">{allowance?.description}</h4>
+                                <p className="text-sm text-emerald-600">{allowance?.code}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveAllowance(selectedAllowance.code)}
+                                className="text-red-500 hover:text-red-700 p-1"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Taxable/Non-taxable Toggle */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Tax Status</Label>
+                                <div className="flex space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAllowanceChange(selectedAllowance.code, "taxable", true)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedAllowance.taxable
+                                        ? "bg-red-100 text-red-700 border-red-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
+                                    }`}
+                                  >
+                                    Taxable
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAllowanceChange(selectedAllowance.code, "taxable", false)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      !selectedAllowance.taxable
+                                        ? "bg-green-100 text-green-700 border-green-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
+                                    }`}
+                                  >
+                                    Non-taxable
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Recurring/Non-recurring Toggle */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Frequency</Label>
+                                <div className="flex space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAllowanceChange(selectedAllowance.code, "recurring", true)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedAllowance.recurring
+                                        ? "bg-blue-100 text-blue-700 border-blue-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
+                                    }`}
+                                  >
+                                    Recurring
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAllowanceChange(selectedAllowance.code, "recurring", false)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      !selectedAllowance.recurring
+                                        ? "bg-orange-100 text-orange-700 border-orange-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
+                                    }`}
+                                  >
+                                    One-time
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Amount/Percentage Toggle */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Calculation Type</Label>
+                                <div className="flex space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleAllowanceChange(selectedAllowance.code, "calculationType", "AMOUNT")
+                                    }
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedAllowance.calculationType === "AMOUNT"
+                                        ? "bg-purple-100 text-purple-700 border-purple-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
+                                    }`}
+                                  >
+                                    Amount
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleAllowanceChange(selectedAllowance.code, "calculationType", "PERCENTAGE")
+                                    }
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedAllowance.calculationType === "PERCENTAGE"
+                                        ? "bg-purple-100 text-purple-700 border-purple-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
+                                    }`}
+                                  >
+                                    Percentage
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Value Input */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">
+                                  {selectedAllowance.calculationType === "AMOUNT" ? "Amount (GHS)" : "Percentage (%)"}
+                                </Label>
+                                <Input
+                                  type="number"
+                                  step={selectedAllowance.calculationType === "PERCENTAGE" ? "0.01" : "1"}
+                                  value={
+                                    selectedAllowance.calculationType === "AMOUNT"
+                                      ? selectedAllowance.amount
+                                      : selectedAllowance.percentage
+                                  }
+                                  onChange={(e) =>
+                                    handleAllowanceChange(
+                                      selectedAllowance.code,
+                                      selectedAllowance.calculationType === "AMOUNT" ? "amount" : "percentage",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder={selectedAllowance.calculationType === "AMOUNT" ? "0" : "0.00"}
+                                />
+                              </div>
+
+                              {/* Effective Date */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Effective Date</Label>
+                                <Input
+                                  type="date"
+                                  value={selectedAllowance.effectiveDate}
+                                  onChange={(e) =>
+                                    handleAllowanceChange(selectedAllowance.code, "effectiveDate", e.target.value)
+                                  }
+                                />
+                              </div>
+
+                              {/* End Date (if not recurring) */}
+                              {!selectedAllowance.recurring && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm font-medium">End Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={selectedAllowance.endDate || ""}
+                                    onChange={(e) =>
+                                      handleAllowanceChange(selectedAllowance.code, "endDate", e.target.value)
+                                    }
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
 
               {selectedAllowances.length === 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="transportAllowance">Transport Allowance (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="transportAllowance"
-                      value={formData.transportAllowance}
-                      onChange={(e) => handleInputChange("transportAllowance", e.target.value)}
-                      placeholder="0"
-                    />
+                <div className="text-center py-8 text-gray-500">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                    <Plus className="w-8 h-8 text-gray-400" />
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="housingAllowance">Housing Allowance (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="housingAllowance"
-                      value={formData.housingAllowance}
-                      onChange={(e) => handleInputChange("housingAllowance", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="medicalAllowance">Medical Allowance (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="medicalAllowance"
-                      value={formData.medicalAllowance}
-                      onChange={(e) => handleInputChange("medicalAllowance", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="mealAllowance">Meal Allowance (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="mealAllowance"
-                      value={formData.mealAllowance}
-                      onChange={(e) => handleInputChange("mealAllowance", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="uniformAllowance">Uniform Allowance (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="uniformAllowance"
-                      value={formData.uniformAllowance}
-                      onChange={(e) => handleInputChange("uniformAllowance", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="communicationAllowance">Communication Allowance (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="communicationAllowance"
-                      value={formData.communicationAllowance}
-                      onChange={(e) => handleInputChange("communicationAllowance", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="otherAllowances">Other Allowances (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="otherAllowances"
-                      value={formData.otherAllowances}
-                      onChange={(e) => handleInputChange("otherAllowances", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
+                  <p className="text-sm">No allowances added yet</p>
+                  <p className="text-xs text-gray-400">Click &quot;Add Allowance&quot; to get started</p>
                 </div>
               )}
             </div>
 
-            {/* Deductions Section */}
-            <div className="space-y-4">
+            {/* Enhanced Deductions Section */}
+            <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Deductions</h3>
                 <Button
@@ -4011,9 +4733,9 @@ function AddEmployeeForm({
 
               {showDeductionSelector && (
                 <Card className="p-4 bg-red-50 border-red-200">
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <Label className="text-sm font-medium text-red-900">Select Deduction Type</Label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {companyDeductions
                         .filter((deduction) => !selectedDeductions.find((d) => d.code === deduction.code))
                         .map((deduction) => (
@@ -4021,7 +4743,7 @@ function AddEmployeeForm({
                             key={deduction.code}
                             type="button"
                             onClick={() => handleAddDeduction(deduction.code)}
-                            className="flex items-center justify-between p-3 bg-white border border-red-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors text-left"
+                            className="flex items-center justify-between p-4 bg-white border border-red-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors text-left"
                           >
                             <div>
                               <div className="font-medium text-sm text-red-900">{deduction.description}</div>
@@ -4045,153 +4767,456 @@ function AddEmployeeForm({
               )}
 
               {selectedDeductions.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedDeductions.map((selectedDeduction) => {
-                    const deduction = companyDeductions.find((d) => d.code === selectedDeduction.code)
-                    return (
-                      <div key={selectedDeduction.code} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor={`deduction-${selectedDeduction.code}`}>{deduction?.description} (GHS)</Label>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveDeduction(selectedDeduction.code)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <Input
-                          type="number"
-                          id={`deduction-${selectedDeduction.code}`}
-                          value={selectedDeduction.amount}
-                          onChange={(e) => handleDeductionAmountChange(selectedDeduction.code, e.target.value)}
-                          placeholder="0"
-                        />
-                      </div>
-                    )
-                  })}
+                <div className="space-y-4">
+                  <div className="text-sm font-medium text-gray-700">
+                    Selected Deductions ({selectedDeductions.length})
+                  </div>
+                  <div className="space-y-4">
+                    {selectedDeductions.map((selectedDeduction) => {
+                      const deduction = companyDeductions.find((d) => d.code === selectedDeduction.code)
+                      return (
+                        <Card key={selectedDeduction.code} className="p-4 border border-red-200">
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-medium text-red-900">{deduction?.description}</h4>
+                                <p className="text-sm text-red-600">{deduction?.code}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveDeduction(selectedDeduction.code)}
+                                className="text-red-500 hover:text-red-700 p-1"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Taxable/Non-taxable Toggle */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Tax Status</Label>
+                                <div className="flex space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeductionChange(selectedDeduction.code, "taxable", true)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedDeduction.taxable
+                                        ? "bg-red-100 text-red-700 border-red-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
+                                    }`}
+                                  >
+                                    Taxable
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeductionChange(selectedDeduction.code, "taxable", false)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      !selectedDeduction.taxable
+                                        ? "bg-green-100 text-green-700 border-green-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
+                                    }`}
+                                  >
+                                    Non-taxable
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Recurring/Non-recurring Toggle */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Frequency</Label>
+                                <div className="flex space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeductionChange(selectedDeduction.code, "recurring", true)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedDeduction.recurring
+                                        ? "bg-blue-100 text-blue-700 border-blue-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
+                                    }`}
+                                  >
+                                    Recurring
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeductionChange(selectedDeduction.code, "recurring", false)}
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      !selectedDeduction.recurring
+                                        ? "bg-orange-100 text-orange-700 border-orange-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
+                                    }`}
+                                  >
+                                    One-time
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Amount/Percentage Toggle */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Calculation Type</Label>
+                                <div className="flex space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleDeductionChange(selectedDeduction.code, "calculationType", "AMOUNT")
+                                    }
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedDeduction.calculationType === "AMOUNT"
+                                        ? "bg-purple-100 text-purple-700 border-purple-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
+                                    }`}
+                                  >
+                                    Amount
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleDeductionChange(selectedDeduction.code, "calculationType", "PERCENTAGE")
+                                    }
+                                    className={`px-3 py-2 text-sm rounded-md border ${
+                                      selectedDeduction.calculationType === "PERCENTAGE"
+                                        ? "bg-purple-100 text-purple-700 border-purple-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
+                                    }`}
+                                  >
+                                    Percentage
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Value Input */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">
+                                  {selectedDeduction.calculationType === "AMOUNT" ? "Amount (GHS)" : "Percentage (%)"}
+                                </Label>
+                                <Input
+                                  type="number"
+                                  step={selectedDeduction.calculationType === "PERCENTAGE" ? "0.01" : "1"}
+                                  value={
+                                    selectedDeduction.calculationType === "AMOUNT"
+                                      ? selectedDeduction.amount
+                                      : selectedDeduction.percentage
+                                  }
+                                  onChange={(e) =>
+                                    handleDeductionChange(
+                                      selectedDeduction.code,
+                                      selectedDeduction.calculationType === "AMOUNT" ? "amount" : "percentage",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder={selectedDeduction.calculationType === "AMOUNT" ? "0" : "0.00"}
+                                />
+                              </div>
+
+                              {/* Effective Date */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Effective Date</Label>
+                                <Input
+                                  type="date"
+                                  value={selectedDeduction.effectiveDate}
+                                  onChange={(e) =>
+                                    handleDeductionChange(selectedDeduction.code, "effectiveDate", e.target.value)
+                                  }
+                                />
+                              </div>
+
+                              {/* End Date (if not recurring) */}
+                              {!selectedDeduction.recurring && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm font-medium">End Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={selectedDeduction.endDate || ""}
+                                    onChange={(e) =>
+                                      handleDeductionChange(selectedDeduction.code, "endDate", e.target.value)
+                                    }
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
 
               {selectedDeductions.length === 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="taxDeduction">Tax Deduction (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="taxDeduction"
-                      value={formData.taxDeduction}
-                      onChange={(e) => handleInputChange("taxDeduction", e.target.value)}
-                      placeholder="0"
-                    />
+                <div className="text-center py-8 text-gray-500">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                    <Plus className="w-8 h-8 text-gray-400" />
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="tier3">Tier 3 Contribution (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="tier3"
-                      value={formData.tier3}
-                      onChange={(e) => handleInputChange("tier3", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="loanDeduction">Loan Deduction (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="loanDeduction"
-                      value={formData.loanDeduction}
-                      onChange={(e) => handleInputChange("loanDeduction", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="advanceDeduction">Advance Deduction (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="advanceDeduction"
-                      value={formData.advanceDeduction}
-                      onChange={(e) => handleInputChange("advanceDeduction", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="otherDeductions">Other Deductions (GHS)</Label>
-                    <Input
-                      type="number"
-                      id="otherDeductions"
-                      value={formData.otherDeductions}
-                      onChange={(e) => handleInputChange("otherDeductions", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
+                  <p className="text-sm">No deductions added yet</p>
+                  <p className="text-xs text-gray-400">Click &quot;Add Deduction&quot; to get started</p>
                 </div>
               )}
             </div>
           </div>
         </TabsContent>
-        <TabsContent value="documents" className="space-y-4">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Required Documents</h3>
-            <div className="space-y-4">
-              {[
-                {
-                  id: "academicCertificate",
-                  title: "1. Academic Certificate(s)",
-                  description: "Educational certificates and transcripts",
-                },
-                {
-                  id: "passportPicture",
-                  title: "2. Passport Picture",
-                  description: "Professional passport-sized photograph",
-                },
-                {
-                  id: "resumeApplication",
-                  title: "3. Resume & Application Letter",
-                  description: "Current CV and cover letter",
-                },
-                {
-                  id: "passport",
-                  title: "4. Passport",
-                  description: "Valid passport copy",
-                },
-                {
-                  id: "nationalId",
-                  title: "5. National ID",
-                  description: "Ghana Card or Voter ID",
-                },
-                {
-                  id: "medicalReport",
-                  title: "6. Medical Report",
-                  description: "Health clearance certificate",
-                },
-                {
-                  id: "policeReport",
-                  title: "7. Police Report",
-                  description: "Criminal background check",
-                },
-                {
-                  id: "otherUploads",
-                  title: "8. Other Uploads",
-                  description: "Additional supporting documents",
-                },
-              ].map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <h4 className="font-medium">{doc.title}</h4>
-                    <p className="text-sm text-gray-600">{doc.description}</p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose File
-                  </Button>
-                </div>
-              ))}
+        <TabsContent value="documents" className="space-y-8 max-w-none">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Required Documents</h3>
+              <div className="text-sm text-gray-500">
+                {uploadedDocuments.length} of {requiredDocuments.length} documents uploaded
+              </div>
             </div>
+
+            <div className="space-y-6">
+              {requiredDocuments.map((doc) => {
+                const uploadedDoc = uploadedDocuments.find((d) => d.documentType === doc.id)
+                const isUploaded = !!uploadedDoc
+                const isUploading = uploadingDocuments.includes(doc.id)
+
+                return (
+                  <Card
+                    key={doc.id}
+                    className={`p-6 border-2 transition-all ${
+                      isUploaded
+                        ? "border-green-200 bg-green-50 shadow-sm"
+                        : isUploading
+                          ? "border-blue-200 bg-blue-50 shadow-sm"
+                          : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3">
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              isUploaded
+                                ? "bg-green-100 text-green-600"
+                                : isUploading
+                                  ? "bg-blue-100 text-blue-600"
+                                  : "bg-gray-100 text-gray-400"
+                            }`}
+                          >
+                            {isUploaded ? (
+                              <CheckCircle className="w-5 h-5" />
+                            ) : isUploading ? (
+                              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <FileText className="w-5 h-5" />
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-gray-900">{doc.title}</h4>
+                            <p className="text-sm text-gray-600">{doc.description}</p>
+                            {isUploaded && uploadedDoc && (
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <Badge
+                                  variant="outline"
+                                  className="text-green-700 border-green-300 bg-green-50 text-xs"
+                                >
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  {uploadedDoc.fileName}
+                                </Badge>
+                                <span className="text-xs text-gray-500">{formatFileSize(uploadedDoc.fileSize)}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveDocument(doc.id)}
+                                  className="text-red-500 hover:text-red-700 text-xs hover:underline"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-3">
+                        {isUploaded ? (
+                          <div className="flex items-center space-x-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePreviewDocument(uploadedDoc!)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 min-w-[80px]"
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              View
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleReplaceDocument(doc.id)}
+                              className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 min-w-[90px]"
+                            >
+                              <Upload className="w-4 h-4 mr-2" />
+                              Replace
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            {/* Hidden file input for desktop */}
+                            <input
+                              ref={(el) => {
+                                if (el) {
+                                  fileInputRefs.current[doc.id] = el
+                                }
+                              }}
+                              type="file"
+                              accept={doc.acceptTypes}
+                              onChange={(e) => handleFileSelect(doc.id, e)}
+                              className="hidden md:block"
+                              id={`file-input-${doc.id}`}
+                              style={{ position: "absolute", left: "-9999px", opacity: 0 }}
+                            />
+
+                            {/* Mobile file input - visible but styled */}
+                            <input
+                              type="file"
+                              accept={doc.acceptTypes}
+                              onChange={(e) => handleFileSelect(doc.id, e)}
+                              className="block md:hidden w-full min-h-[44px] text-sm text-blue-600 border border-blue-300 rounded-md bg-white hover:bg-blue-50 active:bg-blue-100 file:mr-4 file:py-2 file:px-4 file:rounded-l-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                              id={`mobile-file-input-${doc.id}`}
+                            />
+
+                            {/* Desktop button */}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                console.log("[v0] Desktop upload button clicked for:", doc.id)
+
+                                // Try the hidden input first
+                                const hiddenInput = document.getElementById(`file-input-${doc.id}`) as HTMLInputElement
+                                if (hiddenInput) {
+                                  console.log("[v0] Using hidden input for:", doc.id)
+                                  hiddenInput.value = ""
+                                  hiddenInput.click()
+                                } else {
+                                  console.log("[v0] Using handleUploadClick for:", doc.id)
+                                  // Fallback to dynamic creation
+                                  handleUploadClick(doc.id)
+                                }
+                              }}
+                              onTouchEnd={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                console.log("[v0] Desktop upload button touch end for:", doc.id)
+
+                                // Try the hidden input first
+                                const hiddenInput = document.getElementById(`file-input-${doc.id}`) as HTMLInputElement
+                                if (hiddenInput) {
+                                  console.log("[v0] Using hidden input (touch) for:", doc.id)
+                                  hiddenInput.value = ""
+                                  hiddenInput.click()
+                                } else {
+                                  console.log("[v0] Using handleUploadClick (touch) for:", doc.id)
+                                  // Fallback to dynamic creation
+                                  handleUploadClick(doc.id)
+                                }
+                              }}
+                              disabled={isUploading}
+                              className="hidden md:flex text-blue-600 hover:text-blue-700 hover:bg-blue-50 active:bg-blue-100 touch-manipulation min-h-[44px] min-w-[140px] text-sm font-medium border-2 hover:border-blue-400"
+                            >
+                              {isUploading ? (
+                                <>
+                                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2" />
+                                  Uploading...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-4 h-4 mr-2" />
+                                  Choose File
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Upload progress and document confirmation - shown for all devices */}
+                    {isUploading && (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
+                          <span>Uploading...</span>
+                          <span>{uploadProgress[doc.id] || 0}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${uploadProgress[doc.id] || 0}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Show uploaded document info - enhanced for full-screen desktop visibility */}
+                    {isUploaded && uploadedDoc && (
+                      <div className="mt-4 p-4 bg-green-50 border-2 border-green-200 rounded-lg shadow-sm">
+                        <div className="flex items-start space-x-3">
+                          <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-green-900 truncate">✓ {uploadedDoc.fileName}</p>
+                            <p className="text-xs text-green-700 mt-1">
+                              {(uploadedDoc.fileSize / 1024 / 1024).toFixed(2)} MB • Uploaded on{" "}
+                              {uploadedDoc.uploadDate.toLocaleDateString()}
+                            </p>
+                            <div className="mt-2 flex items-center space-x-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handlePreviewDocument(uploadedDoc)}
+                                className="text-green-700 border-green-300 hover:bg-green-100 text-xs h-7"
+                              >
+                                <Eye className="w-3 h-3 mr-1" />
+                                Preview
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleReplaceDocument(doc.id)}
+                                className="text-orange-700 border-orange-300 hover:bg-orange-100 text-xs h-7"
+                              >
+                                <Upload className="w-3 h-3 mr-1" />
+                                Replace
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveDocument(doc.id)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs h-7"
+                              >
+                                <X className="w-3 h-3 mr-1" />
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                )
+              })}
+            </div>
+
+            {uploadedDocuments.length > 0 && (
+              <Card className="p-4 bg-blue-50 border-blue-200">
+                <div className="flex items-center space-x-3">
+                  <CheckCircle className="w-6 h-6 text-blue-600" />
+                  <div>
+                    <h4 className="font-medium text-blue-900">Documents Ready for Review</h4>
+                    <p className="text-sm text-blue-700">
+                      {uploadedDocuments.length} document{uploadedDocuments.length !== 1 ? "s" : ""} uploaded
+                      successfully. All documents will be saved to the document vault and labeled with the
+                      employee&apos;s name.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            )}
           </div>
         </TabsContent>
       </Tabs>
@@ -4221,6 +5246,69 @@ function AddEmployeeForm({
           </div>
         )}
       </div>
+
+      {/* Document Preview Dialog */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Document Preview</DialogTitle>
+          </DialogHeader>
+          {previewDocument && (
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                  {previewDocument.fileType.startsWith("image/") ? (
+                    <img
+                      src={previewDocument.fileUrl || "/placeholder.svg"}
+                      alt={previewDocument.fileName}
+                      className="w-8 h-8 object-cover rounded"
+                    />
+                  ) : (
+                    <FileText className="w-6 h-6 text-gray-600" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-900">{previewDocument.fileName}</h3>
+                  <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
+                    <span>{formatFileSize(previewDocument.fileSize)}</span>
+                    <span>{previewDocument.fileType}</span>
+                    <span>{new Date(previewDocument.uploadDate).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {previewDocument.fileType.startsWith("image/") && (
+                <div className="border rounded-lg p-4">
+                  <img
+                    src={previewDocument.fileUrl || "/placeholder.svg"}
+                    alt={previewDocument.fileName}
+                    className="max-w-full h-auto rounded"
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    // In production, this would trigger actual download
+                    toast({
+                      title: "Download Started",
+                      description: `${previewDocument.fileName} is being downloaded.`,
+                    })
+                    setIsPreviewOpen(false)
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

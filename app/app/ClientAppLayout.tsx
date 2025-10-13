@@ -13,6 +13,15 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 import {
   LayoutDashboard,
   Users,
@@ -37,6 +46,11 @@ import {
   Shield,
   Clock,
   Sigma as Sitemap,
+  Home,
+  Zap,
+  History,
+  MessageSquare,
+  Award,
 } from "lucide-react"
 import { Suspense, useState, useEffect } from "react"
 import { AIChatbox } from "@/components/ai-chatbox"
@@ -110,11 +124,15 @@ export default function ClientAppLayout({
   const [currentTheme, setCurrentTheme] = useState("emerald")
   const [selectedNotification, setSelectedNotification] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [currentPath, setCurrentPath] = useState("")
+  const [breadcrumbs, setBreadcrumbs] = useState([])
 
   // Service Worker registration with proper error handling
   useEffect(() => {
-    // Only register Service Worker in production and if supported
-    if (typeof window !== "undefined" && "serviceWorker" in navigator && process.env.NODE_ENV === "production") {
+    // Only register Service Worker if supported by the browser
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       // Wait for the page to be fully loaded
       window.addEventListener("load", () => {
         // Check if document is in a valid state
@@ -154,6 +172,132 @@ export default function ClientAppLayout({
       setCurrentTheme(savedTheme)
     }
   }, [])
+
+  // Generate breadcrumbs based on current path
+  useEffect(() => {
+    const path = window.location.pathname
+    setCurrentPath(path)
+
+    const pathSegments = path.split("/").filter(Boolean)
+    const breadcrumbItems = []
+
+    // Add home
+    breadcrumbItems.push({ label: "Dashboard", href: "/app", icon: Home })
+
+    if (pathSegments.length > 1) {
+      const module = pathSegments[1]
+      const moduleMap = {
+        employees: { label: "Employees", icon: Users },
+        payroll: { label: "Payroll", icon: Calculator },
+        attendance: { label: "Attendance", icon: Clock },
+        leave: { label: "Leave Management", icon: Calendar },
+        performance: { label: "Performance", icon: Target },
+        learning: { label: "Learning", icon: BookOpen },
+        documents: { label: "Documents", icon: FileText },
+        analytics: { label: "Analytics", icon: BarChart3 },
+        settings: { label: "Settings", icon: Settings },
+        recruitment: { label: "Recruitment", icon: UserPlus },
+        communication: { label: "Communication", icon: MessageSquare },
+        "org-chart": { label: "Org Chart", icon: Sitemap },
+        disciplinary: { label: "Disciplinary", icon: Shield },
+        offboarding: { label: "Offboarding", icon: LogOut },
+        promotions: { label: "Promotions", icon: Award },
+        loans: { label: "Loans", icon: CreditCard },
+        integrations: { label: "Integrations", icon: Plug },
+      }
+
+      if (moduleMap[module]) {
+        breadcrumbItems.push({
+          label: moduleMap[module].label,
+          href: `/app/${module}`,
+          icon: moduleMap[module].icon,
+        })
+      }
+
+      // Add sub-pages
+      if (pathSegments.length > 2) {
+        const subPage = pathSegments[2]
+        const subPageMap = {
+          history: "History",
+          reports: "Reports",
+          profile: "Profile",
+          settings: "Settings",
+        }
+
+        if (subPageMap[subPage]) {
+          breadcrumbItems.push({
+            label: subPageMap[subPage],
+            href: path,
+            icon: null,
+          })
+        }
+      }
+    }
+
+    setBreadcrumbs(breadcrumbItems)
+  }, [])
+
+  // Navigation data structure for better organization
+  const navigationSections = [
+    {
+      title: "Overview",
+      items: [{ name: "Dashboard", href: "/app", icon: LayoutDashboard, description: "Overview and key metrics" }],
+    },
+    {
+      title: "HR Management",
+      items: [
+        { name: "Employees", href: "/app/employees", icon: Users, description: "Manage employee records" },
+        { name: "Recruitment", href: "/app/recruitment", icon: UserPlus, description: "Hire new talent" },
+        { name: "Org Chart", href: "/app/org-chart", icon: Sitemap, description: "Organizational structure" },
+        { name: "Documents", href: "/app/documents", icon: FileText, description: "Document vault" },
+        { name: "Communication", href: "/app/communication", icon: MessageSquare, description: "Team communication" },
+      ],
+    },
+    {
+      title: "Time & Attendance",
+      items: [
+        { name: "Attendance", href: "/app/attendance", icon: Clock, description: "Track work hours" },
+        { name: "Leave Management", href: "/app/leave", icon: Calendar, description: "Manage leave requests" },
+      ],
+    },
+    {
+      title: "Performance",
+      items: [
+        { name: "Performance", href: "/app/performance", icon: Target, description: "Performance reviews" },
+        { name: "Promotions", href: "/app/promotions", icon: Award, description: "Career advancement" },
+        { name: "Learning", href: "/app/learning", icon: BookOpen, description: "Training & development" },
+      ],
+    },
+    {
+      title: "Payroll",
+      items: [
+        { name: "Payroll", href: "/app/payroll", icon: Calculator, description: "Process payroll" },
+        { name: "Payroll History", href: "/app/payroll/history", icon: History, description: "Past payroll records" },
+        { name: "Loans", href: "/app/loans", icon: CreditCard, description: "Employee loans" },
+      ],
+    },
+    {
+      title: "Analytics",
+      items: [{ name: "Reports", href: "/app/analytics", icon: BarChart3, description: "Reports & insights" }],
+    },
+    {
+      title: "Administration",
+      items: [
+        { name: "Disciplinary", href: "/app/disciplinary", icon: Shield, description: "Disciplinary actions" },
+        { name: "Offboarding", href: "/app/offboarding", icon: LogOut, description: "Employee exit process" },
+        { name: "Integrations", href: "/app/integrations", icon: Plug, description: "Third-party integrations" },
+        { name: "Settings", href: "/app/settings", icon: Settings, description: "System settings" },
+      ],
+    },
+  ]
+
+  // Quick actions for common tasks
+  const quickActions = [
+    { name: "Add Employee", href: "/app/employees?action=add", icon: UserPlus, color: "bg-blue-500" },
+    { name: "Process Payroll", href: "/app/payroll?action=process", icon: Calculator, color: "bg-green-500" },
+    { name: "View Reports", href: "/app/analytics", icon: BarChart3, color: "bg-purple-500" },
+    { name: "Upload Documents", href: "/app/documents?action=upload", icon: FileText, color: "bg-orange-500" },
+  ]
 
   const [notifications, setNotifications] = useState([
     {
@@ -210,12 +354,79 @@ export default function ClientAppLayout({
     <CurrencyProvider>
       <div className="min-h-screen bg-gray-50">
         {/* Top Navigation */}
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" className="md:hidden">
+              {/* Mobile Menu Button */}
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="sm" className="md:hidden">
+                    <Menu className="w-5 h-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-80 p-0">
+                  <div className="flex flex-col h-full">
+                    <div className="p-4 border-b">
+                      <div className="flex items-center space-x-2">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center"
+                          style={{ backgroundColor: theme.colors[600] }}
+                        >
+                          <span className="text-white font-bold text-sm">A</span>
+                        </div>
+                        <span className="text-lg font-bold text-gray-900">AkwaabaHRPay</span>
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4">
+                      {navigationSections.map((section, sectionIndex) => (
+                        <div key={sectionIndex} className="mb-6">
+                          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                            {section.title}
+                          </h3>
+                          <div className="space-y-1">
+                            {section.items.map((item, itemIndex) => (
+                              <a
+                                key={itemIndex}
+                                href={item.href}
+                                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors group"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                              >
+                                <item.icon className="w-5 h-5 text-gray-500 group-hover:text-gray-700" />
+                                <div className="flex-1">
+                                  <div className="font-medium">{item.name}</div>
+                                  <div className="text-xs text-gray-500">{item.description}</div>
+                                </div>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-4 border-t">
+                      <Button
+                        variant="ghost"
+                        onClick={handleSignOut}
+                        className="w-full justify-start text-gray-700 hover:text-red-600 hover:bg-red-50"
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Sign Out
+                      </Button>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
+
+              {/* Desktop Sidebar Toggle */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hidden md:block"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              >
                 <Menu className="w-5 h-5" />
               </Button>
+
+              {/* Logo */}
               <div className="flex items-center space-x-2">
                 <div
                   className="w-8 h-8 rounded-lg flex items-center justify-center"
@@ -227,15 +438,16 @@ export default function ClientAppLayout({
               </div>
             </div>
 
-            <div className="flex items-center space-x-4">
-              <form onSubmit={handleSearch} className="relative hidden md:block">
+            {/* Search Bar */}
+            <div className="flex-1 max-w-md mx-4 hidden md:block">
+              <form onSubmit={handleSearch} className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search employees, payroll..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent w-64 font-sans"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent font-sans"
                   style={
                     {
                       "--tw-ring-color": theme.colors[500],
@@ -244,7 +456,41 @@ export default function ClientAppLayout({
                   }
                 />
               </form>
+            </div>
 
+            {/* Right Side Actions */}
+            <div className="flex items-center space-x-2">
+              {/* Mobile Search */}
+              <Button variant="ghost" size="sm" className="md:hidden">
+                <Search className="w-5 h-5" />
+              </Button>
+
+              {/* Quick Actions Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="hidden lg:flex">
+                    <Zap className="w-5 h-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <div className="px-2 py-1.5">
+                    <p className="text-sm font-medium">Quick Actions</p>
+                    <p className="text-xs text-gray-500">Common tasks and shortcuts</p>
+                  </div>
+                  <DropdownMenuSeparator />
+                  {quickActions.map((action, index) => (
+                    <DropdownMenuItem key={index} onClick={() => (window.location.href = action.href)}>
+                      <div className={`w-2 h-2 rounded-full mr-3 ${action.color}`} />
+                      <div>
+                        <div className="font-medium">{action.name}</div>
+                        <div className="text-xs text-gray-500">Quick access</div>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Theme Selector */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="relative">
@@ -274,6 +520,7 @@ export default function ClientAppLayout({
                 </DropdownMenuContent>
               </DropdownMenu>
 
+              {/* Notifications */}
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" size="sm" className="relative">
@@ -335,6 +582,7 @@ export default function ClientAppLayout({
                 </PopoverContent>
               </Popover>
 
+              {/* User Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center space-x-2 hover:bg-gray-50">
@@ -372,6 +620,34 @@ export default function ClientAppLayout({
               </DropdownMenu>
             </div>
           </div>
+
+          {/* Breadcrumb Navigation */}
+          {breadcrumbs.length > 1 && (
+            <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
+              <Breadcrumb>
+                <BreadcrumbList>
+                  {breadcrumbs.map((crumb, index) => (
+                    <div key={index} className="flex items-center">
+                      {index > 0 && <BreadcrumbSeparator className="mx-2" />}
+                      <BreadcrumbItem>
+                        {index === breadcrumbs.length - 1 ? (
+                          <BreadcrumbPage className="flex items-center space-x-2">
+                            {crumb.icon && <crumb.icon className="w-4 h-4" />}
+                            <span>{crumb.label}</span>
+                          </BreadcrumbPage>
+                        ) : (
+                          <BreadcrumbLink href={crumb.href} className="flex items-center space-x-2">
+                            {crumb.icon && <crumb.icon className="w-4 h-4" />}
+                            <span>{crumb.label}</span>
+                          </BreadcrumbLink>
+                        )}
+                      </BreadcrumbItem>
+                    </div>
+                  ))}
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
+          )}
         </header>
 
         {/* Notification Modal Dialog */}
@@ -401,323 +677,133 @@ export default function ClientAppLayout({
         </Dialog>
 
         <div className="flex">
-          {/* Sidebar */}
-          <aside className="w-64 bg-white border-r border-gray-200 min-h-screen hidden md:block">
+          {/* Desktop Sidebar */}
+          <aside
+            className={`bg-white border-r border-gray-200 min-h-screen transition-all duration-300 ${
+              sidebarCollapsed ? "w-16" : "w-64"
+            } hidden md:block`}
+          >
             <nav className="p-4 space-y-2">
               <Suspense fallback={<div>Loading...</div>}>
+                {/* Dashboard Link */}
                 <a
                   href="/app"
-                  className="flex items-center space-x-3 px-3 py-2 rounded-lg font-medium"
-                  style={{
-                    backgroundColor: theme.colors[50],
-                    color: theme.colors[700],
-                  }}
+                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg font-medium ${
+                    currentPath === "/app" ? "bg-gray-100" : ""
+                  }`}
+                  style={
+                    currentPath === "/app"
+                      ? {
+                          backgroundColor: theme.colors[50],
+                          color: theme.colors[700],
+                        }
+                      : {}
+                  }
                 >
-                  <LayoutDashboard className="w-5 h-5" />
-                  <span>Dashboard</span>
+                  <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
+                  {!sidebarCollapsed && <span>Dashboard</span>}
                 </a>
 
-                <div className="pt-4">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">HR Management</p>
-                  <a
-                    href="/app/employees"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:text-white transition-colors font-sans"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <Users className="w-5 h-5" />
-                    <span>Employees</span>
-                  </a>
-                  <a
-                    href="/app/promotions"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <Target className="w-5 h-5" />
-                    <span>Promotions</span>
-                  </a>
-                  <a
-                    href="/app/communication"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <Users className="w-5 h-5" />
-                    <span>Team Communication</span>
-                  </a>
-                  <a
-                    href="/app/org-chart"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <Sitemap className="w-5 h-5" />
-                    <span>Organizational Chart</span>
-                  </a>
-                  <a
-                    href="/app/documents"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <FileText className="w-5 h-5" />
-                    <span>Document Vault</span>
-                  </a>
-                  <a
-                    href="/app/recruitment"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <UserPlus className="w-5 h-5" />
-                    <span>Recruitment</span>
-                  </a>
-                  <a
-                    href="/app/disciplinary"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <Shield className="w-5 h-5" />
-                    <span className="font-sans">Disciplinary & Grievance</span>
-                  </a>
-                  <a
-                    href="/app/attendance"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <Clock className="w-5 h-5" />
-                    <span className="font-sans">Time & Attendance</span>
-                  </a>
-                  <a
-                    href="/app/offboarding"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <LogOut className="w-5 h-5" />
-                    <span className="font-sans">Employee Offboarding</span>
-                  </a>
-                  <a
-                    href="/app/performance"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <Target className="w-5 h-5" />
-                    <span className="font-sans">Performance</span>
-                  </a>
-                  <a
-                    href="/app/learning"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <BookOpen className="w-5 h-5" />
-                    <span className="font-sans">Learning & Development</span>
-                  </a>
-                  <a
-                    href="/app/leave"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <Calendar className="w-5 h-5" />
-                    <span className="font-sans">Leave Management</span>
-                  </a>
-                </div>
-
-                <div className="pt-4">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Payroll</p>
-                  <a
-                    href="/app/payroll"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <Calculator className="w-5 h-5" />
-                    <span className="font-sans">Payroll Processing</span>
-                  </a>
-                  <a
-                    href="/app/payroll/history"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <FileText className="w-5 h-5" />
-                    <span className="font-sans">Payroll History</span>
-                  </a>
-                  <a
-                    href="/app/loans"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <CreditCard className="w-5 h-5" />
-                    <span className="font-sans">Loans & Advances</span>
-                  </a>
-                </div>
-
-                <div className="pt-4">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Analytics</p>
-                  <a
-                    href="/app/analytics"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <BarChart3 className="w-5 h-5" />
-                    <span>Reports & Analytics</span>
-                  </a>
-                </div>
-
-                <div className="pt-4">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">System</p>
-                  <a
-                    href="/app/integrations"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <Plug className="w-5 h-5" />
-                    <span>Integrations</span>
-                  </a>
-                  <a
-                    href="/app/settings"
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors font-sans"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `var(--theme-primary-600)`
-                      e.currentTarget.style.color = "white"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = ""
-                      e.currentTarget.style.color = ""
-                    }}
-                  >
-                    <Settings className="w-4 h-4 mr-2" />
-                    <span>Settings</span>
-                  </a>
-                  <div className="pt-4 mt-4 border-t border-gray-200">
-                    <Button
-                      variant="ghost"
-                      onClick={handleSignOut}
-                      className="w-full justify-start text-gray-700 hover:text-red-600 hover:bg-red-50"
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Sign Out
-                    </Button>
+                {/* Navigation Sections */}
+                {navigationSections.slice(1).map((section, sectionIndex) => (
+                  <div key={sectionIndex} className="pt-4">
+                    {!sidebarCollapsed && (
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                        {section.title}
+                      </p>
+                    )}
+                    <div className="space-y-1">
+                      {section.items.map((item, itemIndex) => {
+                        const isActive = currentPath === item.href || currentPath.startsWith(item.href + "/")
+                        return (
+                          <a
+                            key={itemIndex}
+                            href={item.href}
+                            className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors group ${
+                              isActive ? "text-white" : "text-gray-700 hover:text-white"
+                            }`}
+                            style={
+                              isActive
+                                ? {
+                                    backgroundColor: theme.colors[600],
+                                  }
+                                : {}
+                            }
+                            onMouseEnter={(e) => {
+                              if (!isActive) {
+                                e.currentTarget.style.backgroundColor = theme.colors[600]
+                                e.currentTarget.style.color = "white"
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isActive) {
+                                e.currentTarget.style.backgroundColor = ""
+                                e.currentTarget.style.color = ""
+                              }
+                            }}
+                            title={sidebarCollapsed ? item.name : undefined}
+                          >
+                            <item.icon className="w-5 h-5 flex-shrink-0" />
+                            {!sidebarCollapsed && (
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{item.name}</div>
+                                <div className="text-xs opacity-75 truncate">{item.description}</div>
+                              </div>
+                            )}
+                          </a>
+                        )
+                      })}
+                    </div>
                   </div>
+                ))}
+
+                {/* Quick Actions Section */}
+                {!sidebarCollapsed && (
+                  <div className="pt-4 mt-4 border-t border-gray-200">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Quick Actions</p>
+                    <div className="space-y-1">
+                      {quickActions.map((action, index) => (
+                        <a
+                          key={index}
+                          href={action.href}
+                          className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors group"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = theme.colors[600]
+                            e.currentTarget.style.color = "white"
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = ""
+                            e.currentTarget.style.color = ""
+                          }}
+                        >
+                          <action.icon className="w-5 h-5" />
+                          <span className="font-medium">{action.name}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sign Out */}
+                <div className="pt-4 mt-4 border-t border-gray-200">
+                  <Button
+                    variant="ghost"
+                    onClick={handleSignOut}
+                    className={`w-full justify-start text-gray-700 hover:text-red-600 hover:bg-red-50 ${
+                      sidebarCollapsed ? "px-3" : ""
+                    }`}
+                    title={sidebarCollapsed ? "Sign Out" : undefined}
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    {!sidebarCollapsed && "Sign Out"}
+                  </Button>
                 </div>
               </Suspense>
             </nav>
           </aside>
 
           {/* Main Content */}
-          <main className="flex-1 p-6">{children}</main>
+          <main className="flex-1 p-4 md:p-6 overflow-x-auto">{children}</main>
         </div>
 
         <AIChatbox />
