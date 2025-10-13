@@ -14,7 +14,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 import {
   LayoutDashboard,
   Users,
@@ -40,26 +47,10 @@ import {
   Clock,
   Sigma as Sitemap,
   Home,
-  ChevronRight,
-  Plus,
   Zap,
-  Star,
   History,
-  TrendingUp,
-  Building2,
-  UserCheck,
-  FileCheck,
   MessageSquare,
-  Briefcase,
   Award,
-  GraduationCap,
-  DollarSign,
-  PieChart,
-  Activity,
-  Globe,
-  Cog,
-  ArrowRight,
-  ArrowLeft,
 } from "lucide-react"
 import { Suspense, useState, useEffect } from "react"
 import { AIChatbox } from "@/components/ai-chatbox"
@@ -140,8 +131,8 @@ export default function ClientAppLayout({
 
   // Service Worker registration with proper error handling
   useEffect(() => {
-    // Only register Service Worker in production and if supported
-    if (typeof window !== "undefined" && "serviceWorker" in navigator && process.env.NODE_ENV === "production") {
+    // Only register Service Worker if supported by the browser
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       // Wait for the page to be fully loaded
       window.addEventListener("load", () => {
         // Check if document is in a valid state
@@ -186,63 +177,63 @@ export default function ClientAppLayout({
   useEffect(() => {
     const path = window.location.pathname
     setCurrentPath(path)
-    
-    const pathSegments = path.split('/').filter(Boolean)
+
+    const pathSegments = path.split("/").filter(Boolean)
     const breadcrumbItems = []
-    
+
     // Add home
-    breadcrumbItems.push({ label: 'Dashboard', href: '/app', icon: Home })
-    
+    breadcrumbItems.push({ label: "Dashboard", href: "/app", icon: Home })
+
     if (pathSegments.length > 1) {
       const module = pathSegments[1]
       const moduleMap = {
-        'employees': { label: 'Employees', icon: Users },
-        'payroll': { label: 'Payroll', icon: Calculator },
-        'attendance': { label: 'Attendance', icon: Clock },
-        'leave': { label: 'Leave Management', icon: Calendar },
-        'performance': { label: 'Performance', icon: Target },
-        'learning': { label: 'Learning', icon: BookOpen },
-        'documents': { label: 'Documents', icon: FileText },
-        'analytics': { label: 'Analytics', icon: BarChart3 },
-        'settings': { label: 'Settings', icon: Settings },
-        'recruitment': { label: 'Recruitment', icon: UserPlus },
-        'communication': { label: 'Communication', icon: MessageSquare },
-        'org-chart': { label: 'Org Chart', icon: Sitemap },
-        'disciplinary': { label: 'Disciplinary', icon: Shield },
-        'offboarding': { label: 'Offboarding', icon: LogOut },
-        'promotions': { label: 'Promotions', icon: Award },
-        'loans': { label: 'Loans', icon: CreditCard },
-        'integrations': { label: 'Integrations', icon: Plug }
+        employees: { label: "Employees", icon: Users },
+        payroll: { label: "Payroll", icon: Calculator },
+        attendance: { label: "Attendance", icon: Clock },
+        leave: { label: "Leave Management", icon: Calendar },
+        performance: { label: "Performance", icon: Target },
+        learning: { label: "Learning", icon: BookOpen },
+        documents: { label: "Documents", icon: FileText },
+        analytics: { label: "Analytics", icon: BarChart3 },
+        settings: { label: "Settings", icon: Settings },
+        recruitment: { label: "Recruitment", icon: UserPlus },
+        communication: { label: "Communication", icon: MessageSquare },
+        "org-chart": { label: "Org Chart", icon: Sitemap },
+        disciplinary: { label: "Disciplinary", icon: Shield },
+        offboarding: { label: "Offboarding", icon: LogOut },
+        promotions: { label: "Promotions", icon: Award },
+        loans: { label: "Loans", icon: CreditCard },
+        integrations: { label: "Integrations", icon: Plug },
       }
-      
+
       if (moduleMap[module]) {
         breadcrumbItems.push({
           label: moduleMap[module].label,
           href: `/app/${module}`,
-          icon: moduleMap[module].icon
+          icon: moduleMap[module].icon,
         })
       }
-      
+
       // Add sub-pages
       if (pathSegments.length > 2) {
         const subPage = pathSegments[2]
         const subPageMap = {
-          'history': 'History',
-          'reports': 'Reports',
-          'profile': 'Profile',
-          'settings': 'Settings'
+          history: "History",
+          reports: "Reports",
+          profile: "Profile",
+          settings: "Settings",
         }
-        
+
         if (subPageMap[subPage]) {
           breadcrumbItems.push({
             label: subPageMap[subPage],
             href: path,
-            icon: null
+            icon: null,
           })
         }
       }
     }
-    
+
     setBreadcrumbs(breadcrumbItems)
   }, [])
 
@@ -250,9 +241,7 @@ export default function ClientAppLayout({
   const navigationSections = [
     {
       title: "Overview",
-      items: [
-        { name: "Dashboard", href: "/app", icon: LayoutDashboard, description: "Overview and key metrics" }
-      ]
+      items: [{ name: "Dashboard", href: "/app", icon: LayoutDashboard, description: "Overview and key metrics" }],
     },
     {
       title: "HR Management",
@@ -261,37 +250,35 @@ export default function ClientAppLayout({
         { name: "Recruitment", href: "/app/recruitment", icon: UserPlus, description: "Hire new talent" },
         { name: "Org Chart", href: "/app/org-chart", icon: Sitemap, description: "Organizational structure" },
         { name: "Documents", href: "/app/documents", icon: FileText, description: "Document vault" },
-        { name: "Communication", href: "/app/communication", icon: MessageSquare, description: "Team communication" }
-      ]
+        { name: "Communication", href: "/app/communication", icon: MessageSquare, description: "Team communication" },
+      ],
     },
     {
       title: "Time & Attendance",
       items: [
         { name: "Attendance", href: "/app/attendance", icon: Clock, description: "Track work hours" },
-        { name: "Leave Management", href: "/app/leave", icon: Calendar, description: "Manage leave requests" }
-      ]
+        { name: "Leave Management", href: "/app/leave", icon: Calendar, description: "Manage leave requests" },
+      ],
     },
     {
       title: "Performance",
       items: [
         { name: "Performance", href: "/app/performance", icon: Target, description: "Performance reviews" },
         { name: "Promotions", href: "/app/promotions", icon: Award, description: "Career advancement" },
-        { name: "Learning", href: "/app/learning", icon: BookOpen, description: "Training & development" }
-      ]
+        { name: "Learning", href: "/app/learning", icon: BookOpen, description: "Training & development" },
+      ],
     },
     {
       title: "Payroll",
       items: [
         { name: "Payroll", href: "/app/payroll", icon: Calculator, description: "Process payroll" },
         { name: "Payroll History", href: "/app/payroll/history", icon: History, description: "Past payroll records" },
-        { name: "Loans", href: "/app/loans", icon: CreditCard, description: "Employee loans" }
-      ]
+        { name: "Loans", href: "/app/loans", icon: CreditCard, description: "Employee loans" },
+      ],
     },
     {
       title: "Analytics",
-      items: [
-        { name: "Reports", href: "/app/analytics", icon: BarChart3, description: "Reports & insights" }
-      ]
+      items: [{ name: "Reports", href: "/app/analytics", icon: BarChart3, description: "Reports & insights" }],
     },
     {
       title: "Administration",
@@ -299,9 +286,9 @@ export default function ClientAppLayout({
         { name: "Disciplinary", href: "/app/disciplinary", icon: Shield, description: "Disciplinary actions" },
         { name: "Offboarding", href: "/app/offboarding", icon: LogOut, description: "Employee exit process" },
         { name: "Integrations", href: "/app/integrations", icon: Plug, description: "Third-party integrations" },
-        { name: "Settings", href: "/app/settings", icon: Settings, description: "System settings" }
-      ]
-    }
+        { name: "Settings", href: "/app/settings", icon: Settings, description: "System settings" },
+      ],
+    },
   ]
 
   // Quick actions for common tasks
@@ -309,7 +296,7 @@ export default function ClientAppLayout({
     { name: "Add Employee", href: "/app/employees?action=add", icon: UserPlus, color: "bg-blue-500" },
     { name: "Process Payroll", href: "/app/payroll?action=process", icon: Calculator, color: "bg-green-500" },
     { name: "View Reports", href: "/app/analytics", icon: BarChart3, color: "bg-purple-500" },
-    { name: "Upload Documents", href: "/app/documents?action=upload", icon: FileText, color: "bg-orange-500" }
+    { name: "Upload Documents", href: "/app/documents?action=upload", icon: FileText, color: "bg-orange-500" },
   ]
 
   const [notifications, setNotifications] = useState([
@@ -430,9 +417,9 @@ export default function ClientAppLayout({
               </Sheet>
 
               {/* Desktop Sidebar Toggle */}
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className="hidden md:block"
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               >
@@ -461,10 +448,12 @@ export default function ClientAppLayout({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent font-sans"
-                  style={{
-                    "--tw-ring-color": theme.colors[500],
-                    focusRingColor: theme.colors[500],
-                  } as React.CSSProperties}
+                  style={
+                    {
+                      "--tw-ring-color": theme.colors[500],
+                      focusRingColor: theme.colors[500],
+                    } as React.CSSProperties
+                  }
                 />
               </form>
             </div>
@@ -490,7 +479,7 @@ export default function ClientAppLayout({
                   </div>
                   <DropdownMenuSeparator />
                   {quickActions.map((action, index) => (
-                    <DropdownMenuItem key={index} onClick={() => window.location.href = action.href}>
+                    <DropdownMenuItem key={index} onClick={() => (window.location.href = action.href)}>
                       <div className={`w-2 h-2 rounded-full mr-3 ${action.color}`} />
                       <div>
                         <div className="font-medium">{action.name}</div>
@@ -689,21 +678,27 @@ export default function ClientAppLayout({
 
         <div className="flex">
           {/* Desktop Sidebar */}
-          <aside className={`bg-white border-r border-gray-200 min-h-screen transition-all duration-300 ${
-            sidebarCollapsed ? 'w-16' : 'w-64'
-          } hidden md:block`}>
+          <aside
+            className={`bg-white border-r border-gray-200 min-h-screen transition-all duration-300 ${
+              sidebarCollapsed ? "w-16" : "w-64"
+            } hidden md:block`}
+          >
             <nav className="p-4 space-y-2">
               <Suspense fallback={<div>Loading...</div>}>
                 {/* Dashboard Link */}
                 <a
                   href="/app"
                   className={`flex items-center space-x-3 px-3 py-2 rounded-lg font-medium ${
-                    currentPath === '/app' ? 'bg-gray-100' : ''
+                    currentPath === "/app" ? "bg-gray-100" : ""
                   }`}
-                  style={currentPath === '/app' ? {
-                    backgroundColor: theme.colors[50],
-                    color: theme.colors[700],
-                  } : {}}
+                  style={
+                    currentPath === "/app"
+                      ? {
+                          backgroundColor: theme.colors[50],
+                          color: theme.colors[700],
+                        }
+                      : {}
+                  }
                 >
                   <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
                   {!sidebarCollapsed && <span>Dashboard</span>}
@@ -719,29 +714,31 @@ export default function ClientAppLayout({
                     )}
                     <div className="space-y-1">
                       {section.items.map((item, itemIndex) => {
-                        const isActive = currentPath === item.href || currentPath.startsWith(item.href + '/')
+                        const isActive = currentPath === item.href || currentPath.startsWith(item.href + "/")
                         return (
                           <a
                             key={itemIndex}
                             href={item.href}
                             className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors group ${
-                              isActive 
-                                ? 'text-white' 
-                                : 'text-gray-700 hover:text-white'
+                              isActive ? "text-white" : "text-gray-700 hover:text-white"
                             }`}
-                            style={isActive ? {
-                              backgroundColor: theme.colors[600],
-                            } : {}}
+                            style={
+                              isActive
+                                ? {
+                                    backgroundColor: theme.colors[600],
+                                  }
+                                : {}
+                            }
                             onMouseEnter={(e) => {
                               if (!isActive) {
                                 e.currentTarget.style.backgroundColor = theme.colors[600]
-                                e.currentTarget.style.color = 'white'
+                                e.currentTarget.style.color = "white"
                               }
                             }}
                             onMouseLeave={(e) => {
                               if (!isActive) {
-                                e.currentTarget.style.backgroundColor = ''
-                                e.currentTarget.style.color = ''
+                                e.currentTarget.style.backgroundColor = ""
+                                e.currentTarget.style.color = ""
                               }
                             }}
                             title={sidebarCollapsed ? item.name : undefined}
@@ -763,9 +760,7 @@ export default function ClientAppLayout({
                 {/* Quick Actions Section */}
                 {!sidebarCollapsed && (
                   <div className="pt-4 mt-4 border-t border-gray-200">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                      Quick Actions
-                    </p>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Quick Actions</p>
                     <div className="space-y-1">
                       {quickActions.map((action, index) => (
                         <a
@@ -774,11 +769,11 @@ export default function ClientAppLayout({
                           className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:text-white transition-colors group"
                           onMouseEnter={(e) => {
                             e.currentTarget.style.backgroundColor = theme.colors[600]
-                            e.currentTarget.style.color = 'white'
+                            e.currentTarget.style.color = "white"
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = ''
-                            e.currentTarget.style.color = ''
+                            e.currentTarget.style.backgroundColor = ""
+                            e.currentTarget.style.color = ""
                           }}
                         >
                           <action.icon className="w-5 h-5" />
@@ -795,12 +790,12 @@ export default function ClientAppLayout({
                     variant="ghost"
                     onClick={handleSignOut}
                     className={`w-full justify-start text-gray-700 hover:text-red-600 hover:bg-red-50 ${
-                      sidebarCollapsed ? 'px-3' : ''
+                      sidebarCollapsed ? "px-3" : ""
                     }`}
-                    title={sidebarCollapsed ? 'Sign Out' : undefined}
+                    title={sidebarCollapsed ? "Sign Out" : undefined}
                   >
                     <LogOut className="w-4 h-4 mr-2" />
-                    {!sidebarCollapsed && 'Sign Out'}
+                    {!sidebarCollapsed && "Sign Out"}
                   </Button>
                 </div>
               </Suspense>
@@ -808,9 +803,7 @@ export default function ClientAppLayout({
           </aside>
 
           {/* Main Content */}
-          <main className="flex-1 p-4 md:p-6 overflow-x-auto">
-            {children}
-          </main>
+          <main className="flex-1 p-4 md:p-6 overflow-x-auto">{children}</main>
         </div>
 
         <AIChatbox />
