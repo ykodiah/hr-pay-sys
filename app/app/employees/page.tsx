@@ -499,7 +499,7 @@ export default function EmployeesPage() {
     }
   }, [companySettings])
 
-  const loadSubsidiaries = async () => {
+  const loadSubsidiaries = useCallback(async () => {
     try {
       if (isDemoMode()) {
         console.log("[v0] Demo mode: Using mock subsidiaries")
@@ -529,7 +529,7 @@ export default function EmployeesPage() {
         variant: "destructive",
       })
     }
-  }
+  }, [toast])
 
   useEffect(() => {
     loadEmployees()
@@ -625,7 +625,7 @@ export default function EmployeesPage() {
   }, [formData.hasSubsidiary, formData.subsidiary, generateEmployeeId])
   // </CHANGE>
 
-  const loadCompanyData = async () => {
+  const loadCompanyData = useCallback(async () => {
     try {
       console.log("[v0] Loading company data...")
       const supabase = createClient()
@@ -673,7 +673,7 @@ export default function EmployeesPage() {
     } catch (error) {
       console.error("[v0] Error in loadCompanyData:", error)
     }
-  }
+  }, [])
 
   useEffect(() => {
     console.log("[v0] Subsidiary selection changed:", {
@@ -788,7 +788,7 @@ export default function EmployeesPage() {
 
   // Removed the duplicate loadParentCompanyData function. The useCallback version above is used.
 
-  const loadEmployees = async () => {
+  const loadEmployees = useCallback(async () => {
     try {
       console.log("[v0] Loading employees from database...")
 
@@ -833,7 +833,7 @@ export default function EmployeesPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [toast])
 
   const handleAddEmployee = async (employeeData: any) => {
     try {
@@ -3149,7 +3149,7 @@ function AddEmployeeForm({
   const [isAddingBank, setIsAddingBank] = useState(false)
 
   // Load custom banks for the company
-  const loadCustomBanks = async () => {
+  const loadCustomBanks = useCallback(async () => {
     try {
       if (isDemoMode()) {
         console.log("[v0] Demo mode: Using empty custom banks")
@@ -3172,7 +3172,7 @@ function AddEmployeeForm({
     } catch (error) {
       console.error("Error loading custom banks:", error)
     }
-  }
+  }, [companySettings?.id])
 
   // Add new custom bank
   const addCustomBank = async () => {
