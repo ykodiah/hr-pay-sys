@@ -213,7 +213,6 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<any[]>([])
   const [showAddEmployee, setShowAddEmployee] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -1027,7 +1026,6 @@ export default function EmployeesPage() {
         description: `Employee ${employeeData.displayName} has been added successfully!`,
       })
 
-      setIsAddDialogOpen(false)
     } catch (error) {
       console.error("Error adding employee:", error)
       toast({
@@ -1407,21 +1405,21 @@ export default function EmployeesPage() {
             <Upload className="w-4 h-4 mr-2" />
             Import
           </Button>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <Dialog>
             <DialogTrigger asChild>
               <Button className="bg-emerald-600 hover:bg-emerald-700">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Employee
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Employee</DialogTitle>
                 <DialogDescription>Enter the employee&apos;s information below.</DialogDescription>
               </DialogHeader>
               <AddEmployeeForm
                 onSubmit={handleAddEmployee}
-                onClose={() => setIsAddDialogOpen(false)}
+                onClose={() => {}}
                 subsidiaries={subsidiaries}
                 setFormData={setFormData}
                 formData={formData}
@@ -3397,15 +3395,15 @@ function AddEmployeeForm({
   }, [companySettings?.id, loadCustomBanks])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 p-6">
       <Tabs value={currentTab} onValueChange={setCurrentTab}>
-        <TabsList className="flex justify-between">
+        <TabsList className="flex justify-between w-full p-1">
           <TabsTrigger value="personal">Personal</TabsTrigger>
           <TabsTrigger value="employment">Employment</TabsTrigger>
           <TabsTrigger value="financial">Financial</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
         </TabsList>
-        <TabsContent value="personal" className="space-y-4">
+        <TabsContent value="personal" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="prefix">1. Prefix</Label>
@@ -3629,7 +3627,7 @@ function AddEmployeeForm({
             </div>
           </div>
         </TabsContent>
-        <TabsContent value="employment" className="space-y-4">
+        <TabsContent value="employment" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="position">1. Position *</Label>
@@ -4069,7 +4067,7 @@ function AddEmployeeForm({
             </div>
           </div>
         </TabsContent>
-        <TabsContent value="financial" className="space-y-4">
+        <TabsContent value="financial" className="space-y-6">
           <div className="space-y-6">
             {/* Basic Financial Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4704,7 +4702,7 @@ function AddEmployeeForm({
             </div>
           </div>
         </TabsContent>
-        <TabsContent value="documents" className="space-y-6 max-w-none">
+        <TabsContent value="documents" className="space-y-8 max-w-none">
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Required Documents</h3>
