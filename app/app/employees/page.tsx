@@ -340,7 +340,6 @@ export default function EmployeesPage() {
   >([])
   const [showAllowanceSelector, setShowAllowanceSelector] = useState(false)
   const [showDeductionSelector, setShowDeductionSelector] = useState(false)
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [showInactiveReason, setShowInactiveReason] = useState(false)
 
   // Document upload states
@@ -2139,7 +2138,7 @@ function ImportDataDialog({
 
               {previewData.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="font-medium">Data Preview (First 10 rows)</h4>
+                  <h4 className="font-medium">Data Preview (First 10 rows]</h4>
                   <div className="border rounded-lg overflow-hidden">
                     <div className="overflow-x-auto max-h-64">
                       <table className="w-full text-sm">
@@ -6519,7 +6518,7 @@ function AddEmployeeForm({
     recurring: boolean
     amount: string
     percentage: string
-    calculationType: 'AMOUNT' | 'PERCENTAGE'
+    calculationType: "AMOUNT" | "PERCENTAGE"
     effectiveDate: string
     endDate?: string
   }>>([])
@@ -6531,7 +6530,7 @@ function AddEmployeeForm({
     recurring: boolean
     amount: string
     percentage: string
-    calculationType: 'AMOUNT' | 'PERCENTAGE'
+    calculationType: "AMOUNT" | "PERCENTAGE"
     effectiveDate: string
     endDate?: string
   }>>([])
@@ -6554,50 +6553,50 @@ function AddEmployeeForm({
       id: "academic",
       title: "1. Academic Certificate(s)",
       description: "Educational certificates and transcripts",
-      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png",
     },
     {
       id: "passport-picture",
       title: "2. Passport Picture",
       description: "Professional passport-sized photograph",
-      acceptTypes: ".jpg,.jpeg,.png"
+      acceptTypes: ".jpg,.jpeg,.png",
     },
     {
       id: "resume",
       title: "3. Resume & Application Letter",
       description: "Current CV and cover letter",
-      acceptTypes: ".pdf,.doc,.docx"
+      acceptTypes: ".pdf,.doc,.docx",
     },
     {
       id: "passport",
       title: "4. Passport",
       description: "Valid passport copy",
-      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
     },
     {
       id: "national-id",
       title: "5. National ID",
       description: "Ghana Card or Voter ID",
-      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
     },
     {
       id: "medical",
       title: "6. Medical Report",
       description: "Health clearance certificate",
-      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
     },
     {
       id: "police",
       title: "7. Police Report",
       description: "Criminal background check",
-      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
     },
     {
       id: "other",
       title: "8. Other Uploads",
       description: "Additional supporting documents",
-      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png"
-    }
+      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png",
+    },
   ]
 
   const handleAddAllowance = (allowanceCode: string) => {
@@ -6611,9 +6610,9 @@ function AddEmployeeForm({
         recurring: allowance.recurring,
         amount: "0",
         percentage: "0",
-        calculationType: 'AMOUNT' as 'AMOUNT' | 'PERCENTAGE',
-        effectiveDate: new Date().toISOString().split('T')[0],
-        endDate: undefined
+        calculationType: "AMOUNT" as "AMOUNT" | "PERCENTAGE",
+        effectiveDate: new Date().toISOString().split("T")[0],
+        endDate: undefined,
       }
       setSelectedAllowances([...selectedAllowances, newAllowance])
       setShowAllowanceSelector(false)
@@ -6625,9 +6624,7 @@ function AddEmployeeForm({
   }
 
   const handleAllowanceChange = (allowanceCode: string, field: string, value: any) => {
-    setSelectedAllowances(selectedAllowances.map((a) => 
-      a.code === allowanceCode ? { ...a, [field]: value } : a
-    ))
+    setSelectedAllowances(selectedAllowances.map((a) => (a.code === allowanceCode ? { ...a, [field]: value } : a)))
   }
 
   const handleAddDeduction = (deductionCode: string) => {
@@ -6641,9 +6638,9 @@ function AddEmployeeForm({
         recurring: deduction.recurring,
         amount: "0",
         percentage: "0",
-        calculationType: 'AMOUNT' as 'AMOUNT' | 'PERCENTAGE',
-        effectiveDate: new Date().toISOString().split('T')[0],
-        endDate: undefined
+        calculationType: "AMOUNT" as "AMOUNT" | "PERCENTAGE",
+        effectiveDate: new Date().toISOString().split("T")[0],
+        endDate: undefined,
       }
       setSelectedDeductions([...selectedDeductions, newDeduction])
       setShowDeductionSelector(false)
@@ -6655,43 +6652,41 @@ function AddEmployeeForm({
   }
 
   const handleDeductionChange = (deductionCode: string, field: string, value: any) => {
-    setSelectedDeductions(selectedDeductions.map((d) => 
-      d.code === deductionCode ? { ...d, [field]: value } : d
-    ))
+    setSelectedDeductions(selectedDeductions.map((d) => (d.code === deductionCode ? { ...d, [field]: value } : d)))
   }
   // </CHANGE>
 
   // Document upload handlers
   const handleFileSelect = async (documentType: string, event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('[v0] handleFileSelect called for:', documentType, 'Files:', event.target.files)
+    console.log("[v0] handleFileSelect called for:", documentType, "Files:", event.target.files)
     const file = event.target.files?.[0]
     if (!file) {
-      console.log('[v0] No file selected')
+      console.log("[v0] No file selected")
       return
     }
 
-    console.log('[v0] File selected:', file.name, 'Size:', file.size, 'Type:', file.type)
+    console.log("[v0] File selected:", file.name, "Size:", file.size, "Type:", file.type)
 
     // Validate file type
-    const doc = requiredDocuments.find(d => d.id === documentType)
+    const doc = requiredDocuments.find((d) => d.id === documentType)
     if (!doc) {
-      console.log('[v0] Document type not found:', documentType)
+      console.log("[v0] Document type not found:", documentType)
       return
     }
 
-    const acceptedTypes = doc.acceptTypes.split(',').map(type => type.trim())
-    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
+    const acceptedTypes = doc.acceptTypes.split(",").map((type) => type.trim())
+    const fileExtension = "." + file.name.split(".").pop()?.toLowerCase()
     const mimeType = file.type
 
-    const isValidType = acceptedTypes.some(type => 
-      type.startsWith('.') ? fileExtension === type : mimeType.includes(type.replace('.', ''))
+    const isValidType = acceptedTypes.some((type) =>
+      type.startsWith(".") ? fileExtension === type : mimeType.includes(type.replace(".", "")),
     )
 
     if (!isValidType) {
       toast({
         title: "Invalid File Type",
         description: `Please select a file with one of these types: ${doc.acceptTypes}`,
-        variant: "destructive"
+        variant: "destructive",
       })
       return
     }
@@ -6702,32 +6697,32 @@ function AddEmployeeForm({
       toast({
         title: "File Too Large",
         description: "Please select a file smaller than 10MB",
-        variant: "destructive"
+        variant: "destructive",
       })
       return
     }
 
     // Start upload process
-    setUploadingDocuments(prev => [...prev, documentType])
-    setUploadProgress(prev => ({ ...prev, [documentType]: 0 }))
+    setUploadingDocuments((prev) => [...prev, documentType])
+    setUploadProgress((prev) => ({ ...prev, [documentType]: 0 }))
 
     try {
       // Simulate upload progress
       for (let progress = 0; progress <= 100; progress += 10) {
-        setUploadProgress(prev => ({ ...prev, [documentType]: progress }))
-        await new Promise(resolve => setTimeout(resolve, 100))
+        setUploadProgress((prev) => ({ ...prev, [documentType]: progress }))
+        await new Promise((resolve) => setTimeout(resolve, 100))
       }
 
       // Upload to document service
       const documentService = CentralDocumentService.getInstance()
       const documentId = await documentService.uploadDocument({
         file,
-        employeeId: formData.employee_id || 'temp-id',
-        employeeName: `${formData.first_name} ${formData.last_name}`.trim() || 'New Employee',
+        employeeId: formData.employee_id || "temp-id",
+        employeeName: `${formData.first_name} ${formData.last_name}`.trim() || "New Employee",
         documentType,
         source: "employee-onboarding",
         uploadedBy: "HR Admin",
-        notes: `Uploaded during employee onboarding - ${doc.title}`
+        notes: `Uploaded during employee onboarding - ${doc.title}`,
       })
 
       // Add to uploaded documents
@@ -6738,11 +6733,11 @@ function AddEmployeeForm({
         fileSize: file.size,
         fileType: file.type,
         uploadDate: new Date(),
-        uploadedBy: "HR Admin"
+        uploadedBy: "HR Admin",
       }
 
-      setUploadedDocuments(prev => {
-        const filtered = prev.filter(doc => doc.documentType !== documentType)
+      setUploadedDocuments((prev) => {
+        const filtered = prev.filter((doc) => doc.documentType !== documentType)
         return [...filtered, uploadedDoc]
       })
 
@@ -6750,50 +6745,49 @@ function AddEmployeeForm({
         title: "Upload Successful",
         description: `${file.name} has been uploaded successfully`,
       })
-
     } catch (error) {
       console.error("Upload error:", error)
       toast({
         title: "Upload Failed",
         description: "Failed to upload document. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       })
     } finally {
-      setUploadingDocuments(prev => prev.filter(doc => doc !== documentType))
-      setUploadProgress(prev => ({ ...prev, [documentType]: 0 }))
+      setUploadingDocuments((prev) => prev.filter((doc) => doc !== documentType))
+      setUploadProgress((prev) => ({ ...prev, [documentType]: 0 }))
     }
   }
 
   const handleUploadClick = (documentType: string) => {
     // Create a new file input dynamically for better mobile compatibility
-    const tempInput = document.createElement('input')
-    tempInput.type = 'file'
-    tempInput.accept = requiredDocuments.find(doc => doc.id === documentType)?.acceptTypes || '*/*'
-    tempInput.style.position = 'absolute'
-    tempInput.style.left = '-9999px'
-    tempInput.style.opacity = '0'
-    
+    const tempInput = document.createElement("input")
+    tempInput.type = "file"
+    tempInput.accept = requiredDocuments.find((doc) => doc.id === documentType)?.acceptTypes || "*/*"
+    tempInput.style.position = "absolute"
+    tempInput.style.left = "-9999px"
+    tempInput.style.opacity = "0"
+
     // Add to DOM temporarily
     document.body.appendChild(tempInput)
-    
+
     // Set up change handler
     tempInput.onchange = (e) => {
-      console.log('[v0] handleUploadClick tempInput onchange triggered for:', documentType)
+      console.log("[v0] handleUploadClick tempInput onchange triggered for:", documentType)
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
-        console.log('[v0] File selected via handleUploadClick:', file.name)
+        console.log("[v0] File selected via handleUploadClick:", file.name)
         // Create a synthetic event for handleFileSelect
         const syntheticEvent = {
-          target: { files: [file] }
+          target: { files: [file] },
         } as React.ChangeEvent<HTMLInputElement>
         handleFileSelect(documentType, syntheticEvent)
       } else {
-        console.log('[v0] No file selected via handleUploadClick')
+        console.log("[v0] No file selected via handleUploadClick")
       }
       // Clean up
       document.body.removeChild(tempInput)
     }
-    
+
     // Trigger click with a small delay for mobile
     setTimeout(() => {
       tempInput.click()
@@ -6801,7 +6795,7 @@ function AddEmployeeForm({
   }
 
   const handleRemoveDocument = (documentType: string) => {
-    setUploadedDocuments(uploadedDocuments.filter(doc => doc.documentType !== documentType))
+    setUploadedDocuments(uploadedDocuments.filter((doc) => doc.documentType !== documentType))
     toast({
       title: "Document Removed",
       description: "Document has been removed successfully",
@@ -6814,7 +6808,6 @@ function AddEmployeeForm({
       fileInput.click()
     }
   }
-
 
   const handlePreviewDocument = (document: any) => {
     setPreviewDocument(document)
@@ -6977,5 +6970,7 @@ function AddEmployeeForm({
     // Generate sequential 4-digit number based on existing employees
     const numberPart = String(employees.length + 1).padStart(4, "0")
 
-    return `${letterPart}${numberPart}`\
-  }, [companySettings, formData.hasSubsidiary, formData.subsidiary
+    return `${letterPart}${numberPart}`
+  }, [companySettings, formData.hasSubsidiary, formData.subsidiary, subsidiaries, employees.length])
+
+  useEffect(()\
