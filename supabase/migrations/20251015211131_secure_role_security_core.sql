@@ -1,4 +1,4 @@
--- SECURE ROLE SECURITY IMPLEMENTATION - SIMPLE VERSION
+-- SECURE ROLE SECURITY IMPLEMENTATION - CORE VERSION
 -- This script implements proper role-based access control with company isolation
 
 -- ============================================================================
@@ -404,45 +404,7 @@ AS $$
 $$;
 
 -- ============================================================================
--- STEP 7: CREATE SECURITY VIEWS
--- ============================================================================
-
--- View for security administrators to monitor access
-CREATE OR REPLACE VIEW security_dashboard AS
-SELECT 
-  e.full_name,
-  e.email,
-  c.name as company_name,
-  COUNT(al.id) as access_count,
-  MAX(al.created_at) as last_access,
-  COUNT(DISTINCT al.action) as unique_actions,
-  COUNT(DISTINCT al.resource) as unique_resources
-FROM employees e
-JOIN companies c ON e.company_id = c.id
-LEFT JOIN access_logs al ON e.id = al.employee_id
-WHERE al.created_at >= NOW() - INTERVAL '24 hours'
-GROUP BY e.id, e.full_name, e.email, c.name
-ORDER BY access_count DESC;
-
--- View for role assignments
-CREATE OR REPLACE VIEW role_assignments_summary AS
-SELECT 
-  e.full_name,
-  e.email,
-  c.name as company_name,
-  r.name as role_name,
-  r.code as role_code,
-  ur.assigned_at,
-  ur.is_active
-FROM employees e
-JOIN companies c ON e.company_id = c.id
-JOIN user_roles ur ON e.id = ur.employee_id
-JOIN roles r ON ur.role_id = r.id
-WHERE ur.is_active = TRUE
-ORDER BY c.name, e.full_name;
-
--- ============================================================================
--- STEP 8: CREATE INDEXES FOR PERFORMANCE
+-- STEP 7: CREATE INDEXES FOR PERFORMANCE
 -- ============================================================================
 
 -- Indexes to support the new RLS policies
@@ -457,7 +419,7 @@ CREATE INDEX IF NOT EXISTS idx_access_logs_employee_id_created ON access_logs(em
 CREATE INDEX IF NOT EXISTS idx_access_logs_company_id_created ON access_logs(company_id, created_at);
 
 -- ============================================================================
--- STEP 9: FINAL VERIFICATION
+-- STEP 8: FINAL VERIFICATION
 -- ============================================================================
 
 -- Verify all policies are created

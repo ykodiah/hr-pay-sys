@@ -6884,4 +6884,355 @@ function ImportDataDialog({
             </div>
 
             {/* Advanced Search Options */}
-            <div className="flex flex-wrap gap-2\
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm("")
+                  setSelectedDepartment("all")
+                }}
+              >
+                <X className="w-4 h-4 mr-2" />
+                Clear Filters
+              </Button>
+            </div>
+          </div>
+
+          {/* Employee Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredEmployees.map((employee) => (
+              <Card key={employee.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={employee.avatar || "/placeholder-user.jpg"} />
+                        <AvatarFallback>
+                          {employee.first_name?.[0]}{employee.last_name?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h3 className="font-semibold text-lg">
+                          {employee.prefix} {employee.first_name} {employee.last_name}
+                        </h3>
+                        <p className="text-sm text-gray-600">{employee.position}</p>
+                        <p className="text-xs text-gray-500">{employee.department}</p>
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEditEmployee(employee)}>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleDeleteEmployee(employee.id)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-2">
+                    <div className="flex items-center text-sm">
+                      <Mail className="w-4 h-4 mr-2 text-gray-400" />
+                      <span>{employee.email}</span>
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <Phone className="w-4 h-4 mr-2 text-gray-400" />
+                      <span>{employee.phone_number || "N/A"}</span>
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <Building className="w-4 h-4 mr-2 text-gray-400" />
+                      <span>{employee.employee_id}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {filteredEmployees.length === 0 && (
+            <div className="text-center py-12">
+              <Users className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No employees found</h3>
+              <p className="text-gray-600 mb-4">
+                {searchTerm || selectedDepartment !== "all" 
+                  ? "Try adjusting your search criteria" 
+                  : "Get started by adding your first employee"
+                }
+              </p>
+              {!searchTerm && selectedDepartment === "all" && (
+                <Button onClick={() => setIsAddEmployeeOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Employee
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Import Data Dialog Component
+function ImportDataDialog({
+  onImport,
+  onDownloadTemplate,
+  isOpen,
+  onClose,
+}: {
+  onImport: (data: any[]) => void
+  onDownloadTemplate: (type: string) => void
+  isOpen: boolean
+  onClose: () => void
+}) {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewData, setPreviewData] = useState<any[]>([])
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [importType, setImportType] = useState("employees")
+  const [importErrors, setImportErrors] = useState<string[]>([])
+
+  const handleCSVFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setSelectedFile(file)
+      setPreviewData([])
+      setImportErrors([])
+      processFile(file)
+    }
+  }
+
+  const processFile = (file: File) => {
+    setIsProcessing(true)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const csv = e.target?.result as string
+        const lines = csv.split("\n").filter((line) => line.trim())
+
+        const headers = lines[0].split(",").map((h) => h.trim().replace(/"/g, ""))
+        const data = lines.slice(1).map((line, index) => {
+          const values = line.split(",").map((v) => v.trim().replace(/"/g, ""))
+          const row: any = {}
+
+          headers.forEach((header, i) => {
+            row[header] = values[i] || ""
+          })
+
+          return { ...row, _rowNumber: index + 2 }
+        })
+
+        setPreviewData(data)
+        const errors = validateImportData(data, importType)
+        setImportErrors(errors)
+      } catch (error) {
+        console.error("Error processing CSV:", error)
+        setImportErrors(["Error processing CSV file. Please check the format."])
+      } finally {
+        setIsProcessing(false)
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  const validateImportData = (data: any[], type: string): string[] => {
+    const errors: string[] = []
+
+    if (data.length === 0) {
+      errors.push("No data found in the CSV file")
+      return errors
+    }
+
+    // Basic validation for employees
+    if (type === "employees") {
+      const requiredFields = ["firstName", "lastName", "email", "position", "department"]
+      
+      data.forEach((row, index) => {
+        requiredFields.forEach((field) => {
+          if (!row[field] || row[field].trim() === "") {
+            errors.push(`Row ${row._rowNumber}: ${field} is required`)
+          }
+        })
+
+        // Email validation
+        if (row.email && !/\S+@\S+\.\S+/.test(row.email)) {
+          errors.push(`Row ${row._rowNumber}: Invalid email format`)
+        }
+      })
+    }
+
+    return errors
+  }
+
+  const handleImport = () => {
+    if (!selectedFile || previewData.length === 0) {
+      toast({
+        title: "No Data to Import",
+        description: "Please select and process a CSV file first.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (importErrors.length > 0) {
+      toast({
+        title: "Validation Errors",
+        description: "Please fix all validation errors before importing.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Process all data (not just preview)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const csv = e.target?.result as string
+      const lines = csv.split("\n").filter((line) => line.trim())
+      const headers = lines[0].split(",").map((h) => h.trim().replace(/"/g, ""))
+      const allData = lines.slice(1).map((line) => {
+        const values = line.split(",").map((v) => v.trim().replace(/"/g, ""))
+        const row: any = {}
+        headers.forEach((header, i) => {
+          row[header] = values[i] || ""
+        })
+        return row
+      })
+
+      onImport(allData)
+    }
+    reader.readAsText(selectedFile)
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Import Employee Data</DialogTitle>
+          <DialogDescription>
+            Upload a CSV file to import employee data. Download a template to see the required format.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {/* Import Type Selection */}
+          <div className="space-y-2">
+            <Label>Import Type</Label>
+            <Select value={importType} onValueChange={setImportType}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="employees">Employees</SelectItem>
+                <SelectItem value="payroll">Payroll Data</SelectItem>
+                <SelectItem value="allowances">Allowances</SelectItem>
+                <SelectItem value="leave">Leave Records</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* File Upload */}
+          <div className="space-y-2">
+            <Label>CSV File</Label>
+            <div className="flex items-center space-x-4">
+              <Input
+                type="file"
+                accept=".csv"
+                onChange={handleCSVFileSelect}
+                className="flex-1"
+              />
+              <Button
+                variant="outline"
+                onClick={() => onDownloadTemplate(importType)}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Template
+              </Button>
+            </div>
+          </div>
+
+          {/* Processing Status */}
+          {isProcessing && (
+            <div className="flex items-center space-x-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Processing file...</span>
+            </div>
+          )}
+
+          {/* Validation Errors */}
+          {importErrors.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-red-600">Validation Errors</Label>
+              <div className="bg-red-50 border border-red-200 rounded-md p-3 max-h-32 overflow-y-auto">
+                {importErrors.map((error, index) => (
+                  <p key={index} className="text-sm text-red-600">
+                    {error}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Preview Data */}
+          {previewData.length > 0 && (
+            <div className="space-y-2">
+              <Label>Preview Data ({previewData.length} rows)</Label>
+              <div className="border rounded-md max-h-64 overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      {Object.keys(previewData[0] || {}).map((key) => (
+                        <th key={key} className="px-3 py-2 text-left font-medium">
+                          {key}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewData.slice(0, 10).map((row, index) => (
+                      <tr key={index} className="border-t">
+                        {Object.values(row).map((value, i) => (
+                          <td key={i} className="px-3 py-2">
+                            {String(value)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {previewData.length > 10 && (
+                  <div className="px-3 py-2 text-sm text-gray-500 bg-gray-50">
+                    ... and {previewData.length - 10} more rows
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleImport} 
+            disabled={!selectedFile || previewData.length === 0 || importErrors.length > 0}
+          >
+            Import Data
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
