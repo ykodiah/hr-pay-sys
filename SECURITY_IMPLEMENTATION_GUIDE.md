@@ -112,55 +112,55 @@ This document outlines the comprehensive security implementation for your Supaba
 ## 🛡️ Security Features
 
 ### 1. Company Data Isolation
-```sql
+\`\`\`sql
 -- Users can only access data from their company
 company_id = get_current_user_company_id()
-```
+\`\`\`
 
 ### 2. Role-Based Access Control
-```sql
+\`\`\`sql
 -- Users need specific permissions for actions
 user_has_permission('employees', 'read')
-```
+\`\`\`
 
 ### 3. Self-Service Access
-```sql
+\`\`\`sql
 -- Users can always access their own data
 id = auth.uid()
-```
+\`\`\`
 
 ### 4. Security Logging
-```sql
+\`\`\`sql
 -- All access attempts are logged
 SELECT * FROM access_logs WHERE employee_id = auth.uid();
-```
+\`\`\`
 
 ### 5. Suspicious Activity Detection
-```sql
+\`\`\`sql
 -- Monitor for excessive access attempts
 SELECT * FROM check_suspicious_activity();
-```
+\`\`\`
 
 ## 🔧 Implementation Steps
 
 ### Step 1: Apply Security Scripts
-```bash
+\`\`\`bash
 # Run the security implementation
 psql -h your-db-host -U postgres -d postgres -f scripts/042_secure_role_security_implementation.sql
 
 # Run validation tests
 psql -h your-db-host -U postgres -d postgres -f scripts/043_security_validation_tests.sql
-```
+\`\`\`
 
 ### Step 2: Configure User Metadata
 Ensure user metadata includes company_id:
-```json
+\`\`\`json
 {
   "user_metadata": {
     "company_id": "550e8400-e29b-41d4-a716-446655440000"
   }
 }
-```
+\`\`\`
 
 ### Step 3: Test Access Control
 1. Test with different user roles
@@ -171,22 +171,22 @@ Ensure user metadata includes company_id:
 ## 📈 Security Monitoring
 
 ### Security Dashboard
-```sql
+\`\`\`sql
 -- View security overview
 SELECT * FROM security_dashboard;
-```
+\`\`\`
 
 ### Role Assignments
-```sql
+\`\`\`sql
 -- View current role assignments
 SELECT * FROM role_assignments_summary;
-```
+\`\`\`
 
 ### Security Alerts
-```sql
+\`\`\`sql
 -- Generate security alerts
 SELECT generate_security_alerts();
-```
+\`\`\`
 
 ## 🚨 Security Alerts
 
@@ -209,25 +209,25 @@ The system automatically generates alerts for:
 ### Test Cases
 
 1. **Company Isolation Test**
-   ```sql
+   \`\`\`sql
    -- User from Company A should not see Company B data
    SELECT * FROM employees WHERE company_id != get_current_user_company_id();
    -- Should return empty result
-   ```
+   \`\`\`
 
 2. **Permission Test**
-   ```sql
+   \`\`\`sql
    -- User without 'employees' read permission should not see employees
    SELECT * FROM employees;
    -- Should only return own record or company data if permission exists
-   ```
+   \`\`\`
 
 3. **Role Test**
-   ```sql
+   \`\`\`sql
    -- Employee role should not access admin functions
    SELECT * FROM company_settings;
    -- Should return empty or error
-   ```
+   \`\`\`
 
 ## 📋 Maintenance Tasks
 
@@ -267,7 +267,7 @@ The system automatically generates alerts for:
 
 ### Debug Commands
 
-```sql
+\`\`\`sql
 -- Check user's company
 SELECT get_current_user_company_id();
 
@@ -279,7 +279,7 @@ SELECT * FROM user_roles WHERE employee_id = auth.uid();
 
 -- View security logs
 SELECT * FROM access_logs WHERE employee_id = auth.uid();
-```
+\`\`\`
 
 ## 📚 Additional Resources
 

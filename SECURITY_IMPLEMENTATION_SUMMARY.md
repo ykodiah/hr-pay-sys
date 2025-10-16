@@ -60,13 +60,13 @@
 
 ### **1. Configure User Metadata**
 Add `company_id` to user metadata in your authentication system:
-```json
+\`\`\`json
 {
   "user_metadata": {
     "company_id": "550e8400-e29b-41d4-a716-446655440000"
   }
 }
-```
+\`\`\`
 
 ### **2. Test Security Implementation**
 1. Create test users with different roles
@@ -82,7 +82,7 @@ Add `company_id` to user metadata in your authentication system:
 
 ## 📊 **Security Architecture Overview**
 
-```
+\`\`\`
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   User Login    │───▶│  Authentication  │───▶│  Company ID     │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
@@ -98,7 +98,7 @@ Add `company_id` to user metadata in your authentication system:
 │  Security Logs  │◀───│  Access Control  │───▶│  Company Data   │
 │  & Monitoring   │    │  Enforcement     │    │  Isolation      │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
-```
+\`\`\`
 
 ## 🛡️ **Security Features Summary**
 

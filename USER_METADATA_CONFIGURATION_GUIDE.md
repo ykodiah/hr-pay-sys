@@ -11,17 +11,17 @@ After implementing the security fixes, you need to configure user metadata to in
 1. **Go to Authentication → Users**
 2. **Select a user**
 3. **Edit user metadata**:
-   ```json
+   \`\`\`json
    {
      "user_metadata": {
        "company_id": "550e8400-e29b-41d4-a716-446655440000"
      }
    }
-   ```
+   \`\`\`
 
 ### Option B: Via Supabase Client (Programmatically)
 
-```typescript
+\`\`\`typescript
 // When creating a user
 const { data, error } = await supabase.auth.signUp({
   email: 'user@example.com',
@@ -39,22 +39,22 @@ const { data, error } = await supabase.auth.updateUser({
     company_id: '550e8400-e29b-41d4-a716-446655440000'
   }
 });
-```
+\`\`\`
 
 ### Option C: Via SQL (Admin only)
 
-```sql
+\`\`\`sql
 -- Update user metadata for existing users
 UPDATE auth.users 
 SET raw_user_meta_data = raw_user_meta_data || '{"company_id": "550e8400-e29b-41d4-a716-446655440000"}'::jsonb
 WHERE id = 'user-uuid-here';
-```
+\`\`\`
 
 ## 🧪 Step 2: Test with Different User Roles
 
 ### Test 1: Create Test Users
 
-```sql
+\`\`\`sql
 -- Create test company
 INSERT INTO companies (id, name, email_address, phone_number, address, industry)
 VALUES (
@@ -93,11 +93,11 @@ VALUES
     'Software Developer',
     'Engineering'
   );
-```
+\`\`\`
 
 ### Test 2: Assign Roles
 
-```sql
+\`\`\`sql
 -- Get role IDs
 SELECT id, name, code FROM roles WHERE company_id = '550e8400-e29b-41d4-a716-446655440000';
 
@@ -127,11 +127,11 @@ VALUES (
   '11111111-1111-1111-1111-111111111111',
   true
 );
-```
+\`\`\`
 
 ### Test 3: Test Access Control
 
-```sql
+\`\`\`sql
 -- Test 1: Check if user can see their own data
 -- (Run as each user)
 SELECT * FROM employees WHERE id = auth.uid();
@@ -149,7 +149,7 @@ SELECT user_has_permission('financial', 'read') as can_read_financial;
 -- (Run as user from Company A - should not see Company B data)
 SELECT * FROM employees WHERE company_id != get_current_user_company_id();
 -- Should return empty result
-```
+\`\`\`
 
 ## 🔍 Step 3: Security Testing Checklist
 
@@ -179,7 +179,7 @@ SELECT * FROM employees WHERE company_id != get_current_user_company_id();
 
 ### Security Logs
 
-```sql
+\`\`\`sql
 -- View access logs
 SELECT * FROM access_logs 
 WHERE created_at >= NOW() - INTERVAL '24 hours'
@@ -190,17 +190,17 @@ SELECT * FROM check_suspicious_activity();
 
 -- Generate security alerts
 SELECT generate_security_alerts();
-```
+\`\`\`
 
 ### Security Dashboard
 
-```sql
+\`\`\`sql
 -- View security overview
 SELECT * FROM security_dashboard;
 
 -- View role assignments
 SELECT * FROM role_assignments_summary;
-```
+\`\`\`
 
 ## 🛠️ Troubleshooting
 
@@ -223,7 +223,7 @@ SELECT * FROM role_assignments_summary;
 
 ### Debug Commands
 
-```sql
+\`\`\`sql
 -- Check current user's company
 SELECT get_current_user_company_id() as user_company_id;
 
@@ -243,7 +243,7 @@ AND ur.is_active = true;
 
 -- Check if user is authenticated
 SELECT is_user_authenticated() as is_auth;
-```
+\`\`\`
 
 ## 📋 Next Steps
 

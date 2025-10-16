@@ -17,7 +17,21 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { useCurrency } from "@/lib/currency-context"
-import { Plus, Search, Filter, Download, Upload, MoreHorizontal, Edit, Trash2, Eye, Mail, X, CheckCircle, FileText } from "lucide-react"
+import {
+  Plus,
+  Search,
+  Filter,
+  Download,
+  Upload,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Eye,
+  Mail,
+  X,
+  CheckCircle,
+  FileText,
+} from "lucide-react"
 
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 import { useToast } from "@/hooks/use-toast"
@@ -312,30 +326,34 @@ export default function EmployeesPage() {
     { code: "ADVANCE", description: "Advance Deduction", recurring: true },
   ])
 
-  const [selectedAllowances, setSelectedAllowances] = useState<Array<{
-    id: string;
-    code: string;
-    description: string;
-    taxable: boolean;
-    recurring: boolean;
-    amount: string;
-    percentage: string;
-    calculationType: 'AMOUNT' | 'PERCENTAGE';
-    effectiveDate: string;
-    endDate?: string;
-  }>>([])
-  const [selectedDeductions, setSelectedDeductions] = useState<Array<{
-    id: string;
-    code: string;
-    description: string;
-    taxable: boolean;
-    recurring: boolean;
-    amount: string;
-    percentage: string;
-    calculationType: 'AMOUNT' | 'PERCENTAGE';
-    effectiveDate: string;
-    endDate?: string;
-  }>>([])
+  const [selectedAllowances, setSelectedAllowances] = useState<
+    Array<{
+      id: string
+      code: string
+      description: string
+      taxable: boolean
+      recurring: boolean
+      amount: string
+      percentage: string
+      calculationType: "AMOUNT" | "PERCENTAGE"
+      effectiveDate: string
+      endDate?: string
+    }>
+  >([])
+  const [selectedDeductions, setSelectedDeductions] = useState<
+    Array<{
+      id: string
+      code: string
+      description: string
+      taxable: boolean
+      recurring: boolean
+      amount: string
+      percentage: string
+      calculationType: "AMOUNT" | "PERCENTAGE"
+      effectiveDate: string
+      endDate?: string
+    }>
+  >([])
   const [showAllowanceSelector, setShowAllowanceSelector] = useState(false)
   const [showDeductionSelector, setShowDeductionSelector] = useState(false)
 
@@ -353,50 +371,50 @@ export default function EmployeesPage() {
       id: "academic",
       title: "1. Academic Certificate(s)",
       description: "Educational certificates and transcripts",
-      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png",
     },
     {
       id: "passport-picture",
       title: "2. Passport Picture",
       description: "Professional passport-sized photograph",
-      acceptTypes: ".jpg,.jpeg,.png"
+      acceptTypes: ".jpg,.jpeg,.png",
     },
     {
       id: "resume",
       title: "3. Resume & Application Letter",
       description: "Current CV and cover letter",
-      acceptTypes: ".pdf,.doc,.docx"
+      acceptTypes: ".pdf,.doc,.docx",
     },
     {
       id: "passport",
       title: "4. Passport",
       description: "Valid passport copy",
-      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
     },
     {
       id: "national-id",
       title: "5. National ID",
       description: "Ghana Card or Voter ID",
-      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
     },
     {
       id: "medical",
       title: "6. Medical Report",
       description: "Health clearance certificate",
-      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
     },
     {
       id: "police",
       title: "7. Police Report",
       description: "Criminal background check",
-      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
     },
     {
       id: "other",
       title: "8. Other Uploads",
       description: "Additional supporting documents",
-      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png"
-    }
+      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png",
+    },
   ]
 
   const handleAddAllowance = (allowanceCode: string) => {
@@ -410,9 +428,9 @@ export default function EmployeesPage() {
         recurring: allowance.recurring,
         amount: "0",
         percentage: "0",
-        calculationType: 'AMOUNT' as 'AMOUNT' | 'PERCENTAGE',
-        effectiveDate: new Date().toISOString().split('T')[0],
-        endDate: undefined
+        calculationType: "AMOUNT" as "AMOUNT" | "PERCENTAGE",
+        effectiveDate: new Date().toISOString().split("T")[0],
+        endDate: undefined,
       }
       setSelectedAllowances([...selectedAllowances, newAllowance])
       setShowAllowanceSelector(false)
@@ -424,9 +442,7 @@ export default function EmployeesPage() {
   }
 
   const handleAllowanceChange = (allowanceCode: string, field: string, value: any) => {
-    setSelectedAllowances(selectedAllowances.map((a) => 
-      a.code === allowanceCode ? { ...a, [field]: value } : a
-    ))
+    setSelectedAllowances(selectedAllowances.map((a) => (a.code === allowanceCode ? { ...a, [field]: value } : a)))
   }
 
   const handleAddDeduction = (deductionCode: string) => {
@@ -440,9 +456,9 @@ export default function EmployeesPage() {
         recurring: deduction.recurring,
         amount: "0",
         percentage: "0",
-        calculationType: 'AMOUNT' as 'AMOUNT' | 'PERCENTAGE',
-        effectiveDate: new Date().toISOString().split('T')[0],
-        endDate: undefined
+        calculationType: "AMOUNT" as "AMOUNT" | "PERCENTAGE",
+        effectiveDate: new Date().toISOString().split("T")[0],
+        endDate: undefined,
       }
       setSelectedDeductions([...selectedDeductions, newDeduction])
       setShowDeductionSelector(false)
@@ -454,9 +470,7 @@ export default function EmployeesPage() {
   }
 
   const handleDeductionChange = (deductionCode: string, field: string, value: any) => {
-    setSelectedDeductions(selectedDeductions.map((d) => 
-      d.code === deductionCode ? { ...d, [field]: value } : d
-    ))
+    setSelectedDeductions(selectedDeductions.map((d) => (d.code === deductionCode ? { ...d, [field]: value } : d)))
   }
   // </CHANGE>
 
@@ -1758,73 +1772,74 @@ function ImportDataDialog({
     }
   }
 
-  // Document upload handlers
+  // Document upload handlers - now handleFileSelect is defined above
   const handleUploadClick = (documentType: string) => {
     // Create a new file input dynamically for better mobile compatibility
-    const tempInput = document.createElement('input')
-    tempInput.type = 'file'
-    tempInput.accept = requiredDocuments.find(doc => doc.id === documentType)?.acceptTypes || '*/*'
-    tempInput.style.position = 'absolute'
-    tempInput.style.left = '-9999px'
-    tempInput.style.opacity = '0'
-    
+    const tempInput = document.createElement("input")
+    tempInput.type = "file"
+    tempInput.accept = requiredDocuments.find((doc) => doc.id === documentType)?.acceptTypes || "*/*"
+    tempInput.style.position = "absolute"
+    tempInput.style.left = "-9999px"
+    tempInput.style.opacity = "0"
+
     // Add to DOM temporarily
     document.body.appendChild(tempInput)
-    
+
     // Set up change handler
     tempInput.onchange = (e) => {
-      console.log('[v0] handleUploadClick tempInput onchange triggered for:', documentType)
+      console.log("[v0] handleUploadClick tempInput onchange triggered for:", documentType)
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
-        console.log('[v0] File selected via handleUploadClick:', file.name)
+        console.log("[v0] File selected via handleUploadClick:", file.name)
         // Create a synthetic event for handleFileSelect
         const syntheticEvent = {
-          target: { files: [file] }
+          target: { files: [file] },
         } as React.ChangeEvent<HTMLInputElement>
         handleFileSelect(documentType, syntheticEvent)
       } else {
-        console.log('[v0] No file selected via handleUploadClick')
+        console.log("[v0] No file selected via handleUploadClick")
       }
       // Clean up
       document.body.removeChild(tempInput)
     }
-    
+
     // Trigger click with a small delay for mobile
     setTimeout(() => {
       tempInput.click()
     }, 10)
   }
+  // </CHANGE>
 
   const handleFileSelect = async (documentType: string, event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('[v0] handleFileSelect called for:', documentType, 'Files:', event.target.files)
+    console.log("[v0] handleFileSelect called for:", documentType, "Files:", event.target.files)
     const file = event.target.files?.[0]
     if (!file) {
-      console.log('[v0] No file selected')
+      console.log("[v0] No file selected")
       return
     }
 
-    console.log('[v0] File selected:', file.name, 'Size:', file.size, 'Type:', file.type)
+    console.log("[v0] File selected:", file.name, "Size:", file.size, "Type:", file.type)
 
     // Validate file type
-    const doc = requiredDocuments.find(d => d.id === documentType)
+    const doc = requiredDocuments.find((d) => d.id === documentType)
     if (!doc) {
-      console.log('[v0] Document type not found:', documentType)
+      console.log("[v0] Document type not found:", documentType)
       return
     }
 
-    const acceptedTypes = doc.acceptTypes.split(',').map(type => type.trim())
-    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
+    const acceptedTypes = doc.acceptTypes.split(",").map((type) => type.trim())
+    const fileExtension = "." + file.name.split(".").pop()?.toLowerCase()
     const mimeType = file.type
 
-    const isValidType = acceptedTypes.some(type => 
-      type.startsWith('.') ? fileExtension === type : mimeType.includes(type.replace('.', ''))
+    const isValidType = acceptedTypes.some((type) =>
+      type.startsWith(".") ? fileExtension === type : mimeType.includes(type.replace(".", "")),
     )
 
     if (!isValidType) {
       toast({
         title: "Invalid File Type",
         description: `Please select a file with one of these types: ${doc.acceptTypes}`,
-        variant: "destructive"
+        variant: "destructive",
       })
       return
     }
@@ -1835,32 +1850,32 @@ function ImportDataDialog({
       toast({
         title: "File Too Large",
         description: "Please select a file smaller than 10MB",
-        variant: "destructive"
+        variant: "destructive",
       })
       return
     }
 
     // Start upload process
-    setUploadingDocuments(prev => [...prev, documentType])
-    setUploadProgress(prev => ({ ...prev, [documentType]: 0 }))
+    setUploadingDocuments((prev) => [...prev, documentType])
+    setUploadProgress((prev) => ({ ...prev, [documentType]: 0 }))
 
     try {
       // Simulate upload progress
       for (let progress = 0; progress <= 100; progress += 10) {
-        setUploadProgress(prev => ({ ...prev, [documentType]: progress }))
-        await new Promise(resolve => setTimeout(resolve, 100))
+        setUploadProgress((prev) => ({ ...prev, [documentType]: progress }))
+        await new Promise((resolve) => setTimeout(resolve, 100))
       }
 
       // Upload to document service
       const documentService = CentralDocumentService.getInstance()
       const documentId = await documentService.uploadDocument({
         file,
-        employeeId: formData.employee_id || 'temp-id',
-        employeeName: `${formData.first_name} ${formData.last_name}`.trim() || 'New Employee',
+        employeeId: formData.employee_id || "temp-id",
+        employeeName: `${formData.first_name} ${formData.last_name}`.trim() || "New Employee",
         documentType,
         source: "employee-onboarding",
         uploadedBy: "HR Admin",
-        notes: `Uploaded during employee onboarding - ${doc.title}`
+        notes: `Uploaded during employee onboarding - ${doc.title}`,
       })
 
       // Add to uploaded documents
@@ -1871,11 +1886,11 @@ function ImportDataDialog({
         fileSize: file.size,
         fileType: file.type,
         uploadDate: new Date(),
-        uploadedBy: "HR Admin"
+        uploadedBy: "HR Admin",
       }
 
-      setUploadedDocuments(prev => {
-        const filtered = prev.filter(doc => doc.documentType !== documentType)
+      setUploadedDocuments((prev) => {
+        const filtered = prev.filter((doc) => doc.documentType !== documentType)
         return [...filtered, uploadedDoc]
       })
 
@@ -1883,22 +1898,21 @@ function ImportDataDialog({
         title: "Upload Successful",
         description: `${file.name} has been uploaded successfully`,
       })
-
     } catch (error) {
       console.error("Upload error:", error)
       toast({
         title: "Upload Failed",
         description: "Failed to upload document. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       })
     } finally {
-      setUploadingDocuments(prev => prev.filter(doc => doc !== documentType))
-      setUploadProgress(prev => ({ ...prev, [documentType]: 0 }))
+      setUploadingDocuments((prev) => prev.filter((doc) => doc !== documentType))
+      setUploadProgress((prev) => ({ ...prev, [documentType]: 0 }))
     }
   }
 
   const handleRemoveDocument = (documentType: string) => {
-    setUploadedDocuments(prev => prev.filter(doc => doc.documentType !== documentType))
+    setUploadedDocuments((prev) => prev.filter((doc) => doc.documentType !== documentType))
     toast({
       title: "Document Removed",
       description: "Document has been removed successfully",
@@ -1911,7 +1925,6 @@ function ImportDataDialog({
       fileInput.click()
     }
   }
-
 
   const handlePreviewDocument = (document: any) => {
     setPreviewDocument(document)
@@ -2390,30 +2403,34 @@ function AddEmployeeForm({
     { code: "ADVANCE", description: "Advance Deduction", recurring: true },
   ])
 
-  const [selectedAllowances, setSelectedAllowances] = useState<Array<{
-    id: string;
-    code: string;
-    description: string;
-    taxable: boolean;
-    recurring: boolean;
-    amount: string;
-    percentage: string;
-    calculationType: 'AMOUNT' | 'PERCENTAGE';
-    effectiveDate: string;
-    endDate?: string;
-  }>>([])
-  const [selectedDeductions, setSelectedDeductions] = useState<Array<{
-    id: string;
-    code: string;
-    description: string;
-    taxable: boolean;
-    recurring: boolean;
-    amount: string;
-    percentage: string;
-    calculationType: 'AMOUNT' | 'PERCENTAGE';
-    effectiveDate: string;
-    endDate?: string;
-  }>>([])
+  const [selectedAllowances, setSelectedAllowances] = useState<
+    Array<{
+      id: string
+      code: string
+      description: string
+      taxable: boolean
+      recurring: boolean
+      amount: string
+      percentage: string
+      calculationType: "AMOUNT" | "PERCENTAGE"
+      effectiveDate: string
+      endDate?: string
+    }>
+  >([])
+  const [selectedDeductions, setSelectedDeductions] = useState<
+    Array<{
+      id: string
+      code: string
+      description: string
+      taxable: boolean
+      recurring: boolean
+      amount: string
+      percentage: string
+      calculationType: "AMOUNT" | "PERCENTAGE"
+      effectiveDate: string
+      endDate?: string
+    }>
+  >([])
   const [showAllowanceSelector, setShowAllowanceSelector] = useState(false)
   const [showDeductionSelector, setShowDeductionSelector] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -2433,50 +2450,50 @@ function AddEmployeeForm({
       id: "academic",
       title: "1. Academic Certificate(s)",
       description: "Educational certificates and transcripts",
-      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png",
     },
     {
       id: "passport-picture",
       title: "2. Passport Picture",
       description: "Professional passport-sized photograph",
-      acceptTypes: ".jpg,.jpeg,.png"
+      acceptTypes: ".jpg,.jpeg,.png",
     },
     {
       id: "resume",
       title: "3. Resume & Application Letter",
       description: "Current CV and cover letter",
-      acceptTypes: ".pdf,.doc,.docx"
+      acceptTypes: ".pdf,.doc,.docx",
     },
     {
       id: "passport",
       title: "4. Passport",
       description: "Valid passport copy",
-      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
     },
     {
       id: "national-id",
       title: "5. National ID",
       description: "Ghana Card or Voter ID",
-      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
     },
     {
       id: "medical",
       title: "6. Medical Report",
       description: "Health clearance certificate",
-      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
     },
     {
       id: "police",
       title: "7. Police Report",
       description: "Criminal background check",
-      acceptTypes: ".pdf,.jpg,.jpeg,.png"
+      acceptTypes: ".pdf,.jpg,.jpeg,.png",
     },
     {
       id: "other",
       title: "8. Other Uploads",
       description: "Additional supporting documents",
-      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png"
-    }
+      acceptTypes: ".pdf,.doc,.docx,.jpg,.jpeg,.png",
+    },
   ]
 
   const handleAddAllowance = (allowanceCode: string) => {
@@ -2490,9 +2507,9 @@ function AddEmployeeForm({
         recurring: allowance.recurring,
         amount: "0",
         percentage: "0",
-        calculationType: 'AMOUNT' as 'AMOUNT' | 'PERCENTAGE',
-        effectiveDate: new Date().toISOString().split('T')[0],
-        endDate: undefined
+        calculationType: "AMOUNT" as "AMOUNT" | "PERCENTAGE",
+        effectiveDate: new Date().toISOString().split("T")[0],
+        endDate: undefined,
       }
       setSelectedAllowances([...selectedAllowances, newAllowance])
       setShowAllowanceSelector(false)
@@ -2504,9 +2521,7 @@ function AddEmployeeForm({
   }
 
   const handleAllowanceChange = (allowanceCode: string, field: string, value: any) => {
-    setSelectedAllowances(selectedAllowances.map((a) => 
-      a.code === allowanceCode ? { ...a, [field]: value } : a
-    ))
+    setSelectedAllowances(selectedAllowances.map((a) => (a.code === allowanceCode ? { ...a, [field]: value } : a)))
   }
 
   const handleAddDeduction = (deductionCode: string) => {
@@ -2520,9 +2535,9 @@ function AddEmployeeForm({
         recurring: deduction.recurring,
         amount: "0",
         percentage: "0",
-        calculationType: 'AMOUNT' as 'AMOUNT' | 'PERCENTAGE',
-        effectiveDate: new Date().toISOString().split('T')[0],
-        endDate: undefined
+        calculationType: "AMOUNT" as "AMOUNT" | "PERCENTAGE",
+        effectiveDate: new Date().toISOString().split("T")[0],
+        endDate: undefined,
       }
       setSelectedDeductions([...selectedDeductions, newDeduction])
       setShowDeductionSelector(false)
@@ -2534,9 +2549,7 @@ function AddEmployeeForm({
   }
 
   const handleDeductionChange = (deductionCode: string, field: string, value: any) => {
-    setSelectedDeductions(selectedDeductions.map((d) => 
-      d.code === deductionCode ? { ...d, [field]: value } : d
-    ))
+    setSelectedDeductions(selectedDeductions.map((d) => (d.code === deductionCode ? { ...d, [field]: value } : d)))
   }
   // </CHANGE>
 
@@ -2578,7 +2591,6 @@ function AddEmployeeForm({
       setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
     }
   }, [companySettings])
-  // </CHANGE>
 
   // Filtered lists for searchable dropdowns
   const filteredDepartments = departments.filter((dept) =>
@@ -2966,17 +2978,17 @@ function AddEmployeeForm({
       if (uploadedDocuments.length > 0) {
         try {
           const documentService = CentralDocumentService.getInstance()
-          
+
           // Update all uploaded documents with final employee information
           for (const doc of uploadedDocuments) {
             await documentService.uploadDocument({
               file: new File([], doc.fileName, { type: doc.fileType }), // Create a placeholder file
-              employeeId: formData.employeeId || 'temp-id',
+              employeeId: formData.employeeId || "temp-id",
               employeeName: displayName,
               documentType: doc.documentType,
               source: "employee-onboarding",
               uploadedBy: "HR Admin",
-              notes: `Employee onboarding document - ${doc.fileName}`
+              notes: `Employee onboarding document - ${doc.fileName}`,
             })
           }
 
@@ -3893,14 +3905,14 @@ function AddEmployeeForm({
                 value={formData.status}
                 onValueChange={(value) => {
                   handleInputChange("status", value)
-                  
+
                   // Force state update for inactive reason
                   if (value === "Active") {
                     handleInputChange("inactiveReason", "")
                     // Clear any validation errors for inactive reason
-                    setErrors(prev => ({
+                    setErrors((prev) => ({
                       ...prev,
-                      inactiveReason: ""
+                      inactiveReason: "",
                     }))
                     // Force re-render by updating state
                     setShowInactiveReason(false)
@@ -4341,7 +4353,7 @@ function AddEmployeeForm({
                                 <X className="w-4 h-4" />
                               </button>
                             </div>
-                            
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {/* Taxable/Non-taxable Toggle */}
                               <div className="space-y-2">
@@ -4349,22 +4361,22 @@ function AddEmployeeForm({
                                 <div className="flex space-x-2">
                                   <button
                                     type="button"
-                                    onClick={() => handleAllowanceChange(selectedAllowance.code, 'taxable', true)}
+                                    onClick={() => handleAllowanceChange(selectedAllowance.code, "taxable", true)}
                                     className={`px-3 py-2 text-sm rounded-md border ${
                                       selectedAllowance.taxable
-                                        ? 'bg-red-100 text-red-700 border-red-300'
-                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                        ? "bg-red-100 text-red-700 border-red-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
                                     }`}
                                   >
                                     Taxable
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => handleAllowanceChange(selectedAllowance.code, 'taxable', false)}
+                                    onClick={() => handleAllowanceChange(selectedAllowance.code, "taxable", false)}
                                     className={`px-3 py-2 text-sm rounded-md border ${
                                       !selectedAllowance.taxable
-                                        ? 'bg-green-100 text-green-700 border-green-300'
-                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                        ? "bg-green-100 text-green-700 border-green-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
                                     }`}
                                   >
                                     Non-taxable
@@ -4378,22 +4390,22 @@ function AddEmployeeForm({
                                 <div className="flex space-x-2">
                                   <button
                                     type="button"
-                                    onClick={() => handleAllowanceChange(selectedAllowance.code, 'recurring', true)}
+                                    onClick={() => handleAllowanceChange(selectedAllowance.code, "recurring", true)}
                                     className={`px-3 py-2 text-sm rounded-md border ${
                                       selectedAllowance.recurring
-                                        ? 'bg-blue-100 text-blue-700 border-blue-300'
-                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                        ? "bg-blue-100 text-blue-700 border-blue-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
                                     }`}
                                   >
                                     Recurring
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => handleAllowanceChange(selectedAllowance.code, 'recurring', false)}
+                                    onClick={() => handleAllowanceChange(selectedAllowance.code, "recurring", false)}
                                     className={`px-3 py-2 text-sm rounded-md border ${
                                       !selectedAllowance.recurring
-                                        ? 'bg-orange-100 text-orange-700 border-orange-300'
-                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                        ? "bg-orange-100 text-orange-700 border-orange-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
                                     }`}
                                   >
                                     One-time
@@ -4407,22 +4419,26 @@ function AddEmployeeForm({
                                 <div className="flex space-x-2">
                                   <button
                                     type="button"
-                                    onClick={() => handleAllowanceChange(selectedAllowance.code, 'calculationType', 'AMOUNT')}
+                                    onClick={() =>
+                                      handleAllowanceChange(selectedAllowance.code, "calculationType", "AMOUNT")
+                                    }
                                     className={`px-3 py-2 text-sm rounded-md border ${
-                                      selectedAllowance.calculationType === 'AMOUNT'
-                                        ? 'bg-purple-100 text-purple-700 border-purple-300'
-                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                      selectedAllowance.calculationType === "AMOUNT"
+                                        ? "bg-purple-100 text-purple-700 border-purple-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
                                     }`}
                                   >
                                     Amount
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => handleAllowanceChange(selectedAllowance.code, 'calculationType', 'PERCENTAGE')}
+                                    onClick={() =>
+                                      handleAllowanceChange(selectedAllowance.code, "calculationType", "PERCENTAGE")
+                                    }
                                     className={`px-3 py-2 text-sm rounded-md border ${
-                                      selectedAllowance.calculationType === 'PERCENTAGE'
-                                        ? 'bg-purple-100 text-purple-700 border-purple-300'
-                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                      selectedAllowance.calculationType === "PERCENTAGE"
+                                        ? "bg-purple-100 text-purple-700 border-purple-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
                                     }`}
                                   >
                                     Percentage
@@ -4433,18 +4449,24 @@ function AddEmployeeForm({
                               {/* Value Input */}
                               <div className="space-y-2">
                                 <Label className="text-sm font-medium">
-                                  {selectedAllowance.calculationType === 'AMOUNT' ? 'Amount (GHS)' : 'Percentage (%)'}
+                                  {selectedAllowance.calculationType === "AMOUNT" ? "Amount (GHS)" : "Percentage (%)"}
                                 </Label>
                                 <Input
                                   type="number"
-                                  step={selectedAllowance.calculationType === 'PERCENTAGE' ? '0.01' : '1'}
-                                  value={selectedAllowance.calculationType === 'AMOUNT' ? selectedAllowance.amount : selectedAllowance.percentage}
-                                  onChange={(e) => handleAllowanceChange(
-                                    selectedAllowance.code, 
-                                    selectedAllowance.calculationType === 'AMOUNT' ? 'amount' : 'percentage', 
-                                    e.target.value
-                                  )}
-                                  placeholder={selectedAllowance.calculationType === 'AMOUNT' ? '0' : '0.00'}
+                                  step={selectedAllowance.calculationType === "PERCENTAGE" ? "0.01" : "1"}
+                                  value={
+                                    selectedAllowance.calculationType === "AMOUNT"
+                                      ? selectedAllowance.amount
+                                      : selectedAllowance.percentage
+                                  }
+                                  onChange={(e) =>
+                                    handleAllowanceChange(
+                                      selectedAllowance.code,
+                                      selectedAllowance.calculationType === "AMOUNT" ? "amount" : "percentage",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder={selectedAllowance.calculationType === "AMOUNT" ? "0" : "0.00"}
                                 />
                               </div>
 
@@ -4454,7 +4476,9 @@ function AddEmployeeForm({
                                 <Input
                                   type="date"
                                   value={selectedAllowance.effectiveDate}
-                                  onChange={(e) => handleAllowanceChange(selectedAllowance.code, 'effectiveDate', e.target.value)}
+                                  onChange={(e) =>
+                                    handleAllowanceChange(selectedAllowance.code, "effectiveDate", e.target.value)
+                                  }
                                 />
                               </div>
 
@@ -4464,8 +4488,10 @@ function AddEmployeeForm({
                                   <Label className="text-sm font-medium">End Date</Label>
                                   <Input
                                     type="date"
-                                    value={selectedAllowance.endDate || ''}
-                                    onChange={(e) => handleAllowanceChange(selectedAllowance.code, 'endDate', e.target.value)}
+                                    value={selectedAllowance.endDate || ""}
+                                    onChange={(e) =>
+                                      handleAllowanceChange(selectedAllowance.code, "endDate", e.target.value)
+                                    }
                                   />
                                 </div>
                               )}
@@ -4564,7 +4590,7 @@ function AddEmployeeForm({
                                 <X className="w-4 h-4" />
                               </button>
                             </div>
-                            
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {/* Taxable/Non-taxable Toggle */}
                               <div className="space-y-2">
@@ -4572,22 +4598,22 @@ function AddEmployeeForm({
                                 <div className="flex space-x-2">
                                   <button
                                     type="button"
-                                    onClick={() => handleDeductionChange(selectedDeduction.code, 'taxable', true)}
+                                    onClick={() => handleDeductionChange(selectedDeduction.code, "taxable", true)}
                                     className={`px-3 py-2 text-sm rounded-md border ${
                                       selectedDeduction.taxable
-                                        ? 'bg-red-100 text-red-700 border-red-300'
-                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                        ? "bg-red-100 text-red-700 border-red-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
                                     }`}
                                   >
                                     Taxable
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => handleDeductionChange(selectedDeduction.code, 'taxable', false)}
+                                    onClick={() => handleDeductionChange(selectedDeduction.code, "taxable", false)}
                                     className={`px-3 py-2 text-sm rounded-md border ${
                                       !selectedDeduction.taxable
-                                        ? 'bg-green-100 text-green-700 border-green-300'
-                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                        ? "bg-green-100 text-green-700 border-green-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
                                     }`}
                                   >
                                     Non-taxable
@@ -4601,22 +4627,22 @@ function AddEmployeeForm({
                                 <div className="flex space-x-2">
                                   <button
                                     type="button"
-                                    onClick={() => handleDeductionChange(selectedDeduction.code, 'recurring', true)}
+                                    onClick={() => handleDeductionChange(selectedDeduction.code, "recurring", true)}
                                     className={`px-3 py-2 text-sm rounded-md border ${
                                       selectedDeduction.recurring
-                                        ? 'bg-blue-100 text-blue-700 border-blue-300'
-                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                        ? "bg-blue-100 text-blue-700 border-blue-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
                                     }`}
                                   >
                                     Recurring
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => handleDeductionChange(selectedDeduction.code, 'recurring', false)}
+                                    onClick={() => handleDeductionChange(selectedDeduction.code, "recurring", false)}
                                     className={`px-3 py-2 text-sm rounded-md border ${
                                       !selectedDeduction.recurring
-                                        ? 'bg-orange-100 text-orange-700 border-orange-300'
-                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                        ? "bg-orange-100 text-orange-700 border-orange-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
                                     }`}
                                   >
                                     One-time
@@ -4630,22 +4656,26 @@ function AddEmployeeForm({
                                 <div className="flex space-x-2">
                                   <button
                                     type="button"
-                                    onClick={() => handleDeductionChange(selectedDeduction.code, 'calculationType', 'AMOUNT')}
+                                    onClick={() =>
+                                      handleDeductionChange(selectedDeduction.code, "calculationType", "AMOUNT")
+                                    }
                                     className={`px-3 py-2 text-sm rounded-md border ${
-                                      selectedDeduction.calculationType === 'AMOUNT'
-                                        ? 'bg-purple-100 text-purple-700 border-purple-300'
-                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                      selectedDeduction.calculationType === "AMOUNT"
+                                        ? "bg-purple-100 text-purple-700 border-purple-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
                                     }`}
                                   >
                                     Amount
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => handleDeductionChange(selectedDeduction.code, 'calculationType', 'PERCENTAGE')}
+                                    onClick={() =>
+                                      handleDeductionChange(selectedDeduction.code, "calculationType", "PERCENTAGE")
+                                    }
                                     className={`px-3 py-2 text-sm rounded-md border ${
-                                      selectedDeduction.calculationType === 'PERCENTAGE'
-                                        ? 'bg-purple-100 text-purple-700 border-purple-300'
-                                        : 'bg-gray-100 text-gray-700 border-gray-300'
+                                      selectedDeduction.calculationType === "PERCENTAGE"
+                                        ? "bg-purple-100 text-purple-700 border-purple-300"
+                                        : "bg-gray-100 text-gray-700 border-gray-300"
                                     }`}
                                   >
                                     Percentage
@@ -4656,18 +4686,24 @@ function AddEmployeeForm({
                               {/* Value Input */}
                               <div className="space-y-2">
                                 <Label className="text-sm font-medium">
-                                  {selectedDeduction.calculationType === 'AMOUNT' ? 'Amount (GHS)' : 'Percentage (%)'}
+                                  {selectedDeduction.calculationType === "AMOUNT" ? "Amount (GHS)" : "Percentage (%)"}
                                 </Label>
                                 <Input
                                   type="number"
-                                  step={selectedDeduction.calculationType === 'PERCENTAGE' ? '0.01' : '1'}
-                                  value={selectedDeduction.calculationType === 'AMOUNT' ? selectedDeduction.amount : selectedDeduction.percentage}
-                                  onChange={(e) => handleDeductionChange(
-                                    selectedDeduction.code, 
-                                    selectedDeduction.calculationType === 'AMOUNT' ? 'amount' : 'percentage', 
-                                    e.target.value
-                                  )}
-                                  placeholder={selectedDeduction.calculationType === 'AMOUNT' ? '0' : '0.00'}
+                                  step={selectedDeduction.calculationType === "PERCENTAGE" ? "0.01" : "1"}
+                                  value={
+                                    selectedDeduction.calculationType === "AMOUNT"
+                                      ? selectedDeduction.amount
+                                      : selectedDeduction.percentage
+                                  }
+                                  onChange={(e) =>
+                                    handleDeductionChange(
+                                      selectedDeduction.code,
+                                      selectedDeduction.calculationType === "AMOUNT" ? "amount" : "percentage",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder={selectedDeduction.calculationType === "AMOUNT" ? "0" : "0.00"}
                                 />
                               </div>
 
@@ -4677,7 +4713,9 @@ function AddEmployeeForm({
                                 <Input
                                   type="date"
                                   value={selectedDeduction.effectiveDate}
-                                  onChange={(e) => handleDeductionChange(selectedDeduction.code, 'effectiveDate', e.target.value)}
+                                  onChange={(e) =>
+                                    handleDeductionChange(selectedDeduction.code, "effectiveDate", e.target.value)
+                                  }
                                 />
                               </div>
 
@@ -4687,8 +4725,10 @@ function AddEmployeeForm({
                                   <Label className="text-sm font-medium">End Date</Label>
                                   <Input
                                     type="date"
-                                    value={selectedDeduction.endDate || ''}
-                                    onChange={(e) => handleDeductionChange(selectedDeduction.code, 'endDate', e.target.value)}
+                                    value={selectedDeduction.endDate || ""}
+                                    onChange={(e) =>
+                                      handleDeductionChange(selectedDeduction.code, "endDate", e.target.value)
+                                    }
                                   />
                                 </div>
                               )}
@@ -4721,32 +4761,36 @@ function AddEmployeeForm({
                 {uploadedDocuments.length} of {requiredDocuments.length} documents uploaded
               </div>
             </div>
-            
+
             <div className="space-y-6">
               {requiredDocuments.map((doc) => {
                 const uploadedDoc = uploadedDocuments.find((d) => d.documentType === doc.id)
                 const isUploaded = !!uploadedDoc
                 const isUploading = uploadingDocuments.includes(doc.id)
-                
-                
+
                 return (
-                  <Card key={doc.id} className={`p-6 border-2 transition-all ${
-                    isUploaded 
-                      ? 'border-green-200 bg-green-50 shadow-sm' 
-                      : isUploading 
-                        ? 'border-blue-200 bg-blue-50 shadow-sm' 
-                        : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
-                  }`}>
+                  <Card
+                    key={doc.id}
+                    className={`p-6 border-2 transition-all ${
+                      isUploaded
+                        ? "border-green-200 bg-green-50 shadow-sm"
+                        : isUploading
+                          ? "border-blue-200 bg-blue-50 shadow-sm"
+                          : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center space-x-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                            isUploaded 
-                              ? 'bg-green-100 text-green-600' 
-                              : isUploading 
-                                ? 'bg-blue-100 text-blue-600' 
-                                : 'bg-gray-100 text-gray-400'
-                          }`}>
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              isUploaded
+                                ? "bg-green-100 text-green-600"
+                                : isUploading
+                                  ? "bg-blue-100 text-blue-600"
+                                  : "bg-gray-100 text-gray-400"
+                            }`}
+                          >
                             {isUploaded ? (
                               <CheckCircle className="w-5 h-5" />
                             ) : isUploading ? (
@@ -4760,13 +4804,14 @@ function AddEmployeeForm({
                             <p className="text-sm text-gray-600">{doc.description}</p>
                             {isUploaded && uploadedDoc && (
                               <div className="mt-2 flex flex-wrap items-center gap-2">
-                                <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50 text-xs">
+                                <Badge
+                                  variant="outline"
+                                  className="text-green-700 border-green-300 bg-green-50 text-xs"
+                                >
                                   <CheckCircle className="w-3 h-3 mr-1" />
                                   {uploadedDoc.fileName}
                                 </Badge>
-                                <span className="text-xs text-gray-500">
-                                  {formatFileSize(uploadedDoc.fileSize)}
-                                </span>
+                                <span className="text-xs text-gray-500">{formatFileSize(uploadedDoc.fileSize)}</span>
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveDocument(doc.id)}
@@ -4779,7 +4824,7 @@ function AddEmployeeForm({
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-3">
                         {isUploaded ? (
                           <div className="flex items-center space-x-3">
@@ -4818,9 +4863,9 @@ function AddEmployeeForm({
                               onChange={(e) => handleFileSelect(doc.id, e)}
                               className="hidden md:block"
                               id={`file-input-${doc.id}`}
-                              style={{ position: 'absolute', left: '-9999px', opacity: 0 }}
+                              style={{ position: "absolute", left: "-9999px", opacity: 0 }}
                             />
-                            
+
                             {/* Mobile file input - visible but styled */}
                             <input
                               type="file"
@@ -4829,7 +4874,7 @@ function AddEmployeeForm({
                               className="block md:hidden w-full min-h-[44px] text-sm text-blue-600 border border-blue-300 rounded-md bg-white hover:bg-blue-50 active:bg-blue-100 file:mr-4 file:py-2 file:px-4 file:rounded-l-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                               id={`mobile-file-input-${doc.id}`}
                             />
-                            
+
                             {/* Desktop button */}
                             <Button
                               type="button"
@@ -4838,16 +4883,16 @@ function AddEmployeeForm({
                               onClick={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                console.log('[v0] Desktop upload button clicked for:', doc.id)
-                                
+                                console.log("[v0] Desktop upload button clicked for:", doc.id)
+
                                 // Try the hidden input first
                                 const hiddenInput = document.getElementById(`file-input-${doc.id}`) as HTMLInputElement
                                 if (hiddenInput) {
-                                  console.log('[v0] Using hidden input for:', doc.id)
-                                  hiddenInput.value = ''
+                                  console.log("[v0] Using hidden input for:", doc.id)
+                                  hiddenInput.value = ""
                                   hiddenInput.click()
                                 } else {
-                                  console.log('[v0] Using handleUploadClick for:', doc.id)
+                                  console.log("[v0] Using handleUploadClick for:", doc.id)
                                   // Fallback to dynamic creation
                                   handleUploadClick(doc.id)
                                 }
@@ -4855,16 +4900,16 @@ function AddEmployeeForm({
                               onTouchEnd={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                console.log('[v0] Desktop upload button touch end for:', doc.id)
-                                
+                                console.log("[v0] Desktop upload button touch end for:", doc.id)
+
                                 // Try the hidden input first
                                 const hiddenInput = document.getElementById(`file-input-${doc.id}`) as HTMLInputElement
                                 if (hiddenInput) {
-                                  console.log('[v0] Using hidden input (touch) for:', doc.id)
-                                  hiddenInput.value = ''
+                                  console.log("[v0] Using hidden input (touch) for:", doc.id)
+                                  hiddenInput.value = ""
                                   hiddenInput.click()
                                 } else {
-                                  console.log('[v0] Using handleUploadClick (touch) for:', doc.id)
+                                  console.log("[v0] Using handleUploadClick (touch) for:", doc.id)
                                   // Fallback to dynamic creation
                                   handleUploadClick(doc.id)
                                 }
@@ -4888,7 +4933,7 @@ function AddEmployeeForm({
                         )}
                       </div>
                     </div>
-                    
+
                     {/* Upload progress and document confirmation - shown for all devices */}
                     {isUploading && (
                       <div className="mt-3">
@@ -4897,26 +4942,24 @@ function AddEmployeeForm({
                           <span>{uploadProgress[doc.id] || 0}%</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
+                          <div
                             className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${uploadProgress[doc.id] || 0}%` }}
                           />
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Show uploaded document info - enhanced for full-screen desktop visibility */}
                     {isUploaded && uploadedDoc && (
                       <div className="mt-4 p-4 bg-green-50 border-2 border-green-200 rounded-lg shadow-sm">
                         <div className="flex items-start space-x-3">
                           <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-green-900 truncate">
-                              ✓ {uploadedDoc.fileName}
-                            </p>
+                            <p className="text-sm font-semibold text-green-900 truncate">✓ {uploadedDoc.fileName}</p>
                             <p className="text-xs text-green-700 mt-1">
-                              {(uploadedDoc.fileSize / 1024 / 1024).toFixed(2)} MB • 
-                              Uploaded on {uploadedDoc.uploadDate.toLocaleDateString()}
+                              {(uploadedDoc.fileSize / 1024 / 1024).toFixed(2)} MB • Uploaded on{" "}
+                              {uploadedDoc.uploadDate.toLocaleDateString()}
                             </p>
                             <div className="mt-2 flex items-center space-x-2">
                               <Button
@@ -4958,7 +5001,7 @@ function AddEmployeeForm({
                 )
               })}
             </div>
-            
+
             {uploadedDocuments.length > 0 && (
               <Card className="p-4 bg-blue-50 border-blue-200">
                 <div className="flex items-center space-x-3">
@@ -4966,8 +5009,9 @@ function AddEmployeeForm({
                   <div>
                     <h4 className="font-medium text-blue-900">Documents Ready for Review</h4>
                     <p className="text-sm text-blue-700">
-                      {uploadedDocuments.length} document{uploadedDocuments.length !== 1 ? 's' : ''} uploaded successfully. 
-                      All documents will be saved to the document vault and labeled with the employee's name.
+                      {uploadedDocuments.length} document{uploadedDocuments.length !== 1 ? "s" : ""} uploaded
+                      successfully. All documents will be saved to the document vault and labeled with the employee's
+                      name.
                     </p>
                   </div>
                 </div>
@@ -5013,9 +5057,9 @@ function AddEmployeeForm({
             <div className="space-y-4">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                  {previewDocument.fileType.startsWith('image/') ? (
-                    <img 
-                      src={previewDocument.fileUrl} 
+                  {previewDocument.fileType.startsWith("image/") ? (
+                    <img
+                      src={previewDocument.fileUrl || "/placeholder.svg"}
                       alt={previewDocument.fileName}
                       className="w-8 h-8 object-cover rounded"
                     />
@@ -5032,27 +5076,27 @@ function AddEmployeeForm({
                   </div>
                 </div>
               </div>
-              
-              {previewDocument.fileType.startsWith('image/') && (
+
+              {previewDocument.fileType.startsWith("image/") && (
                 <div className="border rounded-lg p-4">
-                  <img 
-                    src={previewDocument.fileUrl} 
+                  <img
+                    src={previewDocument.fileUrl || "/placeholder.svg"}
                     alt={previewDocument.fileName}
                     className="max-w-full h-auto rounded"
                   />
                 </div>
               )}
-              
+
               <div className="flex justify-end space-x-2">
                 <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>
                   Close
                 </Button>
-                <Button 
+                <Button
                   onClick={() => {
                     // In production, this would trigger actual download
                     toast({
                       title: "Download Started",
-                      description: `${previewDocument.fileName} is being downloaded.`
+                      description: `${previewDocument.fileName} is being downloaded.`,
                     })
                     setIsPreviewOpen(false)
                   }}
