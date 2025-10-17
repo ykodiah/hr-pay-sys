@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -7,11 +7,20 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
-import { User, Calendar, Building, CreditCard, FileText, Edit, Save, Camera, Shield } from "lucide-react"
+import { User, Calendar, Building, CreditCard, FileText, Edit, Save, Camera, Shield, Upload, X, Plus } from "lucide-react"
 
 export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false)
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [documentType, setDocumentType] = useState("")
+  const [documentNotes, setDocumentNotes] = useState("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [profileData, setProfileData] = useState({
     personalInfo: {
       firstName: "Kwame",
@@ -56,6 +65,117 @@ export default function ProfilePage() {
   const handleCancel = () => {
     setIsEditing(false)
     // Reset form data if needed
+  }
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    setSelectedFiles(prev => [...prev, ...files])
+  }
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleUpload = async () => {
+    if (selectedFiles.length === 0) {
+      toast({
+        title: "No files selected",
+        description: "Please select at least one file to upload.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!documentType) {
+      toast({
+        title: "Document type required",
+        description: "Please select a document type.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setUploading(true)
+    
+    try {
+      for (const file of selectedFiles) {
+        const formData = new FormData()
+        formData.append("file", file)
+        formData.append("documentType", documentType)
+        formData.append("employeeId", profileData.employmentInfo.employeeId)
+        formData.append("employeeName", `${profileData.personalInfo.firstName} ${profileData.personalInfo.lastName}`)
+        formData.append("notes", documentNotes)
+        formData.append("source", "employee-profile")
+
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        })
+
+        if (!response.ok) {
+          throw new Error("Upload failed")
+        }
+
+        const result = await response.json()
+        
+        // Also save to document vault
+        await fetch("/api/documents", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            fileUrl: result.url,
+            documentType,
+            employeeId: profileData.employmentInfo.employeeId,
+            employeeName: `${profileData.personalInfo.firstName} ${profileData.personalInfo.lastName}`,
+            notes: documentNotes,
+            source: "employee-profile",
+            status: "pending",
+            accessLevel: "standard",
+            requiresSignature: false,
+            signatureStatus: "not_required",
+            tags: [documentType, "employee-document"],
+            category: "employee-document",
+            dataClassification: "internal",
+            gdprApplicable: false,
+            encryptionStatus: "encrypted",
+            versionNumber: "1.0",
+            uploadedBy: `${profileData.personalInfo.firstName} ${profileData.personalInfo.lastName}`,
+          }),
+        })
+      }
+
+      toast({
+        title: "Upload successful",
+        description: `${selectedFiles.length} document(s) uploaded successfully.`,
+      })
+
+      // Reset form
+      setSelectedFiles([])
+      setDocumentType("")
+      setDocumentNotes("")
+      setIsUploadDialogOpen(false)
+      
+      // Refresh the page to show new documents
+      window.location.reload()
+    } catch (error) {
+      console.error("Upload error:", error)
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload documents. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const openFileDialog = () => {
+    fileInputRef.current?.click()
   }
 
   return (
@@ -454,7 +574,10 @@ export default function ProfilePage() {
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                     <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600 mb-2">Upload additional documents</p>
-                    <Button variant="outline">Choose Files</Button>
+                    <Button variant="outline" onClick={() => setIsUploadDialogOpen(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Choose Files
+                    </Button>
                   </div>
                 )}
               </div>
@@ -462,6 +585,131 @@ export default function ProfilePage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Upload Dialog */}
+      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Upload Documents</DialogTitle>
+            <DialogDescription>
+              Upload documents for {profileData.personalInfo.firstName} {profileData.personalInfo.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Document Type Selection */}
+            <div>
+              <Label htmlFor="documentType">Document Type *</Label>
+              <Select value={documentType} onValueChange={setDocumentType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select document type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="academic">Academic Certificate</SelectItem>
+                  <SelectItem value="passport-picture">Passport Picture</SelectItem>
+                  <SelectItem value="resume">Resume & Application</SelectItem>
+                  <SelectItem value="passport">Passport Copy</SelectItem>
+                  <SelectItem value="national-id">National ID</SelectItem>
+                  <SelectItem value="medical">Medical Report</SelectItem>
+                  <SelectItem value="police">Police Report</SelectItem>
+                  <SelectItem value="contract">Employment Contract</SelectItem>
+                  <SelectItem value="other">Other Documents</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* File Selection */}
+            <div>
+              <Label>Select Files *</Label>
+              <div className="mt-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={openFileDialog}
+                  className="w-full"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose Files
+                </Button>
+              </div>
+              
+              {/* Selected Files */}
+              {selectedFiles.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <Label>Selected Files:</Label>
+                  {selectedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <FileText className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm">{file.name}</span>
+                        <span className="text-xs text-gray-500">
+                          ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(index)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Notes */}
+            <div>
+              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Textarea
+                id="notes"
+                placeholder="Add any notes about these documents..."
+                value={documentNotes}
+                onChange={(e) => setDocumentNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            {/* Upload Button */}
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => setIsUploadDialogOpen(false)}
+                disabled={uploading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpload}
+                disabled={uploading || selectedFiles.length === 0 || !documentType}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                {uploading ? (
+                  <>
+                    <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Documents
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
