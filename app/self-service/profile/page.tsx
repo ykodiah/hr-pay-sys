@@ -181,12 +181,12 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
-          <p className="text-gray-600">Manage your personal and employment information</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">My Profile</h1>
+          <p className="text-sm md:text-base text-gray-600">Manage your personal and employment information</p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
           {isEditing ? (
             <>
               <Button variant="outline" onClick={handleCancel}>
@@ -208,12 +208,12 @@ export default function ProfilePage() {
 
       {/* Profile Header Card */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center space-x-6">
+        <CardContent className="p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
             <div className="relative">
-              <Avatar className="w-24 h-24">
+              <Avatar className="w-20 h-20 md:w-24 md:h-24">
                 <AvatarImage src="/placeholder.svg?height=96&width=96" />
-                <AvatarFallback className="text-2xl">
+                <AvatarFallback className="text-xl md:text-2xl">
                   {profileData.personalInfo.firstName[0]}
                   {profileData.personalInfo.lastName[0]}
                 </AvatarFallback>
@@ -228,20 +228,20 @@ export default function ProfilePage() {
                 </Button>
               )}
             </div>
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold text-gray-900">
+            <div className="flex-1 text-center sm:text-left">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900">
                 {profileData.personalInfo.firstName} {profileData.personalInfo.lastName}
               </h2>
-              <p className="text-lg text-gray-600 mb-2">{profileData.employmentInfo.position}</p>
-              <div className="flex items-center space-x-4 text-sm text-gray-500">
-                <div className="flex items-center space-x-1">
+              <p className="text-base md:text-lg text-gray-600 mb-2">{profileData.employmentInfo.position}</p>
+              <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 text-sm text-gray-500">
+                <div className="flex items-center justify-center sm:justify-start space-x-1">
                   <Building className="w-4 h-4" />
                   <span>{profileData.employmentInfo.department}</span>
                 </div>
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center justify-center sm:justify-start space-x-1">
                   <Badge variant="outline">{profileData.employmentInfo.employeeId}</Badge>
                 </div>
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center justify-center sm:justify-start space-x-1">
                   <Calendar className="w-4 h-4" />
                   <span>Joined {new Date(profileData.employmentInfo.hireDate).toLocaleDateString()}</span>
                 </div>
@@ -253,11 +253,11 @@ export default function ProfilePage() {
 
       {/* Profile Details */}
       <Tabs defaultValue="personal" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="personal">Personal Info</TabsTrigger>
-          <TabsTrigger value="employment">Employment</TabsTrigger>
-          <TabsTrigger value="banking">Banking & Benefits</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
+          <TabsTrigger value="personal" className="text-xs md:text-sm">Personal Info</TabsTrigger>
+          <TabsTrigger value="employment" className="text-xs md:text-sm">Employment</TabsTrigger>
+          <TabsTrigger value="banking" className="text-xs md:text-sm">Banking & Benefits</TabsTrigger>
+          <TabsTrigger value="documents" className="text-xs md:text-sm">Documents</TabsTrigger>
         </TabsList>
 
         <TabsContent value="personal">
@@ -268,8 +268,8 @@ export default function ProfilePage() {
                 <span>Personal Information</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <CardContent className="space-y-4 md:space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div>
                   <Label htmlFor="firstName">First Name</Label>
                   <Input
@@ -542,7 +542,16 @@ export default function ProfilePage() {
                       <p className="text-sm text-gray-500">Uploaded on Jan 15, 2022</p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      toast({
+                        title: "Document View",
+                        description: "Opening Employment Contract...",
+                      })
+                    }}
+                  >
                     View
                   </Button>
                 </div>
@@ -554,7 +563,16 @@ export default function ProfilePage() {
                       <p className="text-sm text-gray-500">Uploaded on Jan 10, 2022</p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      toast({
+                        title: "Document View",
+                        description: "Opening Ghana Card Copy...",
+                      })
+                    }}
+                  >
                     View
                   </Button>
                 </div>
@@ -566,7 +584,16 @@ export default function ProfilePage() {
                       <p className="text-sm text-gray-500">Uploaded on Jan 8, 2022</p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      toast({
+                        title: "Document View",
+                        description: "Opening Educational Certificates...",
+                      })
+                    }}
+                  >
                     View
                   </Button>
                 </div>
@@ -588,10 +615,10 @@ export default function ProfilePage() {
 
       {/* Upload Dialog */}
       <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Upload Documents</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg md:text-xl">Upload Documents</DialogTitle>
+            <DialogDescription className="text-sm md:text-base">
               Upload documents for {profileData.personalInfo.firstName} {profileData.personalInfo.lastName}
             </DialogDescription>
           </DialogHeader>
@@ -681,18 +708,19 @@ export default function ProfilePage() {
             </div>
 
             {/* Upload Button */}
-            <div className="flex justify-end space-x-3">
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
               <Button
                 variant="outline"
                 onClick={() => setIsUploadDialogOpen(false)}
                 disabled={uploading}
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleUpload}
                 disabled={uploading || selectedFiles.length === 0 || !documentType}
-                className="bg-emerald-600 hover:bg-emerald-700"
+                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700"
               >
                 {uploading ? (
                   <>

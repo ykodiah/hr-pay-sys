@@ -429,31 +429,31 @@ export default function EnhancedDocumentVaultPage() {
   return (
     <div className="space-y-6">
       {/* Enhanced Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Advanced Document Vault</h1>
-          <p className="text-gray-600">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Advanced Document Vault</h1>
+          <p className="text-sm md:text-base text-gray-600">
             Enterprise-grade document management with RBAC, audit trails, and e-signatures
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
             <Settings className="w-4 h-4 mr-2" />
             Settings
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => toast({ title: "Bulk Upload", description: "Bulk upload feature coming soon!" })}>
             <Upload className="w-4 h-4 mr-2" />
             Bulk Upload
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => toast({ title: "Archive", description: "Archive feature coming soon!" })}>
             <Archive className="w-4 h-4 mr-2" />
             Archive
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => toast({ title: "Export", description: "Export feature coming soon!" })}>
             <Download className="w-4 h-4 mr-2" />
             Export Report
           </Button>
-          <Button>
+          <Button onClick={() => window.location.href = "/self-service/profile?tab=documents"}>
             <Plus className="w-4 h-4 mr-2" />
             Upload Document
           </Button>
@@ -461,7 +461,7 @@ export default function EnhancedDocumentVaultPage() {
       </div>
 
       {/* Enhanced Stats Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 md:gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -546,7 +546,7 @@ export default function EnhancedDocumentVaultPage() {
             </div>
 
             {/* Filter Row 1 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4">
               <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by employee" />
@@ -617,7 +617,7 @@ export default function EnhancedDocumentVaultPage() {
             </div>
 
             {/* Filter Row 2 - Advanced Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
               <Select value={selectedDateRange} onValueChange={setSelectedDateRange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Date range" />
@@ -822,7 +822,17 @@ export default function EnhancedDocumentVaultPage() {
                                 <Eye className="w-4 h-4 mr-2" />
                                 View
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDocumentAction(document.id, "download")}>
+                              <DropdownMenuItem onClick={() => {
+                                // Create a temporary link to download the file
+                                const link = document.createElement('a')
+                                link.href = document.fileUrl || '#'
+                                link.download = document.fileName
+                                link.click()
+                                toast({
+                                  title: "Download Started",
+                                  description: `Downloading ${document.fileName}...`,
+                                })
+                              }}>
                                 <Download className="w-4 h-4 mr-2" />
                                 Download
                               </DropdownMenuItem>
