@@ -452,7 +452,7 @@ export default function ClientAppLayout({
             </div>
 
             {/* Search Bar */}
-            <div className="flex-1 max-w-md mx-4 hidden md:block">
+            <div className="flex-1 max-w-md mx-2 md:mx-4 hidden md:block">
               <form onSubmit={handleSearch} className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
@@ -460,7 +460,7 @@ export default function ClientAppLayout({
                   placeholder="Search employees, payroll..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent font-sans"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent font-sans transition-all duration-200 hover:border-gray-400"
                   style={{
                     "--tw-ring-color": theme.colors[500],
                     focusRingColor: theme.colors[500],
@@ -808,8 +808,10 @@ export default function ClientAppLayout({
           </aside>
 
           {/* Main Content */}
-          <main className="flex-1 p-4 md:p-6 overflow-x-auto">
-            {children}
+          <main className="flex-1 p-2 md:p-4 lg:p-6 overflow-x-auto min-h-screen">
+            <div className="max-w-7xl mx-auto">
+              {children}
+            </div>
           </main>
         </div>
 

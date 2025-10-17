@@ -10,14 +10,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
     }
 
-    // Validate file type
-    if (!file.type.startsWith("image/")) {
-      return NextResponse.json({ error: "File must be an image" }, { status: 400 })
+    // Validate file type - allow common document types
+    const allowedTypes = [
+      "image/",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain"
+    ]
+    
+    const isValidType = allowedTypes.some(type => file.type.startsWith(type))
+    if (!isValidType) {
+      return NextResponse.json({ 
+        error: "File type not supported. Please upload images, PDFs, or Word documents." 
+      }, { status: 400 })
     }
 
-    // Validate file size (2MB limit)
-    if (file.size > 2 * 1024 * 1024) {
-      return NextResponse.json({ error: "File size must be less than 2MB" }, { status: 400 })
+    // Validate file size (10MB limit for documents)
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: "File size must be less than 10MB" }, { status: 400 })
     }
 
     // Upload to Vercel Blob
