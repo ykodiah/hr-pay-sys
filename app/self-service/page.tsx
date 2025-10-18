@@ -30,7 +30,13 @@ export default function SelfServiceDashboard() {
           <Badge variant="outline" className="text-emerald-600 border-emerald-200">
             January 2025
           </Badge>
-          <Button variant="outline" size="sm">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => {
+              alert("Notifications panel would open here. You have 3 unread notifications!");
+            }}
+          >
             <Bell className="w-4 h-4 mr-2" />3 Notifications
           </Button>
         </div>
@@ -89,35 +95,82 @@ export default function SelfServiceDashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Button className="h-20 flex-col space-y-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+            <Button 
+              className="h-20 flex-col space-y-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              onClick={() => {
+                alert("Leave request form would open here. This feature is coming soon!");
+              }}
+            >
               <Calendar className="w-6 h-6" />
               <span>Request Leave</span>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+            <Button 
+              variant="outline" 
+              className="h-20 flex-col space-y-2 bg-transparent"
+              onClick={() => {
+                alert("Payslips page would open here. This feature is coming soon!");
+              }}
+            >
               <FileText className="w-6 h-6" />
               <span>View Payslips</span>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+            <Button 
+              variant="outline" 
+              className="h-20 flex-col space-y-2 bg-transparent"
+              onClick={() => {
+                alert("Loan application form would open here. This feature is coming soon!");
+              }}
+            >
               <CreditCard className="w-6 h-6" />
               <span>Apply for Loan</span>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+            <Button 
+              variant="outline" 
+              className="h-20 flex-col space-y-2 bg-transparent"
+              onClick={() => {
+                alert("Profile update form would open here. This feature is coming soon!");
+              }}
+            >
               <User className="w-6 h-6" />
               <span>Update Profile</span>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+            <Button 
+              variant="outline" 
+              className="h-20 flex-col space-y-2 bg-transparent"
+              onClick={() => {
+                alert("Goals dashboard would open here. This feature is coming soon!");
+              }}
+            >
               <Target className="w-6 h-6" />
               <span>View Goals</span>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+            <Button 
+              variant="outline" 
+              className="h-20 flex-col space-y-2 bg-transparent"
+              onClick={() => {
+                alert("Learning courses page would open here. This feature is coming soon!");
+              }}
+            >
               <GraduationCap className="w-6 h-6" />
               <span>Browse Courses</span>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+            <Button 
+              variant="outline" 
+              className="h-20 flex-col space-y-2 bg-transparent"
+              onClick={() => {
+                alert("Performance dashboard would open here. This feature is coming soon!");
+              }}
+            >
               <Award className="w-6 h-6" />
               <span>Performance</span>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+            <Button 
+              variant="outline" 
+              className="h-20 flex-col space-y-2 bg-transparent"
+              onClick={() => {
+                alert("Settings page would open here. This feature is coming soon!");
+              }}
+            >
               <Settings className="w-6 h-6" />
               <span>Settings</span>
             </Button>
