@@ -31,7 +31,14 @@ export default function DashboardPage() {
           <Badge variant="outline" className="text-emerald-600 border-emerald-200">
             January 2025
           </Badge>
-          <Button className="bg-emerald-600 hover:bg-emerald-700">Process Payroll</Button>
+          <Button 
+            className="bg-emerald-600 hover:bg-emerald-700"
+            onClick={() => {
+              alert("Payroll processing would start here. This feature is coming soon!");
+            }}
+          >
+            Process Payroll
+          </Button>
         </div>
       </div>
 
@@ -197,23 +204,52 @@ export default function DashboardPage() {
             <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button className="w-full justify-start bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+            <Button 
+              className="w-full justify-start bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              onClick={() => {
+                alert("Payroll processing would start here. This feature is coming soon!");
+              }}
+            >
               <Calculator className="w-4 h-4 mr-2" />
               Process Payroll
             </Button>
-            <Button variant="outline" className="w-full justify-start bg-transparent">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start bg-transparent"
+              onClick={() => {
+                alert("Add employee form would open here. This feature is coming soon!");
+              }}
+            >
               <Users className="w-4 h-4 mr-2" />
               Add Employee
             </Button>
-            <Button variant="outline" className="w-full justify-start bg-transparent">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start bg-transparent"
+              onClick={() => {
+                alert("Job posting form would open here. This feature is coming soon!");
+              }}
+            >
               <Briefcase className="w-4 h-4 mr-2" />
               Post Job Opening
             </Button>
-            <Button variant="outline" className="w-full justify-start bg-transparent">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start bg-transparent"
+              onClick={() => {
+                alert("Approval requests dashboard would open here. This feature is coming soon!");
+              }}
+            >
               <Calendar className="w-4 h-4 mr-2" />
               Approve Requests
             </Button>
-            <Button variant="outline" className="w-full justify-start bg-transparent">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start bg-transparent"
+              onClick={() => {
+                alert("Reports generation would start here. This feature is coming soon!");
+              }}
+            >
               <FileText className="w-4 h-4 mr-2" />
               Generate Reports
             </Button>

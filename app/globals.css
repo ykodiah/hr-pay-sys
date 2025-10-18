@@ -178,6 +178,55 @@
     @apply min-h-[44px] min-w-[44px] px-4 py-2;
   }
 
+  /* Mobile-specific improvements */
+  @media (max-width: 768px) {
+    .mobile-card {
+      @apply p-4;
+    }
+    
+    .mobile-text {
+      @apply text-sm;
+    }
+    
+    .mobile-heading {
+      @apply text-xl;
+    }
+    
+    .mobile-button {
+      @apply min-h-[48px] px-4 py-3 text-base;
+    }
+    
+    .mobile-grid {
+      @apply grid-cols-1 gap-4;
+    }
+    
+    .mobile-spacing {
+      @apply py-8 px-4;
+    }
+  }
+
+  /* Tablet-specific improvements */
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .tablet-grid {
+      @apply grid-cols-2 gap-6;
+    }
+    
+    .tablet-card {
+      @apply p-5;
+    }
+  }
+
+  /* Desktop-specific improvements */
+  @media (min-width: 1025px) {
+    .desktop-grid {
+      @apply grid-cols-3 gap-8;
+    }
+    
+    .desktop-card {
+      @apply p-6;
+    }
+  }
+
   /* Responsive grid utilities */
   .responsive-grid {
     @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;

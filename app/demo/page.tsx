@@ -66,7 +66,13 @@ export default function DemoPage() {
                   </div>
                   <h3 className="text-white text-xl font-semibold mb-2">Complete Product Demo</h3>
                   <p className="text-gray-300 mb-4">1-minute overview of all key features</p>
-                  <Button className="bg-emerald-600 hover:bg-emerald-700">
+                  <Button 
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    onClick={() => {
+                      // Simulate video play functionality
+                      alert("Demo video would start playing here. This is a placeholder for the actual video player.");
+                    }}
+                  >
                     <Play className="w-4 h-4 mr-2" />
                     Watch Demo
                   </Button>
@@ -147,7 +153,13 @@ export default function DemoPage() {
                     <span>4.9</span>
                   </div>
                 </div>
-                <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700">
+                <Button 
+                  size="sm" 
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => {
+                    alert("Dashboard Overview demo would start playing here.");
+                  }}
+                >
                   Watch Demo
                 </Button>
               </CardContent>
@@ -168,7 +180,13 @@ export default function DemoPage() {
                     <span>4.8</span>
                   </div>
                 </div>
-                <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700">
+                <Button 
+                  size="sm" 
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => {
+                    alert("Adding Employees demo would start playing here.");
+                  }}
+                >
                   Watch Demo
                 </Button>
               </CardContent>
@@ -189,7 +207,13 @@ export default function DemoPage() {
                     <span>4.9</span>
                   </div>
                 </div>
-                <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700">
+                <Button 
+                  size="sm" 
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => {
+                    alert("Payroll Processing demo would start playing here.");
+                  }}
+                >
                   Watch Demo
                 </Button>
               </CardContent>
@@ -210,7 +234,13 @@ export default function DemoPage() {
                     <span>4.7</span>
                   </div>
                 </div>
-                <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700">
+                <Button 
+                  size="sm" 
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => {
+                    alert("Leave Management demo would start playing here.");
+                  }}
+                >
                   Watch Demo
                 </Button>
               </CardContent>
@@ -231,7 +261,13 @@ export default function DemoPage() {
                     <span>4.8</span>
                   </div>
                 </div>
-                <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700">
+                <Button 
+                  size="sm" 
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => {
+                    alert("Generating Reports demo would start playing here.");
+                  }}
+                >
                   Watch Demo
                 </Button>
               </CardContent>
@@ -252,7 +288,13 @@ export default function DemoPage() {
                     <span>4.6</span>
                   </div>
                 </div>
-                <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700">
+                <Button 
+                  size="sm" 
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => {
+                    alert("Mobile App Tour demo would start playing here.");
+                  }}
+                >
                   Watch Demo
                 </Button>
               </CardContent>
@@ -275,7 +317,18 @@ export default function DemoPage() {
             <Link href="/launch">
               <Button className="bg-emerald-600 hover:bg-emerald-700">Launch Interactive Demo</Button>
             </Link>
-            <Button variant="outline" className="bg-transparent">
+            <Button 
+              variant="outline" 
+              className="bg-transparent"
+              onClick={() => {
+                // Create a demo guide download
+                const link = document.createElement('a');
+                link.href = '#';
+                link.download = 'AkwaabaHRPay_Demo_Guide.pdf';
+                link.click();
+                alert('Demo guide download started! (This is a placeholder for the actual PDF)');
+              }}
+            >
               <Download className="w-4 h-4 mr-2" />
               Download Demo Guide
             </Button>

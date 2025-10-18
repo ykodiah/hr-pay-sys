@@ -1,12 +1,14 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Users, Calculator, TrendingUp, Shield, Globe, DollarSign, Lock, Zap } from "lucide-react"
+import { CheckCircle, Users, Calculator, TrendingUp, Shield, Globe, DollarSign, Lock, Zap, Menu, X } from "lucide-react"
 import Link from "next/link"
 import { Logo } from "@/components/logo"
+import { useState } from "react"
 
 export default function HomePage() {
   console.log("[v0] Homepage is rendering successfully")
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
@@ -27,42 +29,89 @@ export default function HomePage() {
                 About
               </Link>
             </nav>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <Link href="/auth/login">
-                <Button variant="ghost" className="text-gray-600">
+                <Button variant="ghost" className="text-gray-600 text-sm sm:text-base hidden sm:inline-flex">
                   Sign In
                 </Button>
               </Link>
               <Link href="/get-started">
-                <Button className="bg-emerald-600 hover:bg-emerald-700">Get Started</Button>
+                <Button className="bg-emerald-600 hover:bg-emerald-700 text-sm sm:text-base px-3 sm:px-4 hidden sm:inline-flex">
+                  Get Started
+                </Button>
               </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="md:hidden"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
+                {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </Button>
             </div>
           </div>
         </div>
+        
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden bg-white border-t">
+            <div className="px-4 py-2 space-y-1">
+              <a 
+                href="#features" 
+                className="block px-3 py-2 text-gray-600 hover:text-emerald-600 transition-colors"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Features
+              </a>
+              <a 
+                href="#pricing" 
+                className="block px-3 py-2 text-gray-600 hover:text-emerald-600 transition-colors"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Pricing
+              </a>
+              <Link 
+                href="/about" 
+                className="block px-3 py-2 text-gray-600 hover:text-emerald-600 transition-colors"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                About
+              </Link>
+              <div className="border-t pt-2 mt-2">
+                <Link href="/auth/login" className="block px-3 py-2 text-gray-600 hover:text-emerald-600 transition-colors">
+                  Sign In
+                </Link>
+                <Link href="/get-started" className="block px-3 py-2 text-emerald-600 hover:text-emerald-700 transition-colors">
+                  Get Started
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Hero Section */}
-      <section className="relative py-20 lg:py-32">
+      <section className="relative py-12 sm:py-20 lg:py-32">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             <div>
-              <Badge className="mb-4 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Made for Ghana 🇬🇭</Badge>
-              <h1 className="text-4xl lg:text-6xl font-bold text-gray-900 leading-tight">
+              <Badge className="mb-4 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 text-sm">Made for Ghana 🇬🇭</Badge>
+              <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold text-gray-900 leading-tight">
                 HR & Payroll for Ghana
                 <span className="text-emerald-600 block">Built for Growth</span>
               </h1>
-              <p className="mt-6 text-xl text-gray-600 leading-relaxed">
+              <p className="mt-4 sm:mt-6 text-lg sm:text-xl text-gray-600 leading-relaxed">
                 GHS-native payroll with PAYE, SSNIT, minimum wage compliance, and leave management. Consolidate across
                 subsidiaries with multi-location controls.
               </p>
-              <div className="mt-8 flex flex-col sm:flex-row gap-4">
+              <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <Link href="/auth/login">
-                  <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-lg px-8 py-4 w-full sm:w-auto">
+                  <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto">
                     Launch App
                   </Button>
                 </Link>
                 <Link href="/demo">
-                  <Button size="lg" variant="outline" className="text-lg px-8 py-4 bg-transparent w-full sm:w-auto">
+                  <Button size="lg" variant="outline" className="text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 bg-transparent w-full sm:w-auto">
                     Watch Demo
                   </Button>
                 </Link>
@@ -93,24 +142,24 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 bg-white">
+      <section id="features" className="py-12 sm:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Everything you need for HR & Payroll</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Everything you need for HR & Payroll</h2>
+            <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto">
               Built specifically for Ghanaian businesses with local compliance, multi-currency support, and
               enterprise-grade security.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             <div className="block">
-              <Card className="p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default">
+              <Card className="p-4 sm:p-6 hover:shadow-lg transition-all hover:scale-105 cursor-default touch-manipulation">
                 <CardContent className="p-0">
                   <img
                     src="/ghana-payroll-engine-dashboard.png"
                     alt="Ghana Payroll Engine"
-                    className="w-full h-32 object-cover rounded-lg mb-4"
+                    className="w-full h-24 sm:h-32 object-cover rounded-lg mb-4"
                   />
                   <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-4">
                     <Calculator className="w-6 h-6 text-emerald-600" />
@@ -323,7 +372,9 @@ export default function HomePage() {
                     <span>24/7 support</span>
                   </li>
                 </ul>
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
+                <Link href="/get-started">
+                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
+                </Link>
               </CardContent>
             </Card>
 
@@ -363,7 +414,9 @@ export default function HomePage() {
                     <span>Dedicated account manager</span>
                   </li>
                 </ul>
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
+                <Link href="/get-started">
+                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Start Free Trial</Button>
+                </Link>
               </CardContent>
             </Card>
           </div>
