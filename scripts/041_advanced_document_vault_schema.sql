@@ -218,15 +218,15 @@ CREATE POLICY "Users can view documents they have access to" ON document_vault
     FOR SELECT USING (
         -- Public documents
         access_level = 'public' OR
-        -- User has specific access
-        auth.uid() = ANY(allowed_users) OR
+        -- User has specific access (convert JSONB array to text array)
+        auth.uid()::text = ANY(SELECT jsonb_array_elements_text(allowed_users)) OR
         -- User has required role
         EXISTS (
             SELECT 1 FROM user_role_assignments ura
             JOIN user_roles ur ON ura.role_id = ur.id
             WHERE ura.user_id = auth.uid() 
             AND ura.is_active = true
-            AND ur.name = ANY(required_roles)
+            AND ur.name = ANY(SELECT jsonb_array_elements_text(required_roles))
         ) OR
         -- User is the uploader or employee
         auth.uid() = uploaded_by OR
@@ -263,7 +263,7 @@ CREATE POLICY "Users can view signatures for documents they have access to" ON d
             WHERE dv.id = document_id
             AND (
                 dv.access_level = 'public' OR
-                auth.uid() = ANY(dv.allowed_users) OR
+                auth.uid() = ANY(SELECT jsonb_array_elements_text(dv.allowed_users)) OR
                 auth.uid() = dv.uploaded_by OR
                 auth.uid() = dv.employee_id
             )
@@ -322,7 +322,7 @@ BEGIN
     WHERE id = p_document_id;
     
     -- Check if user has specific access
-    IF auth.uid() = ANY(doc_allowed_users) THEN
+    IF auth.uid()::text = ANY(SELECT jsonb_array_elements_text(doc_allowed_users)) THEN
         RETURN TRUE;
     END IF;
     

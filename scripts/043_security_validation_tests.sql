@@ -144,7 +144,7 @@ DO $$
 DECLARE
     anon_grants INTEGER;
     auth_grants INTEGER;
-    table_name TEXT;
+    tbl_name TEXT;
     tables TEXT[] := ARRAY[
         'employees', 'subsidiaries', 'companies', 'employee_financial',
         'employee_documents', 'organizational_charts', 'company_settings',
@@ -154,26 +154,26 @@ DECLARE
 BEGIN
     RAISE NOTICE 'Checking table permissions...';
     
-    FOREACH table_name IN ARRAY tables
+    FOREACH tbl_name IN ARRAY tables
     LOOP
         -- Check for anonymous grants (should be 0)
         SELECT COUNT(*) INTO anon_grants
-        FROM information_schema.table_privileges
-        WHERE table_schema = 'public'
-        AND table_name = table_name
-        AND grantee = 'anon';
+        FROM information_schema.table_privileges tp
+        WHERE tp.table_schema = 'public'
+        AND tp.table_name = tbl_name
+        AND tp.grantee = 'anon';
         
         -- Check for authenticated grants (should be > 0)
         SELECT COUNT(*) INTO auth_grants
-        FROM information_schema.table_privileges
-        WHERE table_schema = 'public'
-        AND table_name = table_name
-        AND grantee = 'authenticated';
+        FROM information_schema.table_privileges tp
+        WHERE tp.table_schema = 'public'
+        AND tp.table_name = tbl_name
+        AND tp.grantee = 'authenticated';
         
         IF anon_grants = 0 AND auth_grants > 0 THEN
-            RAISE NOTICE '✓ Table % has proper permissions', table_name;
+            RAISE NOTICE '✓ Table % has proper permissions', tbl_name;
         ELSE
-            RAISE NOTICE '✗ Table % has incorrect permissions (anon: %, auth: %)', table_name, anon_grants, auth_grants;
+            RAISE NOTICE '✗ Table % has incorrect permissions (anon: %, auth: %)', tbl_name, anon_grants, auth_grants;
         END IF;
     END LOOP;
 END $$;
