@@ -1,11 +1,11 @@
 /** @type {import('next').NextConfig} */
 const securityHeaders = [
-  // Enforce HTTPS for 2 years with preload (only enable if your domain is HSTS-preload ready)
-  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+  // Enforce HTTPS for 1 year (reduced from 2 years for initial deployment)
+  { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
   // Prevent MIME-type sniffing
   { key: 'X-Content-Type-Options', value: 'nosniff' },
-  // Clickjacking protection
-  { key: 'X-Frame-Options', value: 'DENY' },
+  // Clickjacking protection - allow same origin for iframes
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
   // Improve referrer privacy
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   // Limit powerful browser APIs
@@ -26,28 +26,9 @@ const securityHeaders = [
       'usb=()'
     ].join(', '),
   },
-  // Baseline CSP - adjust as integrations require. Avoids unsafe-inline for scripts.
-  {
-    key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      "base-uri 'self'",
-      "frame-ancestors 'none'",
-      // Next.js and third-party scripts may require https: and 'unsafe-eval' during development.
-      // In production, prefer removing 'unsafe-eval' if possible.
-      "script-src 'self' https: 'unsafe-eval'",
-      "style-src 'self' https: 'unsafe-inline'",
-      "img-src 'self' data: blob: https:",
-      "connect-src 'self' https:",
-      "font-src 'self' data: https:",
-      "object-src 'none'",
-      "form-action 'self'",
-    ].join('; '),
-  },
 ]
 
 const nextConfig = {
-  output: 'standalone',
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -56,6 +37,12 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
   },
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
