@@ -17,8 +17,8 @@ AS $$
   -- Get company_id from user metadata or a dedicated user_profiles table
   -- This avoids querying the employees table which can cause RLS recursion
   SELECT COALESCE(
-    (auth.jwt() ->> 'user_metadata' ->> 'company_id')::uuid,
-    (auth.jwt() ->> 'app_metadata' ->> 'company_id')::uuid,
+    (auth.jwt()::jsonb ->> 'user_metadata')::jsonb ->> 'company_id')::uuid,
+    (auth.jwt()::jsonb ->> 'app_metadata')::jsonb ->> 'company_id')::uuid,
     NULL
   );
 $$;

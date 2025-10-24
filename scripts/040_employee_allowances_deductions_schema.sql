@@ -132,7 +132,7 @@ DROP POLICY IF EXISTS "employee_allowances_delete_policy" ON employee_allowances
 CREATE POLICY "employee_allowances_select_policy" ON employee_allowances
     FOR SELECT
     USING (
-        is_authenticated() AND 
+        is_user_authenticated() AND 
         employee_id IN (
             SELECT id FROM employees 
             WHERE company_id IN (
@@ -145,7 +145,7 @@ CREATE POLICY "employee_allowances_select_policy" ON employee_allowances
 CREATE POLICY "employee_allowances_insert_policy" ON employee_allowances
     FOR INSERT
     WITH CHECK (
-        is_authenticated() AND 
+        is_user_authenticated() AND 
         employee_id IN (
             SELECT id FROM employees 
             WHERE company_id IN (
@@ -158,7 +158,7 @@ CREATE POLICY "employee_allowances_insert_policy" ON employee_allowances
 CREATE POLICY "employee_allowances_update_policy" ON employee_allowances
     FOR UPDATE
     USING (
-        is_authenticated() AND 
+        is_user_authenticated() AND 
         employee_id IN (
             SELECT id FROM employees 
             WHERE company_id IN (
@@ -171,7 +171,7 @@ CREATE POLICY "employee_allowances_update_policy" ON employee_allowances
 CREATE POLICY "employee_allowances_delete_policy" ON employee_allowances
     FOR DELETE
     USING (
-        is_authenticated() AND 
+        is_user_authenticated() AND 
         employee_id IN (
             SELECT id FROM employees 
             WHERE company_id IN (
@@ -195,7 +195,7 @@ DROP POLICY IF EXISTS "employee_deductions_delete_policy" ON employee_deductions
 CREATE POLICY "employee_deductions_select_policy" ON employee_deductions
     FOR SELECT
     USING (
-        is_authenticated() AND 
+        is_user_authenticated() AND 
         employee_id IN (
             SELECT id FROM employees 
             WHERE company_id IN (
@@ -208,7 +208,7 @@ CREATE POLICY "employee_deductions_select_policy" ON employee_deductions
 CREATE POLICY "employee_deductions_insert_policy" ON employee_deductions
     FOR INSERT
     WITH CHECK (
-        is_authenticated() AND 
+        is_user_authenticated() AND 
         employee_id IN (
             SELECT id FROM employees 
             WHERE company_id IN (
@@ -221,7 +221,7 @@ CREATE POLICY "employee_deductions_insert_policy" ON employee_deductions
 CREATE POLICY "employee_deductions_update_policy" ON employee_deductions
     FOR UPDATE
     USING (
-        is_authenticated() AND 
+        is_user_authenticated() AND 
         employee_id IN (
             SELECT id FROM employees 
             WHERE company_id IN (
@@ -234,7 +234,7 @@ CREATE POLICY "employee_deductions_update_policy" ON employee_deductions
 CREATE POLICY "employee_deductions_delete_policy" ON employee_deductions
     FOR DELETE
     USING (
-        is_authenticated() AND 
+        is_user_authenticated() AND 
         employee_id IN (
             SELECT id FROM employees 
             WHERE company_id IN (
