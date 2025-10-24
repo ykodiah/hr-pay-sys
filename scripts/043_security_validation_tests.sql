@@ -160,14 +160,14 @@ BEGIN
         SELECT COUNT(*) INTO anon_grants
         FROM information_schema.table_privileges
         WHERE table_schema = 'public'
-        AND table_name = table_name
+        AND information_schema.table_privileges.table_name = table_name
         AND grantee = 'anon';
         
         -- Check for authenticated grants (should be > 0)
         SELECT COUNT(*) INTO auth_grants
         FROM information_schema.table_privileges
         WHERE table_schema = 'public'
-        AND table_name = table_name
+        AND information_schema.table_privileges.table_name = table_name
         AND grantee = 'authenticated';
         
         IF anon_grants = 0 AND auth_grants > 0 THEN
