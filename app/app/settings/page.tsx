@@ -41,7 +41,6 @@ import {
   Mail,
   Shield,
   Database,
-  FileText,
   EyeOff,
   Check,
   type File,
@@ -280,7 +279,7 @@ export default function SettingsPage() {
   const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState(false)
   const [selectedSubsidiary, setSelectedSubsidiary] = useState<Subsidiary | null>(null)
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<boolean>(false)
-  const [showReactivateConfirm, setShowReactivateConfirm] = useState<boolean>(false)
+  const [showReactivateConfirm, setShowReactivateConfirm] = useState(false)
   const [subsidiaryToToggle, setSubsidiaryToToggle] = useState<Subsidiary | null>(null)
 
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string>("")
@@ -3052,6 +3051,69 @@ Format the response in a professional, actionable manner for HR decision-makers.
     toast({ title: "Report Exported", description: "Security report generated and downloaded." })
   }
 
+  // </CHANGE> Added missing handleExportSettingsTemplate function
+  const handleExportSettingsTemplate = async () => {
+    console.log("[v0] Exporting settings template...")
+    
+    try {
+      // Prepare settings data for export
+      const settingsTemplate = {
+        company: companyData,
+        payroll: {
+          currency: selectedCurrency,
+          taxBands: payeTaxBands,
+          ssnitRates,
+          tier2Rates,
+          tier3Rates,
+          allowances,
+          deductions,
+          taxReliefs,
+        },
+        hr: {
+          leavePolicies: currentPolicies,
+          salaryGrades,
+          unstructuredGrades,
+        },
+        notifications: {
+          emailConfig,
+          notificationSettings,
+          templates: notificationTemplates,
+        },
+        security: {
+          accessSettings,
+          securitySettings,
+        },
+        exportedAt: new Date().toISOString(),
+        version: "1.0",
+      }
+
+      // Convert to JSON and download
+      const jsonContent = JSON.stringify(settingsTemplate, null, 2)
+      const blob = new Blob([jsonContent], { type: "application/json" })
+      const link = document.createElement("a")
+      const url = URL.createObjectURL(blob)
+      link.setAttribute("href", url)
+      link.setAttribute("download", `settings_template_${new Date().toISOString().split("T")[0]}.json`)
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      toast({
+        title: "Export Successful",
+        description: "Settings template exported successfully",
+      })
+    } catch (error) {
+      console.error("[v0] Error exporting settings template:", error)
+      toast({
+        title: "Export Failed",
+        description: "Failed to export settings template. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+
   const handleAddSalaryGrade = () => {
     setEditingGrade(null)
     setNewGrade({
@@ -4627,7 +4689,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                             </div>
                           </div>
 
-                          <div className="flex justify-end space-x-2 pt-2">
+                          <div className="flex justify-end space-x-2">
                             <Button variant="outline" size="sm" onClick={() => handleEditUnstructuredGrade(grade)}>
                               Edit
                             </Button>
@@ -6755,6 +6817,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
                       {/* Active Sessions */}
                       <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">Active Sessions</h3>
                         <div className="flex items-center justify-between">
                           <h3 className="text-lg font-semibold">Active Sessions</h3>
                           <Button variant="outline" onClick={handleRefreshSessions} disabled={isRefreshingSessions}>
@@ -6942,55 +7005,4 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 <CheckCircle className="w-5 h-5 text-emerald-600" />
                                 <div>
                                   <p className="text-sm font-medium">Status</p>
-                                  <p className="text-lg font-bold">{backupStatus || "Ready"}</p>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </div>
-                      </div>
-
-                      {/* Audit Logs */}
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold">Recent Audit Logs</h3>
-                          <Button variant="outline" onClick={handleViewAllLogs}>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View All Logs
-                          </Button>
-                        </div>
-                        <div className="space-y-2">
-                          {auditLogs.slice(0, 5).map((log) => (
-                            <Card key={log.id}>
-                              <CardContent className="p-3">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <p className="font-medium text-sm">{log.action}</p>
-                                    <p className="text-sm text-gray-600">
-                                      {log.user_email} • {log.ip_address} •{new Date(log.timestamp).toLocaleString()}
-                                    </p>
-                                  </div>
-                                  <Badge variant={log.severity === "high" ? "destructive" : "secondary"}>{log.severity}</Badge>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end space-x-2">
-                        <Button variant="outline" onClick={handleExportSecurityReport} disabled={isExportingReport}>
-                          {isExportingReport ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Exporting...
-                            </>
-                          ) : (
-                            <>
-                              <FileText className="w-4 h-4 mr-2" />
-                              Export Security Report
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          className="bg-emerald-600 hover:bg-emerald-700\"
+                                  <p className="text-lg font-bold">{backupStatus || "Ready"}</p>\
