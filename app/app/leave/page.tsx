@@ -4,6 +4,7 @@ import type React from "react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { handleExport } from "@/lib/button-handlers"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -285,7 +286,10 @@ export default function LeavePage() {
           <p className="text-gray-600">Review and manage employee leave requests</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline">
+          <Button 
+            variant="outline"
+            onClick={() => handleExport('leave report')}
+          >
             <Download className="w-4 h-4 mr-2" />
             Export Report
           </Button>

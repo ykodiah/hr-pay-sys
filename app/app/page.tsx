@@ -1,6 +1,8 @@
+"use client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { handleNavigation } from "@/lib/button-handlers"
 import {
   Users,
   Calculator,
@@ -31,7 +33,12 @@ export default function DashboardPage() {
           <Badge variant="outline" className="text-emerald-600 border-emerald-200">
             January 2025
           </Badge>
-          <Button className="bg-emerald-600 hover:bg-emerald-700">Process Payroll</Button>
+          <Button 
+            className="bg-emerald-600 hover:bg-emerald-700"
+            onClick={() => handleNavigation('/app/payroll')}
+          >
+            Process Payroll
+          </Button>
         </div>
       </div>
 
@@ -197,19 +204,34 @@ export default function DashboardPage() {
             <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button className="w-full justify-start bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+            <Button 
+              className="w-full justify-start bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              onClick={() => handleNavigation('/app/payroll')}
+            >
               <Calculator className="w-4 h-4 mr-2" />
               Process Payroll
             </Button>
-            <Button variant="outline" className="w-full justify-start bg-transparent">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start bg-transparent"
+              onClick={() => handleNavigation('/app/employees')}
+            >
               <Users className="w-4 h-4 mr-2" />
               Add Employee
             </Button>
-            <Button variant="outline" className="w-full justify-start bg-transparent">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start bg-transparent"
+              onClick={() => handleNavigation('/app/recruitment')}
+            >
               <Briefcase className="w-4 h-4 mr-2" />
               Post Job Opening
             </Button>
-            <Button variant="outline" className="w-full justify-start bg-transparent">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start bg-transparent"
+              onClick={() => handleNavigation('/app/leave')}
+            >
               <Calendar className="w-4 h-4 mr-2" />
               Approve Requests
             </Button>

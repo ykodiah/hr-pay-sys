@@ -5,6 +5,7 @@ import { DialogDescription } from "@/components/ui/dialog"
 import type React from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
+import { handleExport, handleImport } from "@/lib/button-handlers"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -1413,11 +1414,19 @@ export default function EmployeesPage() {
           <p className="text-gray-600 mt-1">Manage your workforce and employee information</p>
         </div>
         <div className="flex items-center space-x-3">
-          <Button variant="outline" className="bg-transparent">
+          <Button 
+            variant="outline" 
+            className="bg-transparent"
+            onClick={() => handleExport('employees')}
+          >
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
-          <Button variant="outline" className="bg-transparent">
+          <Button 
+            variant="outline" 
+            className="bg-transparent"
+            onClick={() => handleImport('employees')}
+          >
             <Upload className="w-4 h-4 mr-2" />
             Import
           </Button>
