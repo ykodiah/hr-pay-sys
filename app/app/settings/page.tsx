@@ -40,7 +40,6 @@ import {
   Send,
   Mail,
   Shield,
-  Database,
   EyeOff,
   Check,
   type File,
@@ -150,10 +149,11 @@ interface SecuritySettings {
 
 interface AuditLog {
   id: string
-  user_email: string
+  user: string
   action: string
   timestamp: string
-  ip_address: string
+  details: string
+  ipAddress: string
   severity: "high" | "medium" | "low"
 }
 
@@ -770,7 +770,7 @@ export default function SettingsPage() {
   const [templateFeedback, setTemplateFeedback] = useState("")
   const [templateImprovements, setTemplateImprovements] = useState("")
   const [lastGeneratedTemplateId, setLastGeneratedTemplateId] = useState("")
-  const [currentAIModel, setCurrentAIModel] = useState(null)
+  const [currentAIModel, setCurrentAIModel] = useState<any>(null) // Initialize as null or with a default structure
   const [showModelUpgrade, setShowModelUpgrade] = useState(false)
   const [newTemplate, setNewTemplate] = useState({
     name: "",
@@ -3534,6 +3534,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
     loadSubsidiaries()
     fetchCompanyData() // Add actual fetch calls for company data, roles, etc.
     fetchRoles()
+    // Fetch initial audit logs
+    fetchAuditLogs()
   }, [])
 
   // Dummy implementations for functions not yet defined
@@ -3568,6 +3570,18 @@ Format the response in a professional, actionable manner for HR decision-makers.
       { id: "role-hr", name: "HR Manager", description: "Manage HR functions and employee data", permissions: ["read_employees", "edit_employees", "manage_leave"], user_count: 5 },
       { id: "role-payroll", name: "Payroll Officer", description: "Process payroll and manage compensation", permissions: ["read_payroll", "process_payroll"], user_count: 3 },
       { id: "role-employee", name: "Employee", description: "Access own profile and limited HR features", permissions: ["read_profile", "request_leave"], user_count: 150 },
+    ])
+  }
+
+  const fetchAuditLogs = async () => {
+    console.log("[v0] Placeholder: Fetching audit logs...")
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    setAuditLogs([
+      { id: "log-001", user: "admin@example.com", action: "Update Security Settings", timestamp: new Date(Date.now() - 3600000).toISOString(), details: "Enabled Two-Factor Authentication", ipAddress: "192.168.1.10", severity: "medium" },
+      { id: "log-002", user: "hr.manager@example.com", action: "Add Leave Policy", timestamp: new Date(Date.now() - 7200000).toISOString(), details: "Added 'Bereavement Leave' policy with 5 days", ipAddress: "192.168.1.15", severity: "low" },
+      { id: "log-003", user: "payroll.officer@example.com", action: "Process Payroll", timestamp: new Date(Date.now() - 86400000).toISOString(), details: "Monthly payroll for July processed successfully", ipAddress: "192.168.1.20", severity: "low" },
+      { id: "log-004", user: "security@example.com", action: "Failed Login Attempt", timestamp: new Date(Date.now() - 90000000).toISOString(), details: "User 'guest' attempted to log in with invalid credentials", ipAddress: "10.0.0.5", severity: "high" },
+      { id: "log-005", user: "admin@example.com", action: "Update Company Details", timestamp: new Date(Date.now() - 172800000).toISOString(), details: "Changed company address to '100 Main St, Anytown'", ipAddress: "192.168.1.10", severity: "low" },
     ])
   }
   
@@ -5517,22 +5531,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 </div>
               </CardContent>
             </Card>
-
-            {/* Save Button */}
-            <div className="flex justify-end">
-              <Button
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={handleSavePayrollConfig}
-                disabled={isSavingPayroll}
-              >
-                {isSavingPayroll ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4 mr-2" />
-                )}
-                Save Payroll Configuration
-              </Button>
-            </div>
           </div>
         </TabsContent>
 
@@ -6972,39 +6970,5 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
                       {/* Backup Status */}
                       <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Backup Status</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <Card>
-                            <CardContent className="p-4">
-                              <div className="flex items-center space-x-2">
-                                <Calendar className="w-5 h-5 text-blue-600" />
-                                <div>
-                                  <p className="text-sm font-medium">Last Backup</p>
-                                  <p className="text-lg font-bold">
-                                    {lastBackupTime ? new Date(lastBackupTime).toLocaleDateString() : "Never"}
-                                  </p>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                          <Card>
-                            <CardContent className="p-4">
-                              <div className="flex items-center space-x-2">
-                                <Database className="w-5 h-5 text-green-600" />
-                                <div>
-                                  <p className="text-sm font-medium">Backup Size</p>
-                                  <p className="text-lg font-bold">{backupSize || "0 MB"}</p>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                          <Card>
-                            <CardContent className="p-4">
-                              <div className="flex items-center space-x-2">
-                                <CheckCircle className="w-5 h-5 text-emerald-600" />
-                                <div>
-                                  <p className="text-sm font-medium">Status</p>
-                                  <p className="text-lg font-bold">{backupStatus || "Ready"}</p>
-                                </div>
-                              </div>\
-                            </CardContent
+                        <h3 className="text-lg font-semibold">Backup Status</h3>\
+                        <div className
