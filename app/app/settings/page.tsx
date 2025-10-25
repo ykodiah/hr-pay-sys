@@ -3017,7 +3017,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
     toast({ title: "Access Settings Saved", description: "Access control settings have been updated." })
   }
 
-  // Added for Security
   // const handleBackupNow = async () => { // This function was duplicated and is now removed.
   //   setIsBackingUp(true)
   //   console.log("[v0] Initiating manual backup...")
@@ -3051,7 +3050,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     toast({ title: "Report Exported", description: "Security report generated and downloaded." })
   }
 
-  // </CHANGE> Added missing handleExportSettingsTemplate function
+  // Added missing handleExportSettingsTemplate function
   const handleExportSettingsTemplate = async () => {
     console.log("[v0] Exporting settings template...")
     
@@ -7005,4 +7004,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 <CheckCircle className="w-5 h-5 text-emerald-600" />
                                 <div>
                                   <p className="text-sm font-medium">Status</p>
-                                  <p className="text-lg font-bold">{backupStatus || "Ready"}</p>\
+                                  <p className="text-lg font-bold">{backupStatus || "Ready"}</p>
+                                </div>
+                              </div>\
+                            </CardContent
