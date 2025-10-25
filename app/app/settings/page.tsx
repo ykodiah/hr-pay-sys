@@ -3585,6 +3585,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }, 1500)
   }
 
+  }
   return (
     <div className="space-y-6">
       {/* Header */}
