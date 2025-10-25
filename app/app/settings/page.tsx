@@ -3042,7 +3042,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     toast({ title: "View All Logs", description: "Navigating to the full audit log history." })
   }
 
-  const handleExportSecurityReport = async () => {
+  const handleExportAuditReport = async () => {
     setIsExportingReport(true)
     console.log("[v0] Exporting security report...")
     await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate export process
@@ -6970,5 +6970,5 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
                       {/* Backup Status */}
                       <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Backup Status</h3>\
-                        <div className
+                        <h3 className="text-lg font-semibold">Backup Status</h3>
+                        <div className=\"grid grid-
