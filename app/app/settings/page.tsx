@@ -149,7 +149,7 @@ interface SecuritySettings {
 
 interface AuditLog {
   id: string
-  user: string
+  user_email: string // Changed from user to user_email for consistency with session data
   action: string
   timestamp: string
   details: string
@@ -273,7 +273,7 @@ export default function SettingsPage() {
   const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [isBackingUp, setIsBackingUp] = useState<boolean>(false)
-  const [lastBackupTime, setLastBackupTime] = useState<string | null>(null)
+  const [lastBackupTime, setLastBackupTime] = useState<string | null>(null) // Renamed from lastBackupDate
   const [showAddSubsidiary, setShowAddSubsidiary] = useState<boolean>(false)
   const [showEditSubsidiary, setShowEditSubsidiary] = useState(false)
   const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState(false)
@@ -3042,7 +3042,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     toast({ title: "View All Logs", description: "Navigating to the full audit log history." })
   }
 
-  const handleExportAuditReport = async () => {
+  const handleExportSecurityReport = async () => {
     setIsExportingReport(true)
     console.log("[v0] Exporting security report...")
     await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate export process
@@ -3506,6 +3506,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
       const reader = new FileReader()
       reader.onload = (e) => {
         setCompanyLogoPreview(e.target?.result as string)
+        setCompanyData({ ...companyData, logo_url: e.target?.result as string }) // Update companyData state
         setIsUploadingLogo(false)
         toast({ title: "Logo Uploaded", description: "Company logo uploaded successfully." })
       }
@@ -3577,11 +3578,11 @@ Format the response in a professional, actionable manner for HR decision-makers.
     console.log("[v0] Placeholder: Fetching audit logs...")
     await new Promise((resolve) => setTimeout(resolve, 500))
     setAuditLogs([
-      { id: "log-001", user: "admin@example.com", action: "Update Security Settings", timestamp: new Date(Date.now() - 3600000).toISOString(), details: "Enabled Two-Factor Authentication", ipAddress: "192.168.1.10", severity: "medium" },
-      { id: "log-002", user: "hr.manager@example.com", action: "Add Leave Policy", timestamp: new Date(Date.now() - 7200000).toISOString(), details: "Added 'Bereavement Leave' policy with 5 days", ipAddress: "192.168.1.15", severity: "low" },
-      { id: "log-003", user: "payroll.officer@example.com", action: "Process Payroll", timestamp: new Date(Date.now() - 86400000).toISOString(), details: "Monthly payroll for July processed successfully", ipAddress: "192.168.1.20", severity: "low" },
-      { id: "log-004", user: "security@example.com", action: "Failed Login Attempt", timestamp: new Date(Date.now() - 90000000).toISOString(), details: "User 'guest' attempted to log in with invalid credentials", ipAddress: "10.0.0.5", severity: "high" },
-      { id: "log-005", user: "admin@example.com", action: "Update Company Details", timestamp: new Date(Date.now() - 172800000).toISOString(), details: "Changed company address to '100 Main St, Anytown'", ipAddress: "192.168.1.10", severity: "low" },
+      { id: "log-001", user_email: "admin@example.com", action: "Update Security Settings", timestamp: new Date(Date.now() - 3600000).toISOString(), details: "Enabled Two-Factor Authentication", ipAddress: "192.168.1.10", severity: "medium" },
+      { id: "log-002", user_email: "hr.manager@example.com", action: "Add Leave Policy", timestamp: new Date(Date.now() - 7200000).toISOString(), details: "Added 'Bereavement Leave' policy with 5 days", ipAddress: "192.168.1.15", severity: "low" },
+      { id: "log-003", user_email: "payroll.officer@example.com", action: "Process Payroll", timestamp: new Date(Date.now() - 86400000).toISOString(), details: "Monthly payroll for July processed successfully", ipAddress: "192.168.1.20", severity: "low" },
+      { id: "log-004", user_email: "security@example.com", action: "Failed Login Attempt", timestamp: new Date(Date.now() - 90000000).toISOString(), details: "User 'guest' attempted to log in with invalid credentials", ipAddress: "10.0.0.5", severity: "high" },
+      { id: "log-005", user_email: "admin@example.com", action: "Update Company Details", timestamp: new Date(Date.now() - 172800000).toISOString(), details: "Changed company address to '100 Main St, Anytown'", ipAddress: "192.168.1.10", severity: "low" },
     ])
   }
   
@@ -3634,7 +3635,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
               <div className="space-y-4">
                 <Label>Company Logo</Label>
                 <div className="flex items-center space-x-4">
-                  {companyLogoPreview || companyData.logo_url ? (
+                  {(companyLogoPreview || companyData.logo_url) ? (
                     <div className="relative">
                       <img
                         src={companyLogoPreview || companyData.logo_url}
@@ -6959,16 +6960,4 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 onChange={(e) =>
                                   setSecuritySettings({
                                     ...securitySettings,
-                                    dataRetentionDays: Number.parseInt(e.target.value),
-                                  })
-                                }
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Backup Status */}
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Backup Status</h3>
-                        <div className=\"grid grid-
+                                    dataRetentionDays: Number.parseInt(e.target.value) || 90,\
