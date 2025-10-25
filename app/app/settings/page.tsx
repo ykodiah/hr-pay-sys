@@ -3995,8 +3995,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
   }
 
   const handleAddTaxRelief = () => {
+    const currentReliefs = taxReliefs || []
     const newRelief = {
-      id: Math.max(...taxReliefs.map(r => r.id)) + 1,
+      id: currentReliefs.length > 0 ? Math.max(...(currentReliefs || []).map(r => r.id)) + 1 : 1,
       name: "",
       description: "",
       amount: 0,
@@ -4006,8 +4007,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
       effectiveDate: new Date().toISOString().split('T')[0],
       lastUpdated: new Date().toISOString()
     }
-    setTaxReliefs([...taxReliefs, newRelief])
-    setEditingRelief(taxReliefs.length)
+    setTaxReliefs([...currentReliefs, newRelief])
+    setEditingRelief(currentReliefs.length)
   }
 
   const handleEditTaxRelief = (index: number) => {
@@ -5317,9 +5318,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
               <div className="space-y-4">
                 <Label className="text-base font-semibold">Divisions</Label>
                 <div className="space-y-3">
-                  {divisions.length > 0 ? (
+                  {(divisions || []).length > 0 ? (
                     <div className="space-y-2">
-                      {divisions.map((division, index) => (
+                      {(divisions || []).map((division, index) => (
                         <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <span className="font-medium">{division}</span>
                           <Button
@@ -5354,9 +5355,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
               <div className="space-y-4">
                 <Label className="text-base font-semibold">Departments</Label>
                 <div className="space-y-3">
-                  {departments.length > 0 ? (
+                  {(departments || []).length > 0 ? (
                     <div className="space-y-2">
-                      {departments.map((department, index) => (
+                      {(departments || []).map((department, index) => (
                         <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <span className="font-medium">{department}</span>
                           <Button
@@ -5396,9 +5397,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
               <div className="space-y-4">
                 <Label className="text-base font-semibold">Locations</Label>
                 <div className="space-y-3">
-                  {locations.length > 0 ? (
+                  {(locations || []).length > 0 ? (
                     <div className="space-y-2">
-                      {locations.map((location, index) => (
+                      {(locations || []).map((location, index) => (
                         <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <span className="font-medium">{location}</span>
                           <Button
@@ -5495,7 +5496,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <Building2 className="w-5 h-5 text-blue-600" />
                         <div>
                           <p className="text-sm font-medium">Total Subsidiaries</p>
-                          <p className="text-2xl font-bold">{subsidiaries.length}</p>
+                          <p className="text-2xl font-bold">{(subsidiaries || []).length}</p>
                         </div>
                       </div>
                     </CardContent>
@@ -5507,7 +5508,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <div>
                           <p className="text-sm font-medium">Active Companies</p>
                           <p className="text-2xl font-bold">
-                            {subsidiaries.filter((s) => s.status === "active").length}
+                            {(subsidiaries || []).filter((s) => s.status === "active").length}
                           </p>
                         </div>
                       </div>
@@ -5520,7 +5521,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <div>
                           <p className="text-sm font-medium">Total Locations</p>
                           <p className="text-2xl font-bold">
-                            {subsidiaries.reduce((acc, s) => acc + (s.locations?.length || 0), 0)}
+                            {(subsidiaries || []).reduce((acc, s) => acc + (s.locations?.length || 0), 0)}
                           </p>
                         </div>
                       </div>
@@ -5533,7 +5534,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <div>
                           <p className="text-sm font-medium">Total Departments</p>
                           <p className="text-2xl font-bold">
-                            {subsidiaries.reduce((acc, s) => acc + (s.departments?.length || 0), 0)}
+                            {(subsidiaries || []).reduce((acc, s) => acc + (s.departments?.length || 0), 0)}
                           </p>
                         </div>
                       </div>
@@ -5543,7 +5544,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
                 {/* Subsidiaries List */}
                 <div className="space-y-3">
-                  {subsidiaries.map((subsidiary) => (
+                  {(subsidiaries || []).map((subsidiary) => (
                     // Updated subsidiary card to show logo and removed Edit button
                     <Card key={subsidiary.id} className="border-l-4 border-l-blue-500">
                       <CardContent className="p-4">
@@ -5723,7 +5724,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     </Card>
                   ))}
 
-                  {subsidiaries.length === 0 && (
+                  {(subsidiaries || []).length === 0 && (
                     <Card>
                       <CardContent className="p-8 text-center">
                         <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -6014,7 +6015,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {currentPolicies.map((policy) => (
+                  {(currentPolicies || []).map((policy) => (
                     <Card key={policy.name} className="border-l-4 border-l-blue-500">
                       <CardHeader>
                         <CardTitle className="text-lg font-semibold">{policy.name}</CardTitle>
@@ -6099,7 +6100,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
-                  {hrDocuments.map((doc) => (
+                  {(hrDocuments || []).map((doc) => (
                     <Card key={doc.id} className="border-l-4 border-l-green-500">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
@@ -6180,7 +6181,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 {/* Structured Salary Grades */}
                 {salaryGradeTab === "structured" && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {salaryGrades.map((grade) => (
+                    {(salaryGrades || []).map((grade) => (
                       <Card key={grade.id} className="border-l-4 border-l-purple-500">
                         <CardHeader>
                           <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
@@ -6230,7 +6231,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 {/* Unstructured Salary Grades */}
                 {salaryGradeTab === "unstructured" && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {unstructuredGrades.map((grade) => (
+                    {(unstructuredGrades || []).map((grade) => (
                       <Card key={grade.id} className="border-l-4 border-l-blue-500">
                         <CardHeader>
                           <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
@@ -6683,7 +6684,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       </tr>
                     </thead>
                     <tbody>
-                      {allowances.map((allowance, index) => (
+                      {(allowances || []).map((allowance, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="border border-gray-200 px-4 py-3">
                             <Input
@@ -6803,7 +6804,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       </tr>
                     </thead>
                     <tbody>
-                      {deductions.map((deduction, index) => (
+                      {(deductions || []).map((deduction, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="border border-gray-200 px-4 py-3">
                             <Input
@@ -6960,7 +6961,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       </tr>
                     </thead>
                     <tbody>
-                      {taxReliefs.map((relief, index) => (
+                      {(taxReliefs || []).map((relief, index) => (
                         <tr key={relief.id} className="hover:bg-gray-50">
                           <td className="border border-gray-200 px-4 py-3">
                             {editingRelief === index ? (
@@ -7117,7 +7118,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   </table>
                 </div>
 
-                {taxReliefs.length === 0 && (
+                {(taxReliefs || []).length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     <Receipt className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                     <p className="text-lg font-medium">No tax reliefs configured</p>
@@ -7127,7 +7128,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
                 <div className="flex justify-between items-center pt-4 border-t">
                   <div className="text-sm text-gray-500">
-                    {taxReliefs.length} relief{taxReliefs.length !== 1 ? 's' : ''} configured
+                    {(taxReliefs || []).length} relief{(taxReliefs || []).length !== 1 ? 's' : ''} configured
                   </div>
                   <div className="flex space-x-2">
                     <Button
@@ -7180,7 +7181,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       </Button>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Badge variant="secondary">{notificationTemplates.length} Templates</Badge>
+                      <Badge variant="secondary">{(notificationTemplates || []).length} Templates</Badge>
                     </div>
                   </div>
 
@@ -7197,7 +7198,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {notificationTemplates.map((template) => (
+                        {(notificationTemplates || []).map((template) => (
                           <TableRow key={template.id}>
                             <TableCell>
                               <div>
@@ -8287,7 +8288,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-3">
-                {roles.map((role) => (
+                {(roles || []).map((role) => (
                   <Card key={role.id} className="border-l-4 border-l-indigo-500">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
@@ -8464,7 +8465,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   </Button>
                 </div>
                 <div className="space-y-2">
-                  {activeSessions.map((session) => (
+                  {(activeSessions || []).map((session) => (
                     <Card key={session.id}>
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
@@ -8657,7 +8658,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   </Button>
                 </div>
                 <div className="space-y-2">
-                  {auditLogs.slice(0, 5).map((log) => (
+                  {(auditLogs || []).slice(0, 5).map((log) => (
                     <Card key={log.id}>
                       <CardContent className="p-3">
                         <div className="flex items-center justify-between">
