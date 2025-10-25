@@ -138,6 +138,7 @@ interface Role {
   description: string
   permissions: string[]
   user_count: number
+  status?: string
 }
 
 // Added for Access Control and Security
@@ -272,9 +273,9 @@ export default function SettingsPage() {
   const [uploadedFile, setUploadedFile] = useState(null)
   const [documentName, setDocumentName] = useState("")
   const [currentPolicies, setCurrentPolicies] = useState([
-    { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Annual vacation leave" },
-    { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness" },
-    { name: "Maternity Leave", days: 84, usage: "12%", trend: "stable", description: "Maternity and paternity leave" },
+    { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Annual vacation leave", category: "Leave", isActive: true, applicableTo: "All Employees", carryOverLimit: 5, noticeRequired: 7 },
+    { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness", category: "Leave", isActive: true, applicableTo: "All Employees", carryOverLimit: 0, noticeRequired: 0 },
+    { name: "Maternity Leave", days: 84, usage: "12%", trend: "stable", description: "Maternity and paternity leave", category: "Leave", isActive: true, applicableTo: "Female Employees", carryOverLimit: 0, noticeRequired: 30 },
   ])
 
   const [divisions, setDivisions] = useState<string[]>([])
@@ -1735,50 +1736,50 @@ export default function SettingsPage() {
 
     // Load comprehensive allowances
     setAllowances([
-      { code: "BASIC", description: "Basic Salary", recurring: true, amount: 0, percentage: 0, type: "FIXED" },
-      { code: "HRA", description: "Housing Allowance", recurring: true, amount: 500, percentage: 0, type: "FIXED" },
-      { code: "TRA", description: "Transport Allowance", recurring: true, amount: 200, percentage: 0, type: "FIXED" },
-      { code: "MED", description: "Medical Allowance", recurring: true, amount: 150, percentage: 0, type: "FIXED" },
-      { code: "BONUS", description: "Performance Bonus", recurring: false, amount: 0, percentage: 10, type: "VARIABLE" },
-      { code: "OVERTIME", description: "Overtime Pay", recurring: false, amount: 0, percentage: 0, type: "VARIABLE" },
-      { code: "COMM", description: "Commission", recurring: false, amount: 0, percentage: 0, type: "VARIABLE" },
-      { code: "MEAL", description: "Meal Allowance", recurring: true, amount: 100, percentage: 0, type: "FIXED" },
-      { code: "COMM", description: "Communication Allowance", recurring: true, amount: 80, percentage: 0, type: "FIXED" },
-      { code: "FUEL", description: "Fuel Allowance", recurring: true, amount: 300, percentage: 0, type: "FIXED" }
+      { code: "BASIC", description: "Basic Salary", recurring: true, amount: 0, percentage: 0, type: "FIXED", taxable: true },
+      { code: "HRA", description: "Housing Allowance", recurring: true, amount: 500, percentage: 0, type: "FIXED", taxable: true },
+      { code: "TRA", description: "Transport Allowance", recurring: true, amount: 200, percentage: 0, type: "FIXED", taxable: true },
+      { code: "MED", description: "Medical Allowance", recurring: true, amount: 150, percentage: 0, type: "FIXED", taxable: false },
+      { code: "BONUS", description: "Performance Bonus", recurring: false, amount: 0, percentage: 10, type: "VARIABLE", taxable: true },
+      { code: "OVERTIME", description: "Overtime Pay", recurring: false, amount: 0, percentage: 0, type: "VARIABLE", taxable: true },
+      { code: "COMM", description: "Commission", recurring: false, amount: 0, percentage: 0, type: "VARIABLE", taxable: true },
+      { code: "MEAL", description: "Meal Allowance", recurring: true, amount: 100, percentage: 0, type: "FIXED", taxable: true },
+      { code: "COMM", description: "Communication Allowance", recurring: true, amount: 80, percentage: 0, type: "FIXED", taxable: true },
+      { code: "FUEL", description: "Fuel Allowance", recurring: true, amount: 300, percentage: 0, type: "FIXED", taxable: true }
     ])
 
     // Load comprehensive deductions
     setDeductions([
-      { code: "TAX", description: "Income Tax (PAYE)", recurring: true, amount: 0, percentage: 0, type: "VARIABLE" },
-      { code: "SSNIT", description: "SSNIT Contribution", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE" },
-      { code: "TIER2", description: "Tier 2 Pension", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE" },
-      { code: "TIER3", description: "Tier 3 Pension", recurring: true, amount: 0, percentage: 5, type: "VARIABLE" },
-      { code: "LOAN", description: "Staff Loan", recurring: true, amount: 200, percentage: 0, type: "FIXED" },
-      { code: "ADV", description: "Salary Advance", recurring: false, amount: 0, percentage: 0, type: "VARIABLE" },
-      { code: "INS", description: "Insurance Premium", recurring: true, amount: 50, percentage: 0, type: "FIXED" },
-      { code: "UNION", description: "Union Dues", recurring: true, amount: 30, percentage: 0, type: "FIXED" },
-      { code: "WELFARE", description: "Welfare Fund", recurring: true, amount: 25, percentage: 0, type: "FIXED" },
-      { code: "OTHER", description: "Other Deductions", recurring: false, amount: 0, percentage: 0, type: "VARIABLE" }
+      { code: "TAX", description: "Income Tax (PAYE)", recurring: true, amount: 0, percentage: 0, type: "VARIABLE", taxable: false },
+      { code: "SSNIT", description: "SSNIT Contribution", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE", taxable: false },
+      { code: "TIER2", description: "Tier 2 Pension", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE", taxable: false },
+      { code: "TIER3", description: "Tier 3 Pension", recurring: true, amount: 0, percentage: 5, type: "VARIABLE", taxable: false },
+      { code: "LOAN", description: "Staff Loan", recurring: true, amount: 200, percentage: 0, type: "FIXED", taxable: false },
+      { code: "ADV", description: "Salary Advance", recurring: false, amount: 0, percentage: 0, type: "VARIABLE", taxable: false },
+      { code: "INS", description: "Insurance Premium", recurring: true, amount: 50, percentage: 0, type: "FIXED", taxable: false },
+      { code: "UNION", description: "Union Dues", recurring: true, amount: 30, percentage: 0, type: "FIXED", taxable: false },
+      { code: "WELFARE", description: "Welfare Fund", recurring: true, amount: 25, percentage: 0, type: "FIXED", taxable: false },
+      { code: "OTHER", description: "Other Deductions", recurring: false, amount: 0, percentage: 0, type: "VARIABLE", taxable: false }
     ])
 
     // Load comprehensive salary grades
     setSalaryGrades([
-      { id: "1", name: "Entry Level", minSalary: 2000, maxSalary: 3500, description: "Entry level positions" },
-      { id: "2", name: "Junior Level", minSalary: 3500, maxSalary: 5000, description: "Junior professional positions" },
-      { id: "3", name: "Mid Level", minSalary: 5000, maxSalary: 8000, description: "Mid-level professional positions" },
-      { id: "4", name: "Senior Level", minSalary: 8000, maxSalary: 12000, description: "Senior professional positions" },
-      { id: "5", name: "Management Level", minSalary: 12000, maxSalary: 20000, description: "Management positions" },
-      { id: "6", name: "Executive Level", minSalary: 20000, maxSalary: 50000, description: "Executive positions" }
+      { id: 1, name: "Entry Level", minSalary: 2000, maxSalary: 3500, description: "Entry level positions" },
+      { id: 2, name: "Junior Level", minSalary: 3500, maxSalary: 5000, description: "Junior professional positions" },
+      { id: 3, name: "Mid Level", minSalary: 5000, maxSalary: 8000, description: "Mid-level professional positions" },
+      { id: 4, name: "Senior Level", minSalary: 8000, maxSalary: 12000, description: "Senior professional positions" },
+      { id: 5, name: "Management Level", minSalary: 12000, maxSalary: 20000, description: "Management positions" },
+      { id: 6, name: "Executive Level", minSalary: 20000, maxSalary: 50000, description: "Executive positions" }
     ])
 
     // Load comprehensive unstructured grades
     setUnstructuredGrades([
-      { id: "1", name: "Software Engineer I", salary: 4500, description: "Junior software engineer" },
-      { id: "2", name: "Software Engineer II", salary: 6500, description: "Mid-level software engineer" },
-      { id: "3", name: "Senior Software Engineer", salary: 9500, description: "Senior software engineer" },
-      { id: "4", name: "Lead Software Engineer", salary: 13000, description: "Lead software engineer" },
-      { id: "5", name: "Principal Software Engineer", salary: 18000, description: "Principal software engineer" },
-      { id: "6", name: "Staff Software Engineer", salary: 25000, description: "Staff software engineer" }
+      { id: 1, name: "Software Engineer I", salary: 4500, description: "Junior software engineer" },
+      { id: 2, name: "Software Engineer II", salary: 6500, description: "Mid-level software engineer" },
+      { id: 3, name: "Senior Software Engineer", salary: 9500, description: "Senior software engineer" },
+      { id: 4, name: "Lead Software Engineer", salary: 13000, description: "Lead software engineer" },
+      { id: 5, name: "Principal Software Engineer", salary: 18000, description: "Principal software engineer" },
+      { id: 6, name: "Staff Software Engineer", salary: 25000, description: "Staff software engineer" }
     ])
 
     console.log("[v0] Payroll configuration data loaded")
@@ -1801,7 +1802,9 @@ export default function SettingsPage() {
         variables: ["company_name", "employee_name", "employee_id", "start_date"],
         createdBy: "HR Manager",
         createdAt: "2024-01-15T10:00:00Z",
-        lastModified: "2024-01-15T10:00:00Z"
+        lastModified: "2024-01-15T10:00:00Z",
+        status: "Active",
+        description: "Welcome email for new employees"
       },
       {
         id: "template-002",
@@ -1814,7 +1817,9 @@ export default function SettingsPage() {
         variables: ["employee_name", "month", "year", "gross_salary", "net_salary"],
         createdBy: "Payroll Manager",
         createdAt: "2024-01-10T09:00:00Z",
-        lastModified: "2024-01-10T09:00:00Z"
+        lastModified: "2024-01-10T09:00:00Z",
+        status: "Active",
+        description: "Payroll notification for payslip availability"
       },
       {
         id: "template-003",
@@ -1827,7 +1832,9 @@ export default function SettingsPage() {
         variables: ["employee_name", "leave_type", "start_date", "end_date"],
         createdBy: "HR Manager",
         createdAt: "2024-01-08T14:30:00Z",
-        lastModified: "2024-01-08T14:30:00Z"
+        lastModified: "2024-01-08T14:30:00Z",
+        status: "Active",
+        description: "Leave approval notification"
       },
       {
         id: "template-004",
@@ -1840,7 +1847,9 @@ export default function SettingsPage() {
         variables: ["manager_name", "employee_name", "due_date"],
         createdBy: "HR Manager",
         createdAt: "2024-01-05T11:15:00Z",
-        lastModified: "2024-01-05T11:15:00Z"
+        lastModified: "2024-01-05T11:15:00Z",
+        status: "Active",
+        description: "Performance review reminder"
       },
       {
         id: "template-005",
@@ -1853,7 +1862,9 @@ export default function SettingsPage() {
         variables: ["employee_name", "company_name"],
         createdBy: "HR Manager",
         createdAt: "2024-01-01T08:00:00Z",
-        lastModified: "2024-01-01T08:00:00Z"
+        lastModified: "2024-01-01T08:00:00Z",
+        status: "Active",
+        description: "Birthday wishes template"
       }
     ])
 
@@ -1865,8 +1876,8 @@ export default function SettingsPage() {
         message: "Scheduled maintenance will occur on Sunday, January 21st from 2:00 AM to 4:00 AM GMT",
         type: "system",
         priority: "medium",
-        isRead: false,
-        createdAt: "2024-01-15T10:00:00Z",
+        read: false,
+        timestamp: "2024-01-15T10:00:00Z",
         expiresAt: "2024-01-21T04:00:00Z"
       },
       {
@@ -1875,8 +1886,8 @@ export default function SettingsPage() {
         message: "Sarah Johnson has been successfully onboarded as a Software Engineer",
         type: "hr",
         priority: "low",
-        isRead: true,
-        createdAt: "2024-01-14T15:30:00Z",
+        read: true,
+        timestamp: "2024-01-14T15:30:00Z",
         expiresAt: null
       },
       {
@@ -1885,8 +1896,8 @@ export default function SettingsPage() {
         message: "January 2024 payroll has been processed successfully for all employees",
         type: "payroll",
         priority: "high",
-        isRead: false,
-        createdAt: "2024-01-14T09:00:00Z",
+        read: false,
+        timestamp: "2024-01-14T09:00:00Z",
         expiresAt: null
       },
       {
@@ -1895,8 +1906,8 @@ export default function SettingsPage() {
         message: "John Doe has submitted a leave request for February 5-9, 2024",
         type: "leave",
         priority: "medium",
-        isRead: false,
-        createdAt: "2024-01-13T14:20:00Z",
+        read: false,
+        timestamp: "2024-01-13T14:20:00Z",
         expiresAt: "2024-01-20T14:20:00Z"
       }
     ])
@@ -1924,83 +1935,83 @@ export default function SettingsPage() {
     setAuditLogs([
       {
         id: "audit-001",
-        userId: "user-001",
+        user_email: "admin@example.com",
         action: "LOGIN",
         resource: "Authentication",
         timestamp: "2024-01-15T10:30:00Z",
-        ipAddress: "192.168.1.100",
+        ip_address: "192.168.1.100",
         details: "Successful login from Chrome on Windows",
-        status: "SUCCESS"
+        severity: "low"
       },
       {
         id: "audit-002",
-        userId: "user-001",
+        user_email: "admin@example.com",
         action: "UPDATE",
         resource: "Employee Data",
         timestamp: "2024-01-15T10:25:00Z",
-        ipAddress: "192.168.1.100",
+        ip_address: "192.168.1.100",
         details: "Updated employee profile for John Doe",
-        status: "SUCCESS"
+        severity: "medium"
       },
       {
         id: "audit-003",
-        userId: "user-002",
+        user_email: "hr@example.com",
         action: "CREATE",
         resource: "Employee",
         timestamp: "2024-01-15T09:45:00Z",
-        ipAddress: "192.168.1.101",
+        ip_address: "192.168.1.101",
         details: "Created new employee profile for Sarah Johnson",
-        status: "SUCCESS"
+        severity: "medium"
       },
       {
         id: "audit-004",
-        userId: "user-001",
+        user_email: "admin@example.com",
         action: "DELETE",
         resource: "Document",
         timestamp: "2024-01-15T09:30:00Z",
-        ipAddress: "192.168.1.100",
+        ip_address: "192.168.1.100",
         details: "Deleted document: Old Policy Document.pdf",
-        status: "SUCCESS"
+        severity: "high"
       },
       {
         id: "audit-005",
-        userId: "user-003",
+        user_email: "payroll@example.com",
         action: "EXPORT",
         resource: "Payroll Data",
         timestamp: "2024-01-15T08:15:00Z",
-        ipAddress: "192.168.1.102",
+        ip_address: "192.168.1.102",
         details: "Exported payroll data for January 2024",
-        status: "SUCCESS"
+        severity: "high"
       },
       {
         id: "audit-006",
-        userId: "user-001",
+        user_email: "admin@example.com",
         action: "LOGIN_FAILED",
         resource: "Authentication",
         timestamp: "2024-01-15T07:20:00Z",
-        ipAddress: "192.168.1.100",
+        ip_address: "192.168.1.100",
         details: "Failed login attempt with invalid credentials",
-        status: "FAILED"
+        severity: "high"
       },
       {
         id: "audit-007",
-        userId: "user-002",
+        user_email: "hr@example.com",
         action: "UPDATE",
         resource: "Company Settings",
         timestamp: "2024-01-14T16:45:00Z",
-        ipAddress: "192.168.1.101",
+        ip_address: "192.168.1.101",
         details: "Updated company logo and branding",
-        status: "SUCCESS"
+        severity: "medium"
       },
       {
         id: "audit-008",
-        userId: "user-001",
+        user_email: "admin@example.com",
         action: "BACKUP",
         resource: "System",
         timestamp: "2024-01-14T02:00:00Z",
-        ipAddress: "192.168.1.100",
+        ip_address: "192.168.1.100",
         details: "Automated backup completed successfully",
-        status: "SUCCESS"
+        severity: "low"
       }
     ])
 
