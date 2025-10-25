@@ -52,6 +52,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
+  Receipt,
+  ExternalLink,
+  AlertCircle,
+  Clock,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -391,6 +395,47 @@ export default function SettingsPage() {
   const [isSavingPayroll, setIsSavingPayroll] = useState(false)
   const [isSavingTax, setIsSavingTax] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
+
+  // Tax Relief State
+  const [taxReliefs, setTaxReliefs] = useState([
+    {
+      id: 1,
+      name: "Personal Relief",
+      description: "Basic personal tax relief",
+      amount: 402,
+      currency: "GHS",
+      isActive: true,
+      category: "Personal",
+      effectiveDate: "2024-01-01",
+      lastUpdated: "2024-01-01T00:00:00Z"
+    },
+    {
+      id: 2,
+      name: "Child Relief",
+      description: "Tax relief for dependent children",
+      amount: 150,
+      currency: "GHS",
+      isActive: true,
+      category: "Family",
+      effectiveDate: "2024-01-01",
+      lastUpdated: "2024-01-01T00:00:00Z"
+    },
+    {
+      id: 3,
+      name: "Old Age Relief",
+      description: "Tax relief for elderly citizens",
+      amount: 200,
+      currency: "GHS",
+      isActive: true,
+      category: "Age",
+      effectiveDate: "2024-01-01",
+      lastUpdated: "2024-01-01T00:00:00Z"
+    }
+  ])
+  const [isSyncingReliefs, setIsSyncingReliefs] = useState(false)
+  const [reliefsLastSync, setReliefsLastSync] = useState<string | null>("2024-01-01T00:00:00Z")
+  const [editingRelief, setEditingRelief] = useState<number | null>(null)
+  const [isSavingReliefs, setIsSavingReliefs] = useState(false)
 
   const currencyConfig = {
     ghs: {
@@ -3487,6 +3532,146 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
   }
 
+  // Tax Relief Handlers
+  const handleTaxReliefFieldChange = (index: number, field: string, value: any) => {
+    const updatedReliefs = [...taxReliefs]
+    updatedReliefs[index] = { ...updatedReliefs[index], [field]: value }
+    setTaxReliefs(updatedReliefs)
+  }
+
+  const handleAddTaxRelief = () => {
+    const newRelief = {
+      id: Math.max(...taxReliefs.map(r => r.id)) + 1,
+      name: "",
+      description: "",
+      amount: 0,
+      currency: selectedCurrency.toUpperCase(),
+      isActive: true,
+      category: "Personal",
+      effectiveDate: new Date().toISOString().split('T')[0],
+      lastUpdated: new Date().toISOString()
+    }
+    setTaxReliefs([...taxReliefs, newRelief])
+    setEditingRelief(taxReliefs.length)
+  }
+
+  const handleEditTaxRelief = (index: number) => {
+    setEditingRelief(editingRelief === index ? null : index)
+  }
+
+  const handleDeleteTaxRelief = (index: number) => {
+    const updatedReliefs = taxReliefs.filter((_, i) => i !== index)
+    setTaxReliefs(updatedReliefs)
+    if (editingRelief === index) {
+      setEditingRelief(null)
+    } else if (editingRelief && editingRelief > index) {
+      setEditingRelief(editingRelief - 1)
+    }
+    toast({
+      title: "Tax Relief Deleted",
+      description: "The tax relief has been removed successfully.",
+    })
+  }
+
+  const syncTaxReliefsFromGRA = async () => {
+    setIsSyncingReliefs(true)
+    console.log("[v0] Syncing tax reliefs from GRA...")
+
+    try {
+      // Simulate API call to GRA
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      // Simulate updated data from GRA
+      const graReliefs = [
+        {
+          id: 1,
+          name: "Personal Relief",
+          description: "Basic personal tax relief",
+          amount: 402,
+          currency: "GHS",
+          isActive: true,
+          category: "Personal",
+          effectiveDate: "2024-01-01",
+          lastUpdated: new Date().toISOString()
+        },
+        {
+          id: 2,
+          name: "Child Relief",
+          description: "Tax relief for dependent children",
+          amount: 150,
+          currency: "GHS",
+          isActive: true,
+          category: "Family",
+          effectiveDate: "2024-01-01",
+          lastUpdated: new Date().toISOString()
+        },
+        {
+          id: 3,
+          name: "Old Age Relief",
+          description: "Tax relief for elderly citizens",
+          amount: 200,
+          currency: "GHS",
+          isActive: true,
+          category: "Age",
+          effectiveDate: "2024-01-01",
+          lastUpdated: new Date().toISOString()
+        },
+        {
+          id: 4,
+          name: "Disability Relief",
+          description: "Tax relief for persons with disabilities",
+          amount: 100,
+          currency: "GHS",
+          isActive: true,
+          category: "Disability",
+          effectiveDate: "2024-01-01",
+          lastUpdated: new Date().toISOString()
+        }
+      ]
+
+      setTaxReliefs(graReliefs)
+      setReliefsLastSync(new Date().toISOString())
+
+      toast({
+        title: "Tax Reliefs Synced",
+        description: "Successfully synced tax reliefs from GRA. 4 reliefs updated.",
+      })
+    } catch (error) {
+      console.error("[v0] Error syncing tax reliefs:", error)
+      toast({
+        title: "Sync Failed",
+        description: "Failed to sync tax reliefs from GRA. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSyncingReliefs(false)
+    }
+  }
+
+  const handleSaveReliefs = async () => {
+    setIsSavingReliefs(true)
+    console.log("[v0] Saving tax reliefs...")
+
+    try {
+      // Simulate save operation
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      toast({
+        title: "Tax Reliefs Saved",
+        description: "Tax reliefs have been saved successfully.",
+      })
+    } catch (error) {
+      console.error("[v0] Error saving tax reliefs:", error)
+      toast({
+        title: "Save Failed",
+        description: "Failed to save tax reliefs. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingReliefs(false)
+    }
+  }
+
   const handleAllowanceFieldChange = (index: number, field: string, value: any) => {
     const updatedAllowances = [...allowances]
     updatedAllowances[index] = { ...updatedAllowances[index], [field]: value }
@@ -6036,6 +6221,224 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 Save Payroll Configuration
               </Button>
             </div>
+
+            {/* Tax Reliefs Section */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Receipt className="w-5 h-5" />
+                      <span>Tax Reliefs</span>
+                    </CardTitle>
+                    <CardDescription>
+                      Manage tax reliefs and sync with Ghana Revenue Authority (GRA)
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={syncTaxReliefsFromGRA}
+                      disabled={isSyncingReliefs}
+                    >
+                      {isSyncingReliefs ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                      )}
+                      Sync from GRA
+                    </Button>
+                    <Button size="sm" onClick={handleAddTaxRelief}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Relief
+                    </Button>
+                  </div>
+                </div>
+                {reliefsLastSync && (
+                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <Clock className="w-4 h-4" />
+                    <span>Last synced: {new Date(reliefsLastSync).toLocaleString()}</span>
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-200 rounded-lg">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Name</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Description</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Amount</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Category</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Status</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {taxReliefs.map((relief, index) => (
+                        <tr key={relief.id} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 px-4 py-3">
+                            {editingRelief === index ? (
+                              <Input
+                                value={relief.name}
+                                onChange={(e) => handleTaxReliefFieldChange(index, "name", e.target.value)}
+                                className="w-full"
+                                placeholder="Relief name"
+                              />
+                            ) : (
+                              <div className="font-medium">{relief.name}</div>
+                            )}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            {editingRelief === index ? (
+                              <Input
+                                value={relief.description}
+                                onChange={(e) => handleTaxReliefFieldChange(index, "description", e.target.value)}
+                                className="w-full"
+                                placeholder="Description"
+                              />
+                            ) : (
+                              <div className="text-sm text-gray-600">{relief.description}</div>
+                            )}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            {editingRelief === index ? (
+                              <div className="flex items-center space-x-1">
+                                <span className="text-sm text-gray-500">{relief.currency}</span>
+                                <Input
+                                  type="number"
+                                  value={relief.amount}
+                                  onChange={(e) => handleTaxReliefFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)}
+                                  className="w-20 text-right"
+                                  step="0.01"
+                                />
+                              </div>
+                            ) : (
+                              <div className="font-medium text-green-600">
+                                {relief.currency} {relief.amount.toLocaleString()}
+                              </div>
+                            )}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            {editingRelief === index ? (
+                              <Select
+                                value={relief.category}
+                                onValueChange={(value) => handleTaxReliefFieldChange(index, "category", value)}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Personal">Personal</SelectItem>
+                                  <SelectItem value="Family">Family</SelectItem>
+                                  <SelectItem value="Age">Age</SelectItem>
+                                  <SelectItem value="Disability">Disability</SelectItem>
+                                  <SelectItem value="Education">Education</SelectItem>
+                                  <SelectItem value="Medical">Medical</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Badge variant="secondary">{relief.category}</Badge>
+                            )}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            {editingRelief === index ? (
+                              <Switch
+                                checked={relief.isActive}
+                                onCheckedChange={(checked) => handleTaxReliefFieldChange(index, "isActive", checked)}
+                              />
+                            ) : (
+                              <Badge variant={relief.isActive ? "default" : "secondary"}>
+                                {relief.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <div className="flex items-center justify-center space-x-2">
+                              {editingRelief === index ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setEditingRelief(null)}
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleDeleteTaxRelief(index)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleEditTaxRelief(index)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleDeleteTaxRelief(index)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {taxReliefs.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Receipt className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium">No tax reliefs configured</p>
+                    <p className="text-sm">Add your first tax relief or sync from GRA to get started.</p>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-4 border-t">
+                  <div className="text-sm text-gray-500">
+                    {taxReliefs.length} relief{taxReliefs.length !== 1 ? 's' : ''} configured
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      onClick={syncTaxReliefsFromGRA}
+                      disabled={isSyncingReliefs}
+                    >
+                      {isSyncingReliefs ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                      )}
+                      Sync from GRA
+                    </Button>
+                    <Button
+                      onClick={handleSaveReliefs}
+                      disabled={isSavingReliefs}
+                    >
+                      {isSavingReliefs ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      Save Reliefs
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
