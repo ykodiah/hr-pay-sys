@@ -7005,4 +7005,21 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 <CheckCircle className="w-5 h-5 text-emerald-600" />
                                 <div>
                                   <p className="text-sm font-medium">Status</p>
-                                  <p className="text-lg font-bold">{backupStatus || "Ready"}</p>\
+                                  <p className="text-lg font-bold">{backupStatus || "Ready"}</p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
