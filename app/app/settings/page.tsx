@@ -1577,8 +1577,446 @@ export default function SettingsPage() {
     console.log("[v0] Access and security data loaded.")
   }
 
+  const loadHRConfigData = async () => {
+    console.log("[v0] Loading HR configuration data...")
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    // Load comprehensive HR policies
+    setCurrentPolicies([
+      { 
+        name: "Annual Leave", 
+        days: 21, 
+        usage: "68%", 
+        trend: "up", 
+        description: "Annual vacation leave for all employees",
+        category: "Leave",
+        isActive: true,
+        applicableTo: "All Employees",
+        carryOverLimit: 5,
+        noticeRequired: 7
+      },
+      { 
+        name: "Sick Leave", 
+        days: 10, 
+        usage: "45%", 
+        trend: "down", 
+        description: "Medical leave for illness and health issues",
+        category: "Leave",
+        isActive: true,
+        applicableTo: "All Employees",
+        carryOverLimit: 0,
+        noticeRequired: 0
+      },
+      { 
+        name: "Maternity Leave", 
+        days: 90, 
+        usage: "12%", 
+        trend: "stable", 
+        description: "Maternity leave for new mothers",
+        category: "Leave",
+        isActive: true,
+        applicableTo: "Female Employees",
+        carryOverLimit: 0,
+        noticeRequired: 30
+      },
+      { 
+        name: "Paternity Leave", 
+        days: 14, 
+        usage: "8%", 
+        trend: "up", 
+        description: "Paternity leave for new fathers",
+        category: "Leave",
+        isActive: true,
+        applicableTo: "Male Employees",
+        carryOverLimit: 0,
+        noticeRequired: 14
+      },
+      { 
+        name: "Bereavement Leave", 
+        days: 5, 
+        usage: "3%", 
+        trend: "stable", 
+        description: "Leave for family bereavement",
+        category: "Leave",
+        isActive: true,
+        applicableTo: "All Employees",
+        carryOverLimit: 0,
+        noticeRequired: 0
+      },
+      { 
+        name: "Study Leave", 
+        days: 10, 
+        usage: "15%", 
+        trend: "up", 
+        description: "Leave for educational purposes",
+        category: "Development",
+        isActive: true,
+        applicableTo: "All Employees",
+        carryOverLimit: 0,
+        noticeRequired: 30
+      }
+    ])
+
+    // Load comprehensive HR documents
+    setHrDocuments([
+      {
+        id: "doc-001",
+        name: "Employee Handbook 2024",
+        type: "PDF",
+        size: "2.4 MB",
+        uploadedBy: "HR Manager",
+        uploadedAt: "2024-01-15T10:30:00Z",
+        category: "Policy",
+        description: "Comprehensive employee handbook covering all company policies and procedures",
+        tags: ["handbook", "policies", "procedures"],
+        isActive: true,
+        downloadCount: 156
+      },
+      {
+        id: "doc-002",
+        name: "Code of Conduct",
+        type: "PDF",
+        size: "1.2 MB",
+        uploadedBy: "Legal Team",
+        uploadedAt: "2024-01-10T14:20:00Z",
+        category: "Policy",
+        description: "Company code of conduct and ethical guidelines",
+        tags: ["conduct", "ethics", "guidelines"],
+        isActive: true,
+        downloadCount: 89
+      },
+      {
+        id: "doc-003",
+        name: "Performance Review Template",
+        type: "DOCX",
+        size: "0.8 MB",
+        uploadedBy: "HR Manager",
+        uploadedAt: "2024-01-08T09:15:00Z",
+        category: "Template",
+        description: "Standard template for employee performance reviews",
+        tags: ["performance", "review", "template"],
+        isActive: true,
+        downloadCount: 67
+      },
+      {
+        id: "doc-004",
+        name: "Safety Guidelines",
+        type: "PDF",
+        size: "3.1 MB",
+        uploadedBy: "Safety Officer",
+        uploadedAt: "2024-01-05T16:45:00Z",
+        category: "Safety",
+        description: "Workplace safety guidelines and emergency procedures",
+        tags: ["safety", "emergency", "guidelines"],
+        isActive: true,
+        downloadCount: 43
+      },
+      {
+        id: "doc-005",
+        name: "Remote Work Policy",
+        type: "PDF",
+        size: "1.5 MB",
+        uploadedBy: "HR Manager",
+        uploadedAt: "2024-01-03T11:30:00Z",
+        category: "Policy",
+        description: "Guidelines and procedures for remote work arrangements",
+        tags: ["remote", "work", "policy"],
+        isActive: true,
+        downloadCount: 78
+      }
+    ])
+
+    console.log("[v0] HR configuration data loaded")
+  }
+
+  const loadPayrollConfigData = async () => {
+    console.log("[v0] Loading payroll configuration data...")
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    // Load comprehensive allowances
+    setAllowances([
+      { code: "BASIC", description: "Basic Salary", recurring: true, amount: 0, percentage: 0, type: "FIXED" },
+      { code: "HRA", description: "Housing Allowance", recurring: true, amount: 500, percentage: 0, type: "FIXED" },
+      { code: "TRA", description: "Transport Allowance", recurring: true, amount: 200, percentage: 0, type: "FIXED" },
+      { code: "MED", description: "Medical Allowance", recurring: true, amount: 150, percentage: 0, type: "FIXED" },
+      { code: "BONUS", description: "Performance Bonus", recurring: false, amount: 0, percentage: 10, type: "VARIABLE" },
+      { code: "OVERTIME", description: "Overtime Pay", recurring: false, amount: 0, percentage: 0, type: "VARIABLE" },
+      { code: "COMM", description: "Commission", recurring: false, amount: 0, percentage: 0, type: "VARIABLE" },
+      { code: "MEAL", description: "Meal Allowance", recurring: true, amount: 100, percentage: 0, type: "FIXED" },
+      { code: "COMM", description: "Communication Allowance", recurring: true, amount: 80, percentage: 0, type: "FIXED" },
+      { code: "FUEL", description: "Fuel Allowance", recurring: true, amount: 300, percentage: 0, type: "FIXED" }
+    ])
+
+    // Load comprehensive deductions
+    setDeductions([
+      { code: "TAX", description: "Income Tax (PAYE)", recurring: true, amount: 0, percentage: 0, type: "VARIABLE" },
+      { code: "SSNIT", description: "SSNIT Contribution", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE" },
+      { code: "TIER2", description: "Tier 2 Pension", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE" },
+      { code: "TIER3", description: "Tier 3 Pension", recurring: true, amount: 0, percentage: 5, type: "VARIABLE" },
+      { code: "LOAN", description: "Staff Loan", recurring: true, amount: 200, percentage: 0, type: "FIXED" },
+      { code: "ADV", description: "Salary Advance", recurring: false, amount: 0, percentage: 0, type: "VARIABLE" },
+      { code: "INS", description: "Insurance Premium", recurring: true, amount: 50, percentage: 0, type: "FIXED" },
+      { code: "UNION", description: "Union Dues", recurring: true, amount: 30, percentage: 0, type: "FIXED" },
+      { code: "WELFARE", description: "Welfare Fund", recurring: true, amount: 25, percentage: 0, type: "FIXED" },
+      { code: "OTHER", description: "Other Deductions", recurring: false, amount: 0, percentage: 0, type: "VARIABLE" }
+    ])
+
+    // Load comprehensive salary grades
+    setSalaryGrades([
+      { id: "1", name: "Entry Level", minSalary: 2000, maxSalary: 3500, description: "Entry level positions" },
+      { id: "2", name: "Junior Level", minSalary: 3500, maxSalary: 5000, description: "Junior professional positions" },
+      { id: "3", name: "Mid Level", minSalary: 5000, maxSalary: 8000, description: "Mid-level professional positions" },
+      { id: "4", name: "Senior Level", minSalary: 8000, maxSalary: 12000, description: "Senior professional positions" },
+      { id: "5", name: "Management Level", minSalary: 12000, maxSalary: 20000, description: "Management positions" },
+      { id: "6", name: "Executive Level", minSalary: 20000, maxSalary: 50000, description: "Executive positions" }
+    ])
+
+    // Load comprehensive unstructured grades
+    setUnstructuredGrades([
+      { id: "1", name: "Software Engineer I", salary: 4500, description: "Junior software engineer" },
+      { id: "2", name: "Software Engineer II", salary: 6500, description: "Mid-level software engineer" },
+      { id: "3", name: "Senior Software Engineer", salary: 9500, description: "Senior software engineer" },
+      { id: "4", name: "Lead Software Engineer", salary: 13000, description: "Lead software engineer" },
+      { id: "5", name: "Principal Software Engineer", salary: 18000, description: "Principal software engineer" },
+      { id: "6", name: "Staff Software Engineer", salary: 25000, description: "Staff software engineer" }
+    ])
+
+    console.log("[v0] Payroll configuration data loaded")
+  }
+
+  const loadNotificationData = async () => {
+    console.log("[v0] Loading notification data...")
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    // Load comprehensive notification templates
+    setNotificationTemplates([
+      {
+        id: "template-001",
+        name: "Welcome Email",
+        subject: "Welcome to {{company_name}}!",
+        body: "Dear {{employee_name}},\n\nWelcome to {{company_name}}! We're excited to have you join our team.\n\nYour employee ID is: {{employee_id}}\nYour start date is: {{start_date}}\n\nPlease complete your profile setup and review the employee handbook.\n\nBest regards,\nHR Team",
+        type: "email",
+        category: "onboarding",
+        isActive: true,
+        variables: ["company_name", "employee_name", "employee_id", "start_date"],
+        createdBy: "HR Manager",
+        createdAt: "2024-01-15T10:00:00Z",
+        lastModified: "2024-01-15T10:00:00Z"
+      },
+      {
+        id: "template-002",
+        name: "Payroll Notification",
+        subject: "Your payslip for {{month}} {{year}} is ready",
+        body: "Dear {{employee_name}},\n\nYour payslip for {{month}} {{year}} has been processed and is now available in your employee portal.\n\nGross Salary: {{gross_salary}}\nNet Salary: {{net_salary}}\n\nPlease log in to view your detailed payslip.\n\nBest regards,\nPayroll Team",
+        type: "email",
+        category: "payroll",
+        isActive: true,
+        variables: ["employee_name", "month", "year", "gross_salary", "net_salary"],
+        createdBy: "Payroll Manager",
+        createdAt: "2024-01-10T09:00:00Z",
+        lastModified: "2024-01-10T09:00:00Z"
+      },
+      {
+        id: "template-003",
+        name: "Leave Approval",
+        subject: "Your leave request has been approved",
+        body: "Dear {{employee_name}},\n\nYour leave request for {{leave_type}} from {{start_date}} to {{end_date}} has been approved.\n\nPlease ensure you complete any pending tasks before your leave begins.\n\nBest regards,\nHR Team",
+        type: "email",
+        category: "leave",
+        isActive: true,
+        variables: ["employee_name", "leave_type", "start_date", "end_date"],
+        createdBy: "HR Manager",
+        createdAt: "2024-01-08T14:30:00Z",
+        lastModified: "2024-01-08T14:30:00Z"
+      },
+      {
+        id: "template-004",
+        name: "Performance Review Reminder",
+        subject: "Performance Review Due - {{employee_name}}",
+        body: "Dear {{manager_name}},\n\nThis is a reminder that the performance review for {{employee_name}} is due on {{due_date}}.\n\nPlease complete the review and submit it by the deadline.\n\nBest regards,\nHR Team",
+        type: "email",
+        category: "performance",
+        isActive: true,
+        variables: ["manager_name", "employee_name", "due_date"],
+        createdBy: "HR Manager",
+        createdAt: "2024-01-05T11:15:00Z",
+        lastModified: "2024-01-05T11:15:00Z"
+      },
+      {
+        id: "template-005",
+        name: "Birthday Wishes",
+        subject: "Happy Birthday {{employee_name}}!",
+        body: "Dear {{employee_name}},\n\nWishing you a very happy birthday! May this new year bring you joy, success, and fulfillment.\n\nEnjoy your special day!\n\nBest wishes,\n{{company_name}} Team",
+        type: "email",
+        category: "celebration",
+        isActive: true,
+        variables: ["employee_name", "company_name"],
+        createdBy: "HR Manager",
+        createdAt: "2024-01-01T08:00:00Z",
+        lastModified: "2024-01-01T08:00:00Z"
+      }
+    ])
+
+    // Load comprehensive notifications
+    setNotifications([
+      {
+        id: "notif-001",
+        title: "System Maintenance Scheduled",
+        message: "Scheduled maintenance will occur on Sunday, January 21st from 2:00 AM to 4:00 AM GMT",
+        type: "system",
+        priority: "medium",
+        isRead: false,
+        createdAt: "2024-01-15T10:00:00Z",
+        expiresAt: "2024-01-21T04:00:00Z"
+      },
+      {
+        id: "notif-002",
+        title: "New Employee Onboarded",
+        message: "Sarah Johnson has been successfully onboarded as a Software Engineer",
+        type: "hr",
+        priority: "low",
+        isRead: true,
+        createdAt: "2024-01-14T15:30:00Z",
+        expiresAt: null
+      },
+      {
+        id: "notif-003",
+        title: "Payroll Processing Complete",
+        message: "January 2024 payroll has been processed successfully for all employees",
+        type: "payroll",
+        priority: "high",
+        isRead: false,
+        createdAt: "2024-01-14T09:00:00Z",
+        expiresAt: null
+      },
+      {
+        id: "notif-004",
+        title: "Leave Request Pending Approval",
+        message: "John Doe has submitted a leave request for February 5-9, 2024",
+        type: "leave",
+        priority: "medium",
+        isRead: false,
+        createdAt: "2024-01-13T14:20:00Z",
+        expiresAt: "2024-01-20T14:20:00Z"
+      }
+    ])
+
+    console.log("[v0] Notification data loaded")
+  }
+
+  const loadSecurityData = async () => {
+    console.log("[v0] Loading security data...")
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    // Set backup information
+    setLastBackupTime("2024-01-15T02:00:00Z")
+    setBackupSize("2.4 GB")
+    setBackupStatus("completed")
+
+    console.log("[v0] Security data loaded")
+  }
+
+  const loadAuditLogs = async () => {
+    console.log("[v0] Loading audit logs...")
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    // Load comprehensive audit logs
+    setAuditLogs([
+      {
+        id: "audit-001",
+        userId: "user-001",
+        action: "LOGIN",
+        resource: "Authentication",
+        timestamp: "2024-01-15T10:30:00Z",
+        ipAddress: "192.168.1.100",
+        details: "Successful login from Chrome on Windows",
+        status: "SUCCESS"
+      },
+      {
+        id: "audit-002",
+        userId: "user-001",
+        action: "UPDATE",
+        resource: "Employee Data",
+        timestamp: "2024-01-15T10:25:00Z",
+        ipAddress: "192.168.1.100",
+        details: "Updated employee profile for John Doe",
+        status: "SUCCESS"
+      },
+      {
+        id: "audit-003",
+        userId: "user-002",
+        action: "CREATE",
+        resource: "Employee",
+        timestamp: "2024-01-15T09:45:00Z",
+        ipAddress: "192.168.1.101",
+        details: "Created new employee profile for Sarah Johnson",
+        status: "SUCCESS"
+      },
+      {
+        id: "audit-004",
+        userId: "user-001",
+        action: "DELETE",
+        resource: "Document",
+        timestamp: "2024-01-15T09:30:00Z",
+        ipAddress: "192.168.1.100",
+        details: "Deleted document: Old Policy Document.pdf",
+        status: "SUCCESS"
+      },
+      {
+        id: "audit-005",
+        userId: "user-003",
+        action: "EXPORT",
+        resource: "Payroll Data",
+        timestamp: "2024-01-15T08:15:00Z",
+        ipAddress: "192.168.1.102",
+        details: "Exported payroll data for January 2024",
+        status: "SUCCESS"
+      },
+      {
+        id: "audit-006",
+        userId: "user-001",
+        action: "LOGIN_FAILED",
+        resource: "Authentication",
+        timestamp: "2024-01-15T07:20:00Z",
+        ipAddress: "192.168.1.100",
+        details: "Failed login attempt with invalid credentials",
+        status: "FAILED"
+      },
+      {
+        id: "audit-007",
+        userId: "user-002",
+        action: "UPDATE",
+        resource: "Company Settings",
+        timestamp: "2024-01-14T16:45:00Z",
+        ipAddress: "192.168.1.101",
+        details: "Updated company logo and branding",
+        status: "SUCCESS"
+      },
+      {
+        id: "audit-008",
+        userId: "user-001",
+        action: "BACKUP",
+        resource: "System",
+        timestamp: "2024-01-14T02:00:00Z",
+        ipAddress: "192.168.1.100",
+        details: "Automated backup completed successfully",
+        status: "SUCCESS"
+      }
+    ])
+
+    console.log("[v0] Audit logs loaded")
+  }
+
+  const loadSalaryGradesData = async () => {
+    console.log("[v0] Loading salary grades data...")
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    // This data is already loaded in loadPayrollConfigData, but we can add more specific salary grade data here
+    console.log("[v0] Salary grades data loaded")
+  }
+
   const loadAllData = async () => {
-    console.log("[v0] Loading settings data...")
+    console.log("[v0] Loading comprehensive settings data...")
     try {
       await Promise.all([
         loadCompanyData(),
@@ -1586,10 +2024,16 @@ export default function SettingsPage() {
         loadSubsidiaries(),
         loadRoles(),
         loadAccessAndSecurityData(),
+        loadHRConfigData(),
+        loadPayrollConfigData(),
+        loadNotificationData(),
+        loadSecurityData(),
+        loadAuditLogs(),
+        loadSalaryGradesData(),
       ])
-      console.log("[v0] All settings data loaded successfully")
+      console.log("[v0] All comprehensive settings data loaded successfully")
     } catch (error) {
-      console.error("[v0] Error loading settings data:", error)
+      console.error("[v0] Error loading comprehensive settings data:", error)
     }
   }
 
