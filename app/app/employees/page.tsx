@@ -875,8 +875,7 @@ export default function EmployeesPage() {
           created_at: new Date().toISOString(),
         }
 
-        mockEmployees.push(newEmployee)
-        setEmployees([...mockEmployees])
+        setEmployees(prev => [...prev, newEmployee])
         setShowAddEmployee(false)
 
         toast({
@@ -1170,6 +1169,51 @@ export default function EmployeesPage() {
     })
   }
 
+  const handleExportEmployees = () => {
+    try {
+      // Convert employees data to CSV format
+      const csvContent = [
+        // Headers
+        ["Employee ID", "First Name", "Last Name", "Email", "Phone", "Position", "Department", "Status", "Date of Joining"],
+        // Data rows
+        ...employees.map(emp => [
+          emp.employee_id || emp.employeeId || "",
+          emp.first_name || emp.firstName || "",
+          emp.last_name || emp.lastName || "",
+          emp.corporate_email || emp.personal_email || "",
+          emp.phone || "",
+          emp.position || "",
+          emp.department || "",
+          emp.status || "",
+          emp.date_of_joining || emp.dateOfJoining || ""
+        ])
+      ].map(row => row.map(field => `"${field}"`).join(",")).join("\n")
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+      const link = document.createElement("a")
+      const url = URL.createObjectURL(blob)
+      link.setAttribute("href", url)
+      link.setAttribute("download", `employees_export_${new Date().toISOString().split('T')[0]}.csv`)
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      toast({
+        title: "Export Successful",
+        description: `${employees.length} employees exported successfully`,
+      })
+    } catch (error) {
+      console.error("Export error:", error)
+      toast({
+        title: "Export Failed",
+        description: "Failed to export employees. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const downloadTemplate = (templateType: string) => {
     let csvContent = ""
     let filename = ""
@@ -1413,11 +1457,11 @@ export default function EmployeesPage() {
           <p className="text-gray-600 mt-1">Manage your workforce and employee information</p>
         </div>
         <div className="flex items-center space-x-3">
-          <Button variant="outline" className="bg-transparent">
+          <Button variant="outline" className="bg-transparent" onClick={() => handleExportEmployees()}>
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
-          <Button variant="outline" className="bg-transparent">
+          <Button variant="outline" className="bg-transparent" onClick={() => setIsImportDialogOpen(true)}>
             <Upload className="w-4 h-4 mr-2" />
             Import
           </Button>
