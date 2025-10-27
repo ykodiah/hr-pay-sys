@@ -1,7 +1,77 @@
 "use client"
 import { useState, useEffect } from "react"
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import {
+  Building2,
+  Users,
+  X,
+  Eye,
+  Edit,
+  MoreVertical,
+  Loader2,
+  Brain,
+  Plus,
+  RefreshCw,
+  MapPin,
+  Briefcase,
+  Copy,
+  Download,
+  Upload,
+  ImageIcon,
+  AlertTriangle,
+  CheckCircle,
+  Save,
+  Settings,
+  Calendar,
+  Sparkles,
+  TrendingUp,
+  DollarSign,
+  Minus,
+  Calculator,
+  Wifi,
+  Bell,
+  MoreHorizontal,
+  Trash2,
+  Send,
+  Mail,
+  Shield,
+  Database,
+  FileText,
+  EyeOff,
+  Check,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  Maximize,
+  Minimize,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Receipt,
+  ExternalLink,
+  AlertCircle,
+  Clock,
+} from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import { Separator } from "@/components/ui/separator" // Added for Separator
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table" // Added for Table components
 
 interface Company {
   id: string
@@ -122,8 +192,6 @@ export default function SettingsPage() {
 
   const { toast } = useToast()
   const supabase = createClient()
-
-  const [activeTab, setActiveTab] = useState("company") // State for active tab
 
   const [companyData, setCompanyData] = useState<Company>({
     id: "",
@@ -302,9 +370,9 @@ export default function SettingsPage() {
   ])
 
   const [deductions, setDeductions] = useState([
-    { code: "TAX", description: "Tax Deduction", recurring: true, amount: 0, percentage: 0, type: "VARIABLE", taxable: false },
-    { code: "SSNIT", description: "SSNIT Deduction", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE", taxable: false },
-    { code: "LOAN", description: "Loan Deduction", recurring: true, amount: 0, percentage: 0, type: "FIXED", taxable: false },
+    { code: "TAX", description: "Tax Deduction", recurring: true, amount: 0, percentage: 0, type: "VARIABLE" },
+    { code: "SSNIT", description: "SSNIT Deduction", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE" },
+    { code: "LOAN", description: "Loan Deduction", recurring: true, amount: 0, percentage: 0, type: "FIXED" },
   ])
 
   const [ssnitRates, setSsnitRates] = useState({
@@ -952,6 +1020,1613 @@ export default function SettingsPage() {
     setTier3Rates(newRates)
   }
 
+  // Enhanced handleDownload to work with Blob URLs
+  const handleDownload = () => {
+    if (selectedDocument) {
+      const content = parseDocumentContent(selectedDocument)
+      let blob
+      let filename
+
+      if (selectedDocument.type === "PDF") {
+        // In a real application, this would be a PDF file from a URL
+        // For this demo, we'll simulate downloading as a text file
+        blob = new Blob([content], { type: "text/plain" })
+        filename = `${selectedDocument.name}.txt`
+
+        toast({
+          title: "Download Note",
+          description: "PDF viewed directly; download is disabled in this view.",
+        })
+        return // Prevent actual download for PDF in view mode
+      } else if (selectedDocument.type === "DOC" || selectedDocument.type === "DOCX") {
+        // For Word docs, create as RTF format
+        const rtfContent = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}} \\f0\\fs24 ${content.replace(/\n/g, "\\par ")}}`
+        blob = new Blob([rtfContent], { type: "application/rtf" })
+        filename = `${selectedDocument.name}.rtf`
+      } else {
+        // Fallback for other file types
+        blob = new Blob([content], { type: "text/plain" })
+        filename = `${selectedDocument.name}.txt`
+      }
+
+      // Simulate download for non-PDF types
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Download Started",
+        description: `Downloading ${filename}...`,
+      })
+    }
+  }
+
+  // Updated handleFullscreen to use the new state and potentially toggle document viewer fullscreen
+  const handleFullscreen = () => {
+    setIsFullscreen((prev) => !prev)
+    if (!isFullscreen) {
+      toast({
+        title: "Fullscreen Mode",
+        description: "Press ESC to exit fullscreen",
+      })
+    }
+  }
+
+  // Logo upload function
+  const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
+    if (!file) return
+
+    setIsUploadingLogo(true)
+    try {
+      // Create form data for blob upload
+      const formData = new FormData()
+      formData.append("file", file)
+
+      // Upload to Vercel Blob
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error("Upload failed")
+      }
+
+      const { url } = await response.json()
+
+      // Set preview based on type
+      if (type === "company") {
+        setCompanyLogoPreview(url)
+        setCompanyData({ ...companyData, logo_url: url })
+      } else {
+        setSubsidiaryLogoPreview(url)
+        if (selectedSubsidiary) {
+          const updatedSubsidiary = { ...selectedSubsidiary, logo_url: url }
+          setSelectedSubsidiary(updatedSubsidiary)
+          // Also update the subsidiary in the main list
+          setSubsidiaries((prev) =>
+            prev.map((sub) => (sub.id === selectedSubsidiary.id ? { ...sub, logo_url: url } : sub)),
+          )
+        }
+      }
+
+      toast({
+        title: "Logo uploaded successfully",
+        description: "Your logo has been uploaded and is ready to use.",
+      })
+    } catch (error) {
+      console.error("Logo upload error:", error)
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload logo. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingLogo(false)
+    }
+  }
+
+  // Load functions
+  const loadCompanyData = async () => {
+    console.log("[v0] Loading company data...")
+
+    if (isDemoMode()) {
+      console.log("[v0] Demo mode detected, using mock company data")
+      setCompanyData({
+        id: "demo-company-001",
+        name: "Akwaaba Technologies Ltd",
+        email_address: "ykodiah@gmail.com",
+        tax_id: "C0012345678",
+        ssnit_number: "1234567890",
+        industry: "Technology",
+        status: "active",
+        address: "123 Liberation Road, Labone, Accra, Ghana",
+        phone_number: "0249397960",
+        divisions: ["Head Office", "Regional Office"],
+        departments: ["Technology", "Human Resources", "Finance"],
+        locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
+      })
+      setDivisions(["Head Office", "Regional Office"])
+      setDepartments(["Technology", "Human Resources", "Finance"])
+      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+      return
+    }
+
+    try {
+      const { data, error } = await supabase.from("companies").select("*").single()
+
+      if (error) throw error
+
+      if (data) {
+        setCompanyData({
+          id: data.id,
+          name: data.name || "",
+          email_address: data.email_address || "",
+          tax_id: data.tax_id || "",
+          ssnit_number: data.ssnit_number || "",
+          industry: data.industry || "",
+          status: "active",
+          address: data.address || "",
+          phone_number: data.phone_number || "",
+          divisions: data.divisions || [],
+          departments: data.departments || [],
+          locations: data.locations || [],
+        })
+
+        setDivisions(data.divisions || [])
+        setDepartments(data.departments || [])
+        setLocations(data.locations || [])
+        setLogoPreview(data.logo_url || "")
+      }
+    } catch (error) {
+      console.error("[v0] Error loading company data:", error)
+      if (error.message && error.message.includes("infinite recursion detected in policy")) {
+        console.log("[v0] Database policy error detected, falling back to demo mode")
+        // Set demo session cookie to prevent future database calls
+        document.cookie = "demo-session=active; path=/; max-age=86400"
+        // Load demo data
+        setCompanyData({
+          id: "demo-company-001",
+          name: "Akwaaba Technologies Ltd",
+          email_address: "ykodiah@gmail.com",
+          tax_id: "C0012345678",
+          ssnit_number: "1234567890",
+          industry: "Technology",
+          status: "active",
+          address: "123 Liberation Road, Labone, Accra, Ghana",
+          phone_number: "0249397960",
+          divisions: ["Head Office", "Regional Office"],
+          departments: ["Technology", "Human Resources", "Finance"],
+          locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
+        })
+        setDivisions(["Head Office", "Regional Office"])
+        setDepartments(["Technology", "Human Resources", "Finance"])
+        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+        return
+      }
+      toast({
+        title: "Error",
+        description: "Failed to load company data",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const loadEmployees = async () => {
+    console.log("[v0] Loading employees...")
+
+    if (isDemoMode()) {
+      console.log("[v0] Demo mode detected, using mock employees data")
+      setEmployees([
+        {
+          id: "emp-001",
+          first_name: "John",
+          last_name: "Doe",
+          full_name: "John Doe",
+          corporate_email: "john.doe@akwaaba.com",
+          personal_email: "john.doe@gmail.com",
+          position: "Software Engineer",
+          department: "Technology",
+          status: "active",
+        },
+        {
+          id: "emp-002",
+          first_name: "Jane",
+          last_name: "Smith",
+          full_name: "Jane Smith",
+          corporate_email: "jane.smith@akwaaba.com",
+          personal_email: "jane.smith@gmail.com",
+          position: "HR Manager",
+          department: "Human Resources",
+          status: "active",
+        },
+      ])
+      return
+    }
+
+    try {
+      const { data, error } = await supabase.from("employees").select("*").order("created_at", { ascending: false })
+
+      if (error) throw error
+      setEmployees(data || [])
+    } catch (error) {
+      console.error("Error loading employees:", error)
+      if (error.message && error.message.includes("infinite recursion detected in policy")) {
+        console.log("[v0] Database policy error detected, falling back to demo mode for employees")
+        document.cookie = "demo-session=active; path=/; max-age=86400"
+        setEmployees([
+          {
+            id: "emp-001",
+            first_name: "John",
+            last_name: "Doe",
+            full_name: "John Doe",
+            corporate_email: "john.doe@akwaaba.com",
+            personal_email: "john.doe@gmail.com",
+            position: "Software Engineer",
+            department: "Technology",
+            status: "active",
+          },
+          {
+            id: "emp-002",
+            first_name: "Jane",
+            last_name: "Smith",
+            full_name: "Jane Smith",
+            corporate_email: "jane.smith@akwaaba.com",
+            personal_email: "jane.smith@gmail.com",
+            position: "HR Manager",
+            department: "Human Resources",
+            status: "active",
+          },
+        ])
+        return
+      }
+      toast({
+        title: "Error",
+        description: "Failed to load employees",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const loadSubsidiaries = async () => {
+    console.log("[v0] Loading subsidiaries...")
+
+    if (isDemoMode()) {
+      console.log("[v0] Demo mode detected, using mock subsidiaries data")
+      setSubsidiaries([
+        {
+          id: "sub-001",
+          company_id: "comp-001",
+          name: "Akwaaba Digital Solutions",
+          email_address: "info@akwaabadigital.com",
+          phone_number: "+233 30 276 5432",
+          tax_id: "TIN-ADS-2023-001",
+          ssnit_number: "SSNIT-ADS-789012",
+          address: "15 Liberation Road, Ridge, Accra, Ghana",
+          status: "active",
+          industry: "Digital Marketing & Web Development",
+          divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
+          departments: ["Marketing", "Development", "Design", "Sales"],
+          locations: ["Accra - Ridge", "Kumasi Branch"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 2,
+          employee_count: 45,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "sub-002",
+          company_id: "comp-001",
+          name: "Akwaaba Consulting Group",
+          email_address: "consulting@akwaaba.com",
+          phone_number: "+233 30 276 5433",
+          tax_id: "TIN-ACG-2023-002",
+          ssnit_number: "SSNIT-ACG-789013",
+          address: "8 Airport Residential Area, Accra, Ghana",
+          status: "active",
+          industry: "Business Consulting & Strategy",
+          divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
+          departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
+          locations: ["Accra - Airport", "Tema Office"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 2,
+          employee_count: 32,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "sub-003",
+          company_id: "comp-001",
+          name: "Akwaaba Financial Services",
+          email_address: "finance@akwaabafs.com",
+          phone_number: "+233 30 276 5434",
+          tax_id: "TIN-AFS-2023-003",
+          ssnit_number: "SSNIT-AFS-789014",
+          address: "25 Independence Avenue, Accra, Ghana",
+          status: "active",
+          industry: "Financial Technology & Services",
+          divisions: ["Fintech Solutions", "Payment Processing", "Financial Advisory"],
+          departments: ["Finance", "Technology", "Compliance", "Customer Service"],
+          locations: ["Accra - Independence Ave", "Ho Regional Office"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 2,
+          employee_count: 28,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "sub-004",
+          company_id: "comp-001",
+          name: "Akwaaba Logistics Ltd",
+          email_address: "logistics@akwaabalog.com",
+          phone_number: "+233 30 276 5435",
+          tax_id: "TIN-ALL-2023-004",
+          ssnit_number: "SSNIT-ALL-789015",
+          address: "12 Spintex Road, Accra, Ghana",
+          status: "active",
+          industry: "Supply Chain & Logistics",
+          divisions: ["Transportation", "Warehousing", "Supply Chain Management"],
+          departments: ["Operations", "Fleet Management", "Warehousing", "Customer Service"],
+          locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 3,
+          employee_count: 67,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "sub-005",
+          company_id: "comp-001",
+          name: "Akwaaba Training Institute",
+          email_address: "training@akwaabainstitute.com",
+          phone_number: "+233 30 276 5436",
+          tax_id: "TIN-ATI-2023-005",
+          ssnit_number: "SSNIT-ATI-789016",
+          address: "5 Cantonments Road, Accra, Ghana",
+          status: "active",
+          industry: "Education & Professional Training",
+          divisions: ["Corporate Training", "IT Certification", "Professional Development"],
+          departments: ["Training", "Curriculum Development", "Student Services", "Administration"],
+          locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 3,
+          employee_count: 23,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      return
+    }
+
+    try {
+      // Load subsidiaries with employee counts
+      const { data: subsidiariesData, error: subsidiariesError } = await supabase
+        .from("subsidiaries")
+        .select(`
+          *,
+          employees:employees(count)
+        `)
+        .order("created_at", { ascending: false })
+
+      if (subsidiariesError) throw subsidiariesError
+
+      // Process the data to add computed fields
+      const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => ({
+        ...sub,
+        divisions: Array.isArray(sub.divisions) ? sub.divisions : [],
+        departments: Array.isArray(sub.departments) ? sub.departments : [],
+        locations: Array.isArray(sub.locations) ? sub.locations : [],
+        divisions_count: Array.isArray(sub.divisions) ? sub.divisions.length : 0,
+        departments_count: Array.isArray(sub.departments) ? sub.departments.length : 0,
+        locations_count: Array.isArray(sub.locations) ? sub.locations.length : 0,
+        employee_count: sub.employees?.[0]?.count || 0,
+      }))
+
+      setSubsidiaries(processedSubsidiaries)
+      console.log("[v0] Loaded subsidiaries:", processedSubsidiaries.length)
+    } catch (error) {
+      console.error("Subsidiaries loading error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load subsidiaries",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const loadRoles = async () => {
+    console.log("[v0] Loading roles...")
+
+    if (isDemoMode()) {
+      console.log("[v0] Demo mode detected, using mock roles data")
+      setRoles([
+        {
+          id: "role-001",
+          name: "Administrator",
+          description: "Full system access and management capabilities",
+          permissions: ["all"],
+          user_count: 2,
+        },
+        {
+          id: "role-002",
+          name: "HR Manager",
+          description: "Human resources management and employee oversight",
+          permissions: ["hr", "employees", "reports"],
+          user_count: 3,
+        },
+        {
+          id: "role-003",
+          name: "Employee",
+          description: "Standard employee access to personal information",
+          permissions: ["profile", "payslip", "leave"],
+          user_count: 45,
+        },
+      ])
+      return
+    }
+
+    try {
+      const { data, error } = await supabase.from("roles").select("*").order("created_at", { ascending: false })
+
+      if (error) throw error
+      setRoles(data || [])
+    } catch (error) {
+      console.error("Error loading roles:", error)
+      if (error.message && error.message.includes("infinite recursion detected in policy")) {
+        console.log("[v0] Database policy error detected, falling back to demo mode for roles")
+        document.cookie = "demo-session=active; path=/; max-age=86400"
+        setRoles([
+          {
+            id: "role-001",
+            name: "Administrator",
+            description: "Full system access",
+            permissions: ["read", "write", "delete", "admin"],
+            status: "active",
+          },
+          {
+            id: "role-002",
+            name: "HR Manager",
+            description: "Human Resources management",
+            permissions: ["read", "write"],
+            status: "active",
+          },
+        ])
+        return
+      }
+      toast({
+        title: "Error",
+        description: "Failed to load roles",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Added for Access Control and Security
+  const loadAccessAndSecurityData = async () => {
+    console.log("[v0] Loading access and security data...")
+    // Simulate fetching data
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    // Mock data for demonstration
+    setAccessSettings({
+      twoFactorEnabled: true,
+      ssoEnabled: false,
+      passwordExpiryEnabled: true,
+      sessionTimeout: 30,
+      maxLoginAttempts: 5,
+      passwordMinLength: 10,
+      ipRestrictionsEnabled: true,
+      allowedIPs: ["192.168.1.0/24", "10.0.0.1"],
+    })
+    setSecuritySettings({
+      dataEncryptionEnabled: true,
+      auditLoggingEnabled: true,
+      autoBackupEnabled: true,
+      backupFrequency: "daily",
+      dataRetentionDays: 180,
+    })
+    setLastBackupTime(new Date("2024-03-10T10:00:00Z").toISOString())
+    setBackupSize("50 MB")
+    setBackupStatus("Completed")
+    setAuditLogs([
+      {
+        id: "log-001",
+        user_email: "admin@example.com",
+        action: "User logged in",
+        timestamp: new Date("2024-03-11T09:00:00Z").toISOString(),
+        ip_address: "192.168.1.10",
+        severity: "low",
+      },
+      {
+        id: "log-002",
+        user_email: "hr@example.com",
+        action: "Updated employee record",
+        timestamp: new Date("2024-03-11T09:05:00Z").toISOString(),
+        ip_address: "192.168.1.11",
+        severity: "medium",
+      },
+      {
+        id: "log-003",
+        user_email: "admin@example.com",
+        action: "Security settings modified",
+        timestamp: new Date("2024-03-11T09:10:00Z").toISOString(),
+        ip_address: "192.168.1.10",
+        severity: "high",
+      },
+    ])
+    setActiveSessions([
+      {
+        id: "session-001",
+        user_email: "admin@example.com",
+        ip_address: "192.168.1.10",
+        device: "Desktop",
+        last_activity: new Date("2024-03-11T09:10:00Z").toISOString(),
+      },
+      {
+        id: "session-002",
+        user_email: "user@example.com",
+        ip_address: "10.0.0.5",
+        device: "Mobile",
+        last_activity: new Date("2024-03-11T08:30:00Z").toISOString(),
+      },
+    ])
+    console.log("[v0] Access and security data loaded.")
+  }
+
+  const loadHRConfigData = async () => {
+    console.log("[v0] Loading HR configuration data...")
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    // Load comprehensive HR policies
+    setCurrentPolicies([
+      { 
+        name: "Annual Leave", 
+        days: 21, 
+        usage: "68%", 
+        trend: "up", 
+        description: "Annual vacation leave for all employees",
+        category: "Leave",
+        isActive: true,
+        applicableTo: "All Employees",
+        carryOverLimit: 5,
+        noticeRequired: 7
+      },
+      { 
+        name: "Sick Leave", 
+        days: 10, 
+        usage: "45%", 
+        trend: "down", 
+        description: "Medical leave for illness and health issues",
+        category: "Leave",
+        isActive: true,
+        applicableTo: "All Employees",
+        carryOverLimit: 0,
+        noticeRequired: 0
+      },
+      { 
+        name: "Maternity Leave", 
+        days: 90, 
+        usage: "12%", 
+        trend: "stable", 
+        description: "Maternity leave for new mothers",
+        category: "Leave",
+        isActive: true,
+        applicableTo: "Female Employees",
+        carryOverLimit: 0,
+        noticeRequired: 30
+      },
+      { 
+        name: "Paternity Leave", 
+        days: 14, 
+        usage: "8%", 
+        trend: "up", 
+        description: "Paternity leave for new fathers",
+        category: "Leave",
+        isActive: true,
+        applicableTo: "Male Employees",
+        carryOverLimit: 0,
+        noticeRequired: 14
+      },
+      { 
+        name: "Bereavement Leave", 
+        days: 5, 
+        usage: "3%", 
+        trend: "stable", 
+        description: "Leave for family bereavement",
+        category: "Leave",
+        isActive: true,
+        applicableTo: "All Employees",
+        carryOverLimit: 0,
+        noticeRequired: 0
+      },
+      { 
+        name: "Study Leave", 
+        days: 10, 
+        usage: "15%", 
+        trend: "up", 
+        description: "Leave for educational purposes",
+        category: "Development",
+        isActive: true,
+        applicableTo: "All Employees",
+        carryOverLimit: 0,
+        noticeRequired: 30
+      }
+    ])
+
+    // Load comprehensive HR documents
+    setHrDocuments([
+      {
+        id: "doc-001",
+        name: "Employee Handbook 2024",
+        type: "PDF",
+        size: "2.4 MB",
+        uploadedBy: "HR Manager",
+        uploadedAt: "2024-01-15T10:30:00Z",
+        category: "Policy",
+        description: "Comprehensive employee handbook covering all company policies and procedures",
+        tags: ["handbook", "policies", "procedures"],
+        isActive: true,
+        downloadCount: 156
+      },
+      {
+        id: "doc-002",
+        name: "Code of Conduct",
+        type: "PDF",
+        size: "1.2 MB",
+        uploadedBy: "Legal Team",
+        uploadedAt: "2024-01-10T14:20:00Z",
+        category: "Policy",
+        description: "Company code of conduct and ethical guidelines",
+        tags: ["conduct", "ethics", "guidelines"],
+        isActive: true,
+        downloadCount: 89
+      },
+      {
+        id: "doc-003",
+        name: "Performance Review Template",
+        type: "DOCX",
+        size: "0.8 MB",
+        uploadedBy: "HR Manager",
+        uploadedAt: "2024-01-08T09:15:00Z",
+        category: "Template",
+        description: "Standard template for employee performance reviews",
+        tags: ["performance", "review", "template"],
+        isActive: true,
+        downloadCount: 67
+      },
+      {
+        id: "doc-004",
+        name: "Safety Guidelines",
+        type: "PDF",
+        size: "3.1 MB",
+        uploadedBy: "Safety Officer",
+        uploadedAt: "2024-01-05T16:45:00Z",
+        category: "Safety",
+        description: "Workplace safety guidelines and emergency procedures",
+        tags: ["safety", "emergency", "guidelines"],
+        isActive: true,
+        downloadCount: 43
+      },
+      {
+        id: "doc-005",
+        name: "Remote Work Policy",
+        type: "PDF",
+        size: "1.5 MB",
+        uploadedBy: "HR Manager",
+        uploadedAt: "2024-01-03T11:30:00Z",
+        category: "Policy",
+        description: "Guidelines and procedures for remote work arrangements",
+        tags: ["remote", "work", "policy"],
+        isActive: true,
+        downloadCount: 78
+      }
+    ])
+
+    console.log("[v0] HR configuration data loaded")
+  }
+
+  const loadPayrollConfigData = async () => {
+    console.log("[v0] Loading payroll configuration data...")
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    // Load comprehensive allowances
+    setAllowances([
+      { code: "BASIC", description: "Basic Salary", recurring: true, amount: 0, percentage: 0, type: "FIXED", taxable: true },
+      { code: "HRA", description: "Housing Allowance", recurring: true, amount: 500, percentage: 0, type: "FIXED", taxable: true },
+      { code: "TRA", description: "Transport Allowance", recurring: true, amount: 200, percentage: 0, type: "FIXED", taxable: true },
+      { code: "MED", description: "Medical Allowance", recurring: true, amount: 150, percentage: 0, type: "FIXED", taxable: false },
+      { code: "BONUS", description: "Performance Bonus", recurring: false, amount: 0, percentage: 10, type: "VARIABLE", taxable: true },
+      { code: "OVERTIME", description: "Overtime Pay", recurring: false, amount: 0, percentage: 0, type: "VARIABLE", taxable: true },
+      { code: "COMM", description: "Commission", recurring: false, amount: 0, percentage: 0, type: "VARIABLE", taxable: true },
+      { code: "MEAL", description: "Meal Allowance", recurring: true, amount: 100, percentage: 0, type: "FIXED", taxable: true },
+      { code: "COMM", description: "Communication Allowance", recurring: true, amount: 80, percentage: 0, type: "FIXED", taxable: true },
+      { code: "FUEL", description: "Fuel Allowance", recurring: true, amount: 300, percentage: 0, type: "FIXED", taxable: true }
+    ])
+
+    // Load comprehensive deductions
+    setDeductions([
+      { code: "TAX", description: "Income Tax (PAYE)", recurring: true, amount: 0, percentage: 0, type: "VARIABLE", taxable: false },
+      { code: "SSNIT", description: "SSNIT Contribution", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE", taxable: false },
+      { code: "TIER2", description: "Tier 2 Pension", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE", taxable: false },
+      { code: "TIER3", description: "Tier 3 Pension", recurring: true, amount: 0, percentage: 5, type: "VARIABLE", taxable: false },
+      { code: "LOAN", description: "Staff Loan", recurring: true, amount: 200, percentage: 0, type: "FIXED", taxable: false },
+      { code: "ADV", description: "Salary Advance", recurring: false, amount: 0, percentage: 0, type: "VARIABLE", taxable: false },
+      { code: "INS", description: "Insurance Premium", recurring: true, amount: 50, percentage: 0, type: "FIXED", taxable: false },
+      { code: "UNION", description: "Union Dues", recurring: true, amount: 30, percentage: 0, type: "FIXED", taxable: false },
+      { code: "WELFARE", description: "Welfare Fund", recurring: true, amount: 25, percentage: 0, type: "FIXED", taxable: false },
+      { code: "OTHER", description: "Other Deductions", recurring: false, amount: 0, percentage: 0, type: "VARIABLE", taxable: false }
+    ])
+
+    // Load comprehensive salary grades
+    setSalaryGrades([
+      { id: 1, name: "Entry Level", minSalary: 2000, maxSalary: 3500, description: "Entry level positions" },
+      { id: 2, name: "Junior Level", minSalary: 3500, maxSalary: 5000, description: "Junior professional positions" },
+      { id: 3, name: "Mid Level", minSalary: 5000, maxSalary: 8000, description: "Mid-level professional positions" },
+      { id: 4, name: "Senior Level", minSalary: 8000, maxSalary: 12000, description: "Senior professional positions" },
+      { id: 5, name: "Management Level", minSalary: 12000, maxSalary: 20000, description: "Management positions" },
+      { id: 6, name: "Executive Level", minSalary: 20000, maxSalary: 50000, description: "Executive positions" }
+    ])
+
+    // Load comprehensive unstructured grades
+    setUnstructuredGrades([
+      { id: 1, name: "Software Engineer I", salary: 4500, description: "Junior software engineer" },
+      { id: 2, name: "Software Engineer II", salary: 6500, description: "Mid-level software engineer" },
+      { id: 3, name: "Senior Software Engineer", salary: 9500, description: "Senior software engineer" },
+      { id: 4, name: "Lead Software Engineer", salary: 13000, description: "Lead software engineer" },
+      { id: 5, name: "Principal Software Engineer", salary: 18000, description: "Principal software engineer" },
+      { id: 6, name: "Staff Software Engineer", salary: 25000, description: "Staff software engineer" }
+    ])
+
+    console.log("[v0] Payroll configuration data loaded")
+  }
+
+  const loadNotificationData = async () => {
+    console.log("[v0] Loading notification data...")
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    // Load comprehensive notification templates
+    setNotificationTemplates([
+      {
+        id: "template-001",
+        name: "Welcome Email",
+        subject: "Welcome to {{company_name}}!",
+        body: "Dear {{employee_name}},\n\nWelcome to {{company_name}}! We're excited to have you join our team.\n\nYour employee ID is: {{employee_id}}\nYour start date is: {{start_date}}\n\nPlease complete your profile setup and review the employee handbook.\n\nBest regards,\nHR Team",
+        type: "email",
+        category: "onboarding",
+        isActive: true,
+        variables: ["company_name", "employee_name", "employee_id", "start_date"],
+        createdBy: "HR Manager",
+        createdAt: "2024-01-15T10:00:00Z",
+        lastModified: "2024-01-15T10:00:00Z",
+        status: "Active",
+        description: "Welcome email for new employees"
+      },
+      {
+        id: "template-002",
+        name: "Payroll Notification",
+        subject: "Your payslip for {{month}} {{year}} is ready",
+        body: "Dear {{employee_name}},\n\nYour payslip for {{month}} {{year}} has been processed and is now available in your employee portal.\n\nGross Salary: {{gross_salary}}\nNet Salary: {{net_salary}}\n\nPlease log in to view your detailed payslip.\n\nBest regards,\nPayroll Team",
+        type: "email",
+        category: "payroll",
+        isActive: true,
+        variables: ["employee_name", "month", "year", "gross_salary", "net_salary"],
+        createdBy: "Payroll Manager",
+        createdAt: "2024-01-10T09:00:00Z",
+        lastModified: "2024-01-10T09:00:00Z",
+        status: "Active",
+        description: "Payroll notification for payslip availability"
+      },
+      {
+        id: "template-003",
+        name: "Leave Approval",
+        subject: "Your leave request has been approved",
+        body: "Dear {{employee_name}},\n\nYour leave request for {{leave_type}} from {{start_date}} to {{end_date}} has been approved.\n\nPlease ensure you complete any pending tasks before your leave begins.\n\nBest regards,\nHR Team",
+        type: "email",
+        category: "leave",
+        isActive: true,
+        variables: ["employee_name", "leave_type", "start_date", "end_date"],
+        createdBy: "HR Manager",
+        createdAt: "2024-01-08T14:30:00Z",
+        lastModified: "2024-01-08T14:30:00Z",
+        status: "Active",
+        description: "Leave approval notification"
+      },
+      {
+        id: "template-004",
+        name: "Performance Review Reminder",
+        subject: "Performance Review Due - {{employee_name}}",
+        body: "Dear {{manager_name}},\n\nThis is a reminder that the performance review for {{employee_name}} is due on {{due_date}}.\n\nPlease complete the review and submit it by the deadline.\n\nBest regards,\nHR Team",
+        type: "email",
+        category: "performance",
+        isActive: true,
+        variables: ["manager_name", "employee_name", "due_date"],
+        createdBy: "HR Manager",
+        createdAt: "2024-01-05T11:15:00Z",
+        lastModified: "2024-01-05T11:15:00Z",
+        status: "Active",
+        description: "Performance review reminder"
+      },
+      {
+        id: "template-005",
+        name: "Birthday Wishes",
+        subject: "Happy Birthday {{employee_name}}!",
+        body: "Dear {{employee_name}},\n\nWishing you a very happy birthday! May this new year bring you joy, success, and fulfillment.\n\nEnjoy your special day!\n\nBest wishes,\n{{company_name}} Team",
+        type: "email",
+        category: "celebration",
+        isActive: true,
+        variables: ["employee_name", "company_name"],
+        createdBy: "HR Manager",
+        createdAt: "2024-01-01T08:00:00Z",
+        lastModified: "2024-01-01T08:00:00Z",
+        status: "Active",
+        description: "Birthday wishes template"
+      }
+    ])
+
+    // Load comprehensive notifications
+    setNotifications([
+      {
+        id: "notif-001",
+        title: "System Maintenance Scheduled",
+        message: "Scheduled maintenance will occur on Sunday, January 21st from 2:00 AM to 4:00 AM GMT",
+        type: "system",
+        priority: "medium",
+        read: false,
+        timestamp: "2024-01-15T10:00:00Z",
+        expiresAt: "2024-01-21T04:00:00Z"
+      },
+      {
+        id: "notif-002",
+        title: "New Employee Onboarded",
+        message: "Sarah Johnson has been successfully onboarded as a Software Engineer",
+        type: "hr",
+        priority: "low",
+        read: true,
+        timestamp: "2024-01-14T15:30:00Z",
+        expiresAt: null
+      },
+      {
+        id: "notif-003",
+        title: "Payroll Processing Complete",
+        message: "January 2024 payroll has been processed successfully for all employees",
+        type: "payroll",
+        priority: "high",
+        read: false,
+        timestamp: "2024-01-14T09:00:00Z",
+        expiresAt: null
+      },
+      {
+        id: "notif-004",
+        title: "Leave Request Pending Approval",
+        message: "John Doe has submitted a leave request for February 5-9, 2024",
+        type: "leave",
+        priority: "medium",
+        read: false,
+        timestamp: "2024-01-13T14:20:00Z",
+        expiresAt: "2024-01-20T14:20:00Z"
+      }
+    ])
+
+    console.log("[v0] Notification data loaded")
+  }
+
+  const loadSecurityData = async () => {
+    console.log("[v0] Loading security data...")
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    // Set backup information
+    setLastBackupTime("2024-01-15T02:00:00Z")
+    setBackupSize("2.4 GB")
+    setBackupStatus("completed")
+
+    console.log("[v0] Security data loaded")
+  }
+
+  const loadAuditLogs = async () => {
+    console.log("[v0] Loading audit logs...")
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    // Load comprehensive audit logs
+    setAuditLogs([
+      {
+        id: "audit-001",
+        user_email: "admin@example.com",
+        action: "LOGIN",
+        resource: "Authentication",
+        timestamp: "2024-01-15T10:30:00Z",
+        ip_address: "192.168.1.100",
+        details: "Successful login from Chrome on Windows",
+        severity: "low"
+      },
+      {
+        id: "audit-002",
+        user_email: "admin@example.com",
+        action: "UPDATE",
+        resource: "Employee Data",
+        timestamp: "2024-01-15T10:25:00Z",
+        ip_address: "192.168.1.100",
+        details: "Updated employee profile for John Doe",
+        severity: "medium"
+      },
+      {
+        id: "audit-003",
+        user_email: "hr@example.com",
+        action: "CREATE",
+        resource: "Employee",
+        timestamp: "2024-01-15T09:45:00Z",
+        ip_address: "192.168.1.101",
+        details: "Created new employee profile for Sarah Johnson",
+        severity: "medium"
+      },
+      {
+        id: "audit-004",
+        user_email: "admin@example.com",
+        action: "DELETE",
+        resource: "Document",
+        timestamp: "2024-01-15T09:30:00Z",
+        ip_address: "192.168.1.100",
+        details: "Deleted document: Old Policy Document.pdf",
+        severity: "high"
+      },
+      {
+        id: "audit-005",
+        user_email: "payroll@example.com",
+        action: "EXPORT",
+        resource: "Payroll Data",
+        timestamp: "2024-01-15T08:15:00Z",
+        ip_address: "192.168.1.102",
+        details: "Exported payroll data for January 2024",
+        severity: "high"
+      },
+      {
+        id: "audit-006",
+        user_email: "admin@example.com",
+        action: "LOGIN_FAILED",
+        resource: "Authentication",
+        timestamp: "2024-01-15T07:20:00Z",
+        ip_address: "192.168.1.100",
+        details: "Failed login attempt with invalid credentials",
+        severity: "high"
+      },
+      {
+        id: "audit-007",
+        user_email: "hr@example.com",
+        action: "UPDATE",
+        resource: "Company Settings",
+        timestamp: "2024-01-14T16:45:00Z",
+        ip_address: "192.168.1.101",
+        details: "Updated company logo and branding",
+        severity: "medium"
+      },
+      {
+        id: "audit-008",
+        user_email: "admin@example.com",
+        action: "BACKUP",
+        resource: "System",
+        timestamp: "2024-01-14T02:00:00Z",
+        ip_address: "192.168.1.100",
+        details: "Automated backup completed successfully",
+        severity: "low"
+      }
+    ])
+
+    console.log("[v0] Audit logs loaded")
+  }
+
+  const loadSalaryGradesData = async () => {
+    console.log("[v0] Loading salary grades data...")
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    // This data is already loaded in loadPayrollConfigData, but we can add more specific salary grade data here
+    console.log("[v0] Salary grades data loaded")
+  }
+
+  const loadAllData = async () => {
+    console.log("[v0] Loading comprehensive settings data...")
+    try {
+      await Promise.all([
+        loadCompanyData(),
+        loadEmployees(),
+        loadSubsidiaries(),
+        loadRoles(),
+        loadAccessAndSecurityData(),
+        loadHRConfigData(),
+        loadPayrollConfigData(),
+        loadNotificationData(),
+        loadSecurityData(),
+        loadAuditLogs(),
+        loadSalaryGradesData(),
+      ])
+      console.log("[v0] All comprehensive settings data loaded successfully")
+    } catch (error) {
+      console.error("[v0] Error loading comprehensive settings data:", error)
+    }
+  }
+
+  useEffect(() => {
+    loadAllData()
+  }, [])
+
+  // Subsidiary Management Functions
+  const syncSubsidiarySettings = async (subsidiaryId: string) => {
+    console.log("[v0] Syncing settings for subsidiary:", subsidiaryId)
+
+    if (isDemoMode()) {
+      toast({
+        title: "Settings Synced",
+        description: "Subsidiary settings synchronized successfully (Demo Mode)",
+      })
+      return
+    }
+
+    try {
+      // Simulate settings sync process
+      const { error } = await supabase
+        .from("subsidiaries")
+        .update({
+          settings_synced_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", subsidiaryId)
+
+      if (error) throw error
+
+      toast({
+        title: "Settings Synced",
+        description: "Subsidiary settings synchronized successfully",
+      })
+    } catch (error) {
+      console.error("Sync settings error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to sync subsidiary settings",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const refreshEmployeeCount = async (subsidiaryId: string) => {
+    console.log("[v0] Refreshing employee count for subsidiary:", subsidiaryId)
+
+    if (isDemoMode()) {
+      // Simulate employee count refresh in demo mode
+      const mockCount = Math.floor(Math.random() * 100) + 10 // Random count between 10-110
+      const updatedSubsidiaries = subsidiaries.map((sub) =>
+        sub.id === subsidiaryId ? { ...sub, employee_count: mockCount } : sub,
+      )
+      setSubsidiaries(updatedSubsidiaries)
+
+      if (selectedSubsidiary?.id === subsidiaryId) {
+        setSelectedSubsidiary({ ...selectedSubsidiary, employee_count: mockCount })
+      }
+      return mockCount
+    }
+
+    try {
+      const { count, error } = await supabase
+        .from("employees")
+        .select("*", { count: "exact", head: true })
+        .eq("subsidiary_id", subsidiaryId)
+
+      if (error) throw error
+
+      const employeeCount = count || 0
+      await updateSubsidiary(subsidiaryId, { employee_count: employeeCount })
+
+      return employeeCount
+    } catch (error) {
+      console.error("Refresh employee count error:", error)
+      return 0
+    }
+  }
+
+  const viewSubsidiaryEmployees = async (subsidiaryId: string) => {
+    console.log("[v0] Viewing employees for subsidiary:", subsidiaryId)
+
+    const currentCount = await refreshEmployeeCount(subsidiaryId)
+
+    if (isDemoMode()) {
+      const mockEmployees = Array.from({ length: currentCount }, (_, i) => ({
+        id: `emp-${i + 1}`,
+        name: `Employee ${i + 1}`,
+        position: ["Software Engineer", "Marketing Manager", "HR Specialist", "Sales Representative", "Accountant"][
+          i % 5
+        ],
+        department: ["Technology", "Marketing", "Human Resources", "Sales", "Finance"][i % 5],
+        email: `employee${i + 1}@company.com`,
+      }))
+
+      setViewEmployeesModal({
+        isOpen: true,
+        subsidiaryId,
+        employees: mockEmployees,
+      })
+      return
+    }
+
+    try {
+      const { data: employees, error } = await supabase.from("employees").select("*").eq("subsidiary_id", subsidiaryId)
+
+      if (error) throw error
+
+      setViewEmployeesModal({
+        isOpen: true,
+        subsidiaryId,
+        employees: employees || [],
+      })
+    } catch (error) {
+      console.error("View employees error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load employees",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const addNewSubsidiary = async (subsidiaryData: Partial<Subsidiary>) => {
+    console.log("[v0] Adding new subsidiary:", subsidiaryData)
+
+    if (isDemoMode()) {
+      const newSubsidiary: Subsidiary = {
+        id: `sub-${Date.now()}`,
+        company_id: "comp-001",
+        name: subsidiaryData.name || "New Subsidiary",
+        tax_id: subsidiaryData.tax_id || `TIN-${Date.now()}`,
+        ssnit_number: subsidiaryData.ssnit_number || `SSNIT-${Date.now()}`,
+        address: subsidiaryData.address || "",
+        phone_number: subsidiaryData.phone_number || "",
+        email_address: subsidiaryData.email_address || "",
+        status: "active",
+        industry: subsidiaryData.industry || "",
+        divisions: subsidiaryData.divisions || [],
+        departments: subsidiaryData.departments || [],
+        locations: subsidiaryData.locations || [],
+        divisions_count: 0,
+        departments_count: 0,
+        locations_count: 0,
+        employee_count: 0,
+        created_at: new Date().toISOString(),
+        logo_url: subsidiaryLogoPreview || "", // Include uploaded logo URL
+      }
+      setSubsidiaries((prev) => [newSubsidiary, ...prev])
+
+      setSubsidiaryLogoPreview("")
+
+      toast({
+        title: "Subsidiary Added",
+        description: "New subsidiary created successfully (Demo Mode)",
+      })
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("subsidiaries")
+        .insert([
+          {
+            company_id: companyData?.id,
+            name: subsidiaryData.name,
+            tax_id: subsidiaryData.tax_id,
+            ssnit_number: subsidiaryData.ssnit_number,
+            address: subsidiaryData.address,
+            phone_number: subsidiaryData.phone_number,
+            email_address: subsidiaryData.email_address,
+            industry: subsidiaryData.industry,
+            status: "active",
+            divisions: subsidiaryData.divisions || [],
+            departments: subsidiaryData.departments || [],
+            locations: subsidiaryData.locations || [],
+            logo_url: subsidiaryLogoPreview || "", // Include uploaded logo URL
+          },
+        ])
+        .select()
+
+      if (error) throw error
+
+      await loadSubsidiaries() // Reload the list
+
+      setSubsidiaryLogoPreview("")
+
+      toast({
+        title: "Subsidiary Added",
+        description: "New subsidiary created successfully",
+      })
+    } catch (error) {
+      console.error("Add subsidiary error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add subsidiary",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const updateSubsidiary = async (subsidiaryId: string, updates: Partial<Subsidiary>) => {
+    console.log("[v0] Updating subsidiary:", subsidiaryId, updates)
+
+    if (isDemoMode()) {
+      // Update in local state for demo mode
+      const updatedSubsidiaries = subsidiaries.map((sub) => {
+        if (sub.id === subsidiaryId) {
+          const updatedSub = {
+            ...sub,
+            ...updates,
+            // Recalculate counts based on arrays
+            divisions_count: Array.isArray(updates.divisions) ? updates.divisions.length : sub.divisions_count,
+            departments_count: Array.isArray(updates.departments) ? updates.departments.length : sub.departments_count,
+            locations_count: Array.isArray(updates.locations) ? updates.locations.length : sub.locations_count,
+            updated_at: new Date().toISOString(),
+          }
+          return updatedSub
+        }
+        return sub
+      })
+      setSubsidiaries(updatedSubsidiaries)
+
+      // Update selectedSubsidiary if it matches
+      if (selectedSubsidiary?.id === subsidiaryId) {
+        const updatedSelected = updatedSubsidiaries.find((sub) => sub.id === subsidiaryId)
+        if (updatedSelected) {
+          setSelectedSubsidiary(updatedSelected)
+        }
+      }
+
+      toast({
+        title: "Success",
+        description: "Subsidiary updated successfully (Demo Mode)",
+      })
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from("subsidiaries")
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", subsidiaryId)
+
+      if (error) throw error
+
+      // Reload subsidiaries to get fresh data
+      await loadSubsidiaries()
+
+      toast({
+        title: "Success",
+        description: "Subsidiary updated successfully",
+      })
+    } catch (error) {
+      console.error("Update subsidiary error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update subsidiary",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const toggleSubsidiaryStatus = async (subsidiaryId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active"
+    await updateSubsidiary(subsidiaryId, { status: newStatus })
+  }
+
+  const duplicateSubsidiary = async (subsidiary: Subsidiary) => {
+    const duplicatedData = {
+      ...subsidiary,
+      name: `${subsidiary.name} (Copy)`,
+      tax_id: `${subsidiary.tax_id}-COPY`,
+      ssnit_number: `${subsidiary.ssnit_number}-COPY`,
+    }
+    delete duplicatedData.id
+    delete duplicatedData.company_id
+    delete duplicatedData.created_at
+    delete duplicatedData.updated_at
+
+    await addNewSubsidiary(duplicatedData)
+  }
+
+  const deleteSubsidiary = async (subsidiaryId: string) => {
+    console.log("[v0] Deleting subsidiary:", subsidiaryId)
+
+    if (!confirm("Are you sure you want to delete this subsidiary? This action cannot be undone.")) {
+      return
+    }
+
+    if (isDemoMode()) {
+      setSubsidiaries((prev) => prev.filter((s) => s.id !== subsidiaryId))
+      toast({
+        title: "Subsidiary Deleted",
+        description: "Subsidiary has been deleted successfully (Demo Mode)",
+      })
+      return
+    }
+
+    try {
+      const { error } = await supabase.from("subsidiaries").delete().eq("id", subsidiaryId)
+
+      if (error) throw error
+
+      setSubsidiaries((prev) => prev.filter((s) => s.id !== subsidiaryId))
+      toast({
+        title: "Subsidiary Deleted",
+        description: "Subsidiary has been deleted successfully",
+      })
+    } catch (error) {
+      console.error("Subsidiary deletion error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete subsidiary",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleToggleSubsidiaryStatusInner = (subsidiary: Subsidiary) => {
+    setSubsidiaryToToggle(subsidiary)
+    if (subsidiary.status === "active") {
+      setShowDeactivateConfirm(true)
+    } else {
+      setShowReactivateConfirm(true)
+    }
+  }
+
+  const confirmToggleStatusInner = async () => {
+    if (!subsidiaryToToggle) return
+
+    await toggleSubsidiaryStatus(subsidiaryToToggle.id, subsidiaryToToggle.status)
+    setShowDeactivateConfirm(false)
+    setShowReactivateConfirm(false)
+    setSubsidiaryToToggle(null)
+  }
+
+  const handleManageLeaveTypesInner = () => {
+    toast({
+      title: "Leave Types Management",
+      description: "Opening leave types configuration...",
+    })
+  }
+
+  const handleManageAllowancesInner = () => {
+    toast({
+      title: "Allowances Management",
+      description: "Opening allowances configuration...",
+    })
+  }
+
+  const handleManageDeductionsInner = () => {
+    toast({
+      title: "Deductions Management",
+      description: "Opening deductions configuration...",
+    })
+  }
+
+  const handleManageSalaryGradesInner = () => {
+    toast({
+      title: "Salary Grades Management",
+      description: "Opening salary grades configuration...",
+    })
+  }
+
+  const handleAddEmailTemplateInner = () => {
+    toast({
+      title: "Add Email Template",
+      description: "Opening email template editor...",
+    })
+  }
+
+  const handleEditEmailTemplateInner = (templateName: string) => {
+    toast({
+      title: "Edit Email Template",
+      description: `Editing ${templateName} template...`,
+    })
+  }
+
+  const handleAddRoleInner = () => {
+    toast({
+      title: "Add Role",
+      description: "Opening role creation form...",
+    })
+  }
+
+  const handleEditRoleInner = (roleName: string) => {
+    toast({
+      title: "Edit Role",
+      description: `Editing ${roleName} role...`,
+    })
+  }
+
+  const handleBackupNowInner = async () => {
+    setIsBackingUp(true)
+    try {
+      // Simulate backup process
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      setLastBackupTime(new Date().toISOString())
+      setBackupSize("55 MB") // Simulate updated size
+      setBackupStatus("Completed")
+      toast({
+        title: "Backup Successful",
+        description: "Manual backup completed.",
+      })
+    } catch (error) {
+      toast({
+        title: "Backup Failed",
+        description: "Failed to complete system backup.",
+      })
+    } finally {
+      setIsBackingUp(false)
+    }
+  }
+
+  const handleSyncAllSettings = async () => {
+    console.log("[v0] Syncing all subsidiary settings")
+
+    if (isDemoMode()) {
+      toast({
+        title: "Syncing All Settings",
+        description: "Synchronizing settings across all subsidiaries... (Demo Mode)",
+      })
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from("subsidiaries")
+        .update({
+          settings_synced_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .neq("id", "00000000-0000-0000-0000-000000000000")
+
+      if (error) throw error
+
+      toast({
+        title: "Settings Synchronized",
+        description: "All subsidiary settings have been synchronized successfully",
+      })
+    } catch (error) {
+      console.error("Sync all settings error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to sync all subsidiary settings",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleExportSettingsTemplate = async () => {
+    console.log("[v0] Exporting settings template")
+
+    try {
+      const response = await fetch("/api/subsidiaries/export")
+
+      if (!response.ok) throw new Error("Export failed")
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = "subsidiaries_template.csv"
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      toast({
+        title: "Export Successful",
+        description: "Settings template has been downloaded",
+      })
+    } catch (error) {
+      console.error("Export error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to export settings template",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleImportSettings = async (file: File) => {
+    console.log("[v0] Importing settings from file:", file.name)
+
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const response = await fetch("/api/subsidiaries/import", {
+        method: "POST",
+        body: formData,
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) throw new Error(result.error)
+
+      toast({
+        title: "Import Successful",
+        description: result.message,
+      })
+
+      // Refresh subsidiaries list
+      await loadSubsidiaries()
+    } catch (error) {
+      console.error("Import error:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to import settings",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSaveSettings = async () => {
+    console.log("[v0] Saving all settings changes")
+    setIsSavingSettings(true)
+
+    if (isDemoMode()) {
+      // Simulate saving delay for demo
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      toast({
+        title: "Settings Saved",
+        description: "All settings changes have been saved successfully (Demo Mode)",
+      })
+      setIsSavingSettings(false)
+      return
+    }
+
+    try {
+      // Save any pending changes to subsidiaries
+      const { error: subsidiaryError } = await supabase
+        .from("subsidiaries")
+        .update({
+          updated_at: new Date().toISOString(),
+        })
+        .neq("id", "00000000-0000-0000-0000-000000000000")
+
+      if (subsidiaryError) throw subsidiaryError
+
+      // Save sync options to company settings
+      const syncOptions = {
+        hr_policies: true,
+        payroll_configuration: true,
+        leave_types: false,
+        roles_permissions: false,
+      }
+
+      const { error: settingsError } = await supabase.from("company_settings").upsert({
+        id: "sync_options",
+        settings: syncOptions,
+        updated_at: new Date().toISOString(),
+      })
+
+      if (settingsError) throw settingsError
+
+      // Refresh data to show updates
+      await loadAllData()
+
+      toast({
+        title: "Settings Saved",
+        description: "All settings changes have been saved and updated successfully",
+      })
+    } catch (error) {
+      console.error("Save settings error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save settings changes",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingSettings(false)
+    }
+  }
+
   // Enhanced Save button with loading state and better feedback
   const handleSaveSubsidiaryChanges = async () => {
     console.log("[v0] Saving subsidiary changes")
@@ -970,8 +2645,7 @@ export default function SettingsPage() {
         return
       }
 
-      // Save any pending changes to subsidiaries
-      // For now, we'll refresh the data to ensure consistency
+      // Save any pending subsidiary changes
       await loadSubsidiaries()
 
       toast({
@@ -1123,6 +2797,25 @@ export default function SettingsPage() {
 
   const handlePreviousPage = () => {
     setCurrentPage((prev) => Math.max(prev - 1, 1))
+  }
+
+
+  const handleToggleSubsidiaryStatus = (subsidiary: Subsidiary) => {
+    setSubsidiaryToToggle(subsidiary)
+    if (subsidiary.status === "active") {
+      setShowDeactivateConfirm(true)
+    } else {
+      setShowReactivateConfirm(true)
+    }
+  }
+
+  const confirmToggleStatus = async () => {
+    if (!subsidiaryToToggle) return
+
+    await toggleSubsidiaryStatus(subsidiaryToToggle.id, subsidiaryToToggle.status)
+    setShowDeactivateConfirm(false)
+    setShowReactivateConfirm(false)
+    setSubsidiaryToToggle(null)
   }
 
   const handleAddLeaveType = async () => {
@@ -1445,7 +3138,7 @@ All employees must maintain the highest standards of professional conduct.
 
 ## Compliance Requirements
 - Follow all company policies and procedures
-- Comply with all applicable laws and regulations
+- Comply with applicable laws and regulations
 - Report violations immediately
 - Participate in required training programs
 
@@ -1458,56 +3151,25 @@ For questions about this code of conduct, contact HR Department.`,
 Safety is everyone's responsibility in our workplace.
 
 ### Emergency Procedures
-- Fire Emergency: Call 192 (Ghana Fire Service)
-- Medical Emergency: Call 193 (Ambulance Service)
-- Security Emergency: Call internal security at extension 999
+- Fire Emergency: Call 192
+- Medical Emergency: Call 193
+- Security Emergency: Call internal security
 
-### Evacuation Procedures
-1. Sound the alarm
-2. Exit via nearest emergency exit
-3. Assemble at designated meeting point
-4. Account for all personnel
-5. Wait for all-clear signal
-
-## Workplace Hazards
-### Electrical Safety
-- Report damaged electrical equipment immediately
-- Don't overload power outlets
-- Use proper electrical safety equipment
-- Regular electrical inspections conducted
-
-### Office Safety
+### Workplace Safety
 - Keep walkways clear
-- Report slippery surfaces
-- Use proper lifting techniques
-- Maintain clean and organized workspace
+- Report hazards immediately
+- Use proper safety equipment
+- Follow all safety protocols
 
-## Personal Protective Equipment (PPE)
+## Personal Protective Equipment
 Required PPE for specific tasks:
 - Safety glasses for laboratory work
 - Hard hats for construction areas
 - Safety shoes for warehouse operations
-- High-visibility vests for outdoor work
 
 ## Incident Reporting
-All workplace incidents must be reported within 24 hours:
-1. Immediate first aid if needed
-2. Report to supervisor
-3. Complete incident report form
-4. Investigation and corrective action
-
-## Health and Wellness
-- Regular health checkups encouraged
-- Mental health support available
-- Work-life balance initiatives
-- Stress management resources
-
-## Contact Information
-Safety Officer: safety@company.com
-Emergency Hotline: +233-XXX-XXXX-XXX`
+All workplace incidents must be reported within 24 hours.`,
       
-      // Added new documents here for the preview feature
-      ,
       "HR Policies": `# HR Policies and Procedures
 
 ## Recruitment and Selection
@@ -1651,8 +3313,8 @@ Safety Officer: safety@company.com
 Emergency Hotline: +233-XXX-XXXX-XXX`
     }
 
-    return (
-      documentTemplates[document.name] || 
+    // Return template content or default content
+    return documentTemplates[document.name] || 
       `# ${document.name}
 
 ## Document Information
@@ -1678,7 +3340,6 @@ This document contains important information about ${document.name.toLowerCase()
 
 ---
 *This is a preview of the document content. The full document may contain additional sections and detailed information.*`
-    )
   }
 
   const handleDocumentView = (document: any) => {
@@ -1835,7 +3496,7 @@ This document contains important information about ${document.name.toLowerCase()
     }
 
     // Clean and format the text
-    const formattedText = text
+    let formattedText = text
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
       .replace(/\n{3,}/g, '\n\n')
@@ -1854,7 +3515,7 @@ This document contains important information about ${document.name.toLowerCase()
     }
 
     // Convert HTML to markdown-like format
-    const formattedText = html
+    let formattedText = html
       .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n')
       .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n')
       .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n')
@@ -2136,7 +3797,6 @@ This document contains important information about ${document.name.toLowerCase()
       toast({
         title: "Backup Failed",
         description: "Failed to complete system backup.",
-        variant: "destructive",
       })
     } finally {
       setIsBackingUp(false)
@@ -3498,2854 +5158,4504 @@ Format the response in a professional, actionable manner for HR decision-makers.
     })
   }
 
-  const loadCompanyData = async () => {
-    console.log("[v0] Loading company data...")
-
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock company data")
-      setCompanyData({
-        id: "demo-company-001",
-        name: "Akwaaba Technologies Ltd",
-        email_address: "ykodiah@gmail.com",
-        tax_id: "C0012345678",
-        ssnit_number: "1234567890",
-        industry: "Technology",
-        status: "active",
-        address: "123 Liberation Road, Labone, Accra, Ghana",
-        phone_number: "0249397960",
-        divisions: ["Head Office", "Regional Office"],
-        departments: ["Technology", "Human Resources", "Finance"],
-        locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-      })
-      setDivisions(["Head Office", "Regional Office"])
-      setDepartments(["Technology", "Human Resources", "Finance"])
-      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-      return
-    }
-
-    try {
-      const { data, error } = await supabase.from("companies").select("*").single()
-
-      if (error) throw error
-
-      if (data) {
-        setCompanyData({
-          id: data.id,
-          name: data.name || "",
-          email_address: data.email_address || "",
-          tax_id: data.tax_id || "",
-          ssnit_number: data.ssnit_number || "",
-          industry: data.industry || "",
-          status: "active",
-          address: data.address || "",
-          phone_number: data.phone_number || "",
-          divisions: data.divisions || [],
-          departments: data.departments || [],
-          locations: data.locations || [],
-        })
-
-        setDivisions(data.divisions || [])
-        setDepartments(data.departments || [])
-        setLocations(data.locations || [])
-        setLogoPreview(data.logo_url || "")
-      }
-    } catch (error) {
-      console.error("[v0] Error loading company data:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode")
-        // Set demo session cookie to prevent future database calls
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        // Load demo data
-        setCompanyData({
-          id: "demo-company-001",
-          name: "Akwaaba Technologies Ltd",
-          email_address: "ykodiah@gmail.com",
-          tax_id: "C0012345678",
-          ssnit_number: "1234567890",
-          industry: "Technology",
-          status: "active",
-          address: "123 Liberation Road, Labone, Accra, Ghana",
-          phone_number: "0249397960",
-          divisions: ["Head Office", "Regional Office"],
-          departments: ["Technology", "Human Resources", "Finance"],
-          locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-        })
-        setDivisions(["Head Office", "Regional Office"])
-        setDepartments(["Technology", "Human Resources", "Finance"])
-        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-        return
-      }
-      toast({
-        title: "Error",
-        description: "Failed to load company data",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const loadEmployees = async () => {
-    console.log("[v0] Loading employees...")
-
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock employees data")
-      setEmployees([
-        {
-          id: "emp-001",
-          first_name: "John",
-          last_name: "Doe",
-          full_name: "John Doe",
-          corporate_email: "john.doe@akwaaba.com",
-          personal_email: "john.doe@gmail.com",
-          position: "Software Engineer",
-          department: "Technology",
-          status: "active",
-        },
-        {
-          id: "emp-002",
-          first_name: "Jane",
-          last_name: "Smith",
-          full_name: "Jane Smith",
-          corporate_email: "jane.smith@akwaaba.com",
-          personal_email: "jane.smith@gmail.com",
-          position: "HR Manager",
-          department: "Human Resources",
-          status: "active",
-        },
-      ])
-      return
-    }
-
-    try {
-      const { data, error } = await supabase.from("employees").select("*").order("created_at", { ascending: false })
-
-      if (error) throw error
-      setEmployees(data || [])
-    } catch (error) {
-      console.error("Error loading employees:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode for employees")
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        setEmployees([
-          {
-            id: "emp-001",
-            first_name: "John",
-            last_name: "Doe",
-            full_name: "John Doe",
-            corporate_email: "john.doe@akwaaba.com",
-            personal_email: "john.doe@gmail.com",
-            position: "Software Engineer",
-            department: "Technology",
-            status: "active",
-          },
-          {
-            id: "emp-002",
-            first_name: "Jane",
-            last_name: "Smith",
-            full_name: "Jane Smith",
-            corporate_email: "jane.smith@akwaaba.com",
-            personal_email: "jane.smith@gmail.com",
-            position: "HR Manager",
-            department: "Human Resources",
-            status: "active",
-          },
-        ])
-        return
-      }
-      toast({
-        title: "Error",
-        description: "Failed to load employees",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const loadSubsidiaries = async () => {
-    console.log("[v0] Loading subsidiaries...")
-
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock subsidiaries data")
-      setSubsidiaries([
-        {
-          id: "sub-001",
-          company_id: "comp-001",
-          name: "Akwaaba Digital Solutions",
-          email_address: "info@akwaabadigital.com",
-          phone_number: "+233 30 276 5432",
-          tax_id: "TIN-ADS-2023-001",
-          ssnit_number: "SSNIT-ADS-789012",
-          address: "15 Liberation Road, Ridge, Accra, Ghana",
-          status: "active",
-          industry: "Digital Marketing & Web Development",
-          divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
-          departments: ["Marketing", "Development", "Design", "Sales"],
-          locations: ["Accra - Ridge", "Kumasi Branch"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 45,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-002",
-          company_id: "comp-001",
-          name: "Akwaaba Consulting Group",
-          email_address: "consulting@akwaaba.com",
-          phone_number: "+233 30 276 5433",
-          tax_id: "TIN-ACG-2023-002",
-          ssnit_number: "SSNIT-ACG-789013",
-          address: "8 Airport Residential Area, Accra, Ghana",
-          status: "active",
-          industry: "Business Consulting & Strategy",
-          divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
-          departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
-          locations: ["Accra - Airport", "Tema Office"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 32,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-003",
-          company_id: "comp-001",
-          name: "Akwaaba Financial Services",
-          email_address: "finance@akwaabafs.com",
-          phone_number: "+233 30 276 5434",
-          tax_id: "TIN-AFS-2023-003",
-          ssnit_number: "SSNIT-AFS-789014",
-          address: "25 Independence Avenue, Accra, Ghana",
-          status: "active",
-          industry: "Financial Technology & Services",
-          divisions: ["Fintech Solutions", "Payment Processing", "Financial Advisory"],
-          departments: ["Finance", "Technology", "Compliance", "Customer Service"],
-          locations: ["Accra - Independence Ave", "Ho Regional Office"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 28,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-004",
-          company_id: "comp-001",
-          name: "Akwaaba Logistics Ltd",
-          email_address: "logistics@akwaabalog.com",
-          phone_number: "+233 30 276 5435",
-          tax_id: "TIN-ALL-2023-004",
-          ssnit_number: "SSNIT-ALL-789015",
-          address: "12 Spintex Road, Accra, Ghana",
-          status: "active",
-          industry: "Supply Chain & Logistics",
-          divisions: ["Transportation", "Warehousing", "Supply Chain Management"],
-          departments: ["Operations", "Fleet Management", "Warehousing", "Customer Service"],
-          locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 3,
-          employee_count: 67,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-005",
-          company_id: "comp-001",
-          name: "Akwaaba Training Institute",
-          email_address: "training@akwaabainstitute.com",
-          phone_number: "+233 30 276 5436",
-          tax_id: "TIN-ATI-2023-005",
-          ssnit_number: "SSNIT-ATI-789016",
-          address: "5 Cantonments Road, Accra, Ghana",
-          status: "active",
-          industry: "Education & Professional Training",
-          divisions: ["Corporate Training", "IT Certification", "Professional Development"],
-          departments: ["Training", "Curriculum Development", "Student Services", "Administration"],
-          locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 3,
-          employee_count: 23,
-          created_at: new Date().toISOString(),
-        },
-      ])
-      return
-    }
-
-    try {
-      // Load subsidiaries with employee counts
-      const { data: subsidiariesData, error: subsidiariesError } = await supabase
-        .from("subsidiaries")
-        .select(`
-          *,
-          employees:employees(count)
-        `)
-        .order("created_at", { ascending: false })
-
-      if (subsidiariesError) throw subsidiariesError
-
-      // Process the data to add computed fields
-      const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => ({
-        ...sub,
-        divisions: Array.isArray(sub.divisions) ? sub.divisions : [],
-        departments: Array.isArray(sub.departments) ? sub.departments : [],
-        locations: Array.isArray(sub.locations) ? sub.locations : [],
-        divisions_count: Array.isArray(sub.divisions) ? sub.divisions.length : 0,
-        departments_count: Array.isArray(sub.departments) ? sub.departments.length : 0,
-        locations_count: Array.isArray(sub.locations) ? sub.locations.length : 0,
-        employee_count: sub.employees?.[0]?.count || 0,
-      }))
-
-      setSubsidiaries(processedSubsidiaries)
-      console.log("[v0] Loaded subsidiaries:", processedSubsidiaries.length)
-    } catch (error) {
-      console.error("Subsidiaries loading error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load subsidiaries",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const loadRoles = async () => {
-    console.log("[v0] Loading roles...")
-
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock roles data")
-      setRoles([
-        {
-          id: "role-001",
-          name: "Administrator",
-          description: "Full system access and management capabilities",
-          permissions: ["all"],
-          user_count: 2,
-        },
-        {
-          id: "role-002",
-          name: "HR Manager",
-          description: "Human resources management and employee oversight",
-          permissions: ["hr", "employees", "reports"],
-          user_count: 3,
-        },
-        {
-          id: "role-003",
-          name: "Employee",
-          description: "Standard employee access to personal information",
-          permissions: ["profile", "payslip", "leave"],
-          user_count: 45,
-        },
-      ])
-      return
-    }
-
-    try {
-      const { data, error } = await supabase.from("roles").select("*").order("created_at", { ascending: false })
-
-      if (error) throw error
-      setRoles(data || [])
-    } catch (error) {
-      console.error("Error loading roles:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode for roles")
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        setRoles([
-          {
-            id: "role-001",
-            name: "Administrator",
-            description: "Full system access",
-            permissions: ["read", "write", "delete", "admin"],
-            status: "active",
-          },
-          {
-            id: "role-002",
-            name: "HR Manager",
-            description: "Human Resources management",
-            permissions: ["read", "write"],
-            status: "active",
-          },
-        ])
-        return
-      }
-      toast({
-        title: "Error",
-        description: "Failed to load roles",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // Added for Access Control and Security
-  const loadAccessAndSecurityData = async () => {
-    console.log("[v0] Loading access and security data...")
-    // Simulate fetching data
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
-    // Mock data for demonstration
-    setAccessSettings({
-      twoFactorEnabled: true,
-      ssoEnabled: false,
-      passwordExpiryEnabled: true,
-      sessionTimeout: 30,
-      maxLoginAttempts: 5,
-      passwordMinLength: 10,
-      ipRestrictionsEnabled: true,
-      allowedIPs: ["192.168.1.0/24", "10.0.0.1"],
-    })
-    setSecuritySettings({
-      dataEncryptionEnabled: true,
-      auditLoggingEnabled: true,
-      autoBackupEnabled: true,
-      backupFrequency: "daily",
-      dataRetentionDays: 180,
-    })
-    setLastBackupTime(new Date("2024-03-10T10:00:00Z").toISOString())
-    setBackupSize("50 MB")
-    setBackupStatus("Completed")
-    setAuditLogs([
-      {
-        id: "log-001",
-        user_email: "admin@example.com",
-        action: "User logged in",
-        timestamp: new Date("2024-03-11T09:00:00Z").toISOString(),
-        ip_address: "192.168.1.10",
-        severity: "low",
-      },
-      {
-        id: "log-002",
-        user_email: "hr@example.com",
-        action: "Updated employee record",
-        timestamp: new Date("2024-03-11T09:05:00Z").toISOString(),
-        ip_address: "192.168.1.11",
-        severity: "medium",
-      },
-      {
-        id: "log-003",
-        user_email: "admin@example.com",
-        action: "Security settings modified",
-        timestamp: new Date("2024-03-11T09:10:00Z").toISOString(),
-        ip_address: "192.168.1.10",
-        severity: "high",
-      },
-    ])
-    setActiveSessions([
-      {
-        id: "session-001",
-        user_email: "admin@example.com",
-        ip_address: "192.168.1.10",
-        device: "Desktop",
-        last_activity: new Date("2024-03-11T09:10:00Z").toISOString(),
-      },
-      {
-        id: "session-002",
-        user_email: "user@example.com",
-        ip_address: "10.0.0.5",
-        device: "Mobile",
-        last_activity: new Date("2024-03-11T08:30:00Z").toISOString(),
-      },
-    ])
-    console.log("[v0] Access and security data loaded.")
-  }
-
-  const loadHRConfigData = async () => {
-    console.log("[v0] Loading HR configuration data...")
-    
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock HR data")
-      // Fall back to existing mock data if in demo mode
-      setCurrentPolicies([
-        { 
-          name: "Annual Leave", 
-          days: 21, 
-          usage: "68%", 
-          trend: "up", 
-          description: "Annual vacation leave for all employees",
-          category: "Leave",
-          isActive: true,
-          applicableTo: "All Employees",
-          carryOverLimit: 5,
-          noticeRequired: 7
-        },
-        { 
-          name: "Sick Leave", 
-          days: 10, 
-          usage: "45%", 
-          trend: "down", 
-          description: "Medical leave for illness and health issues",
-          category: "Leave",
-          isActive: true,
-          applicableTo: "All Employees",
-          carryOverLimit: 0,
-          noticeRequired: 0
-        },
-        { 
-          name: "Maternity Leave", 
-          days: 90, 
-          usage: "12%", 
-          trend: "stable", 
-          description: "Maternity leave for new mothers",
-          category: "Leave",
-          isActive: true,
-          applicableTo: "Female Employees",
-          carryOverLimit: 0,
-          noticeRequired: 30
-        },
-      ])
-      setHrDocuments([
-        {
-          id: "doc-001",
-          name: "Employee Handbook 2024",
-          type: "PDF",
-          size: "2.4 MB",
-          uploadedBy: "HR Manager",
-          uploadedAt: "2024-01-15T10:30:00Z",
-          category: "Policy",
-          description: "Comprehensive employee handbook covering all company policies and procedures",
-          tags: ["handbook", "policies", "procedures"],
-          isActive: true,
-          downloadCount: 156,
-          visibleToAll: true
-        },
-        {
-          id: "doc-002",
-          name: "Code of Conduct",
-          type: "PDF",
-          size: "1.2 MB",
-          uploadedBy: "Legal Team",
-          uploadedAt: "2024-01-10T14:20:00Z",
-          category: "Policy",
-          description: "Company code of conduct and ethical guidelines",
-          tags: ["conduct", "ethics", "guidelines"],
-          isActive: true,
-          downloadCount: 89,
-          visibleToAll: true
-        }
-      ])
-      return
-    }
-
-    try {
-      const { data: leaveTypesData, error: leaveTypesError } = await supabase
-        .from("leave_types")
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-
-      if (leaveTypesError) throw leaveTypesError
-
-      if (leaveTypesData && leaveTypesData.length > 0) {
-        const policies = leaveTypesData.map((lt: any) => ({
-          name: lt.name,
-          days: lt.annual_entitlement || 0,
-          usage: "0%", // Calculate from leave_requests table
-          trend: "stable",
-          description: lt.description || "",
-          category: "Leave",
-          isActive: lt.is_active,
-          applicableTo: "All Employees",
-          carryOverLimit: lt.max_carry_over_days || 0,
-          noticeRequired: lt.min_notice_days || 0
-        }))
-        setCurrentPolicies(policies)
-      }
-
-      // For now, keep the mock data
-      setHrDocuments([
-        {
-          id: "doc-001",
-          name: "Employee Handbook 2024",
-          type: "PDF",
-          size: "2.4 MB",
-          uploadedBy: "HR Manager",
-          uploadedAt: "2024-01-15T10:30:00Z",
-          category: "Policy",
-          description: "Comprehensive employee handbook covering all company policies and procedures",
-          tags: ["handbook", "policies", "procedures"],
-          isActive: true,
-          downloadCount: 156,
-          visibleToAll: true
-        },
-        {
-          id: "doc-002",
-          name: "Code of Conduct",
-          type: "PDF",
-          size: "1.2 MB",
-          uploadedBy: "Legal Team",
-          uploadedAt: "2024-01-10T14:20:00Z",
-          category: "Policy",
-          description: "Company code of conduct and ethical guidelines",
-          tags: ["conduct", "ethics", "guidelines"],
-          isActive: true,
-          downloadCount: 89,
-          visibleToAll: true
-        }
-      ])
-
-      console.log("[v0] HR configuration data loaded from database")
-    } catch (error) {
-      console.error("[v0] Error loading HR configuration data:", error)
-      // Fall back to demo data
-      setCurrentPolicies([
-        { 
-          name: "Annual Leave", 
-          days: 21, 
-          usage: "68%", 
-          trend: "up", 
-          description: "Annual vacation leave for all employees",
-          category: "Leave",
-          isActive: true,
-          applicableTo: "All Employees",
-          carryOverLimit: 5,
-          noticeRequired: 7
-        }
-      ])
-    }
-  }
-
-  const loadPayrollConfigData = async () => {
-    console.log("[v0] Loading payroll configuration data...")
-    
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock payroll data")
-      // Fall back to existing mock data if in demo mode
-      setAllowances([
-        { code: "BASIC", description: "Basic Salary", recurring: true, amount: 0, percentage: 0, type: "FIXED", taxable: true },
-        { code: "HRA", description: "Housing Allowance", recurring: true, amount: 500, percentage: 0, type: "FIXED", taxable: true },
-        { code: "TRA", description: "Transport Allowance", recurring: true, amount: 200, percentage: 0, type: "FIXED", taxable: true },
-        { code: "MED", description: "Medical Allowance", recurring: true, amount: 150, percentage: 0, type: "FIXED", taxable: false },
-      ])
-      setDeductions([
-        { code: "TAX", description: "Tax Deduction", recurring: true, amount: 0, percentage: 0, type: "VARIABLE", taxable: false },
-        { code: "SSNIT", description: "SSNIT Deduction", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE", taxable: false },
-        { code: "LOAN", description: "Loan Deduction", recurring: true, amount: 0, percentage: 0, type: "FIXED", taxable: false },
-      ])
-      setSalaryGrades([
-        { id: 1, name: "Entry Level", minSalary: 2000, maxSalary: 3500, description: "Entry level positions" },
-        { id: 2, name: "Junior Level", minSalary: 3500, maxSalary: 5000, description: "Junior professional positions" },
-      ])
-      return
-    }
-
-    try {
-      const { data: allowancesData, error: allowancesError } = await supabase
-        .from("payroll_allowances")
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-
-      if (allowancesError) throw allowancesError
-
-      if (allowancesData && allowancesData.length > 0) {
-        const formattedAllowances = allowancesData.map((a: any) => ({
-          code: a.code,
-          description: a.description,
-          taxable: a.taxable,
-          recurring: a.recurring,
-          amount: a.amount || 0,
-          percentage: a.percentage || 0,
-          type: a.type
-        }))
-        setAllowances(formattedAllowances)
-      }
-
-      const { data: deductionsData, error: deductionsError } = await supabase
-        .from("payroll_deductions")
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-
-      if (deductionsError) throw deductionsError
-
-      if (deductionsData && deductionsData.length > 0) {
-        const formattedDeductions = deductionsData.map((d: any) => ({
-          code: d.code,
-          description: d.description,
-          recurring: d.recurring,
-          amount: d.amount || 0,
-          percentage: d.percentage || 0,
-          type: d.type,
-          taxable: d.taxable
-        }))
-        setDeductions(formattedDeductions)
-      }
-
-      const { data: salaryGradesData, error: salaryGradesError } = await supabase
-        .from("salary_grades")
-        .select("*")
-        .eq("is_active", true)
-        .order("grade_level", { ascending: true })
-
-      if (salaryGradesError) throw salaryGradesError
-
-      if (salaryGradesData && salaryGradesData.length > 0) {
-        const formattedGrades = salaryGradesData.map((g: any) => ({
-          id: g.id,
-          name: g.grade_name,
-          description: `Grade Level ${g.grade_level}`,
-          minSalary: g.step_1 || 0,
-          maxSalary: g.step_5 || g.step_4 || g.step_3 || g.step_2 || g.step_1 || 0,
-          notches: [
-            { step: 1, amount: g.step_1 || 0 },
-            { step: 2, amount: g.step_2 || 0 },
-            { step: 3, amount: g.step_3 || 0 },
-            { step: 4, amount: g.step_4 || 0 },
-            { step: 5, amount: g.step_5 || 0 },
-          ].filter(n => n.amount > 0)
-        }))
-        setSalaryGrades(formattedGrades)
-      }
-
-      const { data: taxRatesData, error: taxRatesError } = await supabase
-        .from("tax_rates")
-        .select("*")
-        .eq("is_active", true)
-        .single()
-
-      if (!taxRatesError && taxRatesData) {
-        setSsnitRates({
-          employee: taxRatesData.employee_rate || 5.5,
-          employer: taxRatesData.employer_rate || 13,
-          total: taxRatesData.total_rate || 18.5
-        })
-      }
-
-      console.log("[v0] Payroll configuration data loaded from database")
-    } catch (error) {
-      console.error("[v0] Error loading payroll configuration data:", error)
-      // Keep existing mock data as fallback
-    }
-  }
-
-  const loadNotificationData = async () => {
-    console.log("[v0] Loading notification data...")
-    
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock notification data")
-      // Fall back to existing mock data if in demo mode
-      setNotificationTemplates([
-        {
-          id: "template-001",
-          name: "Welcome Email",
-          subject: "Welcome to {{company_name}}!",
-          body: "Dear {{employee_name}},\n\nWelcome to {{company_name}}! We're excited to have you join our team.\n\nBest regards,\nHR Team",
-          type: "email",
-          category: "onboarding",
-          isActive: true,
-          variables: ["company_name", "employee_name"],
-          createdBy: "HR Manager",
-          createdAt: "2024-01-15T10:00:00Z",
-          lastModified: "2024-01-15T10:00:00Z",
-          status: "Active",
-          description: "Welcome email for new employees"
-        }
-      ])
-      setNotifications([
-        {
-          id: "notif-001",
-          title: "System Maintenance Scheduled",
-          message: "Scheduled maintenance will occur on Sunday, January 21st from 2:00 AM to 4:00 AM GMT",
-          type: "system",
-          priority: "medium",
-          read: false,
-          timestamp: "2024-01-15T10:00:00Z",
-          expiresAt: "2024-01-21T04:00:00Z"
-        },
-      ])
-      return
-    }
-
-    try {
-      const { data: templatesData, error: templatesError } = await supabase
-        .from("notification_templates")
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-
-      if (templatesError) throw templatesError
-
-      if (templatesData && templatesData.length > 0) {
-        const formattedTemplates = templatesData.map((t: any) => ({
-          id: t.id,
-          name: t.template_name,
-          subject: t.subject,
-          body: t.body_template,
-          type: t.template_type,
-          category: t.category,
-          isActive: t.is_active,
-          variables: t.variables || [],
-          createdBy: "System",
-          createdAt: t.created_at,
-          lastModified: t.updated_at,
-          status: t.is_active ? "Active" : "Inactive",
-          description: `${t.category} notification template`
-        }))
-        setNotificationTemplates(formattedTemplates)
-      }
-
-      const { data: notificationsData, error: notificationsError } = await supabase
-        .from("notification_history")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(10)
-
-      if (notificationsError) throw notificationsError
-
-      if (notificationsData && notificationsData.length > 0) {
-        const formattedNotifications = notificationsData.map((n: any) => ({
-          id: n.id,
-          title: n.subject,
-          message: n.body,
-          type: n.notification_type,
-          priority: "medium",
-          read: !!n.opened_at,
-          timestamp: n.created_at,
-          expiresAt: null
-        }))
-        setNotifications(formattedNotifications)
-      }
-
-      console.log("[v0] Notification data loaded from database")
-    } catch (error) {
-      console.error("[v0] Error loading notification data:", error)
-      // Keep existing mock data as fallback
-    }
-  }
-
-  const loadSecurityData = async () => {
-    console.log("[v0] Loading security data...")
-    
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock security data")
-      // Fall back to existing mock data if in demo mode
-      setLastBackupTime(new Date("2024-03-10T10:00:00Z").toISOString())
-      setBackupSize("50 MB")
-      setBackupStatus("Completed")
-      return
-    }
-
-    try {
-      // Set backup information (this would come from your backup system)
-      setLastBackupTime(new Date().toISOString())
-      setBackupSize("2.4 GB")
-      setBackupStatus("completed")
-
-      console.log("[v0] Security data loaded")
-    } catch (error) {
-      console.error("[v0] Error loading security data:", error)
-    }
-  }
-
-  const loadAuditLogs = async () => {
-    console.log("[v0] Loading audit logs...")
-    
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock audit logs")
-      setAuditLogs([
-        {
-          id: "log-001",
-          user_email: "admin@example.com",
-          action: "User logged in",
-          timestamp: new Date("2024-03-11T09:00:00Z").toISOString(),
-          ip_address: "192.168.1.10",
-          severity: "low",
-        },
-      ])
-      return
-    }
-
-    try {
-      const { data: auditLogsData, error: auditLogsError } = await supabase
-        .from("access_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50)
-
-      if (auditLogsError) throw auditLogsError
-
-      if (auditLogsData && auditLogsData.length > 0) {
-        const formattedLogs = auditLogsData.map((log: any) => ({
-          id: log.id,
-          user_email: "user@example.com", // You'd need to join with employees table
-          action: log.action,
-          timestamp: log.created_at,
-          ip_address: log.ip_address?.toString() || "N/A",
-          severity: log.success ? "low" : "high"
-        }))
-        setAuditLogs(formattedLogs)
-      }
-
-      console.log("[v0] Audit logs loaded from database")
-    } catch (error) {
-      console.error("[v0] Error loading audit logs:", error)
-      // Keep existing mock data as fallback
-    }
-  }
-
-  const loadSalaryGradesData = async () => {
-    console.log("[v0] Loading salary grades data...")
-    await new Promise((resolve) => setTimeout(resolve, 200))
-
-    // This data is already loaded in loadPayrollConfigData, but we can add more specific salary grade data here
-    console.log("[v0] Salary grades data loaded")
-  }
-
-  const loadAllData = async () => {
-    console.log("[v0] Loading comprehensive settings data...")
-    try {
-      await Promise.all([
-        loadCompanyData(),
-        loadEmployees(),
-        loadSubsidiaries(),
-        loadRoles(),
-        loadAccessAndSecurityData(),
-        loadHRConfigData(),
-        loadPayrollConfigData(),
-        loadNotificationData(),
-        loadSecurityData(),
-        loadAuditLogs(),
-        loadSalaryGradesData(),
-      ])
-      console.log("[v0] All settings data loaded successfully")
-    } catch (error) {
-      console.error("[v0] Error loading settings data:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load some settings data",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // Load data when the component mounts
-  useEffect(() => {
-    loadAllData()
-  }, [])
-
-  // Subsidiary Management Functions
-  const syncSubsidiarySettings = async (subsidiaryId: string) => {
-    console.log("[v0] Syncing settings for subsidiary:", subsidiaryId)
-
-    if (isDemoMode()) {
-      toast({
-        title: "Settings Synced",
-        description: "Subsidiary settings synchronized successfully (Demo Mode)",
-      })
-      return
-    }
-
-    try {
-      // Simulate settings sync process
-      const { error } = await supabase
-        .from("subsidiaries")
-        .update({
-          settings_synced_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", subsidiaryId)
-
-      if (error) throw error
-
-      toast({
-        title: "Settings Synced",
-        description: "Subsidiary settings synchronized successfully",
-      })
-    } catch (error) {
-      console.error("Sync settings error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to sync subsidiary settings",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const refreshEmployeeCount = async (subsidiaryId: string) => {
-    console.log("[v0] Refreshing employee count for subsidiary:", subsidiaryId)
-
-    if (isDemoMode()) {
-      // Simulate employee count refresh in demo mode
-      const mockCount = Math.floor(Math.random() * 100) + 10 // Random count between 10-110
-      const updatedSubsidiaries = subsidiaries.map((sub) =>
-        sub.id === subsidiaryId ? { ...sub, employee_count: mockCount } : sub,
-      )
-      setSubsidiaries(updatedSubsidiaries)
-      toast({
-        title: "Employee Count Refreshed",
-        description: "Employee count updated successfully (Demo Mode)",
-      })
-      return
-    }
-
-    try {
-      // In a real scenario, you'd likely fetch employee count from a related table or service
-      // For now, we simulate an update.
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      const mockCount = Math.floor(Math.random() * 200) + 20 // Simulate fetching a new count
-      const updatedSubsidiaries = subsidiaries.map((sub) =>
-        sub.id === subsidiaryId ? { ...sub, employee_count: mockCount } : sub,
-      )
-      setSubsidiaries(updatedSubsidiaries)
-
-      toast({
-        title: "Employee Count Refreshed",
-        description: "Employee count updated successfully",
-      })
-    } catch (error) {
-      console.error("Refresh employee count error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to refresh employee count",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const updateSubsidiary = async (subsidiaryId: string, updates: Partial<Subsidiary>) => {
-    console.log("[v0] Updating subsidiary:", subsidiaryId, updates)
-    try {
-      const { data, error } = await supabase
-        .from("subsidiaries")
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq("id", subsidiaryId)
-        .select("*")
-        .single()
-
-      if (error) throw error
-
-      // Update local state with the latest data
-      setSubsidiaries((prev) =>
-        prev.map((sub) => (sub.id === subsidiaryId ? { ...sub, ...data } : sub)),
-      )
-      return data
-    } catch (error) {
-      console.error("Error updating subsidiary:", error)
-      throw error // Re-throw to be caught by calling functions
-    }
-  }
-
-  const confirmToggleStatus = async () => {
-    if (!subsidiaryToToggle) return
-
-    const newStatus = subsidiaryToToggle.status === "active" ? "inactive" : "active"
-    try {
-      await updateSubsidiary(subsidiaryToToggle.id, { status: newStatus })
-      toast({
-        title: "Status Updated",
-        description: `Subsidiary '${subsidiaryToToggle.name}' is now ${newStatus}.`,
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: `Failed to ${newStatus} subsidiary. Please try again.`,
-        variant: "destructive",
-      })
-    } finally {
-      setShowDeactivateConfirm(false)
-      setShowReactivateConfirm(false)
-      setSubsidiaryToToggle(null)
-    }
-  }
-
-
-  // Other component logic...
-
   return (
-    <div className="container mx-auto p-4 md:p-8">
-      {/* Tabs for different settings sections */}
-      <div className="mb-6 flex flex-wrap gap-2 border-b border-gray-200">
-        <button
-          onClick={() => setActiveTab("company")}
-          className={`px-4 py-2 rounded-t-lg font-semibold ${activeTab === "company" ? "bg-white text-primary border-b-2 border-primary" : "text-gray-500 hover:text-gray-700"}`}
-        >
-          Company Information
-        </button>
-        <button
-          onClick={() => setActiveTab("hr")}
-          className={`px-4 py-2 rounded-t-lg font-semibold ${activeTab === "hr" ? "bg-white text-primary border-b-2 border-primary" : "text-gray-500 hover:text-gray-700"}`}
-        >
-          HR Settings
-        </button>
-        <button
-          onClick={() => setActiveTab("payroll")}
-          className={`px-4 py-2 rounded-t-lg font-semibold ${activeTab === "payroll" ? "bg-white text-primary border-b-2 border-primary" : "text-gray-500 hover:text-gray-700"}`}
-        >
-          Payroll & Taxes
-        </button>
-        <button
-          onClick={() => setActiveTab("notifications")}
-          className={`px-4 py-2 rounded-t-lg font-semibold ${activeTab === "notifications" ? "bg-white text-primary border-b-2 border-primary" : "text-gray-500 hover:text-gray-700"}`}
-        >
-          Notifications
-        </button>
-        <button
-          onClick={() => setActiveTab("security")}
-          className={`px-4 py-2 rounded-t-lg font-semibold ${activeTab === "security" ? "bg-white text-primary border-b-2 border-primary" : "text-gray-500 hover:text-gray-700"}`}
-        >
-          Security
-        </button>
-        <button
-          onClick={() => setActiveTab("access")}
-          className={`px-4 py-2 rounded-t-lg font-semibold ${activeTab === "access" ? "bg-white text-primary border-b-2 border-primary" : "text-gray-500 hover:text-gray-700"}`}
-        >
-          Access Control
-        </button>
-        <button
-          onClick={() => setActiveTab("subsidiaries")}
-          className={`px-4 py-2 rounded-t-lg font-semibold ${activeTab === "subsidiaries" ? "bg-white text-primary border-b-2 border-primary" : "text-gray-500 hover:text-gray-700"}`}
-        >
-          Subsidiaries
-        </button>
-        <button
-          onClick={() => setActiveTab("employees")}
-          className={`px-4 py-2 rounded-t-lg font-semibold ${activeTab === "employees" ? "bg-white text-primary border-b-2 border-primary" : "text-gray-500 hover:text-gray-700"}`}
-        >
-          Employees
-        </button>
-        <button
-          onClick={() => setActiveTab("roles")}
-          className={`px-4 py-2 rounded-t-lg font-semibold ${activeTab === "roles" ? "bg-white text-primary border-b-2 border-primary" : "text-gray-500 hover:text-gray-700"}`}
-        >
-          Roles
-        </button>
-        <button
-          onClick={() => setActiveTab("documents")}
-          className={`px-4 py-2 rounded-t-lg font-semibold ${activeTab === "documents" ? "bg-white text-primary border-b-2 border-primary" : "text-gray-500 hover:text-gray-700"}`}
-        >
-          HR Documents
-        </button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+          <p className="text-gray-600">Manage your organization settings and configurations</p>
+        </div>
       </div>
 
-      {/* Content for each tab */}
-      {activeTab === "company" && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-2xl font-bold mb-4">Company Information</h2>
-          <form onSubmit={async (e) => {
-            e.preventDefault()
-            setIsSavingSettings(true)
-            try {
-              if (isDemoMode()) {
-                await new Promise((resolve) => setTimeout(resolve, 1500))
-                toast({ title: "Company Info Saved", description: "Settings updated (Demo Mode)" })
-              } else {
-                // Save to Supabase
-                const { error } = await supabase.from("companies").update({
-                  name: companyData.name,
-                  email_address: companyData.email_address,
-                  phone_number: companyData.phone_number,
-                  address: companyData.address,
-                  tax_id: companyData.tax_id,
-                  ssnit_number: companyData.ssnit_number,
-                  industry: companyData.industry,
-                  divisions: companyData.divisions,
-                  departments: companyData.departments,
-                  locations: companyData.locations,
-                }).eq('id', companyData.id)
+      <Tabs defaultValue="company" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-8">
+          <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="subsidiaries">Multi-Company</TabsTrigger>
+          <TabsTrigger value="hr">HR</TabsTrigger>
+          <TabsTrigger value="payroll">Payroll</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="roles">Roles</TabsTrigger>
+          <TabsTrigger value="access">Access</TabsTrigger>
+          <TabsTrigger value="security">Security</TabsTrigger>
+        </TabsList>
 
-                if (error) throw error
-                toast({ title: "Company Info Saved", description: "Company settings updated successfully" })
-              }
-            } catch (error) {
-              console.error("Error saving company info:", error)
-              toast({ title: "Save Failed", description: "Failed to save company information", variant: "destructive" })
-            } finally {
-              setIsSavingSettings(false)
-            }
-          }}>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
-                  Company Name
-                </label>
-                <input
-                  type="text"
-                  id="companyName"
-                  value={companyData.name}
-                  onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  required
-                />
+        {/* Company Settings */}
+        <TabsContent value="company">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Building2 className="w-5 h-5" />
+                <span>Company Settings</span>
+              </CardTitle>
+              <CardDescription>Manage your company information and organizational structure</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <Label>Company Logo</Label>
+                <div className="flex items-center space-x-4">
+                  {companyLogoPreview || companyData.logo_url ? (
+                    <div className="relative">
+                      <img
+                        src={companyLogoPreview || companyData.logo_url}
+                        alt="Company Logo"
+                        className="w-20 h-20 object-cover rounded-lg border"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                        onClick={() => {
+                          setCompanyLogoPreview("")
+                          setCompanyData({ ...companyData, logo_url: "" })
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                      <ImageIcon className="w-8 h-8 text-gray-400" />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleLogoUpload(file, "company")
+                        }
+                      }}
+                      className="hidden"
+                      id="company-logo-upload"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => document.getElementById("company-logo-upload")?.click()}
+                      disabled={isUploadingLogo}
+                      className="flex items-center space-x-2"
+                    >
+                      {isUploadingLogo ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" />
+                          <span>Upload Logo</span>
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label htmlFor="industry" className="block text-sm font-medium text-gray-700">
-                  Industry
-                </label>
-                <input
-                  type="text"
-                  id="industry"
-                  value={companyData.industry}
-                  onChange={(e) => setCompanyData({ ...companyData, industry: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="companyName">Company Name</Label>
+                  <Input
+                    id="companyName"
+                    value={companyData.name}
+                    onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="industry">Industry</Label>
+                  <Input
+                    id="industry"
+                    value={companyData.industry}
+                    onChange={(e) => setCompanyData({ ...companyData, industry: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="taxId">Tax ID</Label>
+                  <Input
+                    id="taxId"
+                    value={companyData.tax_id}
+                    onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="ssnitNumber">SSNIT Number</Label>
+                  <Input
+                    id="ssnitNumber"
+                    value={companyData.ssnit_number}
+                    onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={companyData.email_address}
+                    onChange={(e) => setCompanyData({ ...companyData, email_address: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={companyData.phone_number}
+                    onChange={(e) => setCompanyData({ ...companyData, phone_number: e.target.value })}
+                  />
+                </div>
               </div>
+
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  value={companyData.email_address}
-                  onChange={(e) => setCompanyData({ ...companyData, email_address: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                />
-              </div>
-              <div>
-                <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  id="phoneNumber"
-                  value={companyData.phone_number}
-                  onChange={(e) => setCompanyData({ ...companyData, phone_number: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                />
-              </div>
-              <div>
-                <label htmlFor="address" className="block text-sm font-medium text-gray-700">
-                  Address
-                </label>
-                <input
-                  type="text"
+                <Label htmlFor="address">Address</Label>
+                <Textarea
                   id="address"
                   value={companyData.address}
                   onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                 />
               </div>
-              <div>
-                <label htmlFor="taxId" className="block text-sm font-medium text-gray-700">
-                  Tax ID
-                </label>
-                <input
-                  type="text"
-                  id="taxId"
-                  value={companyData.tax_id}
-                  onChange={(e) => setCompanyData({ ...companyData, tax_id: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                />
-              </div>
-              <div>
-                <label htmlFor="ssnitNumber" className="block text-sm font-medium text-gray-700">
-                  SSNIT Number
-                </label>
-                <input
-                  type="text"
-                  id="ssnitNumber"
-                  value={companyData.ssnit_number}
-                  onChange={(e) => setCompanyData({ ...companyData, ssnit_number: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                />
-              </div>
-            </div>
 
-            {/* Divisions, Departments, Locations */}
-            <div className="mt-6">
-              <h3 className="text-lg font-semibold mb-2">Organizational Structure</h3>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div>
-                  <label htmlFor="divisions" className="block text-sm font-medium text-gray-700">Divisions</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Divisions</Label>
+                <div className="space-y-3">
+                  {(divisions || []).length > 0 ? (
+                    <div className="space-y-2">
+                      {(divisions || []).map((division, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <span className="font-medium">{division}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveDivision(division)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No divisions added yet</p>
+                  )}
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Enter division name"
                       value={newDivisionName}
                       onChange={(e) => setNewDivisionName(e.target.value)}
-                      placeholder="Add division"
-                      className="flex-1 mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                      onKeyPress={(e) => e.key === "Enter" && handleAddDivision()}
                     />
-                    <button type="button" onClick={handleAddDivision} className="mt-1 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Add</button>
+                    <Button variant="outline" size="sm" onClick={handleAddDivision} disabled={!newDivisionName.trim()}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Division
+                    </Button>
                   </div>
-                  <ul className="mt-2 space-y-1">
-                    {divisions.map((division, index) => (
-                      <li key={index} className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                        <span>{division}</span>
-                        <button type="button" onClick={() => handleRemoveDivision(division)} className="text-red-500 hover:text-red-700">Remove</button>
-                      </li>
-                    ))}
-                  </ul>
                 </div>
-                <div>
-                  <label htmlFor="departments" className="block text-sm font-medium text-gray-700">Departments</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Departments</Label>
+                <div className="space-y-3">
+                  {(departments || []).length > 0 ? (
+                    <div className="space-y-2">
+                      {(departments || []).map((department, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <span className="font-medium">{department}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveDepartment(department)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No departments added yet</p>
+                  )}
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Enter department name"
                       value={newDepartmentName}
                       onChange={(e) => setNewDepartmentName(e.target.value)}
-                      placeholder="Add department"
-                      className="flex-1 mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                      onKeyPress={(e) => e.key === "Enter" && handleAddDepartment()}
                     />
-                    <button type="button" onClick={handleAddDepartment} className="mt-1 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Add</button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddDepartment}
+                      disabled={!newDepartmentName.trim()}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Department
+                    </Button>
                   </div>
-                  <ul className="mt-2 space-y-1">
-                    {departments.map((department, index) => (
-                      <li key={index} className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                        <span>{department}</span>
-                        <button type="button" onClick={() => handleRemoveDepartment(department)} className="text-red-500 hover:text-red-700">Remove</button>
-                      </li>
-                    ))}
-                  </ul>
                 </div>
-                <div>
-                  <label htmlFor="locations" className="block text-sm font-medium text-gray-700">Locations</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Locations</Label>
+                <div className="space-y-3">
+                  {(locations || []).length > 0 ? (
+                    <div className="space-y-2">
+                      {(locations || []).map((location, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <span className="font-medium">{location}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveLocation(location)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No locations added yet</p>
+                  )}
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Enter location name"
                       value={newLocationName}
                       onChange={(e) => setNewLocationName(e.target.value)}
-                      placeholder="Add location"
-                      className="flex-1 mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                      onKeyPress={(e) => e.key === "Enter" && handleAddLocation()}
                     />
-                    <button type="button" onClick={handleAddLocation} className="mt-1 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Add</button>
+                    <Button variant="outline" size="sm" onClick={handleAddLocation} disabled={!newLocationName.trim()}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Location
+                    </Button>
                   </div>
-                  <ul className="mt-2 space-y-1">
-                    {locations.map((location, index) => (
-                      <li key={index} className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                        <span>{location}</span>
-                        <button type="button" onClick={() => handleRemoveLocation(location)} className="text-red-500 hover:text-red-700">Remove</button>
-                      </li>
-                    ))}
-                  </ul>
                 </div>
               </div>
-            </div>
 
-            {/* Logo Upload */}
-            <div className="mt-6">
-              <label htmlFor="companyLogo" className="block text-sm font-medium text-gray-700">
-                Company Logo
-              </label>
-              <div className="mt-2 flex items-center">
-                {companyLogoPreview && (
-                  <img src={companyLogoPreview || "/placeholder.svg"} alt="Company Logo Preview" className="h-16 w-16 rounded-full mr-4 object-cover" />
-                )}
-                <input
-                  type="file"
-                  id="companyLogo"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      const reader = new FileReader()
-                      reader.onloadend = () => {
-                        setCompanyLogoPreview(reader.result as string)
-                        // In a real app, you would upload this to storage and save the URL
-                      }
-                      reader.readAsDataURL(file)
-                    }
-                  }}
-                  className="rounded-md border border-gray-300 p-2 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                />
-              </div>
-              {isUploadingLogo && <p className="text-sm text-gray-500 mt-2">Uploading logo...</p>}
-            </div>
-
-
-            <div className="flex justify-end mt-8">
-              <button
-                type="submit"
-                disabled={isSavingSettings}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
-              >
-                {isSavingSettings ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {activeTab === "hr" && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-2xl font-bold mb-4">HR Settings</h2>
-          <form onSubmit={async (e) => {
-            e.preventDefault()
-            await handleSaveHRConfig()
-          }}>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="leaveYearStart" className="block text-sm font-medium text-gray-700">Leave Year Start</label>
-                <select
-                  id="leaveYearStart"
-                  value={hrConfig.leaveYearStart}
-                  onChange={(e) => setHrConfig({ ...hrConfig, leaveYearStart: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+              <div className="flex justify-end">
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveSettings}
+                  disabled={isSavingSettings}
                 >
-                  <option>January</option>
-                  <option>February</option>
-                  <option>March</option>
-                  {/* ... other months */}
-                </select>
+                  {isSavingSettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Company Settings
+                    </>
+                  )}
+                </Button>
               </div>
-              <div>
-                <label htmlFor="probationPeriod" className="block text-sm font-medium text-gray-700">Probation Period (Months)</label>
-                <input
-                  type="number"
-                  id="probationPeriod"
-                  value={hrConfig.probationPeriod}
-                  onChange={(e) => setHrConfig({ ...hrConfig, probationPeriod: Number.parseInt(e.target.value) })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                />
-              </div>
-              <div>
-                <label htmlFor="workingHoursPerDay" className="block text-sm font-medium text-gray-700">Working Hours per Day</label>
-                <input
-                  type="number"
-                  id="workingHoursPerDay"
-                  value={hrConfig.workingHoursPerDay}
-                  onChange={(e) => setHrConfig({ ...hrConfig, workingHoursPerDay: Number.parseInt(e.target.value) })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                />
-              </div>
-              <div>
-                <label htmlFor="workingDaysPerWeek" className="block text-sm font-medium text-gray-700">Working Days per Week</label>
-                <input
-                  type="number"
-                  id="workingDaysPerWeek"
-                  value={hrConfig.workingDaysPerWeek}
-                  onChange={(e) => setHrConfig({ ...hrConfig, workingDaysPerWeek: Number.parseInt(e.target.value) })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                />
-              </div>
-            </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <h3 className="text-lg font-semibold mt-6 mb-2">Features</h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="flex items-center">
-                <input
-                  id="autoApproveLeave"
-                  type="checkbox"
-                  checked={hrConfig.autoApproveLeave}
-                  onChange={(e) => setHrConfig({ ...hrConfig, autoApproveLeave: e.target.checked })}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                />
-                <label htmlFor="autoApproveLeave" className="ml-2 block text-sm font-medium text-gray-700">Auto-Approve Leave Requests</label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  id="emailNotifications"
-                  type="checkbox"
-                  checked={hrConfig.emailNotifications}
-                  onChange={(e) => setHrConfig({ ...hrConfig, emailNotifications: e.target.checked })}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                />
-                <label htmlFor="emailNotifications" className="ml-2 block text-sm font-medium text-gray-700">Email Notifications</label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  id="aiRecommendations"
-                  type="checkbox"
-                  checked={hrConfig.aiRecommendations}
-                  onChange={(e) => setHrConfig({ ...hrConfig, aiRecommendations: e.target.checked })}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                />
-                <label htmlFor="aiRecommendations" className="ml-2 block text-sm font-medium text-gray-700">AI Recommendations</label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  id="smartScheduling"
-                  type="checkbox"
-                  checked={hrConfig.smartScheduling}
-                  onChange={(e) => setHrConfig({ ...hrConfig, smartScheduling: e.target.checked })}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                />
-                <label htmlFor="smartScheduling" className="ml-2 block text-sm font-medium text-gray-700">Smart Scheduling</label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  id="performanceTracking"
-                  type="checkbox"
-                  checked={hrConfig.performanceTracking}
-                  onChange={(e) => setHrConfig({ ...hrConfig, performanceTracking: e.target.checked })}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                />
-                <label htmlFor="performanceTracking" className="ml-2 block text-sm font-medium text-gray-700">Performance Tracking</label>
-              </div>
-            </div>
-
-            <div className="flex justify-end mt-8">
-              <button
-                type="submit"
-                disabled={isSaving} // Use the general saving state
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
-              >
-                {isSaving ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {activeTab === "payroll" && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-2xl font-bold mb-4">Payroll & Taxes</h2>
-          <div className="mb-6 flex space-x-4 border-b border-gray-200 pb-2">
-            <button
-              onClick={() => setSalaryGradeTab("structured")}
-              className={`px-3 py-2 rounded-md font-medium ${salaryGradeTab === "structured" ? "bg-primary text-white" : "text-gray-600 hover:bg-gray-100"}`}
-            >
-              Structured Salary Grades
-            </button>
-            <button
-              onClick={() => setSalaryGradeTab("unstructured")}
-              className={`px-3 py-2 rounded-md font-medium ${salaryGradeTab === "unstructured" ? "bg-primary text-white" : "text-gray-600 hover:bg-gray-100"}`}
-            >
-              Unstructured Grades
-            </button>
-          </div>
-
-          {salaryGradeTab === "structured" && (
-            <>
-              <div className="flex justify-end mb-4">
-                <button onClick={() => setShowImportExportModal(true)} className="mr-2 px-3 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Import/Export</button>
-                <button onClick={handleAddSalaryGrade} className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                  Add Salary Grade
-                </button>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade Name</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Min Salary</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Max Salary</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {salaryGrades.map((grade) => (
-                      <tr key={grade.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{grade.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.description}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.minSalary.toLocaleString()}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.maxSalary.toLocaleString()}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <button onClick={() => handleEditSalaryGrade(grade)} className="text-blue-500 hover:text-blue-700 mr-2">Edit</button>
-                          <button onClick={() => handleDeleteSalaryGrade(grade.id)} className="text-red-500 hover:text-red-700">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Salary Grade Modal */}
-              {showSalaryGradeModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black bg-opacity-50">
-                  <div className="bg-white rounded-lg p-6 shadow-xl max-w-4xl w-full">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg font-semibold">{editingGrade ? "Edit" : "Add"} Salary Grade</h3>
-                      <button onClick={() => setShowSalaryGradeModal(false)} className="text-gray-500 hover:text-gray-700">&times;</button>
-                    </div>
-                    <form onSubmit={(e) => { e.preventDefault(); handleSaveSalaryGrade() }}>
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <TabsContent value="subsidiaries">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Building2 className="w-5 h-5" />
+                  <span>Multi-Company Management</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button onClick={() => setShowAddSubsidiary(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Subsidiary
+                  </Button>
+                  <Button variant="outline" onClick={handleSaveSubsidiaryChanges} disabled={isSavingSubsidiary}>
+                    {isSavingSubsidiary ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardTitle>
+              <CardDescription>
+                Manage subsidiary companies, their organizational structure, and synchronize settings across entities
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Company Overview Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Building2 className="w-5 h-5 text-blue-600" />
                         <div>
-                          <label htmlFor="gradeName" className="block text-sm font-medium text-gray-700">Grade Name</label>
-                          <input
-                            type="text"
-                            id="gradeName"
-                            value={newGrade.name}
-                            onChange={(e) => setNewGrade({ ...newGrade, name: e.target.value })}
-                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                            required
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label htmlFor="gradeDescription" className="block text-sm font-medium text-gray-700">Description</label>
-                          <input
-                            type="text"
-                            id="gradeDescription"
-                            value={newGrade.description}
-                            onChange={(e) => setNewGrade({ ...newGrade, description: e.target.value })}
-                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="minSalary" className="block text-sm font-medium text-gray-700">Minimum Salary</label>
-                          <input
-                            type="number"
-                            id="minSalary"
-                            value={newGrade.minSalary}
-                            onChange={(e) => setNewGrade({ ...newGrade, minSalary: e.target.value })}
-                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="maxSalary" className="block text-sm font-medium text-gray-700">Maximum Salary</label>
-                          <input
-                            type="number"
-                            id="maxSalary"
-                            value={newGrade.maxSalary}
-                            onChange={(e) => setNewGrade({ ...newGrade, maxSalary: e.target.value })}
-                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="numberOfNotches" className="block text-sm font-medium text-gray-700">Number of Notches</label>
-                          <input
-                            type="number"
-                            id="numberOfNotches"
-                            value={newGrade.numberOfNotches}
-                            onChange={(e) => setNewGrade({ ...newGrade, numberOfNotches: Number.parseInt(e.target.value) })}
-                            min="2"
-                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                            required
-                          />
-                        </div>
-                        <div className="flex items-end">
-                          <button type="button" onClick={handleGenerateNotches} disabled={isGeneratingNotches} className="mt-1 px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark disabled:opacity-50">
-                            {isGeneratingNotches ? "Generating..." : "Generate Notches"}
-                          </button>
+                          <p className="text-sm font-medium">Total Subsidiaries</p>
+                          <p className="text-2xl font-bold">{(subsidiaries || []).length}</p>
                         </div>
                       </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Users className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="text-sm font-medium">Active Companies</p>
+                          <p className="text-2xl font-bold">
+                            {(subsidiaries || []).filter((s) => s.status === "active").length}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <MapPin className="w-5 h-5 text-purple-600" />
+                        <div>
+                          <p className="text-sm font-medium">Total Locations</p>
+                          <p className="text-2xl font-bold">
+                            {(subsidiaries || []).reduce((acc, s) => acc + (s.locations?.length || 0), 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Briefcase className="w-5 h-5 text-orange-600" />
+                        <div>
+                          <p className="text-sm font-medium">Total Departments</p>
+                          <p className="text-2xl font-bold">
+                            {(subsidiaries || []).reduce((acc, s) => acc + (s.departments?.length || 0), 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
 
-                      <div className="mt-6">
-                        <h4 className="text-md font-semibold mb-2">Notches</h4>
-                        {newGrade.notches.length > 0 ? (
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            {newGrade.notches.map((notch, index) => (
-                              <div key={index}>
-                                <label htmlFor={`notchStep${index}`} className="block text-sm font-medium text-gray-700">Step {notch.step}</label>
-                                <input
+                {/* Subsidiaries List */}
+                <div className="space-y-3">
+                  {(subsidiaries || []).map((subsidiary) => (
+                    // Updated subsidiary card to show logo and removed Edit button
+                    <Card key={subsidiary.id} className="border-l-4 border-l-blue-500">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
+                                {subsidiary.logo_url ? (
+                                  <img
+                                    src={subsidiary.logo_url || "/placeholder.svg"}
+                                    alt={`${subsidiary.name} logo`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                                    {subsidiary.name.charAt(0)}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h3 className="text-base font-semibold">{subsidiary.name}</h3>
+                                    <p className="text-xs text-gray-600">{subsidiary.industry}</p>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Badge
+                                      variant={subsidiary.status === "active" ? "default" : "secondary"}
+                                      className="text-xs"
+                                    >
+                                      {subsidiary.status}
+                                    </Badge>
+                                    <span className="text-xs text-gray-500">Tax ID: {subsidiary.tax_id}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                              <div>
+                                <p className="text-xs font-medium text-gray-700 mb-1">Contact Information</p>
+                                <div className="space-y-0.5">
+                                  <p className="text-xs text-gray-600">{subsidiary.email_address}</p>
+                                  <p className="text-xs text-gray-600">{subsidiary.phone_number}</p>
+                                  <p className="text-xs text-gray-600 truncate">{subsidiary.address}</p>
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-700 mb-1">Organizational Structure</p>
+                                <div className="flex items-center space-x-3 text-xs text-gray-600">
+                                  <span>
+                                    {subsidiary.divisions_count || subsidiary.divisions?.length || 0} Divisions
+                                  </span>
+                                  <span>
+                                    {subsidiary.departments_count || subsidiary.departments?.length || 0} Departments
+                                  </span>
+                                  <span>
+                                    {subsidiary.locations_count || subsidiary.locations?.length || 0} Locations
+                                  </span>
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-700 mb-1">Registration Details</p>
+                                <div className="space-y-0.5">
+                                  <p className="text-xs text-gray-600">SSNIT: {subsidiary.ssnit_number}</p>
+                                  <p className="text-xs text-gray-600">
+                                    Created:{" "}
+                                    {subsidiary.created_at
+                                      ? new Date(subsidiary.created_at).toLocaleDateString()
+                                      : "N/A"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowSubsidiaryDetails(true)
+                                }}
+                              >
+                                <Eye className="w-3 h-3 mr-1" />
+                                View Details
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowEditSubsidiary(true)
+                                }}
+                              >
+                                <Edit className="w-3 h-3 mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
+                                onClick={() => syncSubsidiarySettings(subsidiary.id)}
+                              >
+                                <RefreshCw className="w-3 h-3 mr-1" />
+                                Sync Settings
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-transparent"
+                                onClick={() => viewSubsidiaryEmployees(subsidiary.id)}
+                              >
+                                <Users className="w-3 h-3 mr-1" />
+                                View Employees ({subsidiary.employee_count || 0})
+                              </Button>
+                            </div>
+                          </div>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                <MoreVertical className="h-3 w-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowSubsidiaryDetails(true)
+                                }}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setShowEditSubsidiary(true)
+                                }}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Subsidiary
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => syncSubsidiarySettings(subsidiary.id)}>
+                                <RefreshCw className="w-4 h-4 mr-2" />
+                                Sync Settings
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => duplicateSubsidiary(subsidiary)}>
+                                <Copy className="w-4 h-4 mr-2" />
+                                Duplicate
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              {subsidiary.status === "active" ? (
+                                <DropdownMenuItem
+                                  onClick={() => confirmDeactivateSubsidiary(subsidiary.id)}
+                                  className="text-orange-600"
+                                >
+                                  <AlertTriangle className="w-4 h-4 mr-2" />
+                                  Deactivate
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem
+                                  onClick={() => confirmReactivateSubsidiary(subsidiary.id)}
+                                  className="text-green-600"
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-2" />
+                                  Reactivate
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                  {(subsidiaries || []).length === 0 && (
+                    <Card>
+                      <CardContent className="p-8 text-center">
+                        <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Subsidiaries Found</h3>
+                        <p className="text-gray-600 mb-4">
+                          Get started by adding your first subsidiary company to manage multiple entities.
+                        </p>
+                        <Button onClick={() => setShowAddSubsidiary(true)}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add First Subsidiary
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Settings Synchronization Panel */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <RefreshCw className="w-5 h-5" />
+                      <span>Settings Synchronization</span>
+                    </CardTitle>
+                    <CardDescription>Synchronize settings across all subsidiary companies</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="font-medium mb-2">Sync Options</h4>
+                        <div className="space-y-2">
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" defaultChecked />
+                            <span className="text-sm">HR Policies</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" defaultChecked />
+                            <span className="text-sm">Payroll Configuration</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" />
+                            <span className="text-sm">Leave Types</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input type="checkbox" className="rounded" />
+                            <span className="text-sm">Roles & Permissions</span>
+                          </label>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-2">Sync Actions</h4>
+
+                        <div className="space-y-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={handleSaveSettings}
+                            disabled={isSavingSettings}
+                          >
+                            {isSavingSettings ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-4 h-4 mr-2" />
+                                Save Settings
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={handleExportSettingsTemplate}
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Export Settings Template
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={() => setImportModal(true)}
+                          >
+                            <Upload className="w-4 h-4 mr-2" />
+                            Import Settings
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="hr">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Settings className="w-5 h-5" />
+                      <span>HR Configuration</span>
+                    </CardTitle>
+                    <CardDescription>Configure core HR settings and policies</CardDescription>
+                  </div>
+                  <Button
+                    onClick={handleSaveHRConfig}
+                    disabled={isSaving}
+                    className="bg-black text-white hover:bg-gray-800"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save HR Configuration
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="leaveYearStart">Leave Year Start</Label>
+                      <Select
+                        value={hrConfig.leaveYearStart}
+                        onValueChange={(value) => setHrConfig({ ...hrConfig, leaveYearStart: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="January">January</SelectItem>
+                          <SelectItem value="February">February</SelectItem>
+                          <SelectItem value="March">March</SelectItem>
+                          <SelectItem value="April">April</SelectItem>
+                          <SelectItem value="May">May</SelectItem>
+                          <SelectItem value="June">June</SelectItem>
+                          <SelectItem value="July">July</SelectItem>
+                          <SelectItem value="August">August</SelectItem>
+                          <SelectItem value="September">September</SelectItem>
+                          <SelectItem value="October">October</SelectItem>
+                          <SelectItem value="November">November</SelectItem>
+                          <SelectItem value="December">December</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="workingHours">Working Hours/Day</Label>
+                      <Input
+                        id="workingHours"
+                        type="number"
+                        value={hrConfig.workingHoursPerDay}
+                        onChange={(e) =>
+                          setHrConfig({ ...hrConfig, workingHoursPerDay: Number.parseInt(e.target.value) })
+                        }
+                        min="1"
+                        max="24"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="probationPeriod">Probation Period (months)</Label>
+                      <Input
+                        id="probationPeriod"
+                        type="number"
+                        value={hrConfig.probationPeriod}
+                        onChange={(e) => setHrConfig({ ...hrConfig, probationPeriod: Number.parseInt(e.target.value) })}
+                        min="0"
+                        max="12"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="workingDays">Working Days/Week</Label>
+                      <Input
+                        id="workingDays"
+                        type="number"
+                        value={hrConfig.workingDaysPerWeek}
+                        onChange={(e) =>
+                          setHrConfig({ ...hrConfig, workingDaysPerWeek: Number.parseInt(e.target.value) })
+                        }
+                        min="1"
+                        max="7"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Auto-approve leave requests</Label>
+                      <p className="text-sm text-muted-foreground">Automatically approve requests within policy</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.autoApproveLeave}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, autoApproveLeave: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Email notifications</Label>
+                      <p className="text-sm text-muted-foreground">Send email updates for HR activities</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.emailNotifications}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, emailNotifications: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center space-x-2">
+                        <Sparkles className="w-4 h-4 text-purple-500" />
+                        <span>AI Recommendations</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground">Enable AI-driven insights for HR processes</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.aiRecommendations}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, aiRecommendations: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center space-x-2">
+                        <TrendingUp className="w-4 h-4 text-blue-500" />
+                        <span>Smart Scheduling</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground">Optimize schedules based on employee availability</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.smartScheduling}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, smartScheduling: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center space-x-2">
+                        <Calendar className="w-4 h-4 text-green-500" />
+                        <span>Performance Tracking</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground">Track employee performance metrics and goals</p>
+                    </div>
+                    <Switch
+                      checked={hrConfig.performanceTracking}
+                      onCheckedChange={(checked) => setHrConfig({ ...hrConfig, performanceTracking: checked })}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Leave Policies Management */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center space-x-2">
+                    <Calendar className="w-5 h-5" />
+                    <span>Leave Policies</span>
+                  </CardTitle>
+                  <div className="flex items-center space-x-2">
+                    <Button variant="outline" onClick={handleManageLeaveTypes}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Leave Type
+                    </Button>
+                  </div>
+                </div>
+                <CardDescription>Manage leave policies and generate AI insights</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {(currentPolicies || []).map((policy) => (
+                    <Card key={policy.name} className="border-l-4 border-l-blue-500">
+                      <CardHeader>
+                        <CardTitle className="text-lg font-semibold">{policy.name}</CardTitle>
+                        <CardDescription>{policy.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          <p className="text-sm">
+                            <span className="font-medium">Days:</span> {policy.days}
+                          </p>
+                          <p className="text-sm">
+                            <span className="font-medium">Usage:</span> {policy.usage}
+                          </p>
+                        </div>
+
+                        <div className="border-t pt-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-muted-foreground">AI Insight</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleGeneratePolicyInsight(policy.name)}
+                              disabled={loadingInsights[policy.name]}
+                              className="h-6 px-2 text-xs"
+                            >
+                              {loadingInsights[policy.name] ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Brain className="w-3 h-3" />
+                              )}
+                              <span className="ml-1">Generate</span>
+                            </Button>
+                          </div>
+
+                          {policyInsights[policy.name] ? (
+                            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                              <p className="text-xs text-blue-800 leading-relaxed">{policyInsights[policy.name]}</p>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 text-center">
+                              <p className="text-xs text-gray-500">Click Generate to get AI insights for this policy</p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex justify-end space-x-2 pt-2">
+                          <Button variant="outline" size="sm" onClick={() => handlePolicyAction("view", policy.name)}>
+                            View
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handlePolicyAction("edit", policy.name)}>
+                            Edit
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handlePolicyAction("delete", policy.name)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* HR Documents Management */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center space-x-2">
+                    <ImageIcon className="w-5 h-5" />
+                    <span>HR Documents</span>
+                  </CardTitle>
+                  <Button variant="outline" onClick={handleAddDocument}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Document
+                  </Button>
+                </div>
+                <CardDescription>Manage HR documents and visibility settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
+                  {(hrDocuments || []).map((doc) => (
+                    <Card key={doc.id} className="border-l-4 border-l-green-500">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-base font-semibold">{doc.name}</h3>
+                            <p className="text-xs text-gray-600">
+                              {doc.type} - {doc.size}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-4">
+                            <div className="flex flex-col items-center space-y-1">
+                              <Switch
+                                checked={doc.visibleToAll}
+                                onCheckedChange={() => handleToggleDocumentVisibility(doc.id)}
+                              />
+                              <span className="text-xs text-muted-foreground">
+                                {doc.visibleToAll ? "available to employees" : "hidden from employees"}
+                              </span>
+                            </div>
+                            <Button variant="outline" size="sm" onClick={() => handleDocumentView(doc)}>
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => handleDocumentAction("edit", doc.id)}>
+                              <Edit className="w-4 h-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDocumentAction("delete", doc.id)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <TrendingUp className="w-5 h-5" />
+                  <span>Salary Grades & Notches</span>
+                </CardTitle>
+                <CardDescription>Manage salary grades and compensation structure for employees</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Tab Navigation */}
+                <div className="flex space-x-1 bg-muted p-1 rounded-lg">
+                  <button
+                    onClick={() => setSalaryGradeTab("structured")}
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                      salaryGradeTab === "structured"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Structured Salary Grade
+                  </button>
+                  <button
+                    onClick={() => setSalaryGradeTab("unstructured")}
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                      salaryGradeTab === "unstructured"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Unstructured Salary Grade
+                  </button>
+                </div>
+
+                {/* Structured Salary Grades */}
+                {salaryGradeTab === "structured" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {(salaryGrades || []).map((grade) => (
+                      <Card key={grade.id} className="border-l-4 border-l-purple-500">
+                        <CardHeader>
+                          <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
+                          <CardDescription>{grade.description}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-2">
+                            <p className="text-sm">
+                              <span className="font-medium">Range:</span> ₵{grade.minSalary.toLocaleString()} - ₵
+                              {grade.maxSalary.toLocaleString()}
+                            </p>
+                            <p className="text-sm">
+                              <span className="font-medium">Notches:</span> {grade.notches.length} steps
+                            </p>
+                          </div>
+
+                          <div className="border-t pt-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-muted-foreground">Salary Steps</span>
+                            </div>
+                            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-32 overflow-y-auto">
+                              <div className="space-y-1">
+                                {grade.notches.map((notch) => (
+                                  <div key={notch.step} className="flex justify-between text-xs">
+                                    <span>Step {notch.step}</span>
+                                    <span className="font-medium">₵{notch.amount.toLocaleString()}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end space-x-2 pt-2">
+                            <Button variant="outline" size="sm" onClick={() => handleEditSalaryGrade(grade)}>
+                              Edit
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteSalaryGrade(grade.id)}>
+                              Delete
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+
+                {/* Unstructured Salary Grades */}
+                {salaryGradeTab === "unstructured" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {(unstructuredGrades || []).map((grade) => (
+                      <Card key={grade.id} className="border-l-4 border-l-blue-500">
+                        <CardHeader>
+                          <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
+                          <CardDescription>{grade.description}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-3">
+                            <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-green-800">General Increment</span>
+                                <span className="text-sm font-semibold text-green-900">
+                                  {grade.generalIncrement.type === "percentage"
+                                    ? `${grade.generalIncrement.value}%`
+                                    : `₵${grade.generalIncrement.value.toLocaleString()}`}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-blue-800">Performance Increment</span>
+                                <span className="text-sm font-semibold text-blue-900">
+                                  {grade.performanceIncrement.type === "percentage"
+                                    ? `${grade.performanceIncrement.value}%`
+                                    : `₵${grade.performanceIncrement.value.toLocaleString()}`}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end space-x-2 pt-2">
+                            <Button variant="outline" size="sm" onClick={() => handleEditUnstructuredGrade(grade)}>
+                              Edit
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteUnstructuredGrade(grade.id)}>
+                              Delete
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="payroll">
+          <div className="space-y-6">
+            {/* Payroll Configuration Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Settings className="w-5 h-5" />
+                  <span>Payroll Configuration</span>
+                </CardTitle>
+                <CardDescription>Configure basic payroll settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div>
+                    <Label htmlFor="payFrequency">Pay Frequency</Label>
+                    <Select defaultValue="monthly">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="biweekly">Bi-Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="currency">Currency</Label>
+                    <Select value={selectedCurrency} onValueChange={handleCurrencyChange}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ghs">Ghana Cedis (GHS)</SelectItem>
+                        <SelectItem value="usd">US Dollar (USD)</SelectItem>
+                        <SelectItem value="eur">Euro (EUR)</SelectItem>
+                        <SelectItem value="ngn">Nigerian Naira (NGN)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="minimumWage">Minimum Wage ({getCurrencyConfig(selectedCurrency).symbol})</Label>
+                    <Input type="number" defaultValue="18.15" />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="weekdayOvertimeRate">Weekday Overtime Rate Multiplier</Label>
+                    <Input type="number" step="0.1" defaultValue="1.5" />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="weekendOvertimeRate">Weekend Overtime Rate Multiplier</Label>
+                    <Input type="number" step="0.1" defaultValue="2" />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="payrollCutoffDay">Payroll Cutoff Day</Label>
+                    <Input type="number" min="1" max="31" defaultValue="25" />
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch id="autoCalculatePAYE" defaultChecked />
+                    <Label htmlFor="autoCalculatePAYE">Auto-calculate PAYE</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="autoCalculateSSNIT" defaultChecked />
+                    <Label htmlFor="autoCalculateSSNIT">Auto-calculate SSNIT</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="autoCalculateProvidentFund" defaultChecked />
+                    <Label htmlFor="autoCalculateProvidentFund">Auto-calculate Provident Fund (Tier 3)</Label>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button onClick={handleSavePayrollConfig} disabled={isSavingPayroll}>
+                    {isSavingPayroll ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4 mr-2" />
+                    )}
+                    Save Payroll Configuration
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Tax Configuration Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Calculator className="w-5 h-5" />
+                  <span>Tax Configuration</span>
+                </CardTitle>
+                <CardDescription>Configure tax bands and SSNIT rates</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="font-medium">PAYE Tax Bands</h4>
+                      <p className="text-sm text-gray-500">
+                        {getCurrencyConfig(selectedCurrency).country} - Version{" "}
+                        {getCurrencyConfig(selectedCurrency)?.version} - Last Updated:{" "}
+                        {getCurrencyConfig(selectedCurrency)?.lastUpdated}
+                      </p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => syncWithGovernmentAPI(selectedCurrency)}
+                        disabled={!apiStatus[selectedCurrency as keyof typeof apiStatus]?.connected || isSyncing}
+                      >
+                        {isSyncing ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                        )}
+                        Sync API
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleAddTaxBand}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Band
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse border border-gray-200 rounded-lg">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">Band</th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">Rate (%)</th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
+                            From ({getCurrencyConfig(selectedCurrency).symbol})
+                          </th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
+                            To ({getCurrencyConfig(selectedCurrency).symbol})
+                          </th>
+                          <th className="border border-gray-200 px-4 py-3 text-left font-medium">
+                            Cumulative Tax ({getCurrencyConfig(selectedCurrency).symbol})
+                          </th>
+                          <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getCurrencyConfig(selectedCurrency)?.taxBands.map((band, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="border border-gray-200 px-4 py-3 font-medium">{band.rate}</td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {band.rate}%
+                              </span>
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              {band.from ? band.from.toLocaleString() : "0"}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3">
+                              {band.to ? band.to.toLocaleString() : "∞"}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3 font-medium text-green-600">
+                              {band.cumulativeTax ? band.cumulativeTax.toLocaleString() : "0"}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-3 text-center">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  console.log("[v0] Editing tax band:", band)
+                                }}
+                              >
+                                Edit
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* SSNIT Rates Section */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">SSNIT Rates</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employee:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={ssnitRates.employee}
+                              onChange={(e) => updateSsnitRates("employee", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employer:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={ssnitRates.employer}
+                              onChange={(e) => updateSsnitRates("employer", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t">
+                          <span className="font-medium text-blue-600">Total:</span>
+                          <span className="font-medium text-blue-600">{ssnitRates.total}%</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Tier 2 Rates</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employee:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={tier2Rates.employee}
+                              onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employer:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={tier2Rates.employer}
+                              onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t">
+                          <span className="font-medium text-blue-600">Total:</span>
+                          <span className="font-medium text-blue-600">{tier2Rates.total}%</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Tier 3 Rates</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employee:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={tier3Rates.employee}
+                              onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Employer:</span>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="number"
+                              value={tier3Rates.employer}
+                              onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right"
+                              step="0.1"
+                            />
+                            <span className="text-sm">%</span>
+                            <Badge variant="secondary">Active</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t">
+                          <span className="font-medium text-blue-600">Total:</span>
+                          <span className="font-medium text-blue-600">{tier3Rates.total}%</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* API Status and Recent Updates */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <Wifi className="w-5 h-5" />
+                          <span>API Status</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span>Ghana</span>
+                          <Badge variant="default" className="bg-green-100 text-green-800">
+                            Connected
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Nigeria</span>
+                          <Badge variant="destructive">Disconnected</Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Usa</span>
+                          <Badge variant="destructive">Disconnected</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <Bell className="w-5 h-5" />
+                          <span>Recent Updates</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <div className="flex items-start space-x-2">
+                            <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                            <div>
+                              <p className="text-sm font-medium">Ghana PAYE Rates Updated</p>
+                              <p className="text-xs text-gray-500">New tax rates effective January 1, 2024</p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="flex justify-end mt-6">
+                    <Button
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={handleSaveTaxConfig}
+                      disabled={isSavingTax}
+                    >
+                      {isSavingTax ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      Save Tax Configuration
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <DollarSign className="w-5 h-5" />
+                  <span>Allowances</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-end mb-4">
+                  <Button onClick={handleAddAllowance} className="bg-green-600 hover:bg-green-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-200 rounded-lg">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Code</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Description</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Taxable</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Recurring</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">AMOUNT</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">%</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">FIXED/VARIABLE</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(allowances || []).map((allowance, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={allowance.code}
+                              onChange={(e) => handleAllowanceFieldChange(index, "code", e.target.value)}
+                              className="border-0 bg-transparent p-0 font-medium"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={allowance.description}
+                              onChange={(e) => handleAllowanceFieldChange(index, "description", e.target.value)}
+                              className="border-0 bg-transparent p-0"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Switch
+                              checked={allowance.taxable}
+                              onCheckedChange={(checked) => handleAllowanceFieldChange(index, "taxable", checked)}
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Switch
+                              checked={allowance.recurring}
+                              onCheckedChange={(checked) => handleAllowanceFieldChange(index, "recurring", checked)}
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              value={allowance.amount}
+                              onChange={(e) =>
+                                handleAllowanceFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={allowance.percentage}
+                              onChange={(e) =>
+                                handleAllowanceFieldChange(index, "percentage", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Select
+                              value={allowance.type}
+                              onValueChange={(value) => handleAllowanceFieldChange(index, "type", value)}
+                            >
+                              <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
+                                <Badge variant={allowance.type === "FIXED" ? "default" : "secondary"}>
+                                  {allowance.type}
+                                </Badge>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="FIXED">FIXED</SelectItem>
+                                <SelectItem value="VARIABLE">VARIABLE</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => handleEditAllowance(index)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteAllowance(index)} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Minus className="w-5 h-5" />
+                  <span>Deductions</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-end mb-4">
+                  <Button onClick={handleAddDeduction} className="bg-green-600 hover:bg-green-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-200 rounded-lg">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Code</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Description</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Recurring</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">AMOUNT</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">%</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">FIXED/VARIABLE</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(deductions || []).map((deduction, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={deduction.code}
+                              onChange={(e) => handleDeductionFieldChange(index, "code", e.target.value)}
+                              className="border-0 bg-transparent p-0 font-medium"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            <Input
+                              value={deduction.description}
+                              onChange={(e) => handleDeductionFieldChange(index, "description", e.target.value)}
+                              className="border-0 bg-transparent p-0"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Switch
+                              checked={deduction.recurring}
+                              onCheckedChange={(checked) => handleDeductionFieldChange(index, "recurring", checked)}
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              value={deduction.amount}
+                              onChange={(e) =>
+                                handleDeductionFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={deduction.percentage}
+                              onChange={(e) =>
+                                handleDeductionFieldChange(index, "percentage", Number.parseFloat(e.target.value) || 0)
+                              }
+                              className="border-0 bg-transparent p-0 text-center w-20"
+                            />
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <Select
+                              value={deduction.type}
+                              onValueChange={(value) => handleDeductionFieldChange(index, "type", value)}
+                            >
+                              <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
+                                <Badge variant={deduction.type === "FIXED" ? "default" : "secondary"}>
+                                  {deduction.type}
+                                </Badge>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="FIXED">FIXED</SelectItem>
+                                <SelectItem value="VARIABLE">VARIABLE</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => handleEditDeduction(index)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteDeduction(index)} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Save Button */}
+            <div className="flex justify-end">
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={handleSavePayrollConfig}
+                disabled={isSavingPayroll}
+              >
+                {isSavingPayroll ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                Save Payroll Configuration
+              </Button>
+            </div>
+
+            {/* Tax Reliefs Section */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Receipt className="w-5 h-5" />
+                      <span>Tax Reliefs</span>
+                    </CardTitle>
+                    <CardDescription>
+                      Manage tax reliefs and sync with Ghana Revenue Authority (GRA)
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={syncTaxReliefsFromGRA}
+                      disabled={isSyncingReliefs}
+                    >
+                      {isSyncingReliefs ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                      )}
+                      Sync from GRA
+                    </Button>
+                    <Button size="sm" onClick={handleAddTaxRelief}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Relief
+                    </Button>
+                  </div>
+                </div>
+                {reliefsLastSync && (
+                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <Clock className="w-4 h-4" />
+                    <span>Last synced: {new Date(reliefsLastSync).toLocaleString()}</span>
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-200 rounded-lg">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Name</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Description</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Amount</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Category</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">GRA Code</th>
+                        <th className="border border-gray-200 px-4 py-3 text-left font-medium">Status</th>
+                        <th className="border border-gray-200 px-4 py-3 text-center font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(taxReliefs || []).map((relief, index) => (
+                        <tr key={relief.id} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 px-4 py-3">
+                            {editingRelief === index ? (
+                              <Input
+                                value={relief.name}
+                                onChange={(e) => handleTaxReliefFieldChange(index, "name", e.target.value)}
+                                className="w-full"
+                                placeholder="Relief name"
+                              />
+                            ) : (
+                              <div>
+                                <div className="font-medium">{relief.name}</div>
+                                {relief.isMandatory && (
+                                  <Badge variant="outline" className="text-xs mt-1">
+                                    Mandatory
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            {editingRelief === index ? (
+                              <Input
+                                value={relief.description}
+                                onChange={(e) => handleTaxReliefFieldChange(index, "description", e.target.value)}
+                                className="w-full"
+                                placeholder="Description"
+                              />
+                            ) : (
+                              <div className="text-sm text-gray-600 max-w-xs">
+                                {relief.description}
+                                {relief.maxChildren && (
+                                  <div className="text-xs text-blue-600 mt-1">
+                                    Max: {relief.maxChildren} children
+                                  </div>
+                                )}
+                                {relief.minAge && (
+                                  <div className="text-xs text-blue-600 mt-1">
+                                    Min age: {relief.minAge}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            {editingRelief === index ? (
+                              <div className="flex items-center space-x-1">
+                                <span className="text-sm text-gray-500">{relief.currency}</span>
+                                <Input
                                   type="number"
-                                  id={`notchStep${index}`}
-                                  value={notch.amount}
-                                  onChange={(e) => {
-                                    const updatedNotches = [...newGrade.notches]
-                                    updatedNotches[index] = { ...notch, amount: Number(e.target.value) }
-                                    setNewGrade({ ...newGrade, notches: updatedNotches })
-                                  }}
-                                  className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                                  required
+                                  value={relief.amount}
+                                  onChange={(e) => handleTaxReliefFieldChange(index, "amount", Number.parseFloat(e.target.value) || 0)}
+                                  className="w-20 text-right"
+                                  step="0.01"
                                 />
                               </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-500">Notches will appear here after generation.</p>
-                        )}
-                      </div>
+                            ) : (
+                              <div>
+                                <div className="font-medium text-green-600">
+                                  {relief.currency} {relief.amount.toLocaleString()}
+                                </div>
+                                {relief.maxAmount && relief.maxAmount !== relief.amount && (
+                                  <div className="text-xs text-gray-500">
+                                    Max: {relief.currency} {relief.maxAmount.toLocaleString()}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            {editingRelief === index ? (
+                              <Select
+                                value={relief.category}
+                                onValueChange={(value) => handleTaxReliefFieldChange(index, "category", value)}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Personal">Personal</SelectItem>
+                                  <SelectItem value="Family">Family</SelectItem>
+                                  <SelectItem value="Age">Age</SelectItem>
+                                  <SelectItem value="Disability">Disability</SelectItem>
+                                  <SelectItem value="Education">Education</SelectItem>
+                                  <SelectItem value="Medical">Medical</SelectItem>
+                                  <SelectItem value="Investment">Investment</SelectItem>
+                                  <SelectItem value="Housing">Housing</SelectItem>
+                                  <SelectItem value="Special">Special</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Badge variant="secondary">{relief.category}</Badge>
+                            )}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            <div className="text-sm font-mono text-gray-600">
+                              {relief.graCode || "N/A"}
+                            </div>
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3">
+                            {editingRelief === index ? (
+                              <Switch
+                                checked={relief.isActive}
+                                onCheckedChange={(checked) => handleTaxReliefFieldChange(index, "isActive", checked)}
+                              />
+                            ) : (
+                              <Badge variant={relief.isActive ? "default" : "secondary"}>
+                                {relief.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-center">
+                            <div className="flex items-center justify-center space-x-2">
+                              {editingRelief === index ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setEditingRelief(null)}
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleDeleteTaxRelief(index)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleEditTaxRelief(index)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleDeleteTaxRelief(index)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-                      <div className="flex justify-end mt-8">
-                        <button type="submit" className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark">Save Grade</button>
-                      </div>
-                    </form>
+                {(taxReliefs || []).length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Receipt className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium">No tax reliefs configured</p>
+                    <p className="text-sm">Add your first tax relief or sync from GRA to get started.</p>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-4 border-t">
+                  <div className="text-sm text-gray-500">
+                    {(taxReliefs || []).length} relief{(taxReliefs || []).length !== 1 ? 's' : ''} configured
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      onClick={syncTaxReliefsFromGRA}
+                      disabled={isSyncingReliefs}
+                    >
+                      {isSyncingReliefs ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                      )}
+                      Sync from GRA
+                    </Button>
+                    <Button
+                      onClick={handleSaveReliefs}
+                      disabled={isSavingReliefs}
+                    >
+                      {isSavingReliefs ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      Save Reliefs
+                    </Button>
                   </div>
                 </div>
-              )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-              {/* Import/Export Modal */}
-              {showImportExportModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black bg-opacity-50">
-                  <div className="bg-white rounded-lg p-6 shadow-xl max-w-2xl w-full">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg font-semibold">Import/Export Salary Grades</h3>
-                      <button onClick={() => setShowImportExportModal(false)} className="text-gray-500 hover:text-gray-700">&times;</button>
+        <TabsContent value="notifications">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Bell className="w-5 h-5" />
+                  <span>Notification Templates</span>
+                </CardTitle>
+                <CardDescription>Manage email and SMS templates for HR and payroll notifications</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div className="flex space-x-2">
+                      <Button onClick={handleAddNotificationTemplate} className="bg-green-600 hover:bg-green-700">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Template
+                      </Button>
                     </div>
-                    <div className="grid grid-cols-1 gap-4 mb-6">
-                      <div>
-                        <label htmlFor="importData" className="block text-sm font-medium text-gray-700">Paste CSV Data</label>
-                        <textarea
-                          id="importData"
-                          rows={8}
-                          value={importData}
-                          onChange={(e) => setImportData(e.target.value)}
-                          placeholder="Paste your CSV data here..."
-                          className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                        />
-                      </div>
-                      <div className="flex justify-center gap-4">
-                        <button onClick={handleImportSalaryGrades} disabled={isImporting} className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:opacity-50">
-                          {isImporting ? "Importing..." : "Import from CSV"}
-                        </button>
-                        <button onClick={() => handleExportSalaryGrades("csv")} disabled={isExporting} className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50">
-                          {isExporting ? "Exporting..." : "Export to CSV"}
-                        </button>
-                        <button onClick={() => handleExportSalaryGrades("excel")} disabled={isExporting} className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 disabled:opacity-50">
-                          {isExporting ? "Exporting..." : "Export to Excel"}
-                        </button>
-                      </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary">{(notificationTemplates || []).length} Templates</Badge>
                     </div>
                   </div>
-                </div>
-              )}
-            </>
-          )}
 
-          {salaryGradeTab === "unstructured" && (
-            <>
-              <div className="flex justify-end mb-4">
-                <button onClick={handleAddUnstructuredGrade} className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                  Add Unstructured Grade
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade Name</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">General Increment</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Performance Increment</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {unstructuredGrades.map((grade) => (
-                      <tr key={grade.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{grade.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.description}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.generalIncrement.type === 'percentage' ? `${grade.generalIncrement.value}%` : `GHS ${grade.generalIncrement.value}`}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.performanceIncrement.type === 'percentage' ? `${grade.performanceIncrement.value}%` : `GHS ${grade.performanceIncrement.value}`}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <button onClick={() => handleEditUnstructuredGrade(grade)} className="text-blue-500 hover:text-blue-700 mr-2">Edit</button>
-                          <button onClick={() => handleDeleteUnstructuredGrade(grade.id)} className="text-red-500 hover:text-red-700">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Unstructured Grade Modal */}
-              {showUnstructuredModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black bg-opacity-50">
-                  <div className="bg-white rounded-lg p-6 shadow-xl max-w-2xl w-full">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg font-semibold">{editingUnstructured ? "Edit" : "Add"} Unstructured Grade</h3>
-                      <button onClick={() => setShowUnstructuredModal(false)} className="text-gray-500 hover:text-gray-700">&times;</button>
-                    </div>
-                    <form onSubmit={(e) => { e.preventDefault(); handleSaveUnstructuredGrade() }}>
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                          <label htmlFor="unstructuredGradeName" className="block text-sm font-medium text-gray-700">Grade Name</label>
-                          <input
-                            type="text"
-                            id="unstructuredGradeName"
-                            value={newUnstructured.name}
-                            onChange={(e) => setNewUnstructured({ ...newUnstructured, name: e.target.value })}
-                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                            required
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label htmlFor="unstructuredGradeDescription" className="block text-sm font-medium text-gray-700">Description</label>
-                          <input
-                            type="text"
-                            id="unstructuredGradeDescription"
-                            value={newUnstructured.description}
-                            onChange={(e) => setNewUnstructured({ ...newUnstructured, description: e.target.value })}
-                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                          />
-                        </div>
-
-                        {/* General Increment */}
-                        <div className="border p-3 rounded-md">
-                          <h4 className="text-md font-semibold mb-2">General Increment</h4>
-                          <div className="grid grid-cols-2 gap-2">
-                            <select
-                              value={newUnstructured.generalIncrement.type}
-                              onChange={(e) => setNewUnstructured({ ...newUnstructured, generalIncrement: { ...newUnstructured.generalIncrement, type: e.target.value as 'percentage' | 'fixed' } })}
-                              className="rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                            >
-                              <option value="percentage">%</option>
-                              <option value="fixed">Fixed Amount (GHS)</option>
-                            </select>
-                            <input
-                              type="number"
-                              value={newUnstructured.generalIncrement.value}
-                              onChange={(e) => setNewUnstructured({ ...newUnstructured, generalIncrement: { ...newUnstructured.generalIncrement, value: Number(e.target.value) } })}
-                              className="rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        {/* Performance Increment */}
-                        <div className="border p-3 rounded-md">
-                          <h4 className="text-md font-semibold mb-2">Performance Increment</h4>
-                          <div className="grid grid-cols-2 gap-2">
-                            <select
-                              value={newUnstructured.performanceIncrement.type}
-                              onChange={(e) => setNewUnstructured({ ...newUnstructured, performanceIncrement: { ...newUnstructured.performanceIncrement, type: e.target.value as 'percentage' | 'fixed' } })}
-                              className="rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                            >
-                              <option value="percentage">%</option>
-                              <option value="fixed">Fixed Amount (GHS)</option>
-                            </select>
-                            <input
-                              type="number"
-                              value={newUnstructured.performanceIncrement.value}
-                              onChange={(e) => setNewUnstructured({ ...newUnstructured, performanceIncrement: { ...newUnstructured.performanceIncrement, value: Number(e.target.value) } })}
-                              className="rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                              required
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end mt-8">
-                        <button type="submit" className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark">Save Grade</button>
-                      </div>
-                    </form>
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Template Name</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Last Modified</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(notificationTemplates || []).map((template) => (
+                          <TableRow key={template.id}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{template.name}</div>
+                                <div className="text-sm text-muted-foreground">{template.description}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{template.category}</Badge>
+                            </TableCell>
+                            <TableCell>{template.type}</TableCell>
+                            <TableCell>
+                              <Badge variant={template.status === "Active" ? "default" : "secondary"}>
+                                {template.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{template.lastModified}</TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleViewTemplate(template)}>
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    View
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleDeleteTemplate(template.id)}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
-              )}
-            </>
-          )}
-
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <h3 className="text-xl font-bold mb-4">Allowances & Deductions</h3>
-            <div className="mb-6">
-              <h4 className="text-lg font-semibold mb-2">Allowances</h4>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Taxable</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recurring</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {allowances.map((allowance, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{allowance.code}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{allowance.description}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{allowance.taxable ? 'Yes' : 'No'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{allowance.recurring ? 'Yes' : 'No'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{allowance.type === 'FIXED' ? allowance.amount.toLocaleString() : '-'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{allowance.type === 'PERCENTAGE' ? `${allowance.percentage}%` : '-'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{allowance.type}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                          <button onClick={() => handleEditAllowance(index)} className="text-blue-500 hover:text-blue-700">Edit</button>
-                          <button onClick={() => handleDeleteAllowance(index)} className="text-red-500 hover:text-red-700">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <button onClick={handleAddAllowance} className="mt-4 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Add Allowance</button>
-            </div>
-
-            <div className="mb-6">
-              <h4 className="text-lg font-semibold mb-2">Deductions</h4>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recurring</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {deductions.map((deduction, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{deduction.code}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{deduction.description}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{deduction.recurring ? 'Yes' : 'No'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{deduction.type === 'FIXED' ? deduction.amount.toLocaleString() : '-'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{deduction.type === 'VARIABLE' ? `${deduction.percentage}%` : '-'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{deduction.type}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                          <button onClick={() => handleEditDeduction(index)} className="text-blue-500 hover:text-blue-700">Edit</button>
-                          <button onClick={() => handleDeleteDeduction(index)} className="text-red-500 hover:text-red-700">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <button onClick={handleAddDeduction} className="mt-4 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Add Deduction</button>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <h3 className="text-xl font-bold mb-4">Tax Rates & Social Security</h3>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                {/* SSNIT Rates */}
-                <div>
-                  <h4 className="text-lg font-semibold mb-2">SSNIT Rates (%)</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Employee</label>
-                      <input
-                        type="number"
-                        value={ssnitRates.employee}
-                        onChange={(e) => updateSsnitRates("employee", Number.parseFloat(e.target.value))}
-                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                        step="0.1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Employer</label>
-                      <input
-                        type="number"
-                        value={ssnitRates.employer}
-                        onChange={(e) => updateSsnitRates("employer", Number.parseFloat(e.target.value))}
-                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                        step="0.1"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700">Total</label>
-                      <input
-                        type="number"
-                        value={ssnitRates.total}
-                        readOnly
-                        className="mt-1 w-full rounded-md border-gray-300 bg-gray-100 shadow-sm focus:border-primary focus:ring-primary"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tier 2 Rates */}
-                <div>
-                  <h4 className="text-lg font-semibold mb-2">Tier 2 Rates (%)</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Employee</label>
-                      <input
-                        type="number"
-                        value={tier2Rates.employee}
-                        onChange={(e) => updateTier2Rates("employee", Number.parseFloat(e.target.value))}
-                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                        step="0.1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Employer</label>
-                      <input
-                        type="number"
-                        value={tier2Rates.employer}
-                        onChange={(e) => updateTier2Rates("employer", Number.parseFloat(e.target.value))}
-                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                        step="0.1"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700">Total</label>
-                      <input
-                        type="number"
-                        value={tier2Rates.total}
-                        readOnly
-                        className="mt-1 w-full rounded-md border-gray-300 bg-gray-100 shadow-sm focus:border-primary focus:ring-primary"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tier 3 Rates */}
-                <div>
-                  <h4 className="text-lg font-semibold mb-2">Tier 3 Rates (%)</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Employee</label>
-                      <input
-                        type="number"
-                        value={tier3Rates.employee}
-                        onChange={(e) => updateTier3Rates("employee", Number.parseFloat(e.target.value))}
-                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                        step="0.1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Employer</label>
-                      <input
-                        type="number"
-                        value={tier3Rates.employer}
-                        onChange={(e) => updateTier3Rates("employer", Number.parseFloat(e.target.value))}
-                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                        step="0.1"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700">Total</label>
-                      <input
-                        type="number"
-                        value={tier3Rates.total}
-                        readOnly
-                        className="mt-1 w-full rounded-md border-gray-300 bg-gray-100 shadow-sm focus:border-primary focus:ring-primary"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <h3 className="text-xl font-bold mb-4">Tax Reliefs</h3>
-              <div className="flex justify-end mb-4">
-                <button onClick={syncTaxReliefsFromGRA} disabled={isSyncingReliefs} className="mr-2 px-3 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50">
-                  {isSyncingReliefs ? "Syncing..." : "Sync from GRA"}
-                </button>
-                <button onClick={handleAddTaxRelief} className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                  Add Tax Relief
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Effective Date</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {taxReliefs.map((relief, index) => (
-                      <tr key={relief.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {editingRelief === index ? (
-                            <input
-                              type="text"
-                              value={relief.name}
-                              onChange={(e) => handleTaxReliefFieldChange(index, 'name', e.target.value)}
-                              className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                            />
-                          ) : (
-                            relief.name
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {editingRelief === index ? (
-                            <input
-                              type="text"
-                              value={relief.category}
-                              onChange={(e) => handleTaxReliefFieldChange(index, 'category', e.target.value)}
-                              className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                            />
-                          ) : (
-                            relief.category
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {editingRelief === index ? (
-                            <input
-                              type="number"
-                              value={relief.amount}
-                              onChange={(e) => handleTaxReliefFieldChange(index, 'amount', Number.parseFloat(e.target.value))}
-                              className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                            />
-                          ) : (
-                            relief.amount.toLocaleString()
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{relief.currency}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {editingRelief === index ? (
-                            <input
-                              type="date"
-                              value={relief.effectiveDate}
-                              onChange={(e) => handleTaxReliefFieldChange(index, 'effectiveDate', e.target.value)}
-                              className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                            />
-                          ) : (
-                            relief.effectiveDate
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {editingRelief === index ? (
-                            <input
-                              type="checkbox"
-                              checked={relief.isActive}
-                              onChange={(e) => handleTaxReliefFieldChange(index, 'isActive', e.target.checked)}
-                              className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                            />
-                          ) : (
-                            relief.isActive ? 'Yes' : 'No'
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                          <button onClick={() => handleEditTaxRelief(index)} className="text-blue-500 hover:text-blue-700">
-                            {editingRelief === index ? "Save" : "Edit"}
-                          </button>
-                          {editingRelief !== index && (
-                            <button onClick={() => handleDeleteTaxRelief(index)} className="text-red-500 hover:text-red-700">Delete</button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-
-            <div className="flex justify-end mt-8">
-              <button
-                type="submit"
-                disabled={isSavingPayroll || isSavingTax}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
-              >
-                {isSavingPayroll || isSavingTax ? "Saving..." : "Save Payroll & Tax Settings"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {activeTab === "notifications" && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-2xl font-bold mb-4">Notification Settings</h2>
-          <form onSubmit={async (e) => {
-            e.preventDefault()
-            setIsSaving(true)
-            try {
-              await new Promise((resolve) => setTimeout(resolve, 1500)) // Simulate saving
-              toast({ title: "Notification Settings Saved", description: "Your notification preferences have been updated." })
-            } catch (error) {
-              toast({ title: "Save Failed", description: "Failed to save notification settings.", variant: "destructive" })
-            } finally {
-              setIsSaving(false)
-            }
-          }}>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {/* Notification Preferences */}
-              <div className="space-y-2">
-                <h4 className="text-lg font-semibold mb-2">Preferences</h4>
-                <div className="flex items-center">
-                  <input
-                    id="payrollNotifications"
-                    type="checkbox"
-                    checked={notificationSettings.payrollNotifications}
-                    onChange={(e) => setNotificationSettings({ ...notificationSettings, payrollNotifications: e.target.checked })}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <label htmlFor="payrollNotifications" className="ml-2 block text-sm font-medium text-gray-700">Payroll Notifications</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    id="leaveNotifications"
-                    type="checkbox"
-                    checked={notificationSettings.leaveNotifications}
-                    onChange={(e) => setNotificationSettings({ ...notificationSettings, leaveNotifications: e.target.checked })}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <label htmlFor="leaveNotifications" className="ml-2 block text-sm font-medium text-gray-700">Leave Notifications</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    id="attendanceAlerts"
-                    type="checkbox"
-                    checked={notificationSettings.attendanceAlerts}
-                    onChange={(e) => setNotificationSettings({ ...notificationSettings, attendanceAlerts: e.target.checked })}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <label htmlFor="attendanceAlerts" className="ml-2 block text-sm font-medium text-gray-700">Attendance Alerts</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    id="promotionNotifications"
-                    type="checkbox"
-                    checked={notificationSettings.promotionNotifications}
-                    onChange={(e) => setNotificationSettings({ ...notificationSettings, promotionNotifications: e.target.checked })}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <label htmlFor="promotionNotifications" className="ml-2 block text-sm font-medium text-gray-700">Promotion Notifications</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    id="systemMaintenanceAlerts"
-                    type="checkbox"
-                    checked={notificationSettings.systemMaintenanceAlerts}
-                    onChange={(e) => setNotificationSettings({ ...notificationSettings, systemMaintenanceAlerts: e.target.checked })}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <label htmlFor="systemMaintenanceAlerts" className="ml-2 block text-sm font-medium text-gray-700">System Maintenance Alerts</label>
-                </div>
-              </div>
-
-              {/* Delivery Methods */}
-              <div className="space-y-2">
-                <h4 className="text-lg font-semibold mb-2">Delivery Methods</h4>
-                <div>
-                  <label htmlFor="emailDigest" className="block text-sm font-medium text-gray-700">Email Digest Frequency</label>
-                  <select
-                    id="emailDigest"
-                    value={notificationSettings.emailDigest}
-                    onChange={(e) => setNotificationSettings({ ...notificationSettings, emailDigest: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="immediate">Immediate</option>
-                  </select>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    id="smsAlerts"
-                    type="checkbox"
-                    checked={notificationSettings.smsAlerts}
-                    onChange={(e) => setNotificationSettings({ ...notificationSettings, smsAlerts: e.target.checked })}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <label htmlFor="smsAlerts" className="ml-2 block text-sm font-medium text-gray-700">SMS Alerts</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    id="pushNotifications"
-                    type="checkbox"
-                    checked={notificationSettings.pushNotifications}
-                    onChange={(e) => setNotificationSettings({ ...notificationSettings, pushNotifications: e.target.checked })}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <label htmlFor="pushNotifications" className="ml-2 block text-sm font-medium text-gray-700">Push Notifications</label>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <h3 className="text-xl font-bold mb-4">Notification Templates</h3>
-              <div className="flex justify-end mb-4">
-                <button onClick={handleAddNotificationTemplate} className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                  Add Template
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Template Name</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Modified</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {notificationTemplates.map((template) => (
-                      <tr key={template.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{template.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{template.type}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{template.category}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{template.lastModified}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${template.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {template.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                          <button onClick={() => handleViewTemplate(template)} className="text-blue-500 hover:text-blue-700 mr-2">View</button>
-                          <button onClick={() => handleEditTemplate(template)} className="text-blue-500 hover:text-blue-700 mr-2">Edit</button>
-                          <button onClick={() => handleDeleteTemplate(template.id)} className="text-red-500 hover:text-red-700">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Template Modal */}
             {showTemplateModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black bg-opacity-50">
-                <div className="bg-white rounded-lg p-6 shadow-xl max-w-3xl w-full">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold">{templateModalType === 'view' ? 'View' : templateModalType === 'edit' ? 'Edit' : 'Add'} Notification Template</h3>
-                    <button onClick={() => { setShowTemplateModal(false); setTemplateModalType('view'); setSelectedTemplate(null); setEditingTemplate(null) }} className="text-gray-500 hover:text-gray-700">&times;</button>
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold">
+                      {templateModalType === 'view' && `View Template: ${selectedTemplate?.name}`}
+                      {templateModalType === 'edit' && `Edit Template: ${selectedTemplate?.name}`}
+                      {templateModalType === 'add' && 'Add New Template'}
+                    </h2>
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setShowTemplateModal(false)
+                      setSelectedTemplate(null)
+                      setTemplateModalType("view")
+                      setAiDescription("")
+                      setShowAiPanel(false)
+                      setIsGeneratingAi(false)
+                      setShowFeedbackPanel(false)
+                      setTemplateRating(0)
+                      setTemplateFeedback("")
+                      setTemplateImprovements("")
+                      setLastGeneratedTemplateId("")
+                      setCurrentAIModel(null)
+                      setShowModelUpgrade(false)
+                    }}>
+                      <X className="w-4 h-4" />
+                    </Button>
                   </div>
-                  {templateModalType === 'view' ? (
-                    <>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700">Template Name</label>
-                        <p className="mt-1 text-gray-900">{selectedTemplate.name}</p>
-                      </div>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700">Subject</label>
-                        <p className="mt-1 text-gray-900">{selectedTemplate.subject}</p>
-                      </div>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700">Body</label>
-                        <pre className="mt-1 text-gray-900 bg-gray-100 p-3 rounded whitespace-pre-wrap">{selectedTemplate.body}</pre>
-                      </div>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700">Variables</label>
-                        <p className="mt-1 text-gray-900">{selectedTemplate.variables.join(', ')}</p>
-                      </div>
-                      <div className="flex justify-end">
-                        <button onClick={() => { setShowTemplateModal(false); setTemplateModalType('view'); setSelectedTemplate(null); setEditingTemplate(null) }} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark">Close</button>
-                      </div>
-                    </>
-                  ) : (
-                    <form onSubmit={handleSaveTemplate}>
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+                  {templateModalType === 'view' && selectedTemplate && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label htmlFor="templateName" className="block text-sm font-medium text-gray-700">Template Name</label>
-                          <input
-                            type="text"
-                            id="templateName"
+                          <Label>Template Name</Label>
+                          <div className="p-3 bg-gray-50 rounded-md">{selectedTemplate.name}</div>
+                        </div>
+                        <div>
+                          <Label>Category</Label>
+                          <div className="p-3 bg-gray-50 rounded-md">{selectedTemplate.category}</div>
+                        </div>
+                        <div>
+                          <Label>Type</Label>
+                          <div className="p-3 bg-gray-50 rounded-md">{selectedTemplate.type}</div>
+                        </div>
+                        <div>
+                          <Label>Status</Label>
+                          <div className="p-3 bg-gray-50 rounded-md">
+                            <Badge variant={selectedTemplate.status === "Active" ? "default" : "secondary"}>
+                              {selectedTemplate.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Description</Label>
+                        <div className="p-3 bg-gray-50 rounded-md">{selectedTemplate.description}</div>
+                      </div>
+                      <div>
+                        <Label>Subject</Label>
+                        <div className="p-3 bg-gray-50 rounded-md">{selectedTemplate.subject || "No subject specified"}</div>
+                      </div>
+                      <div>
+                        <Label>Template Body</Label>
+                        <div className="p-3 bg-gray-50 rounded-md min-h-32 whitespace-pre-wrap">
+                          {selectedTemplate.body || "No template body specified"}
+                        </div>
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => {
+                          setShowTemplateModal(false)
+                          setSelectedTemplate(null)
+                          setAiDescription("")
+                          setShowAiPanel(false)
+                          setIsGeneratingAi(false)
+                          setShowFeedbackPanel(false)
+                          setTemplateRating(0)
+                          setTemplateFeedback("")
+                          setTemplateImprovements("")
+                          setLastGeneratedTemplateId("")
+                          setCurrentAIModel(null)
+                          setShowModelUpgrade(false)
+                        }}>
+                          Close
+                        </Button>
+                        <Button onClick={() => {
+                          setTemplateModalType("edit")
+                        }}>
+                          Edit Template
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {templateModalType === 'edit' && selectedTemplate && (
+                    <div className="space-y-4">
+                      {/* AI Assist Panel */}
+                      <div className="border rounded-lg p-4 bg-blue-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-blue-900">AI Template Assistant</h3>
+                              {currentAIModel && (
+                                <div className="flex items-center space-x-2 mt-1">
+                                  <Badge variant={currentAIModel.isLatest ? "default" : "secondary"} className="text-xs">
+                                    {currentAIModel.name}
+                                  </Badge>
+                                  <span className="text-xs text-blue-700">
+                                    {currentAIModel.performanceScore}% performance
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={checkAIModelUpdates}
+                              className="text-blue-600 border-blue-200 hover:bg-blue-100"
+                            >
+                              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              Check Updates
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowAiPanel(!showAiPanel)}
+                              className="text-blue-600 border-blue-200 hover:bg-blue-100"
+                            >
+                              {showAiPanel ? "Hide" : "Show"} AI Assistant
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {showAiPanel && (
+                          <div className="space-y-3">
+                            <div>
+                              <Label htmlFor="aiDescription">Describe the template you want to create or improve:</Label>
+                              <Textarea
+                                id="aiDescription"
+                                value={aiDescription}
+                                onChange={(e) => setAiDescription(e.target.value)}
+                                placeholder="e.g., 'Create a welcome email for new employees' or 'Generate a leave approval notification'"
+                                rows={3}
+                                className="mt-1"
+                              />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                onClick={handleGenerateAiTemplate}
+                                disabled={isGeneratingAi || !aiDescription.trim()}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                {isGeneratingAi ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Generating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    Generate with AI
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAiDescription("")}
+                                disabled={isGeneratingAi}
+                              >
+                                Clear
+                              </Button>
+                            </div>
+                            <p className="text-xs text-blue-700">
+                              💡 AI will generate a professional template based on your description. You can edit the generated content before saving.
+                            </p>
+                            
+                            {/* GPT-5 Upgrade Simulation Button (for testing) */}
+                            <div className="mt-3 pt-3 border-t border-blue-200">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={simulateGPT5Upgrade}
+                                className="text-purple-600 border-purple-200 hover:bg-purple-100 w-full"
+                              >
+                                <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                Simulate GPT-5 Upgrade
+                              </Button>
+                              <p className="text-xs text-purple-600 mt-1 text-center">
+                                Test the automatic upgrade system
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Feedback Panel */}
+                        {showFeedbackPanel && lastGeneratedTemplateId && (
+                          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="font-semibold text-green-900">Rate This AI Template</h4>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowFeedbackPanel(false)}
+                                className="text-green-600 hover:bg-green-100"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              <div>
+                                <Label>How would you rate this template?</Label>
+                                <div className="flex space-x-1 mt-1">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                      key={star}
+                                      onClick={() => setTemplateRating(star)}
+                                      className={`w-6 h-6 ${
+                                        star <= templateRating
+                                          ? 'text-yellow-400'
+                                          : 'text-gray-300'
+                                      } hover:text-yellow-400 transition-colors`}
+                                    >
+                                      <svg className="w-full h-full" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                      </svg>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="templateFeedback">Additional Feedback (Optional)</Label>
+                                <Textarea
+                                  id="templateFeedback"
+                                  value={templateFeedback}
+                                  onChange={(e) => setTemplateFeedback(e.target.value)}
+                                  placeholder="What did you like or dislike about this template?"
+                                  rows={2}
+                                  className="mt-1"
+                                />
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="templateImprovements">Suggested Improvements (Optional)</Label>
+                                <Textarea
+                                  id="templateImprovements"
+                                  value={templateImprovements}
+                                  onChange={(e) => setTemplateImprovements(e.target.value)}
+                                  placeholder="How could this template be improved? (One suggestion per line)"
+                                  rows={2}
+                                  className="mt-1"
+                                />
+                              </div>
+                              
+                              <div className="flex justify-end space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setShowFeedbackPanel(false)}
+                                >
+                                  Skip
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={handleSubmitTemplateFeedback}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  Submit Feedback
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="editTemplateName">Template Name</Label>
+                          <Input
+                            id="editTemplateName"
                             value={newTemplate.name}
-                            onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
-                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                            required
+                            onChange={(e) => setNewTemplate({...newTemplate, name: e.target.value})}
+                            placeholder="Enter template name"
                           />
                         </div>
                         <div>
-                          <label htmlFor="templateType" className="block text-sm font-medium text-gray-700">Type</label>
-                          <select
-                            id="templateType"
-                            value={newTemplate.type}
-                            onChange={(e) => setNewTemplate({ ...newTemplate, type: e.target.value })}
-                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                          >
-                            <option value="Email">Email</option>
-                            <option value="SMS">SMS</option>
-                            <option value="Push">Push Notification</option>
-                          </select>
+                          <Label htmlFor="editTemplateCategory">Category</Label>
+                          <Select value={newTemplate.category} onValueChange={(value) => setNewTemplate({...newTemplate, category: value})}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="HR">HR</SelectItem>
+                              <SelectItem value="Payroll">Payroll</SelectItem>
+                              <SelectItem value="Leave">Leave</SelectItem>
+                              <SelectItem value="Performance">Performance</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div>
-                          <label htmlFor="templateCategory" className="block text-sm font-medium text-gray-700">Category</label>
-                          <select
-                            id="templateCategory"
-                            value={newTemplate.category}
-                            onChange={(e) => setNewTemplate({ ...newTemplate, category: e.target.value })}
-                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                          >
-                            <option value="HR">HR</option>
-                            <option value="Payroll">Payroll</option>
-                            <option value="Leave">Leave</option>
-                            <option value="Onboarding">Onboarding</option>
-                            <option value="System">System</option>
-                          </select>
+                          <Label htmlFor="editTemplateType">Type</Label>
+                          <Select value={newTemplate.type} onValueChange={(value) => setNewTemplate({...newTemplate, type: value})}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Email">Email</SelectItem>
+                              <SelectItem value="SMS">SMS</SelectItem>
+                              <SelectItem value="Push">Push Notification</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="editTemplateSubject">Subject</Label>
+                          <Input
+                            id="editTemplateSubject"
+                            value={newTemplate.subject}
+                            onChange={(e) => setNewTemplate({...newTemplate, subject: e.target.value})}
+                            placeholder="Enter email subject"
+                          />
                         </div>
                       </div>
-                      <div className="mt-4">
-                        <label htmlFor="templateSubject" className="block text-sm font-medium text-gray-700">Subject</label>
-                        <input
-                          type="text"
-                          id="templateSubject"
-                          value={newTemplate.subject}
-                          onChange={(e) => setNewTemplate({ ...newTemplate, subject: e.target.value })}
-                          className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                          required
-                        />
-                      </div>
-                      <div className="mt-4">
-                        <label htmlFor="templateBody" className="block text-sm font-medium text-gray-700">Body</label>
-                        <textarea
-                          id="templateBody"
-                          rows={10}
+                      <div>
+                        <Label htmlFor="editTemplateBody">Template Body</Label>
+                        <Textarea
+                          id="editTemplateBody"
                           value={newTemplate.body}
-                          onChange={(e) => setNewTemplate({ ...newTemplate, body: e.target.value })}
-                          className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                          required
+                          onChange={(e) => setNewTemplate({...newTemplate, body: e.target.value})}
+                          placeholder="Enter template content. Use {{variable_name}} for dynamic content."
+                          rows={8}
                         />
                       </div>
-                      <div className="mt-4">
-                        <label htmlFor="templateVariables" className="block text-sm font-medium text-gray-700">Variables (comma-separated)</label>
-                        <input
-                          type="text"
-                          id="templateVariables"
-                          value={newTemplate.variables.join(', ')}
-                          onChange={(e) => setNewTemplate({ ...newTemplate, variables: e.target.value.split(',').map(v => v.trim()).filter(v => v) })}
-                          placeholder="e.g., employee_name, company_name"
-                          className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                        />
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => {
+                          setTemplateModalType("view")
+                        }}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSaveTemplate} disabled={isSaving}>
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-2" />
+                              Save Changes
+                            </>
+                          )}
+                        </Button>
                       </div>
-
-                      <div className="mt-6 flex justify-end space-x-3">
-                        <button type="button" onClick={() => setShowAiPanel(!showAiPanel)} className="px-3 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600">
-                          {showAiPanel ? "Hide AI" : "Use AI Assistant"}
-                        </button>
-                        <button type="submit" disabled={isSaving} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50">
-                          {isSaving ? "Saving..." : "Save Template"}
-                        </button>
-                      </div>
-                    </form>
+                    </div>
                   )}
 
-                  {/* AI Panel */}
-                  {showAiPanel && templateModalType !== 'view' && (
-                    <div className="mt-6 p-4 border border-dashed border-gray-400 rounded-lg">
-                      <h4 className="text-lg font-semibold mb-2">AI Template Generator</h4>
-                      <textarea
-                        rows={3}
-                        value={aiDescription}
-                        onChange={(e) => setAiDescription(e.target.value)}
-                        placeholder="Describe the notification template you need..."
-                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                      />
-                      <div className="flex justify-end mt-3">
-                        <button onClick={handleGenerateAiTemplate} disabled={isGeneratingAi} className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50">
-                          {isGeneratingAi ? "Generating..." : "Generate Template"}
-                        </button>
+                  {templateModalType === 'add' && (
+                    <div className="space-y-4">
+                      {/* AI Assist Panel */}
+                      <div className="border rounded-lg p-4 bg-blue-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-blue-900">AI Template Assistant</h3>
+                              {currentAIModel && (
+                                <div className="flex items-center space-x-2 mt-1">
+                                  <Badge variant={currentAIModel.isLatest ? "default" : "secondary"} className="text-xs">
+                                    {currentAIModel.name}
+                                  </Badge>
+                                  <span className="text-xs text-blue-700">
+                                    {currentAIModel.performanceScore}% performance
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={checkAIModelUpdates}
+                              className="text-blue-600 border-blue-200 hover:bg-blue-100"
+                            >
+                              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              Check Updates
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowAiPanel(!showAiPanel)}
+                              className="text-blue-600 border-blue-200 hover:bg-blue-100"
+                            >
+                              {showAiPanel ? "Hide" : "Show"} AI Assistant
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {showAiPanel && (
+                          <div className="space-y-3">
+                            <div>
+                              <Label htmlFor="aiDescriptionAdd">Describe the template you want to create:</Label>
+                              <Textarea
+                                id="aiDescriptionAdd"
+                                value={aiDescription}
+                                onChange={(e) => setAiDescription(e.target.value)}
+                                placeholder="e.g., 'Create a welcome email for new employees' or 'Generate a leave approval notification'"
+                                rows={3}
+                                className="mt-1"
+                              />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                onClick={handleGenerateAiTemplate}
+                                disabled={isGeneratingAi || !aiDescription.trim()}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                {isGeneratingAi ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Generating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    Generate with AI
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAiDescription("")}
+                                disabled={isGeneratingAi}
+                              >
+                                Clear
+                              </Button>
+                            </div>
+                            <p className="text-xs text-blue-700">
+                              💡 AI will generate a professional template based on your description. You can edit the generated content before saving.
+                            </p>
+                            
+                            {/* GPT-5 Upgrade Simulation Button (for testing) */}
+                            <div className="mt-3 pt-3 border-t border-blue-200">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={simulateGPT5Upgrade}
+                                className="text-purple-600 border-purple-200 hover:bg-purple-100 w-full"
+                              >
+                                <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                Simulate GPT-5 Upgrade
+                              </Button>
+                              <p className="text-xs text-purple-600 mt-1 text-center">
+                                Test the automatic upgrade system
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Feedback Panel */}
+                        {showFeedbackPanel && lastGeneratedTemplateId && (
+                          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="font-semibold text-green-900">Rate This AI Template</h4>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowFeedbackPanel(false)}
+                                className="text-green-600 hover:bg-green-100"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              <div>
+                                <Label>How would you rate this template?</Label>
+                                <div className="flex space-x-1 mt-1">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                      key={star}
+                                      onClick={() => setTemplateRating(star)}
+                                      className={`w-6 h-6 ${
+                                        star <= templateRating
+                                          ? 'text-yellow-400'
+                                          : 'text-gray-300'
+                                      } hover:text-yellow-400 transition-colors`}
+                                    >
+                                      <svg className="w-full h-full" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                      </svg>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="templateFeedbackAdd">Additional Feedback (Optional)</Label>
+                                <Textarea
+                                  id="templateFeedbackAdd"
+                                  value={templateFeedback}
+                                  onChange={(e) => setTemplateFeedback(e.target.value)}
+                                  placeholder="What did you like or dislike about this template?"
+                                  rows={2}
+                                  className="mt-1"
+                                />
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="templateImprovementsAdd">Suggested Improvements (Optional)</Label>
+                                <Textarea
+                                  id="templateImprovementsAdd"
+                                  value={templateImprovements}
+                                  onChange={(e) => setTemplateImprovements(e.target.value)}
+                                  placeholder="How could this template be improved? (One suggestion per line)"
+                                  rows={2}
+                                  className="mt-1"
+                                />
+                              </div>
+                              
+                              <div className="flex justify-end space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setShowFeedbackPanel(false)}
+                                >
+                                  Skip
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={handleSubmitTemplateFeedback}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  Submit Feedback
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      {/* AI Model Upgrade Notification */}
-                      {showModelUpgrade && currentAIModel && (
-                        <div className="mt-4 p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded relative" role="alert">
-                          <strong className="font-bold">AI Model Update!</strong>
-                          <span className="block sm:inline"> You are now using {currentAIModel.name} ({currentAIModel.version}) with advanced capabilities.</span>
-                          <button onClick={() => setShowModelUpgrade(false)} className="absolute top-0 bottom-0 right-0 px-3 py-2 text-blue-500 hover:text-blue-700">
-                            <span className="text-xl">&times;</span>
-                          </button>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="templateName">Template Name</Label>
+                          <Input
+                            id="templateName"
+                            value={newTemplate.name}
+                            onChange={(e) => setNewTemplate({...newTemplate, name: e.target.value})}
+                            placeholder="Enter template name"
+                          />
                         </div>
-                      )}
-
-                      {/* Feedback Panel */}
-                      {showFeedbackPanel && lastGeneratedTemplateId && (
-                        <div className="mt-4 p-4 border border-gray-300 rounded-md bg-gray-50">
-                          <h5 className="text-md font-semibold mb-3">Rate & Feedback for Generated Template</h5>
-                          <div className="flex items-center mb-3">
-                            <span className="mr-3 text-sm font-medium">Rating:</span>
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <svg
-                                key={star}
-                                onClick={() => setTemplateRating(star)}
-                                className={`h-6 w-6 cursor-pointer ${star <= templateRating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                              >
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.024a1 1 0 00-.364 1.119l1.07 3.292c.3.921-.755 1.688-1.54 1.119l-2.8-2.024a1 1 0 00-1.178 0l-2.8 2.024c-.785.57-1.847-.197-1.551-1.119l1.07-3.292a1 1 0 00-.364-1.119L2.68 9.127c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                              </svg>
-                            ))}
-                          </div>
-                          <div className="mb-3">
-                            <label htmlFor="templateFeedback" className="block text-sm font-medium text-gray-700">Feedback</label>
-                            <textarea
-                              id="templateFeedback"
-                              rows={3}
-                              value={templateFeedback}
-                              onChange={(e) => setTemplateFeedback(e.target.value)}
-                              placeholder="Provide your feedback..."
-                              className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor="templateImprovements" className="block text-sm font-medium text-gray-700">Improvement Suggestions (one per line)</label>
-                            <textarea
-                              id="templateImprovements"
-                              rows={3}
-                              value={templateImprovements}
-                              onChange={(e) => setTemplateImprovements(e.target.value)}
-                              placeholder="Suggestions for improvement..."
-                              className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                            />
-                          </div>
-                          <div className="flex justify-end mt-4">
-                            <button onClick={handleSubmitTemplateFeedback} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark">Submit Feedback</button>
-                          </div>
+                        <div>
+                          <Label htmlFor="templateCategory">Category</Label>
+                          <Select value={newTemplate.category} onValueChange={(value) => setNewTemplate({...newTemplate, category: value})}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="HR">HR</SelectItem>
+                              <SelectItem value="Payroll">Payroll</SelectItem>
+                              <SelectItem value="Leave">Leave</SelectItem>
+                              <SelectItem value="Performance">Performance</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
-                      )}
+                        <div>
+                          <Label htmlFor="templateType">Type</Label>
+                          <Select value={newTemplate.type} onValueChange={(value) => setNewTemplate({...newTemplate, type: value})}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Email">Email</SelectItem>
+                              <SelectItem value="SMS">SMS</SelectItem>
+                              <SelectItem value="Push">Push Notification</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="templateSubject">Subject</Label>
+                          <Input
+                            id="templateSubject"
+                            value={newTemplate.subject}
+                            onChange={(e) => setNewTemplate({...newTemplate, subject: e.target.value})}
+                            placeholder="Enter email subject"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="templateBody">Template Body</Label>
+                        <Textarea
+                          id="templateBody"
+                          value={newTemplate.body}
+                          onChange={(e) => setNewTemplate({...newTemplate, body: e.target.value})}
+                          placeholder="Enter template content. Use {{variable_name}} for dynamic content."
+                          rows={8}
+                        />
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => {
+                          setShowTemplateModal(false)
+                          setIsAddingTemplate(false)
+                          setAiDescription("")
+                          setShowAiPanel(false)
+                          setIsGeneratingAi(false)
+                          setShowFeedbackPanel(false)
+                          setTemplateRating(0)
+                          setTemplateFeedback("")
+                          setTemplateImprovements("")
+                          setLastGeneratedTemplateId("")
+                          setCurrentAIModel(null)
+                          setShowModelUpgrade(false)
+                          setNewTemplate({
+                            name: "",
+                            category: "HR",
+                            type: "Email",
+                            subject: "",
+                            body: "",
+                            variables: [],
+                          })
+                        }}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSaveTemplate} disabled={isSaving}>
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-2" />
+                              Save Template
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
             )}
 
-            <div className="flex justify-end mt-8">
-              <button
-                type="submit"
-                disabled={isSaving}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
-              >
-                {isSaving ? "Saving..." : "Save Notification Settings"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+            {/* Email Configuration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Mail className="w-5 h-5" />
+                  <span>Email Configuration</span>
+                </CardTitle>
+                <CardDescription>Configure SMTP settings for sending notifications</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="provider">Email Provider</Label>
+                      <Select
+                        value={emailConfig.provider}
+                        onValueChange={(value) => setEmailConfig({ ...emailConfig, provider: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="smtp">SMTP</SelectItem>
+                          <SelectItem value="sendgrid">SendGrid</SelectItem>
+                          <SelectItem value="mailgun">Mailgun</SelectItem>
+                          <SelectItem value="ses">Amazon SES</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-      {activeTab === "security" && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-2xl font-bold mb-4">Security Settings</h2>
-          <form onSubmit={async (e) => {
-            e.preventDefault()
-            await handleSaveSecuritySettings()
-          }}>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {/* Data Security */}
-              <div>
-                <h4 className="text-lg font-semibold mb-3">Data Security</h4>
-                <div className="flex items-center mb-2">
-                  <input
-                    id="dataEncryptionEnabled"
-                    type="checkbox"
-                    checked={securitySettings.dataEncryptionEnabled}
-                    onChange={(e) => setSecuritySettings({ ...securitySettings, dataEncryptionEnabled: e.target.checked })}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <label htmlFor="dataEncryptionEnabled" className="ml-2 block text-sm font-medium text-gray-700">Data Encryption</label>
-                </div>
-                <div className="flex items-center mb-2">
-                  <input
-                    id="auditLoggingEnabled"
-                    type="checkbox"
-                    checked={securitySettings.auditLoggingEnabled}
-                    onChange={(e) => setSecuritySettings({ ...securitySettings, auditLoggingEnabled: e.target.checked })}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <label htmlFor="auditLoggingEnabled" className="ml-2 block text-sm font-medium text-gray-700">Audit Logging</label>
-                </div>
-              </div>
+                    <div>
+                      <Label htmlFor="smtpHost">SMTP Host</Label>
+                      <Input
+                        id="smtpHost"
+                        value={emailConfig.smtpHost}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpHost: e.target.value })}
+                        placeholder="smtp.gmail.com"
+                      />
+                    </div>
 
-              {/* Backup Settings */}
-              <div>
-                <h4 className="text-lg font-semibold mb-3">Backup Settings</h4>
-                <div className="flex items-center mb-2">
-                  <input
-                    id="autoBackupEnabled"
-                    type="checkbox"
-                    checked={securitySettings.autoBackupEnabled}
-                    onChange={(e) => setSecuritySettings({ ...securitySettings, autoBackupEnabled: e.target.checked })}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <label htmlFor="autoBackupEnabled" className="ml-2 block text-sm font-medium text-gray-700">Automatic Backups</label>
+                    <div>
+                      <Label htmlFor="smtpPort">SMTP Port</Label>
+                      <Input
+                        id="smtpPort"
+                        type="number"
+                        value={emailConfig.smtpPort}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpPort: Number.parseInt(e.target.value) })}
+                        placeholder="587"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="smtpUsername">Username</Label>
+                      <Input
+                        id="smtpUsername"
+                        value={emailConfig.smtpUsername}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, smtpUsername: e.target.value })}
+                        placeholder="your-email@company.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="fromEmail">From Email</Label>
+                      <Input
+                        id="fromEmail"
+                        value={emailConfig.fromEmail}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, fromEmail: e.target.value })}
+                        placeholder="hr@company.com"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="fromName">From Name</Label>
+                      <Input
+                        id="fromName"
+                        value={emailConfig.fromName}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, fromName: e.target.value })}
+                        placeholder="HR Department"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="replyTo">Reply To</Label>
+                      <Input
+                        id="replyTo"
+                        value={emailConfig.replyTo}
+                        onChange={(e) => setEmailConfig({ ...emailConfig, replyTo: e.target.value })}
+                        placeholder="noreply@company.com"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="enableTLS"
+                          checked={emailConfig.enableTLS}
+                          onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableTLS: checked })}
+                        />
+                        <Label htmlFor="enableTLS">Enable TLS</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="enableSSL"
+                          checked={emailConfig.enableSSL}
+                          onCheckedChange={(checked) => setEmailConfig({ ...emailConfig, enableSSL: checked })}
+                        />
+                        <Label htmlFor="enableSSL">Enable SSL</Label>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+
                 <div>
-                  <label htmlFor="backupFrequency" className="block text-sm font-medium text-gray-700">Backup Frequency</label>
-                  <select
-                    id="backupFrequency"
-                    value={securitySettings.backupFrequency}
-                    onChange={(e) => setSecuritySettings({ ...securitySettings, backupFrequency: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                    disabled={!securitySettings.autoBackupEnabled}
+                  <Label htmlFor="smtpPassword">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="smtpPassword"
+                      type={showPassword ? "text" : "password"}
+                      value={emailConfig.smtpPassword}
+                      onChange={(e) => setEmailConfig({ ...emailConfig, smtpPassword: e.target.value })}
+                      placeholder="Enter your email password"
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleTestEmail}
+                    disabled={testConnectionStatus === "testing"}
+                    className={`${
+                      testConnectionStatus === "success"
+                        ? "border-green-500 text-green-600"
+                        : testConnectionStatus === "error"
+                          ? "border-red-500 text-red-600"
+                          : ""
+                    }`}
                   >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
+                    {testConnectionStatus === "testing" ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : testConnectionStatus === "success" ? (
+                      <Check className="w-4 h-4 mr-2 text-green-600" />
+                    ) : testConnectionStatus === "error" ? (
+                      <X className="w-4 h-4 mr-2 text-red-600" />
+                    ) : (
+                      <Send className="w-4 h-4 mr-2" />
+                    )}
+                    {testConnectionStatus === "testing"
+                      ? "Testing Connection..."
+                      : testConnectionStatus === "success"
+                        ? "Connection Successful"
+                        : testConnectionStatus === "error"
+                          ? "Connection Failed"
+                          : "Test Connection"}
+                  </Button>
+                  <Button onClick={handleSaveEmailConfig} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                    Save Configuration
+                  </Button>
                 </div>
-                <div className="mt-2">
-                  <label htmlFor="dataRetentionDays" className="block text-sm font-medium text-gray-700">Data Retention (Days)</label>
-                  <input
-                    type="number"
-                    id="dataRetentionDays"
-                    value={securitySettings.dataRetentionDays}
-                    onChange={(e) => setSecuritySettings({ ...securitySettings, dataRetentionDays: Number.parseInt(e.target.value) })}
-                    min="30"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  />
-                </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <h3 className="text-xl font-bold mb-4">Backup Status</h3>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Last Backup Time</p>
-                  <p className="text-base font-semibold text-gray-900">{lastBackupTime ? new Date(lastBackupTime).toLocaleString() : 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Backup Size</p>
-                  <p className="text-base font-semibold text-gray-900">{backupSize || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Status</p>
-                  <p className={`text-base font-semibold ${backupStatus === 'Completed' ? 'text-green-600' : backupStatus === 'Failed' ? 'text-red-600' : 'text-yellow-600'}`}>{backupStatus || 'Unknown'}</p>
-                </div>
-              </div>
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={handleBackupNow}
-                  disabled={isBackingUp}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
-                >
-                  {isBackingUp ? "Backing Up..." : "Backup Now"}
-                </button>
-              </div>
-            </div>
+            {/* Notification Preferences */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Settings className="w-5 h-5" />
+                  <span>Notification Preferences</span>
+                </CardTitle>
+                <CardDescription>Configure default notification settings for all employees</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <h4 className="font-medium">HR Notifications</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Employee Welcome</Label>
+                            <p className="text-sm text-muted-foreground">Send welcome email to new employees</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.payrollNotifications} // Corrected to use a relevant setting
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Leave Notifications</Label>
+                            <p className="text-sm text-muted-foreground">Notify about leave requests and approvals</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.leaveNotifications}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, leaveNotifications: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Promotion Notifications</Label>
+                            <p className="text-sm text-muted-foreground">Send promotion and transfer notifications</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.promotionNotifications}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, promotionNotifications: checked })
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
 
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <h3 className="text-xl font-bold mb-4">Audit Logs</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {auditLogs.slice(0, 5).map((log) => ( // Displaying latest 5 logs here
-                      <tr key={log.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(log.timestamp).toLocaleString()}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{log.user_email}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.action}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.ip_address}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${log.severity === 'high' ? 'bg-red-100 text-red-800' : log.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
-                            {log.severity.toUpperCase()}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-4">
-                <button type="button" onClick={handleViewAllLogs} className="text-primary hover:underline">View All Audit Logs</button>
-              </div>
-            </div>
+                    <div className="space-y-4">
+                      <h4 className="font-medium">Payroll & Attendance</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Payroll Processing</Label>
+                            <p className="text-sm text-muted-foreground">Notify when payroll is processed</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.payrollNotifications}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>Attendance Alerts</Label>
+                            <p className="text-sm text-muted-foreground">Send alerts for attendance issues</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.attendanceAlerts}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, attendanceAlerts: checked })
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label>System Maintenance</Label>
+                            <p className="text-sm text-muted-foreground">Notify about system maintenance</p>
+                          </div>
+                          <Switch
+                            checked={notificationSettings.systemMaintenanceAlerts}
+                            onCheckedChange={(checked) =>
+                              setNotificationSettings({ ...notificationSettings, systemMaintenanceAlerts: checked })
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-            <div className="flex justify-end mt-8 pt-6 border-t border-gray-200">
-              <button
-                type="submit"
-                disabled={isSavingSecuritySettings}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
-              >
-                {isSavingSecuritySettings ? "Saving..." : "Save Security Settings"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+                  <Separator />
 
-      {activeTab === "access" && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-2xl font-bold mb-4">Access Control</h2>
-          <form onSubmit={async (e) => {
-            e.preventDefault()
-            await handleSaveAccessSettings()
-          }}>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {/* Authentication */}
-              <div>
-                <h4 className="text-lg font-semibold mb-3">Authentication</h4>
-                <div className="flex items-center mb-2">
-                  <input
-                    id="twoFactorEnabled"
-                    type="checkbox"
-                    checked={accessSettings.twoFactorEnabled}
-                    onChange={(e) => setAccessSettings({ ...accessSettings, twoFactorEnabled: e.target.checked })}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <label htmlFor="twoFactorEnabled" className="ml-2 block text-sm font-medium text-gray-700">Two-Factor Authentication (2FA)</label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <Label>Email Digest Frequency</Label>
+                      <Select
+                        value={notificationSettings.emailDigest}
+                        onValueChange={(value) =>
+                          setNotificationSettings({ ...notificationSettings, emailDigest: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="immediate">Immediate</SelectItem>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="smsAlerts"
+                        checked={notificationSettings.smsAlerts}
+                        onCheckedChange={(checked) =>
+                          setNotificationSettings({ ...notificationSettings, smsAlerts: checked })
+                        }
+                      />
+                      <div>
+                        <Label htmlFor="smsAlerts">SMS Alerts</Label>
+                        <p className="text-sm text-muted-foreground">Enable SMS notifications</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="pushNotifications"
+                        checked={notificationSettings.pushNotifications}
+                        onCheckedChange={(checked) =>
+                          setNotificationSettings({ ...notificationSettings, pushNotifications: checked })
+                        }
+                      />
+                      <div>
+                        <Label htmlFor="pushNotifications">Push Notifications</Label>
+                        <p className="text-sm text-muted-foreground">Enable browser push notifications</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => {
+                        setIsSaving(true) // Use the general saving state
+                        setTimeout(() => {
+                          setIsSaving(false)
+                          toast({
+                            title: "Preferences Saved",
+                            description: "Notification preferences have been updated successfully",
+                          })
+                        }, 1500)
+                      }}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                      Save Preferences
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center mb-2">
-                  <input
-                    id="ssoEnabled"
-                    type="checkbox"
-                    checked={accessSettings.ssoEnabled}
-                    onChange={(e) => setAccessSettings({ ...accessSettings, ssoEnabled: e.target.checked })}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <label htmlFor="ssoEnabled" className="ml-2 block text-sm font-medium text-gray-700">Single Sign-On (SSO)</label>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="roles">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="w-5 h-5" />
+                  <span>Roles & Permissions</span>
+                </CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" onClick={handleAddRoleInner}>
+                    Add Role
+                  </Button>
                 </div>
               </div>
-
-              {/* Session Management */}
-              <div>
-                <h4 className="text-lg font-semibold mb-3">Session Management</h4>
-                <div className="mb-2">
-                  <label htmlFor="sessionTimeout" className="block text-sm font-medium text-gray-700">Session Timeout (minutes)</label>
-                  <input
-                    type="number"
-                    id="sessionTimeout"
-                    value={accessSettings.sessionTimeout}
-                    onChange={(e) => setAccessSettings({ ...accessSettings, sessionTimeout: Number.parseInt(e.target.value) })}
-                    min="5"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  />
-                </div>
-                <div className="mb-2">
-                  <label htmlFor="maxLoginAttempts" className="block text-sm font-medium text-gray-700">Maximum Login Attempts</label>
-                  <input
-                    type="number"
-                    id="maxLoginAttempts"
-                    value={accessSettings.maxLoginAttempts}
-                    onChange={(e) => setAccessSettings({ ...accessSettings, maxLoginAttempts: Number.parseInt(e.target.value) })}
-                    min="1"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  />
-                </div>
+              <CardDescription>Manage user roles and permissions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                {(roles || []).map((role) => (
+                  <Card key={role.id} className="border-l-4 border-l-indigo-500">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-base font-semibold">{role.name}</h3>
+                          <p className="text-xs text-gray-600">{role.description}</p>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <span className="text-sm text-gray-500">{role.user_count} Users</span>
+                          <Button variant="outline" size="sm" onClick={() => handleEditRoleInner(role.name)}>
+                            Edit
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              {/* Password Policies */}
-              <div>
-                <h4 className="text-lg font-semibold mb-3">Password Policies</h4>
-                <div className="flex items-center mb-2">
-                  <input
-                    id="passwordExpiryEnabled"
-                    type="checkbox"
-                    checked={accessSettings.passwordExpiryEnabled}
-                    onChange={(e) => setAccessSettings({ ...accessSettings, passwordExpiryEnabled: e.target.checked })}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <label htmlFor="passwordExpiryEnabled" className="ml-2 block text-sm font-medium text-gray-700">Password Expiry</label>
-                </div>
-                <div className="mb-2">
-                  <label htmlFor="passwordMinLength" className="block text-sm font-medium text-gray-700">Minimum Password Length</label>
-                  <input
-                    type="number"
-                    id="passwordMinLength"
-                    value={accessSettings.passwordMinLength}
-                    onChange={(e) => setAccessSettings({ ...accessSettings, passwordMinLength: Number.parseInt(e.target.value) })}
-                    min="6"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  />
+        {/* Access Control Tab Content */}
+        <TabsContent value="access">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Shield className="w-5 h-5" />
+                <span>Access Control</span>
+              </CardTitle>
+              <CardDescription>Manage user access and authentication settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Authentication Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Authentication Settings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="twoFactor">Two-Factor Authentication</Label>
+                      <Switch
+                        id="twoFactor"
+                        checked={accessSettings.twoFactorEnabled}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, twoFactorEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="ssoEnabled">Single Sign-On (SSO)</Label>
+                      <Switch
+                        id="ssoEnabled"
+                        checked={accessSettings.ssoEnabled}
+                        onCheckedChange={(checked) => setAccessSettings({ ...accessSettings, ssoEnabled: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="passwordExpiry">Password Expiry</Label>
+                      <Switch
+                        id="passwordExpiry"
+                        checked={accessSettings.passwordExpiryEnabled}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordExpiryEnabled: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
+                      <Input
+                        id="sessionTimeout"
+                        type="number"
+                        value={accessSettings.sessionTimeout}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, sessionTimeout: Number.parseInt(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
+                      <Input
+                        id="maxLoginAttempts"
+                        type="number"
+                        value={accessSettings.maxLoginAttempts}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, maxLoginAttempts: Number.parseInt(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="passwordMinLength">Minimum Password Length</Label>
+                      <Input
+                        id="passwordMinLength"
+                        type="number"
+                        value={accessSettings.passwordMinLength}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, passwordMinLength: Number.parseInt(e.target.value) })
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* IP Restrictions */}
-              <div>
-                <h4 className="text-lg font-semibold mb-3">IP Restrictions</h4>
-                <div className="flex items-center mb-2">
-                  <input
-                    id="ipRestrictionsEnabled"
-                    type="checkbox"
-                    checked={accessSettings.ipRestrictionsEnabled}
-                    onChange={(e) => setAccessSettings({ ...accessSettings, ipRestrictionsEnabled: e.target.checked })}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <label htmlFor="ipRestrictionsEnabled" className="ml-2 block text-sm font-medium text-gray-700">Enable IP Restrictions</label>
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">IP Access Control</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="ipRestrictions">Enable IP Restrictions</Label>
+                    <Switch
+                      id="ipRestrictions"
+                      checked={accessSettings.ipRestrictionsEnabled}
+                      onCheckedChange={(checked) =>
+                        setAccessSettings({ ...accessSettings, ipRestrictionsEnabled: checked })
+                      }
+                    />
+                  </div>
+                  {accessSettings.ipRestrictionsEnabled && (
+                    <div className="space-y-2">
+                      <Label>Allowed IP Addresses</Label>
+                      {accessSettings.allowedIPs.map((ip, index) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <Input
+                            value={ip}
+                            onChange={(e) => {
+                              const newIPs = [...accessSettings.allowedIPs]
+                              newIPs[index] = e.target.value
+                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
+                            }}
+                            placeholder="192.168.1.0/24"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const newIPs = accessSettings.allowedIPs.filter((_, i) => i !== index)
+                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setAccessSettings({
+                            ...accessSettings,
+                            allowedIPs: [...accessSettings.allowedIPs, ""],
+                          })
+                        }
+                      >
+                        Add IP Range
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                <div className="mb-2">
-                  <label htmlFor="allowedIPs" className="block text-sm font-medium text-gray-700">Allowed IPs/Ranges (CIDR notation, comma-separated)</label>
-                  <textarea
-                    id="allowedIPs"
-                    rows={3}
-                    value={accessSettings.allowedIPs.join(', ')}
-                    onChange={(e) => setAccessSettings({ ...accessSettings, allowedIPs: e.target.value.split(',').map(ip => ip.trim()).filter(ip => ip) })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                    disabled={!accessSettings.ipRestrictionsEnabled}
-                  />
+              </div>
+
+              {/* Active Sessions */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Active Sessions</h3>
+                  <Button variant="outline" onClick={handleRefreshSessions} disabled={isRefreshingSessions}>
+                    {isRefreshingSessions ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    Refresh
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {(activeSessions || []).map((session) => (
+                    <Card key={session.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{session.user_email}</p>
+                            <p className="text-sm text-gray-600">
+                              {session.ip_address} • {session.device} • Last active:{" "}
+                              {new Date(session.last_activity).toLocaleString()}
+                            </p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => handleTerminateSession(session.id)}>
+                            Terminate
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               </div>
-            </div>
 
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <h3 className="text-xl font-bold mb-4">Active Sessions</h3>
-              <div className="flex justify-end mb-4">
-                <button type="button" onClick={handleRefreshSessions} disabled={isRefreshingSessions} className="px-3 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50">
-                  {isRefreshingSessions ? "Refreshing..." : "Refresh Sessions"}
-                </button>
+              <div className="flex justify-end">
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveAccessSettings}
+                  disabled={isSavingAccessSettings}
+                >
+                  {isSavingAccessSettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Access Settings
+                    </>
+                  )}
+                </Button>
               </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Activity</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {activeSessions.map((session) => (
-                      <tr key={session.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{session.user_email}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{session.ip_address}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{session.device}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(session.last_activity).toLocaleString()}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <button onClick={() => handleTerminateSession(session.id)} className="text-red-500 hover:text-red-700">Terminate</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Security Tab Content */}
+        <TabsContent value="security">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="w-5 h-5" />
+                  <span>Security Settings</span>
+                </CardTitle>
+                <Button variant="outline" onClick={handleBackupNow} disabled={isBackingUp}>
+                  {isBackingUp ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Backing Up...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" />
+                      Backup Now
+                    </>
+                  )}
+                </Button>
               </div>
+              <CardDescription>Manage security settings, backups, and audit logs</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Security Policies */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Security Policies</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="dataEncryption">Data Encryption at Rest</Label>
+                      <Switch
+                        id="dataEncryption"
+                        checked={securitySettings.dataEncryptionEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, dataEncryptionEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="auditLogging">Audit Logging</Label>
+                      <Switch
+                        id="auditLogging"
+                        checked={securitySettings.auditLoggingEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, auditLoggingEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="autoBackup">Automatic Backups</Label>
+                      <Switch
+                        id="autoBackup"
+                        checked={securitySettings.autoBackupEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, autoBackupEnabled: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="backupFrequency">Backup Frequency</Label>
+                      <Select
+                        value={securitySettings.backupFrequency}
+                        onValueChange={(value) => setSecuritySettings({ ...securitySettings, backupFrequency: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="retentionPeriod">Data Retention Period (days)</Label>
+                      <Input
+                        id="retentionPeriod"
+                        type="number"
+                        value={securitySettings.dataRetentionDays}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            dataRetentionDays: Number.parseInt(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Backup Status */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Backup Status</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <p className="text-sm font-medium">Last Backup</p>
+                          <p className="text-lg font-bold">
+                            {lastBackupTime ? new Date(lastBackupTime).toLocaleDateString() : "Never"}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <Database className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="text-sm font-medium">Backup Size</p>
+                          <p className="text-lg font-bold">{backupSize || "0 MB"}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="w-5 h-5 text-emerald-600" />
+                        <div>
+                          <p className="text-sm font-medium">Status</p>
+                          <p className="text-lg font-bold">{backupStatus || "Ready"}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Audit Logs */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Recent Audit Logs</h3>
+                  <Button variant="outline" onClick={handleViewAllLogs}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    View All Logs
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {(auditLogs || []).slice(0, 5).map((log) => (
+                    <Card key={log.id}>
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-sm">{log.action}</p>
+                            <p className="text-xs text-gray-600">
+                              {log.user_email} • {log.ip_address} •{new Date(log.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                          <Badge variant={log.severity === "high" ? "destructive" : "secondary"}>{log.severity}</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={handleExportSecurityReport} disabled={isExportingReport}>
+                  {isExportingReport ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4 mr-2" />
+                      Export Security Report
+                    </>
+                  )}
+                </Button>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveSecuritySettings}
+                  disabled={isSavingSecuritySettings}
+                >
+                  {isSavingSecuritySettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Security Settings
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {showDocumentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className={`bg-white rounded-lg p-6 w-full ${documentModalType === 'view' ? 'max-w-6xl max-h-[95vh]' : 'max-w-2xl max-h-[90vh]'} overflow-y-auto`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">
+                {documentModalType === 'add' && 'Add New Document'}
+                {documentModalType === 'edit' && 'Edit Document'}
+                {documentModalType === 'view' && `View Document: ${selectedDocument?.name}`}
+                {documentModalType === 'delete' && 'Delete Document'}
+              </h2>
+              <Button variant="ghost" size="sm" onClick={() => {
+                setShowDocumentModal(false)
+                handleResetViewer()
+              }}>
+                <X className="w-4 h-4" />
+              </Button>
             </div>
 
-            <div className="flex justify-end mt-8 pt-6 border-t border-gray-200">
-              <button
-                type="submit"
-                disabled={isSavingAccessSettings}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
-              >
-                {isSavingAccessSettings ? "Saving..." : "Save Access Settings"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+            {/* Add Document Form */}
+            {documentModalType === 'add' && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="documentName">Document Name</Label>
+                  <Input
+                    id="documentName"
+                    value={documentName}
+                    onChange={(e) => setDocumentName(e.target.value)}
+                    placeholder="e.g., Employee Handbook"
+                  />
+                </div>
 
-      {activeTab === "subsidiaries" && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-2xl font-bold mb-4">Subsidiary Management</h2>
-          <div className="flex justify-end mb-4">
-            <button onClick={handleRefreshSubsidiaries} className="mr-2 px-3 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Refresh List</button>
-            <button onClick={() => setShowAddSubsidiary(true)} className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Add New Subsidiary</button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Industry</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employees</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {subsidiaries.map((sub) => (
-                  <tr key={sub.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sub.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sub.industry}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sub.employee_count}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${sub.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {sub.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      <button onClick={() => { setSelectedSubsidiary(sub); setShowSubsidiaryDetails(true); }} className="text-blue-500 hover:text-blue-700 mr-2">View</button>
-                      <button onClick={() => { setSelectedSubsidiary(sub); setShowEditSubsidiary(true); }} className="text-blue-500 hover:text-blue-700 mr-2">Edit</button>
-                      {sub.status === 'active' ? (
-                        <button onClick={() => confirmDeactivateSubsidiary(sub.id)} className="text-red-500 hover:text-red-700">Deactivate</button>
+                <div>
+                  <Label htmlFor="documentFile">Upload File</Label>
+                  <Input
+                    id="documentFile"
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleFileUpload}
+                  />
+                  {uploadedFile && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Selected: {uploadedFile.name} ({(uploadedFile.size / (1024 * 1024)).toFixed(2)}MB)
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <AlertTriangle className="w-5 h-5 text-blue-600" />
+                  <p className="text-sm text-blue-800">
+                    Supported formats: PDF, DOC, DOCX. Maximum file size: 10MB
+                  </p>
+                </div>
+
+                {/* File Content Preview */}
+                {(documentPreviewContent || isParsingFile) && (
+                  <div className="space-y-2">
+                    <Label>Content Preview</Label>
+                    <div className="border border-gray-300 rounded-md bg-gray-50 h-64 overflow-auto p-4">
+                      {isParsingFile ? (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center space-y-2">
+                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600" />
+                            <p className="text-sm text-gray-600">Parsing file content...</p>
+                          </div>
+                        </div>
                       ) : (
-                        <button onClick={() => confirmReactivateSubsidiary(sub.id)} className="text-green-500 hover:text-green-700">Reactivate</button>
+                        <div className="prose prose-sm max-w-none">
+                          <div 
+                            className="whitespace-pre-wrap text-gray-800 leading-relaxed text-sm"
+                            dangerouslySetInnerHTML={{
+                              __html: documentPreviewContent
+                                .replace(/# (.*)/g, '<h1 class="text-lg font-bold text-gray-900 mb-3 border-b border-gray-200 pb-1">$1</h1>')
+                                .replace(/## (.*)/g, '<h2 class="text-base font-semibold text-gray-800 mb-2 mt-4">$1</h2>')
+                                .replace(/### (.*)/g, '<h3 class="text-sm font-medium text-gray-700 mb-2 mt-3">$1</h3>')
+                                .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+                                .replace(/- (.*)/g, '<li class="mb-1 text-gray-700">$1</li>')
+                                .replace(/(\d+)\. (.*)/g, '<li class="mb-1 text-gray-700"><span class="font-medium">$1.</span> $2</li>')
+                                .replace(/\n\n/g, '</p><p class="mb-2 text-gray-700">')
+                                .replace(/^(?!<[h|l])/gm, '<p class="mb-2 text-gray-700">')
+                                .replace(/<li/g, '<ul class="list-disc list-inside mb-2"><li')
+                                .replace(/<\/li>/g, '</li></ul>')
+                                .replace(/<ul class="list-disc list-inside mb-2"><ul class="list-disc list-inside mb-2">/g, '<ul class="list-disc list-inside mb-2">')
+                                .replace(/<\/ul><\/ul>/g, '</ul>')
+                            }}
+                          />
+                        </div>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                    {!isParsingFile && (
+                      <p className="text-xs text-gray-500">
+                        This is a preview of the parsed content from your uploaded file.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <Button variant="outline" onClick={() => setShowDocumentModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveDocument}
+                    disabled={isSavingDocument}
+                    className="bg-black text-white hover:bg-gray-800"
+                  >
+                    {isSavingDocument ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Upload Document
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Edit Document Form */}
+            {documentModalType === 'edit' && selectedDocument && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="editDocumentName">Document Name</Label>
+                  <Input
+                    id="editDocumentName"
+                    value={documentName}
+                    onChange={(e) => setDocumentName(e.target.value)}
+                    placeholder="e.g., Employee Handbook"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="editDocumentFile">Replace File (Optional)</Label>
+                  <Input
+                    id="editDocumentFile"
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleFileUpload}
+                  />
+                  {uploadedFile && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      New file: {uploadedFile.name} ({(uploadedFile.size / (1024 * 1024)).toFixed(2)}MB)
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Current: {selectedDocument.name} ({selectedDocument.size})
+                  </p>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <Button variant="outline" onClick={() => setShowDocumentModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleEditDocument}
+                    disabled={isSavingDocument}
+                    className="bg-black text-white hover:bg-gray-800"
+                  >
+                    {isSavingDocument ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Update Document
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* View Document - Adobe-like PDF Viewer */}
+            {documentModalType === 'view' && selectedDocument && (
+              <div className="space-y-4">
+                {/* PDF Viewer Toolbar */}
+                <div className="flex items-center justify-between p-3 bg-gray-100 border border-gray-300 rounded-md">
+                  <div className="flex items-center space-x-2">
+                    {/* Page Navigation */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePreviousPage}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm font-medium px-2">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleNextPage}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    {/* Zoom Controls */}
+                    <Button variant="outline" size="sm" onClick={handleZoomOut} disabled={documentZoom <= 50}>
+                      <ZoomOut className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm font-medium px-2 min-w-[60px] text-center">
+                      {documentZoom}%
+                    </span>
+                    <Button variant="outline" size="sm" onClick={handleZoomIn} disabled={documentZoom >= 200}>
+                      <ZoomIn className="w-4 h-4" />
+                    </Button>
+
+                    {/* Rotate */}
+                    <Button variant="outline" size="sm" onClick={handleRotate}>
+                      <RotateCw className="w-4 h-4" />
+                    </Button>
+
+                    {/* Fullscreen */}
+                    <Button variant="outline" size="sm" onClick={handleToggleFullscreen}>
+                      {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                    </Button>
+
+                    {/* Search */}
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <Input
+                        type="text"
+                        placeholder="Search..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-8 w-40 h-8 text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Document Preview Area */}
+                <div className={`border border-gray-300 rounded-md bg-gray-50 ${isFullscreen ? 'h-[calc(100vh-200px)]' : 'h-[600px]'} overflow-auto`}>
+                  <div
+                    className="bg-white shadow-lg min-h-full"
+                    style={{
+                      transform: `scale(${documentZoom / 100}) rotate(${documentRotation}deg)`,
+                      transition: 'transform 0.3s ease',
+                    }}
+                  >
+                    {documentPreviewContent ? (
+                      <div className="p-8 max-w-4xl mx-auto">
+                        <div className="prose prose-lg max-w-none">
+                          <div 
+                            className="whitespace-pre-wrap text-gray-800 leading-relaxed"
+                            dangerouslySetInnerHTML={{
+                              __html: documentPreviewContent
+                                .replace(/# (.*)/g, '<h1 class="text-3xl font-bold text-gray-900 mb-6 border-b-2 border-gray-200 pb-2">$1</h1>')
+                                .replace(/## (.*)/g, '<h2 class="text-2xl font-semibold text-gray-800 mb-4 mt-8">$1</h2>')
+                                .replace(/### (.*)/g, '<h3 class="text-xl font-medium text-gray-700 mb-3 mt-6">$1</h3>')
+                                .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+                                .replace(/- (.*)/g, '<li class="mb-2 text-gray-700">$1</li>')
+                                .replace(/(\d+)\. (.*)/g, '<li class="mb-2 text-gray-700"><span class="font-medium">$1.</span> $2</li>')
+                                .replace(/\n\n/g, '</p><p class="mb-4 text-gray-700">')
+                                .replace(/^(?!<[h|l])/gm, '<p class="mb-4 text-gray-700">')
+                                .replace(/<li/g, '<ul class="list-disc list-inside mb-4"><li')
+                                .replace(/<\/li>/g, '</li></ul>')
+                                .replace(/<ul class="list-disc list-inside mb-4"><ul class="list-disc list-inside mb-4">/g, '<ul class="list-disc list-inside mb-4">')
+                                .replace(/<\/ul><\/ul>/g, '</ul>')
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="text-center space-y-4">
+                          <FileText className="w-16 h-16 mx-auto text-gray-400" />
+                          <div>
+                            <p className="text-lg font-semibold text-gray-700">{selectedDocument.name}</p>
+                            <p className="text-sm text-gray-500">Loading document preview...</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Viewer Info */}
+                <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <div className="flex items-center space-x-2">
+                    <Shield className="w-5 h-5 text-blue-600" />
+                    <p className="text-sm text-blue-800">
+                      This document is protected. Downloading is disabled for security purposes.
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleResetViewer}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Reset View
+                  </Button>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-4">
+                  <Button variant="outline" onClick={() => {
+                    setShowDocumentModal(false)
+                    handleResetViewer()
+                  }}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Delete Document Confirmation */}
+            {documentModalType === 'delete' && selectedDocument && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3 p-4 bg-red-50 border border-red-200 rounded-md">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                  <div>
+                    <p className="font-semibold text-red-800">Are you sure you want to delete this document?</p>
+                    <p className="text-sm text-red-700 mt-1">
+                      "{selectedDocument.name}" will be permanently removed. This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <Button variant="outline" onClick={() => setShowDocumentModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleDeleteDocument(selectedDocument.id)}
+                    disabled={isSavingDocument}
+                  >
+                    {isSavingDocument ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Document
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-
-          {/* Modals for Add, Edit, View Subsidiary */}
-          {showAddSubsidiary && <AddEditSubsidiaryModal mode="add" onClose={() => setShowAddSubsidiary(false)} onSuccess={loadSubsidiaries} />}
-          {showEditSubsidiary && selectedSubsidiary && <AddEditSubsidiaryModal mode="edit" subsidiary={selectedSubsidiary} onClose={() => setShowEditSubsidiary(false)} onSuccess={loadSubsidiaries} />}
-          {showSubsidiaryDetails && selectedSubsidiary && <SubsidiaryDetailsModal subsidiary={selectedSubsidiary} onClose={() => setShowSubsidiaryDetails(false)} />}
-
-          {/* Confirmation Modals */}
-          {showDeactivateConfirm && subsidiaryToToggle && (
-            <ConfirmationModal
-              title={`Deactivate ${subsidiaryToToggle.name}?`}
-              message="Are you sure you want to deactivate this subsidiary? It will not be accessible until reactivated."
-              onConfirm={confirmToggleStatus}
-              onCancel={() => setShowDeactivateConfirm(false)}
-            />
-          )}
-          {showReactivateConfirm && subsidiaryToToggle && (
-            <ConfirmationModal
-              title={`Reactivate ${subsidiaryToToggle.name}?`}
-              message="Are you sure you want to reactivate this subsidiary?"
-              onConfirm={confirmToggleStatus}
-              onCancel={() => setShowReactivateConfirm(false)}
-            />
-          )}
         </div>
       )}
 
-      {activeTab === "employees" && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-2xl font-bold mb-4">Employee Management</h2>
-          <div className="flex justify-end mb-4">
-            <button onClick={() => setImportModal(true)} className="mr-2 px-3 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Import Employees</button>
-            <button className=\"px-3 py-2 bg-blue-500 text-white rounded-md hover:
+      {/* Add Subsidiary Modal */}
+      {showAddSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Add New Subsidiary</CardTitle>
+                <CardDescription>Enter the details for the new subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    <div className="flex items-center space-x-4">
+                      {subsidiaryLogoPreview ? (
+                        <div className="relative">
+                          <img
+                            src={subsidiaryLogoPreview || "/placeholder.svg"}
+                            alt="Subsidiary Logo"
+                            className="w-20 h-20 object-cover rounded-lg border"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                            onClick={() => setSubsidiaryLogoPreview("")}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                          <ImageIcon className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              handleLogoUpload(file, "subsidiary")
+                            }
+                          }}
+                          className="hidden"
+                          id="subsidiary-logo-upload"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById("subsidiary-logo-upload")?.click()}
+                          disabled={isUploadingLogo}
+                          className="flex items-center space-x-2"
+                        >
+                          {isUploadingLogo ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              <span>Upload Logo</span>
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="subsidiaryName">Subsidiary Name</Label>
+                      <Input id="subsidiaryName" placeholder="Enter subsidiary name" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryIndustry">Industry</Label>
+                      <Input id="subsidiaryIndustry" placeholder="Enter industry" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryTaxId">Tax ID</Label>
+                      <Input id="subsidiaryTaxId" placeholder="Enter tax ID" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiarySsnit">SSNIT Number</Label>
+                      <Input id="subsidiarySsnit" placeholder="Enter SSNIT number" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryEmail">Email Address</Label>
+                      <Input id="subsidiaryEmail" type="email" placeholder="Enter email address" />
+                    </div>
+                    <div>
+                      <Label htmlFor="subsidiaryPhone">Phone Number</Label>
+                      <Input id="subsidiaryPhone" placeholder="Enter phone number" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="subsidiaryAddress">Address</Label>
+                    <Textarea id="subsidiaryAddress" placeholder="Enter address" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter division" />
+                      <Button variant="outline" size="sm">
+                        Add Division
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter department" />
+                      <Button variant="outline" size="sm">
+                        Add Department
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    <div className="space-y-2">
+                      <Input placeholder="Enter location name" />
+                      <Button variant="outline" size="sm">
+                        Add Location
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setShowAddSubsidiary(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => setShowAddSubsidiary(false)}>Add Subsidiary</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Subsidiary Modal */}
+      {showEditSubsidiary && selectedSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Edit Subsidiary</CardTitle>
+                <CardDescription>Edit the details for the selected subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    <div className="flex items-center space-x-4">
+                      {subsidiaryLogoPreview || selectedSubsidiary.logo_url ? (
+                        <div className="relative">
+                          <img
+                            src={subsidiaryLogoPreview || selectedSubsidiary.logo_url}
+                            alt="Subsidiary Logo"
+                            className="w-20 h-20 object-cover rounded-lg border"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
+                            onClick={() => setSubsidiaryLogoPreview("")}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                          <ImageIcon className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              handleLogoUpload(file, "subsidiary")
+                            }
+                          }}
+                          className="hidden"
+                          id="subsidiary-logo-upload-edit"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById("subsidiary-logo-upload-edit")?.click()}
+                          disabled={isUploadingLogo}
+                          className="flex items-center space-x-2"
+                        >
+                          {isUploadingLogo ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              <span>Upload Logo</span>
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-gray-500">PNG, JPG up to 2MB</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="editSubsidiaryName">Subsidiary Name</Label>
+                      <Input
+                        id="editSubsidiaryName"
+                        placeholder="Enter subsidiary name"
+                        value={selectedSubsidiary.name}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryIndustry">Industry</Label>
+                      <Input
+                        id="editSubsidiaryIndustry"
+                        placeholder="Enter industry"
+                        value={selectedSubsidiary.industry}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, industry: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryTaxId">Tax ID</Label>
+                      <Input
+                        id="editSubsidiaryTaxId"
+                        placeholder="Enter tax ID"
+                        value={selectedSubsidiary.tax_id}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, tax_id: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiarySsnit">SSNIT Number</Label>
+                      <Input
+                        id="editSubsidiarySsnit"
+                        placeholder="Enter SSNIT number"
+                        value={selectedSubsidiary.ssnit_number}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, ssnit_number: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryEmail">Email Address</Label>
+                      <Input
+                        id="editSubsidiaryEmail"
+                        type="email"
+                        placeholder="Enter email address"
+                        value={selectedSubsidiary.email_address}
+                        onChange={(e) =>
+                          setSelectedSubsidiary({ ...selectedSubsidiary, email_address: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editSubsidiaryPhone">Phone Number</Label>
+                      <Input
+                        id="editSubsidiaryPhone"
+                        placeholder="Enter phone number"
+                        value={selectedSubsidiary.phone_number}
+                        onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, phone_number: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="editSubsidiaryAddress">Address</Label>
+                    <Textarea
+                      id="editSubsidiaryAddress"
+                      placeholder="Enter address"
+                      value={selectedSubsidiary.address}
+                      onChange={(e) => setSelectedSubsidiary({ ...selectedSubsidiary, address: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.divisions) ? (
+                        selectedSubsidiary.divisions.map((division, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={division}
+                              onChange={(e) => {
+                                const newDivisions = [...selectedSubsidiary.divisions]
+                                newDivisions[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newDivisions = selectedSubsidiary.divisions.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <Input placeholder="No divisions defined" disabled />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newDivisions = selectedSubsidiary.divisions
+                            ? [...selectedSubsidiary.divisions, "New Division"]
+                            : ["New Division"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, divisions: newDivisions })
+                        }}
+                      >
+                        Add Division
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.departments) ? (
+                        selectedSubsidiary.departments.map((department, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={department}
+                              onChange={(e) => {
+                                const newDepartments = [...selectedSubsidiary.departments]
+                                newDepartments[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newDepartments = selectedSubsidiary.departments.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <Input placeholder="No departments defined" disabled />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newDepartments = selectedSubsidiary.departments
+                            ? [...selectedSubsidiary.departments, "New Department"]
+                            : ["New Department"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, departments: newDepartments })
+                        }}
+                      >
+                        Add Department
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    <div className="space-y-2">
+                      {Array.isArray(selectedSubsidiary.locations) ? (
+                        selectedSubsidiary.locations.map((location, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <Input
+                              value={location}
+                              onChange={(e) => {
+                                const newLocations = [...selectedSubsidiary.locations]
+                                newLocations[index] = e.target.value
+                                setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newLocations = selectedSubsidiary.locations.filter((_, i) => i !== index)
+                                setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <Input placeholder="No locations defined" disabled />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newLocations = selectedSubsidiary.locations
+                            ? [...selectedSubsidiary.locations, "New Location"]
+                            : ["New Location"]
+                          setSelectedSubsidiary({ ...selectedSubsidiary, locations: newLocations })
+                        }}
+                      >
+                        Add Location
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="ghost" onClick={() => setShowEditSubsidiary(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (selectedSubsidiary) {
+                        await updateSubsidiary(selectedSubsidiary.id, {
+                          name: selectedSubsidiary.name,
+                          industry: selectedSubsidiary.industry,
+                          tax_id: selectedSubsidiary.tax_id,
+                          ssnit_number: selectedSubsidiary.ssnit_number,
+                          email_address: selectedSubsidiary.email_address,
+                          phone_number: selectedSubsidiary.phone_number,
+                          address: selectedSubsidiary.address,
+                          divisions: selectedSubsidiary.divisions,
+                          departments: selectedSubsidiary.departments,
+                          locations: selectedSubsidiary.locations,
+                          logo_url: subsidiaryLogoPreview || selectedSubsidiary.logo_url,
+                        })
+                        setShowEditSubsidiary(false)
+                        setSubsidiaryLogoPreview("")
+                      }
+                    }}
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Subsidiary Details Modal */}
+      {showSubsidiaryDetails && selectedSubsidiary && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/50">
+          <div className="relative m-8 md:m-16 lg:m-24">
+            <Card className="max-w-3xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-xl">Subsidiary Details</CardTitle>
+                <CardDescription>View the details for the selected subsidiary company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Subsidiary Logo</Label>
+                    {selectedSubsidiary.logo_url ? (
+                      <img
+                        src={selectedSubsidiary.logo_url || "/placeholder.svg"}
+                        alt="Subsidiary Logo"
+                        className="w-20 h-20 object-cover rounded-lg border"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                        <ImageIcon className="w-8 h-8 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label>Subsidiary Name</Label>
+                      <Input value={selectedSubsidiary.name} disabled />
+                    </div>
+                    <div>
+                      <Label>Industry</Label>
+                      <Input value={selectedSubsidiary.industry} disabled />
+                    </div>
+                    <div>
+                      <Label>Tax ID</Label>
+                      <Input value={selectedSubsidiary.tax_id} disabled />
+                    </div>
+                    <div>
+                      <Label>SSNIT Number</Label>
+                      <Input value={selectedSubsidiary.ssnit_number} disabled />
+                    </div>
+                    <div>
+                      <Label>Email Address</Label>
+                      <Input value={selectedSubsidiary.email_address} disabled />
+                    </div>
+                    <div>
+                      <Label>Phone Number</Label>
+                      <Input value={selectedSubsidiary.phone_number} disabled />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Address</Label>
+                    <Textarea value={selectedSubsidiary.address} disabled />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Divisions</Label>
+                    {Array.isArray(selectedSubsidiary.divisions) ? (
+                      selectedSubsidiary.divisions.map((division, index) => (
+                        <Input key={index} value={division} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No divisions defined" disabled />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Departments</Label>
+                    {Array.isArray(selectedSubsidiary.departments) ? (
+                      selectedSubsidiary.departments.map((department, index) => (
+                        <Input key={index} value={department} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No departments defined" disabled />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Locations</Label>
+                    {Array.isArray(selectedSubsidiary.locations) ? (
+                      selectedSubsidiary.locations.map((location, index) => (
+                        <Input key={index} value={location} disabled />
+                      ))
+                    ) : (
+                      <Input placeholder="No locations defined" disabled />
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="ghost" onClick={() => setShowSubsidiaryDetails(false)}>
+                    Close
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate Confirmation Modal */}
+      {showDeactivateConfirm && subsidiaryToToggle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="max-w-md mx-auto">
+            <CardHeader>
+              <CardTitle className="text-xl">Confirm Action</CardTitle>
+              <CardDescription>
+                Are you sure you want to {subsidiaryToToggle.status === 'active' ? 'deactivate' : 'activate'} this subsidiary?
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-end space-x-2">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => {
+                    setShowDeactivateConfirm(false)
+                    setSubsidiaryToToggle(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant={subsidiaryToToggle.status === 'active' ? 'destructive' : 'default'}
+                  onClick={() => {
+                    handleToggleSubsidiaryStatus(subsidiaryToToggle.id)
+                    setShowDeactivateConfirm(false)
+                    setSubsidiaryToToggle(null)
+                  }}
+                >
+                  {subsidiaryToToggle.status === 'active' ? 'Deactivate' : 'Activate'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  )
+}

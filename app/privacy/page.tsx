@@ -77,7 +77,7 @@ export default function PrivacyPage() {
                   <Eye className="w-6 h-6 text-blue-600" />
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-2">Transparency</h3>
-                <p className="text-sm text-gray-600">Clear policies on what data we collect and how it's used</p>
+                <p className="text-sm text-gray-600">Clear policies on what data we collect and how it&apos;s used</p>
               </CardContent>
             </Card>
             <Card className="p-6 text-center">

@@ -189,7 +189,7 @@ export default function TrainingPage() {
             <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 leading-tight mb-6">Training Center</h1>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
               Master AkwaabaHRPay with our comprehensive training materials. From basic setup to advanced features,
-              we'll help you become an expert.
+              we&apos;ll help you become an expert.
             </p>
           </div>
 
