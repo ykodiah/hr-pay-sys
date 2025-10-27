@@ -25,6 +25,7 @@ import {
   AlertCircle
 } from "lucide-react"
 import { RecruitmentAI, InterviewQuestions } from "@/lib/ai/recruitment-ai"
+import { toast } from "@/hooks/use-toast"
 
 interface AIInterviewGeneratorProps {
   jobTitle: string
@@ -51,6 +52,15 @@ export function AIInterviewGenerator({
   }, [jobTitle, department, experienceLevel])
 
   const handleGenerateQuestions = async () => {
+    if (!jobTitle || !department || !experienceLevel) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide job title, department, and experience level",
+        variant: "destructive"
+      })
+      return
+    }
+
     setIsGenerating(true)
     
     try {
@@ -62,8 +72,18 @@ export function AIInterviewGenerator({
       
       setQuestions(generatedQuestions)
       onQuestionsGenerated?.(generatedQuestions)
+      
+      toast({
+        title: "Questions Generated",
+        description: `Interview questions for ${jobTitle} generated successfully`
+      })
     } catch (error) {
       console.error('Question generation failed:', error)
+      toast({
+        title: "Generation Failed",
+        description: "There was an error generating interview questions. Please try again.",
+        variant: "destructive"
+      })
     } finally {
       setIsGenerating(false)
     }
@@ -75,6 +95,11 @@ export function AIInterviewGenerator({
     const categoryQuestions = questions[category]
     const text = categoryQuestions.map((q, index) => `${index + 1}. ${q}`).join('\n')
     navigator.clipboard.writeText(text)
+    
+    toast({
+      title: "Questions Copied",
+      description: `${categoryQuestions.length} ${category} questions copied to clipboard`
+    })
   }
 
   const handleDownloadAll = () => {

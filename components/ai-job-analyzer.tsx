@@ -390,6 +390,77 @@ export function AIJobAnalyzer({ onAnalysisComplete }: AIJobAnalyzerProps) {
               </div>
             </CardContent>
           </Card>
+
+          {/* Ghana-Specific Market Insights */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Target className="w-5 h-5 text-purple-600" />
+                <span>Ghana Market Insights & Recommendations</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-900 mb-2">Salary Benchmark</p>
+                      <p className="text-sm text-blue-700">
+                        Based on Ghana market analysis, the recommended salary range is GHS {analysis.estimatedSalary.min.toLocaleString()} - {analysis.estimatedSalary.max.toLocaleString()} 
+                        for this position in {formData.location}. This is competitive for the local market.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <TrendingUp className="w-5 h-5 text-green-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-green-900 mb-2">Market Demand Analysis</p>
+                      <p className="text-sm text-green-700">
+                        {analysis.marketDemand === 'high' ? 'High demand' : analysis.marketDemand === 'medium' ? 'Medium demand' : 'Low demand'} for {formData.title} roles in Ghana. 
+                        Expected to fill in {analysis.estimatedTimeToFill} days based on current market conditions.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-purple-50 rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <Zap className="w-5 h-5 text-purple-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-purple-900 mb-2">Ghana-Specific Insights</p>
+                      <ul className="text-sm text-purple-700 space-y-1">
+                        <li>• Mobile-first approach essential for Ghanaian market penetration</li>
+                        <li>• Cultural sensitivity and local language skills are competitive advantages</li>
+                        <li>• Growing fintech and e-commerce sectors creating new opportunities</li>
+                        <li>• Government digitalization initiatives driving tech job growth</li>
+                        <li>• Understanding of Ghana Labour Act and SSNIT compliance important</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-orange-50 rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="w-5 h-5 text-orange-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-orange-900 mb-2">Hiring Strategy Recommendations</p>
+                      <ul className="text-sm text-orange-700 space-y-1">
+                        <li>• Focus on local universities and tech hubs for talent sourcing</li>
+                        <li>• Consider remote work options to access broader talent pool</li>
+                        <li>• Emphasize cultural fit and local market knowledge in interviews</li>
+                        <li>• Offer competitive benefits including SSNIT and health insurance</li>
+                        <li>• Provide professional development opportunities for career growth</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

@@ -22,6 +22,7 @@ import {
   Zap
 } from "lucide-react"
 import { RecruitmentAI, SalaryBenchmark } from "@/lib/ai/recruitment-ai"
+import { toast } from "@/hooks/use-toast"
 
 interface AISalaryBenchmarkProps {
   position: string
@@ -49,6 +50,15 @@ export function AISalaryBenchmark({
   }, [selectedPosition, selectedLocation, selectedExperience])
 
   const handleGetBenchmark = async () => {
+    if (!selectedPosition || !selectedLocation || !selectedExperience) {
+      toast({
+        title: "Missing Information",
+        description: "Please select position, location, and experience level",
+        variant: "destructive"
+      })
+      return
+    }
+
     setIsLoading(true)
     
     try {
@@ -60,8 +70,18 @@ export function AISalaryBenchmark({
       
       setBenchmark(benchmark)
       onBenchmarkUpdate?.(benchmark)
+      
+      toast({
+        title: "Benchmark Generated",
+        description: `Salary benchmark for ${selectedPosition} in ${selectedLocation} generated successfully`
+      })
     } catch (error) {
       console.error('Benchmark failed:', error)
+      toast({
+        title: "Benchmark Failed",
+        description: "There was an error generating the salary benchmark. Please try again.",
+        variant: "destructive"
+      })
     } finally {
       setIsLoading(false)
     }

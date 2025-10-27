@@ -94,14 +94,14 @@ export class RecruitmentAI {
     description: string,
     requirements: string[]
   ): Promise<JobAnalysis> {
-    // Simulate AI analysis with realistic data
+    // Enhanced AI analysis with Ghana-specific insights
     const experienceLevel = this.determineExperienceLevel(title, requirements);
-    const baseSalary = this.calculateBaseSalary(title, department, experienceLevel);
+    const baseSalary = this.calculateGhanaSalary(title, experienceLevel, location);
     const locationMultiplier = this.GHANA_SALARY_MULTIPLIERS[location as keyof typeof this.GHANA_SALARY_MULTIPLIERS] || 0.8;
     
     const estimatedSalary = {
-      min: Math.round(baseSalary * locationMultiplier * 0.8),
-      max: Math.round(baseSalary * locationMultiplier * 1.2),
+      min: Math.round(baseSalary * 0.8),
+      max: Math.round(baseSalary * 1.3),
       currency: 'GHS'
     };
 
@@ -118,8 +118,8 @@ export class RecruitmentAI {
       benefits: this.generateBenefits(department, experienceLevel),
       workArrangement: this.determineWorkArrangement(title, department),
       urgency: this.assessUrgency(title, department),
-      marketDemand: this.assessMarketDemand(title, department),
-      estimatedTimeToFill: this.estimateTimeToFill(title, department, location)
+      marketDemand: this.assessGhanaMarketDemand(title, location),
+      estimatedTimeToFill: this.calculateGhanaTimeToFill(title, location, experienceLevel)
     };
   }
 
@@ -280,36 +280,64 @@ export class RecruitmentAI {
   private static generateResponsibilities(title: string, department: string): string[] {
     const responsibilities: { [key: string]: string[] } = {
       'Engineering': [
-        'Develop and maintain high-quality software solutions',
+        'Develop and maintain scalable software solutions for Ghanaian and international markets',
         'Collaborate with cross-functional teams to define and implement new features',
-        'Write clean, maintainable, and efficient code',
+        'Write clean, maintainable, and efficient code following industry best practices',
         'Participate in code reviews and technical discussions',
-        'Troubleshoot and debug applications',
-        'Stay updated with latest technologies and best practices'
+        'Troubleshoot and debug applications with focus on performance optimization',
+        'Stay updated with latest technologies and implement innovative solutions',
+        'Work with local and international development teams',
+        'Ensure applications meet Ghanaian data protection and privacy requirements'
       ],
       'Human Resources': [
-        'Manage recruitment and selection processes',
-        'Develop and implement HR policies and procedures',
-        'Handle employee relations and conflict resolution',
+        'Manage end-to-end recruitment and selection processes',
+        'Develop and implement HR policies compliant with Ghana Labour Act 2003',
+        'Handle employee relations and conflict resolution effectively',
         'Coordinate performance management and appraisal systems',
-        'Ensure compliance with Ghana Labour Act and other regulations',
-        'Manage employee benefits and compensation programs'
+        'Ensure compliance with Ghana Labour Act, SSNIT, and other local regulations',
+        'Manage employee benefits including SSNIT contributions and health insurance',
+        'Develop training programs for local talent development',
+        'Maintain employee records in compliance with Ghanaian labor laws'
       ],
       'Finance': [
-        'Prepare financial reports and statements',
-        'Manage budgeting and forecasting processes',
-        'Ensure compliance with financial regulations',
-        'Analyze financial data and provide insights',
-        'Coordinate with external auditors and tax authorities',
-        'Manage cash flow and working capital'
+        'Prepare financial reports compliant with Ghana Accounting Standards',
+        'Manage budgeting and forecasting processes for local operations',
+        'Ensure compliance with GRA tax regulations and filing requirements',
+        'Analyze financial data and provide strategic insights',
+        'Coordinate with external auditors and Ghana Revenue Authority',
+        'Manage cash flow and working capital for Ghana operations',
+        'Handle foreign exchange transactions and currency risk management',
+        'Prepare reports for Bank of Ghana regulatory requirements'
       ],
       'Marketing': [
-        'Develop and execute marketing campaigns',
-        'Analyze market trends and competitor activities',
-        'Manage digital marketing channels and social media',
-        'Coordinate with sales teams to generate leads',
-        'Measure and report on marketing performance',
-        'Develop brand positioning and messaging strategies'
+        'Develop and execute marketing campaigns for Ghanaian market',
+        'Analyze local market trends and competitor activities',
+        'Manage digital marketing channels including mobile-first strategies',
+        'Coordinate with sales teams to generate leads and drive revenue',
+        'Measure and report on marketing performance and ROI',
+        'Develop brand positioning for Ghanaian and West African markets',
+        'Create culturally relevant content for local audiences',
+        'Manage partnerships with local media and advertising agencies'
+      ],
+      'Sales': [
+        'Develop and maintain relationships with Ghanaian clients',
+        'Achieve sales targets and revenue objectives',
+        'Identify new business opportunities in local market',
+        'Prepare sales proposals and presentations',
+        'Negotiate contracts and pricing with clients',
+        'Maintain CRM system with accurate client information',
+        'Collaborate with marketing team on lead generation',
+        'Provide customer support and maintain client satisfaction'
+      ],
+      'Operations': [
+        'Oversee daily operations and ensure efficiency',
+        'Manage supply chain and logistics for Ghana operations',
+        'Implement process improvements and best practices',
+        'Coordinate with local suppliers and vendors',
+        'Ensure compliance with local business regulations',
+        'Manage inventory and resource allocation',
+        'Develop and maintain operational procedures',
+        'Monitor key performance indicators and metrics'
       ]
     };
 
@@ -318,19 +346,40 @@ export class RecruitmentAI {
       'Collaborate with team members to achieve departmental goals',
       'Maintain high standards of work quality and professionalism',
       'Contribute to process improvements and innovation',
-      'Ensure compliance with company policies and procedures',
+      'Ensure compliance with company policies and local regulations',
       'Support organizational objectives and strategic initiatives'
     ];
   }
 
   private static extractRequiredSkills(description: string, requirements: string[]): string[] {
     const commonSkills = [
+      // Core Skills
       'Communication', 'Problem Solving', 'Teamwork', 'Leadership', 'Time Management',
+      'Critical Thinking', 'Adaptability', 'Cultural Sensitivity', 'Multilingual',
+      
+      // Technical Skills
       'Microsoft Office', 'Project Management', 'Data Analysis', 'Customer Service',
-      'JavaScript', 'Python', 'React', 'Node.js', 'SQL', 'AWS', 'Git',
-      'Financial Analysis', 'Budgeting', 'Auditing', 'Tax Compliance',
-      'Digital Marketing', 'SEO', 'Social Media', 'Content Creation',
-      'Recruitment', 'Employee Relations', 'Performance Management', 'Training'
+      'JavaScript', 'Python', 'React', 'Node.js', 'SQL', 'AWS', 'Git', 'Docker',
+      'Mobile Development', 'API Development', 'Database Management',
+      
+      // Ghana-Specific Skills
+      'Ghana Labour Act', 'SSNIT Compliance', 'GRA Tax Regulations', 'Bank of Ghana Regulations',
+      'Local Market Knowledge', 'West African Business Practices', 'Cultural Awareness',
+      
+      // Financial Skills
+      'Financial Analysis', 'Budgeting', 'Auditing', 'Tax Compliance', 'Forex Management',
+      'Ghana Accounting Standards', 'IFRS', 'ACCA', 'CPA',
+      
+      // Marketing Skills
+      'Digital Marketing', 'SEO', 'Social Media', 'Content Creation', 'Mobile Marketing',
+      'Local Market Research', 'Brand Management', 'Customer Acquisition',
+      
+      // HR Skills
+      'Recruitment', 'Employee Relations', 'Performance Management', 'Training',
+      'Labor Law Compliance', 'HRIS Systems', 'Talent Development',
+      
+      // Language Skills
+      'English', 'Twi', 'Hausa', 'French', 'Local Languages'
     ];
 
     const extractedSkills: string[] = [];
@@ -342,32 +391,92 @@ export class RecruitmentAI {
       }
     });
 
-    return extractedSkills.length > 0 ? extractedSkills : ['Communication', 'Problem Solving', 'Teamwork'];
+    // Add Ghana-specific skills based on department
+    if (description.toLowerCase().includes('hr') || description.toLowerCase().includes('human resources')) {
+      extractedSkills.push('Ghana Labour Act', 'SSNIT Compliance');
+    }
+    if (description.toLowerCase().includes('finance') || description.toLowerCase().includes('accounting')) {
+      extractedSkills.push('GRA Tax Regulations', 'Ghana Accounting Standards');
+    }
+    if (description.toLowerCase().includes('marketing') || description.toLowerCase().includes('sales')) {
+      extractedSkills.push('Local Market Knowledge', 'Mobile Marketing');
+    }
+
+    return extractedSkills.length > 0 ? extractedSkills : ['Communication', 'Problem Solving', 'Teamwork', 'Cultural Awareness'];
   }
 
   private static generatePreferredSkills(title: string, department: string): string[] {
     const preferredSkills: { [key: string]: string[] } = {
-      'Engineering': ['Agile/Scrum', 'CI/CD', 'Docker', 'Kubernetes', 'Microservices'],
-      'Human Resources': ['CIPD Certification', 'HRIS Systems', 'Labor Law', 'Training & Development'],
-      'Finance': ['CPA/ACCA', 'ERP Systems', 'Financial Modeling', 'Risk Management'],
-      'Marketing': ['Google Analytics', 'HubSpot', 'Adobe Creative Suite', 'Email Marketing']
+      'Engineering': [
+        'Agile/Scrum', 'CI/CD', 'Docker', 'Kubernetes', 'Microservices',
+        'Mobile App Development', 'Cloud Computing', 'DevOps', 'API Design',
+        'Ghana Tech Ecosystem Knowledge', 'Fintech Experience', 'E-commerce Platforms'
+      ],
+      'Human Resources': [
+        'CIPD Certification', 'HRIS Systems', 'Labor Law', 'Training & Development',
+        'Ghana Labour Act Expertise', 'SSNIT Administration', 'Talent Acquisition',
+        'Employee Engagement', 'Performance Management', 'Cultural Competency'
+      ],
+      'Finance': [
+        'CPA/ACCA', 'ERP Systems', 'Financial Modeling', 'Risk Management',
+        'Ghana Accounting Standards', 'GRA Tax Compliance', 'Forex Management',
+        'Banking Regulations', 'IFRS', 'Audit Experience', 'Treasury Management'
+      ],
+      'Marketing': [
+        'Google Analytics', 'HubSpot', 'Adobe Creative Suite', 'Email Marketing',
+        'Social Media Marketing', 'Mobile Marketing', 'Local Market Research',
+        'Brand Management', 'Content Strategy', 'Digital Advertising',
+        'Ghanaian Market Knowledge', 'West African Consumer Behavior'
+      ],
+      'Sales': [
+        'CRM Systems', 'Lead Generation', 'Client Relationship Management',
+        'Negotiation Skills', 'Presentation Skills', 'Market Analysis',
+        'Ghanaian Business Culture', 'B2B Sales', 'Account Management'
+      ],
+      'Operations': [
+        'Process Improvement', 'Supply Chain Management', 'Quality Control',
+        'Project Management', 'Vendor Management', 'Inventory Management',
+        'Local Supplier Networks', 'Logistics Management', 'Cost Optimization'
+      ]
     };
 
-    return preferredSkills[department] || ['Advanced Excel', 'Presentation Skills', 'Strategic Thinking'];
+    return preferredSkills[department] || [
+      'Advanced Excel', 'Presentation Skills', 'Strategic Thinking',
+      'Cultural Awareness', 'Local Market Knowledge', 'Multilingual'
+    ];
   }
 
   private static generateQualifications(title: string, experienceLevel: string): string[] {
     const baseQualifications = [
       'Bachelor\'s degree in relevant field or equivalent experience',
-      'Strong communication and interpersonal skills',
+      'Strong communication and interpersonal skills in English',
       'Proven ability to work independently and as part of a team',
-      'Excellent problem-solving and analytical skills'
+      'Excellent problem-solving and analytical skills',
+      'Cultural sensitivity and ability to work in diverse environments',
+      'Proficiency in Microsoft Office Suite'
     ];
 
+    // Add Ghana-specific qualifications
+    if (title.toLowerCase().includes('hr') || title.toLowerCase().includes('human resources')) {
+      baseQualifications.push('Knowledge of Ghana Labour Act 2003');
+      baseQualifications.push('Understanding of SSNIT and local labor regulations');
+    }
+    
+    if (title.toLowerCase().includes('finance') || title.toLowerCase().includes('accounting')) {
+      baseQualifications.push('Knowledge of Ghana Accounting Standards');
+      baseQualifications.push('Understanding of GRA tax regulations');
+    }
+    
+    if (title.toLowerCase().includes('marketing') || title.toLowerCase().includes('sales')) {
+      baseQualifications.push('Understanding of Ghanaian consumer behavior');
+      baseQualifications.push('Experience with mobile-first marketing strategies');
+    }
+
     if (experienceLevel === 'senior' || experienceLevel === 'executive') {
-      baseQualifications.push('5+ years of relevant experience');
+      baseQualifications.push('5+ years of relevant experience in Ghana or West Africa');
       baseQualifications.push('Leadership and team management experience');
       baseQualifications.push('Proven track record of delivering results');
+      baseQualifications.push('Experience working with international teams');
     }
 
     return baseQualifications;
@@ -375,18 +484,34 @@ export class RecruitmentAI {
 
   private static generateBenefits(department: string, experienceLevel: string): string[] {
     const baseBenefits = [
-      'Competitive salary package',
-      'Health insurance coverage',
-      'Annual leave entitlement',
-      'Professional development opportunities',
-      'Flexible working arrangements',
-      'Pension scheme contribution'
+      'Competitive salary package in Ghana Cedis (GHS)',
+      'Comprehensive health insurance coverage',
+      'Annual leave entitlement (21+ days)',
+      'Professional development and training opportunities',
+      'Flexible working arrangements (hybrid/remote options)',
+      'SSNIT pension scheme contribution',
+      'Transportation allowance',
+      'Lunch allowance',
+      '13th month salary bonus'
     ];
 
     if (experienceLevel === 'senior' || experienceLevel === 'executive') {
-      baseBenefits.push('Performance bonus');
-      baseBenefits.push('Car allowance');
-      baseBenefits.push('Stock options');
+      baseBenefits.push('Performance-based bonus');
+      baseBenefits.push('Car allowance or company vehicle');
+      baseBenefits.push('Stock options or profit sharing');
+      baseBenefits.push('International travel opportunities');
+      baseBenefits.push('Executive health checkup');
+    }
+
+    // Add department-specific benefits
+    if (department === 'Engineering') {
+      baseBenefits.push('Tech equipment and tools allowance');
+      baseBenefits.push('Conference and training budget');
+    }
+    
+    if (department === 'Sales') {
+      baseBenefits.push('Commission structure');
+      baseBenefits.push('Client entertainment allowance');
     }
 
     return baseBenefits;
@@ -589,5 +714,127 @@ export class RecruitmentAI {
     };
 
     return focuses[department] || 'excellence and continuous improvement';
+  }
+
+  // New methods for enhanced Ghana-specific analysis
+  private static generateGhanaMarketInsights(title: string, location: string): string[] {
+    const insights = [
+      `High demand for ${title} roles in Ghana's growing economy`,
+      'Mobile-first approach essential for Ghanaian market penetration',
+      'Cultural sensitivity and local language skills are competitive advantages',
+      'Growing fintech and e-commerce sectors creating new opportunities',
+      'Government digitalization initiatives driving tech job growth'
+    ];
+
+    if (location === 'Accra') {
+      insights.push('Accra offers highest salary potential but highest cost of living');
+      insights.push('Strong talent pool with international exposure');
+    } else {
+      insights.push(`${location} offers lower cost of living with competitive salaries`);
+      insights.push('Growing regional business hub with expanding opportunities');
+    }
+
+    return insights;
+  }
+
+  private static generateGhanaCulturalConsiderations(location: string): string[] {
+    return [
+      'Understanding of Ghanaian business culture and hierarchy',
+      'Respect for traditional values while embracing innovation',
+      'Ability to work with diverse ethnic groups and languages',
+      'Familiarity with local holidays and cultural events',
+      'Understanding of family-oriented work culture',
+      'Experience with community engagement and social responsibility'
+    ];
+  }
+
+  private static calculateGhanaTimeToFill(title: string, location: string, experienceLevel: string): number {
+    let baseDays = 25; // Faster than international average
+    
+    // Adjust based on role complexity
+    if (title.toLowerCase().includes('senior') || title.toLowerCase().includes('manager')) {
+      baseDays += 10;
+    }
+    if (title.toLowerCase().includes('director') || title.toLowerCase().includes('head')) {
+      baseDays += 15;
+    }
+    
+    // Adjust based on location
+    if (location === 'Accra') {
+      baseDays -= 5; // Larger talent pool
+    } else {
+      baseDays += 5; // Smaller talent pool
+    }
+    
+    // Adjust based on experience level
+    if (experienceLevel === 'entry') {
+      baseDays -= 5;
+    } else if (experienceLevel === 'executive') {
+      baseDays += 10;
+    }
+    
+    return Math.max(15, baseDays); // Minimum 15 days
+  }
+
+  private static assessGhanaMarketDemand(title: string, location: string): 'low' | 'medium' | 'high' {
+    const highDemandRoles = [
+      'Software Engineer', 'Data Scientist', 'Digital Marketing', 'Finance',
+      'Fintech', 'E-commerce', 'Mobile Development', 'Cybersecurity',
+      'Project Manager', 'Business Analyst', 'Sales Manager'
+    ];
+    
+    const isHighDemand = highDemandRoles.some(role => 
+      title.toLowerCase().includes(role.toLowerCase())
+    );
+    
+    if (isHighDemand) return 'high';
+    
+    // Location-based demand
+    if (location === 'Accra') return 'medium';
+    return 'low';
+  }
+
+  private static calculateGhanaSalary(title: string, experienceLevel: string, location: string): number {
+    // Enhanced salary calculation for Ghana market
+    const baseSalaries: { [key: string]: number } = {
+      'Software Engineer': 3500,
+      'Senior Software Engineer': 5500,
+      'Data Scientist': 4500,
+      'Product Manager': 5000,
+      'Marketing Manager': 4000,
+      'HR Manager': 3500,
+      'Finance Manager': 4500,
+      'Sales Manager': 4200,
+      'Operations Manager': 3800,
+      'Business Analyst': 3200,
+      'Project Manager': 4000,
+      'UX Designer': 3500,
+      'DevOps Engineer': 4800,
+      'System Administrator': 3200,
+      'Accountant': 2800,
+      'Customer Success Manager': 3500,
+      'Content Manager': 2500,
+      'Digital Marketing Specialist': 2200,
+      'Recruiter': 2000,
+      'Executive Assistant': 1800
+    };
+
+    let baseSalary = 2500; // Default base salary in GHS
+    
+    // Find matching title
+    for (const [key, value] of Object.entries(baseSalaries)) {
+      if (title.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(title.toLowerCase())) {
+        baseSalary = value;
+        break;
+      }
+    }
+
+    // Apply experience multiplier
+    const experienceMultiplier = this.EXPERIENCE_MULTIPLIERS[experienceLevel as keyof typeof this.EXPERIENCE_MULTIPLIERS] || 1.0;
+    
+    // Apply location multiplier
+    const locationMultiplier = this.GHANA_SALARY_MULTIPLIERS[location as keyof typeof this.GHANA_SALARY_MULTIPLIERS] || 0.8;
+
+    return Math.round(baseSalary * experienceMultiplier * locationMultiplier);
   }
 }
