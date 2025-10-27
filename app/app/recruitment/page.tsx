@@ -14,6 +14,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/hooks/use-toast"
+import { AIJobAnalyzer } from "@/components/ai-job-analyzer"
+import { AICandidateMatcher } from "@/components/ai-candidate-matcher"
+import { AISalaryBenchmark } from "@/components/ai-salary-benchmark"
+import { AIInterviewGenerator } from "@/components/ai-interview-generator"
+import { AIRequisitionGenerator } from "@/components/ai-requisition-generator"
+import { JobAnalysis } from "@/lib/ai/recruitment-ai"
 import {
   Briefcase,
   Users,
@@ -43,6 +49,19 @@ import {
   Award,
   BookOpen,
   Shield,
+  Brain,
+  Pause,
+  Play,
+  X,
+  Check,
+  AlertCircle,
+  ThumbsUp,
+  ThumbsDown,
+  ArrowRight,
+  ArrowLeft,
+  Copy,
+  Share,
+  Trash2
 } from "lucide-react"
 
 interface JobRequisition {
@@ -163,8 +182,10 @@ export default function RecruitmentPage() {
   const [showOfferDialog, setShowOfferDialog] = useState(false)
   const [showOnboardingDialog, setShowOnboardingDialog] = useState(false)
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null)
+  const [jobAnalysis, setJobAnalysis] = useState<JobAnalysis | null>(null)
+  const [selectedJobForAnalysis, setSelectedJobForAnalysis] = useState<JobPosting | null>(null)
 
-  const [requisitions] = useState<JobRequisition[]>([
+  const [requisitions, setRequisitions] = useState<JobRequisition[]>([
     {
       id: "1",
       title: "Senior Software Engineer",
@@ -195,7 +216,7 @@ export default function RecruitmentPage() {
     },
   ])
 
-  const [jobPostings] = useState<JobPosting[]>([
+  const [jobPostings, setJobPostings] = useState<JobPosting[]>([
     {
       id: "1",
       requisitionId: "1",
@@ -623,6 +644,236 @@ export default function RecruitmentPage() {
     setShowJobDialog(true)
   }
 
+  // Job Management Functions
+  const handleEditJob = (job: JobPosting) => {
+    setSelectedJobForAnalysis(job)
+    setShowJobDialog(true)
+    toast({
+      title: "Edit Job",
+      description: `Editing job posting: ${job.title}`
+    })
+  }
+
+  const handleDeleteJob = (jobId: string) => {
+    setJobPostings(prev => prev.filter(job => job.id !== jobId))
+    toast({
+      title: "Job Deleted",
+      description: "Job posting has been deleted successfully."
+    })
+  }
+
+  const handleDuplicateJob = (job: JobPosting) => {
+    const duplicatedJob: JobPosting = {
+      ...job,
+      id: `job_${Date.now()}`,
+      title: `${job.title} (Copy)`,
+      status: "draft",
+      postedDate: new Date().toISOString().split("T")[0],
+      applicationsCount: 0
+    }
+    setJobPostings(prev => [...prev, duplicatedJob])
+    toast({
+      title: "Job Duplicated",
+      description: `Created a copy of: ${job.title}`
+    })
+  }
+
+  const handlePauseJob = (jobId: string) => {
+    setJobPostings(prev => prev.map(job => 
+      job.id === jobId ? { ...job, status: "paused" as const } : job
+    ))
+    toast({
+      title: "Job Paused",
+      description: "Job posting has been paused and is no longer accepting applications."
+    })
+  }
+
+  const handleResumeJob = (jobId: string) => {
+    setJobPostings(prev => prev.map(job => 
+      job.id === jobId ? { ...job, status: "active" as const } : job
+    ))
+    toast({
+      title: "Job Resumed",
+      description: "Job posting has been resumed and is now accepting applications."
+    })
+  }
+
+  // Application Management Functions
+  const handleApproveApplication = (applicationId: string) => {
+    setApplications(prev => prev.map(app => 
+      app.id === applicationId ? { ...app, status: "approved" as const } : app
+    ))
+    toast({
+      title: "Application Approved",
+      description: "Application has been approved and moved to next stage."
+    })
+  }
+
+  const handleRejectApplication = (applicationId: string) => {
+    setApplications(prev => prev.map(app => 
+      app.id === applicationId ? { ...app, status: "rejected" as const } : app
+    ))
+    toast({
+      title: "Application Rejected",
+      description: "Application has been rejected."
+    })
+  }
+
+  const handleMoveToInterview = (applicationId: string) => {
+    setApplications(prev => prev.map(app => 
+      app.id === applicationId ? { ...app, status: "interview" as const } : app
+    ))
+    toast({
+      title: "Moved to Interview",
+      description: "Application has been moved to interview stage."
+    })
+  }
+
+  const handleDownloadResume = (application: Application) => {
+    // Simulate resume download
+    const link = document.createElement("a")
+    link.href = "#" // In real app, this would be the actual resume URL
+    link.download = `${application.candidateName}_Resume.pdf`
+    link.click()
+    toast({
+      title: "Resume Downloaded",
+      description: `Resume for ${application.candidateName} has been downloaded.`
+    })
+  }
+
+  // Interview Management Functions
+  const handleScheduleInterview = (application: Application) => {
+    setSelectedApplication(application)
+    setShowInterviewDialog(true)
+  }
+
+  const handleCompleteInterview = (interviewId: string, rating: number, feedback: string) => {
+    setInterviews(prev => prev.map(interview => 
+      interview.id === interviewId 
+        ? { ...interview, status: "completed" as const, rating, feedback }
+        : interview
+    ))
+    toast({
+      title: "Interview Completed",
+      description: "Interview has been marked as completed with feedback recorded."
+    })
+  }
+
+  const handleCancelInterview = (interviewId: string) => {
+    setInterviews(prev => prev.map(interview => 
+      interview.id === interviewId ? { ...interview, status: "cancelled" as const } : interview
+    ))
+    toast({
+      title: "Interview Cancelled",
+      description: "Interview has been cancelled."
+    })
+  }
+
+  // Offer Management Functions
+  const handleSendOffer = (offerId: string) => {
+    setOfferLetters(prev => prev.map(offer => 
+      offer.id === offerId ? { ...offer, status: "sent" as const } : offer
+    ))
+    toast({
+      title: "Offer Sent",
+      description: "Offer letter has been sent to the candidate."
+    })
+  }
+
+  const handleWithdrawOffer = (offerId: string) => {
+    setOfferLetters(prev => prev.map(offer => 
+      offer.id === offerId ? { ...offer, status: "withdrawn" as const } : offer
+    ))
+    toast({
+      title: "Offer Withdrawn",
+      description: "Offer letter has been withdrawn."
+    })
+  }
+
+  const handleAcceptOffer = (offerId: string) => {
+    setOfferLetters(prev => prev.map(offer => 
+      offer.id === offerId ? { ...offer, status: "accepted" as const } : offer
+    ))
+    toast({
+      title: "Offer Accepted",
+      description: "Candidate has accepted the offer."
+    })
+  }
+
+  const handleRejectOffer = (offerId: string) => {
+    setOfferLetters(prev => prev.map(offer => 
+      offer.id === offerId ? { ...offer, status: "rejected" as const } : offer
+    ))
+    toast({
+      title: "Offer Rejected",
+      description: "Candidate has rejected the offer."
+    })
+  }
+
+  // Onboarding Management Functions
+  const handleCompleteOnboarding = (checklistId: string) => {
+    setOnboardingChecklists(prev => prev.map(checklist => 
+      checklist.id === checklistId ? { ...checklist, status: "completed" as const } : checklist
+    ))
+    toast({
+      title: "Onboarding Completed",
+      description: "Onboarding process has been completed successfully."
+    })
+  }
+
+  const handleUpdateTaskStatus = (checklistId: string, taskId: string, status: string) => {
+    setOnboardingChecklists(prev => prev.map(checklist => 
+      checklist.id === checklistId 
+        ? {
+            ...checklist,
+            tasks: checklist.tasks.map(task => 
+              task.id === taskId ? { ...task, status: status as any } : task
+            )
+          }
+        : checklist
+    ))
+  }
+
+  // Analytics Functions
+  const handleExportData = (type: string) => {
+    toast({
+      title: "Export Started",
+      description: `Exporting ${type} data...`
+    })
+    // In real app, this would trigger actual data export
+  }
+
+  const handleGenerateReport = (reportType: string) => {
+    toast({
+      title: "Report Generated",
+      description: `${reportType} report has been generated successfully.`
+    })
+  }
+
+  // Utility Functions
+  const handleShareJob = (job: JobPosting) => {
+    const jobUrl = `${window.location.origin}/jobs/${job.id}`
+    navigator.clipboard.writeText(jobUrl).then(() => {
+      toast({
+        title: "Job Link Copied",
+        description: "Job posting link has been copied to clipboard."
+      })
+    }).catch(() => {
+      toast({
+        title: "Copy Failed",
+        description: "Failed to copy job link. Please try again.",
+        variant: "destructive"
+      })
+    })
+  }
+
+  const handleSendReminder = (type: string, id: string) => {
+    toast({
+      title: "Reminder Sent",
+      description: `${type} reminder has been sent successfully.`
+    })
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -638,38 +889,24 @@ export default function RecruitmentPage() {
                 New Requisition
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Create Job Requisition</DialogTitle>
+                <DialogTitle className="flex items-center space-x-2">
+                  <Brain className="w-5 h-5 text-purple-600" />
+                  <span>AI-Powered Job Requisition</span>
+                </DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="title">Job Title</Label>
-                    <Input id="title" placeholder="e.g. Senior Software Engineer" />
-                  </div>
-                  <div>
-                    <Label htmlFor="department">Department</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="engineering">Engineering</SelectItem>
-                        <SelectItem value="hr">Human Resources</SelectItem>
-                        <SelectItem value="finance">Finance</SelectItem>
-                        <SelectItem value="marketing">Marketing</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setShowRequisitionDialog(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateRequisition}>Create Requisition</Button>
-                </div>
-              </div>
+              <AIRequisitionGenerator 
+                onRequisitionCreated={(requisition) => {
+                  setRequisitions(prev => [...prev, requisition])
+                  toast({
+                    title: "Requisition Created",
+                    description: `Successfully created requisition for ${requisition.title}`
+                  })
+                  setShowRequisitionDialog(false)
+                }}
+                onClose={() => setShowRequisitionDialog(false)}
+              />
             </DialogContent>
           </Dialog>
           <Button onClick={handlePostJob}>
@@ -680,8 +917,9 @@ export default function RecruitmentPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-8">
+        <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="ai-analysis">AI Analysis</TabsTrigger>
           <TabsTrigger value="requisitions">Requisitions</TabsTrigger>
           <TabsTrigger value="jobs">Job Postings</TabsTrigger>
           <TabsTrigger value="applications">Applications</TabsTrigger>
@@ -819,6 +1057,33 @@ export default function RecruitmentPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="ai-analysis" className="space-y-6">
+          <div className="grid lg:grid-cols-2 gap-6">
+            <AIJobAnalyzer onAnalysisComplete={setJobAnalysis} />
+            <AISalaryBenchmark 
+              position={selectedJobForAnalysis?.title || "Software Engineer"}
+              location={selectedJobForAnalysis?.location || "Accra"}
+              experience={jobAnalysis?.experienceLevel || "mid"}
+            />
+          </div>
+          
+          {jobAnalysis && (
+            <AICandidateMatcher 
+              jobAnalysis={jobAnalysis}
+              candidates={applications}
+              onCandidateSelect={setSelectedApplication}
+            />
+          )}
+          
+          {jobAnalysis && (
+            <AIInterviewGenerator
+              jobTitle={jobAnalysis.title}
+              department={jobAnalysis.department}
+              experienceLevel={jobAnalysis.experienceLevel}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="requisitions" className="space-y-6">
@@ -1048,17 +1313,53 @@ export default function RecruitmentPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
-                        <DropdownMenuItem>
-                          <Eye className="w-4 h-4 mr-2" />
-                          View Applications
+                        <DropdownMenuItem onClick={() => {
+                          setSelectedJobForAnalysis(job)
+                          setActiveTab("ai-analysis")
+                        }}>
+                          <Brain className="w-4 h-4 mr-2" />
+                          AI Analysis
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          const jobApplications = applications.filter(app => app.jobId === job.id)
+                          setActiveTab("applications")
+                          toast({
+                            title: "Applications Filtered",
+                            description: `Showing ${jobApplications.length} applications for ${job.title}`
+                          })
+                        }}>
+                          <Eye className="w-4 h-4 mr-2" />
+                          View Applications ({job.applications})
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEditJob(job)}>
                           <Edit className="w-4 h-4 mr-2" />
                           Edit Posting
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Send className="w-4 h-4 mr-2" />
+                        <DropdownMenuItem onClick={() => handleDuplicateJob(job)}>
+                          <Copy className="w-4 h-4 mr-2" />
+                          Duplicate Job
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleShareJob(job)}>
+                          <Share className="w-4 h-4 mr-2" />
                           Share Job
+                        </DropdownMenuItem>
+                        {job.status === "active" ? (
+                          <DropdownMenuItem onClick={() => handlePauseJob(job.id)}>
+                            <Pause className="w-4 h-4 mr-2" />
+                            Pause Job
+                          </DropdownMenuItem>
+                        ) : job.status === "paused" ? (
+                          <DropdownMenuItem onClick={() => handleResumeJob(job.id)}>
+                            <Play className="w-4 h-4 mr-2" />
+                            Resume Job
+                          </DropdownMenuItem>
+                        ) : null}
+                        <DropdownMenuItem 
+                          onClick={() => handleDeleteJob(job.id)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete Job
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -1151,18 +1452,42 @@ export default function RecruitmentPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedApplication(application)
+                              toast({
+                                title: "Application Details",
+                                description: `Viewing details for ${application.candidateName}`
+                              })
+                            }}>
                               <Eye className="w-4 h-4 mr-2" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownloadResume(application)}>
                               <Download className="w-4 h-4 mr-2" />
                               Download Resume
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleScheduleInterview(application)}>
                               <Calendar className="w-4 h-4 mr-2" />
                               Schedule Interview
                             </DropdownMenuItem>
+                            {application.status === "applied" && (
+                              <>
+                                <DropdownMenuItem onClick={() => handleApproveApplication(application.id)}>
+                                  <ThumbsUp className="w-4 h-4 mr-2" />
+                                  Approve Application
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleRejectApplication(application.id)}>
+                                  <ThumbsDown className="w-4 h-4 mr-2" />
+                                  Reject Application
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {application.status === "approved" && (
+                              <DropdownMenuItem onClick={() => handleMoveToInterview(application.id)}>
+                                <ArrowRight className="w-4 h-4 mr-2" />
+                                Move to Interview
+                              </DropdownMenuItem>
+                            )}
                             {application.status === "interview" && (
                               <DropdownMenuItem onClick={() => generateOfferLetter(application)}>
                                 <FileText className="w-4 h-4 mr-2" />
@@ -1190,12 +1515,209 @@ export default function RecruitmentPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="interviews" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Interview Management</h2>
+              <p className="text-gray-600">Schedule and manage candidate interviews</p>
+            </div>
+            <div className="flex space-x-2">
+              <Button onClick={() => setShowInterviewDialog(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Schedule Interview
+              </Button>
+              <Button variant="outline">
+                <Calendar className="w-4 h-4 mr-2" />
+                View Calendar
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Scheduled</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {interviews.filter(i => i.status === 'scheduled').length}
+                    </p>
+                  </div>
+                  <Calendar className="w-8 h-8 text-blue-600" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Completed</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {interviews.filter(i => i.status === 'completed').length}
+                    </p>
+                  </div>
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">This Week</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {interviews.filter(i => {
+                        const interviewDate = new Date(i.date)
+                        const now = new Date()
+                        const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+                        return interviewDate >= now && interviewDate <= weekFromNow
+                      }).length}
+                    </p>
+                  </div>
+                  <Clock className="w-8 h-8 text-orange-600" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Upcoming Interviews ({interviews.length})</CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Select defaultValue="all">
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {interviews.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No interviews scheduled</h3>
+                    <p className="text-gray-600 mb-4">Get started by scheduling your first interview</p>
+                    <Button onClick={() => setShowInterviewDialog(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Schedule Interview
+                    </Button>
+                  </div>
+                ) : (
+                  interviews.map((interview) => (
+                    <div key={interview.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Calendar className="w-6 h-6 text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900">{interview.candidateName}</h3>
+                            <p className="text-sm text-gray-600">{interview.jobTitle}</p>
+                            <div className="flex items-center space-x-4 mt-1">
+                              <div className="flex items-center text-xs text-gray-500">
+                                <Calendar className="w-3 h-3 mr-1" />
+                                {interview.date} at {interview.time}
+                              </div>
+                              <div className="flex items-center text-xs text-gray-500">
+                                <Users className="w-3 h-3 mr-1" />
+                                {interview.interviewer}
+                              </div>
+                              <div className="flex items-center text-xs text-gray-500">
+                                <Phone className="w-3 h-3 mr-1" />
+                                {interview.type}
+                              </div>
+                            </div>
+                            {interview.feedback && (
+                              <div className="mt-2 p-2 bg-gray-50 rounded text-xs text-gray-600">
+                                <strong>Feedback:</strong> {interview.feedback}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <Badge className={getStatusColor(interview.status)}>{interview.status}</Badge>
+                          {interview.rating && (
+                            <div className="flex items-center space-x-1">
+                              <Star className="w-4 h-4 text-yellow-500" />
+                              <span className="text-sm font-medium">{interview.rating}/5</span>
+                            </div>
+                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedApplication(applications.find(app => app.candidateName === interview.candidateName) || null)
+                                toast({
+                                  title: "Viewing Details",
+                                  description: `Showing details for ${interview.candidateName}`
+                                })
+                              }}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                toast({
+                                  title: "Edit Interview",
+                                  description: "Interview editing functionality will be implemented"
+                                })
+                              }}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Interview
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSendReminder("Interview", interview.id)}>
+                                <Send className="w-4 h-4 mr-2" />
+                                Send Reminder
+                              </DropdownMenuItem>
+                              {interview.status === "scheduled" && (
+                                <DropdownMenuItem onClick={() => handleCompleteInterview(interview.id, 4, "Good performance")}>
+                                  <CheckCircle className="w-4 h-4 mr-2" />
+                                  Mark Complete
+                                </DropdownMenuItem>
+                              )}
+                              {interview.status === "scheduled" && (
+                                <DropdownMenuItem onClick={() => handleCancelInterview(interview.id)}>
+                                  <X className="w-4 h-4 mr-2" />
+                                  Cancel Interview
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="offers" className="space-y-6">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Offer Letters ({offerLetters.length})</CardTitle>
-                <Button>
+                <Button onClick={() => {
+                  toast({
+                    title: "Generate Offer",
+                    description: "Select a candidate from the Applications tab to generate an offer"
+                  })
+                }}>
                   <Plus className="w-4 h-4 mr-2" />
                   Generate Offer
                 </Button>
@@ -1253,21 +1775,57 @@ export default function RecruitmentPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              toast({
+                                title: "Preview Offer",
+                                description: `Previewing offer for ${offer.candidateName}`
+                              })
+                            }}>
                               <Eye className="w-4 h-4 mr-2" />
                               Preview Offer
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              toast({
+                                title: "Edit Offer",
+                                description: "Offer editing functionality will be implemented"
+                              })
+                            }}>
                               <Edit className="w-4 h-4 mr-2" />
                               Edit Offer
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Send className="w-4 h-4 mr-2" />
-                              Send to Candidate
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            {offer.status === "draft" && (
+                              <DropdownMenuItem onClick={() => handleSendOffer(offer.id)}>
+                                <Send className="w-4 h-4 mr-2" />
+                                Send to Candidate
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={() => {
+                              toast({
+                                title: "PDF Downloaded",
+                                description: `Offer letter for ${offer.candidateName} downloaded`
+                              })
+                            }}>
                               <Download className="w-4 h-4 mr-2" />
                               Download PDF
+                            </DropdownMenuItem>
+                            {offer.status === "sent" && (
+                              <>
+                                <DropdownMenuItem onClick={() => handleAcceptOffer(offer.id)}>
+                                  <Check className="w-4 h-4 mr-2" />
+                                  Mark as Accepted
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleRejectOffer(offer.id)}>
+                                  <X className="w-4 h-4 mr-2" />
+                                  Mark as Rejected
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            <DropdownMenuItem 
+                              onClick={() => handleWithdrawOffer(offer.id)}
+                              className="text-red-600"
+                            >
+                              <X className="w-4 h-4 mr-2" />
+                              Withdraw Offer
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -1288,7 +1846,12 @@ export default function RecruitmentPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Onboarding Checklists ({onboardingChecklists.length})</CardTitle>
-                <Button>
+                <Button onClick={() => {
+                  toast({
+                    title: "Create Checklist",
+                    description: "Select a candidate from the Offers tab to create an onboarding checklist"
+                  })
+                }}>
                   <Plus className="w-4 h-4 mr-2" />
                   Create Checklist
                 </Button>
@@ -1344,7 +1907,7 @@ export default function RecruitmentPage() {
                                 </Badge>
                                 <Select
                                   value={task.status}
-                                  onValueChange={(value) => updateTaskStatus(checklist.id, task.id, value as any)}
+                                  onValueChange={(value) => handleUpdateTaskStatus(checklist.id, task.id, value)}
                                 >
                                   <SelectTrigger className="w-32">
                                     <SelectValue />
@@ -1382,18 +1945,54 @@ export default function RecruitmentPage() {
                         <div className="mt-6">
                           <h4 className="font-medium text-gray-900 mb-3">Quick Actions</h4>
                           <div className="space-y-2">
-                            <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full justify-start bg-transparent"
+                              onClick={() => handleSendReminder("Welcome Email", checklist.id)}
+                            >
                               <Send className="w-4 h-4 mr-2" />
                               Send Welcome Email
                             </Button>
-                            <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full justify-start bg-transparent"
+                              onClick={() => {
+                                toast({
+                                  title: "Orientation Scheduled",
+                                  description: `Orientation scheduled for ${checklist.candidateName}`
+                                })
+                              }}
+                            >
                               <Calendar className="w-4 h-4 mr-2" />
                               Schedule Orientation
                             </Button>
-                            <Button variant="outline" size="sm" className="w-full justify-start bg-transparent">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full justify-start bg-transparent"
+                              onClick={() => {
+                                toast({
+                                  title: "Certificate Generated",
+                                  description: `Certificate generated for ${checklist.candidateName}`
+                                })
+                              }}
+                            >
                               <Award className="w-4 h-4 mr-2" />
                               Generate Certificate
                             </Button>
+                            {checklist.status !== "completed" && (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="w-full justify-start bg-transparent"
+                                onClick={() => handleCompleteOnboarding(checklist.id)}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Complete Onboarding
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1517,7 +2116,27 @@ export default function RecruitmentPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Recruitment Performance Trends</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Recruitment Performance Trends</CardTitle>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleExportData("Analytics")}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Export Data
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleGenerateReport("Recruitment Performance")}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Generate Report
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="h-64 flex items-center justify-center text-gray-500">
@@ -1525,12 +2144,122 @@ export default function RecruitmentPage() {
                   <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                   <p>Analytics dashboard coming soon</p>
                   <p className="text-sm">Integration with advanced reporting tools</p>
+                  <div className="mt-4 space-x-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleExportData("Hiring Funnel")}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Export Funnel Data
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleGenerateReport("Source Effectiveness")}
+                    >
+                      <TrendingUp className="w-4 h-4 mr-2" />
+                      Source Report
+                    </Button>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Interview Scheduling Dialog */}
+      <Dialog open={showInterviewDialog} onOpenChange={setShowInterviewDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Schedule Interview</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedApplication && (
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h3 className="font-medium">{selectedApplication.candidateName}</h3>
+                <p className="text-sm text-gray-600">
+                  {jobPostings.find(j => j.id === selectedApplication.jobId)?.title}
+                </p>
+              </div>
+            )}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Interview Date</Label>
+                <Input type="date" />
+              </div>
+              <div className="space-y-2">
+                <Label>Interview Time</Label>
+                <Input type="time" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Interview Type</Label>
+              <Select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select interview type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="phone">Phone Interview</SelectItem>
+                  <SelectItem value="video">Video Interview</SelectItem>
+                  <SelectItem value="in-person">In-Person Interview</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Interviewer</Label>
+              <Input placeholder="Enter interviewer name" />
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea placeholder="Add any additional notes..." rows={3} />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowInterviewDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => {
+                if (selectedApplication) {
+                  const newInterview: Interview = {
+                    id: `interview_${Date.now()}`,
+                    applicationId: selectedApplication.id,
+                    candidateName: selectedApplication.candidateName,
+                    jobTitle: jobPostings.find(j => j.id === selectedApplication.jobId)?.title || "Unknown Position",
+                    date: interviewData.date || new Date().toISOString().split("T")[0],
+                    time: interviewData.time || "10:00 AM",
+                    type: interviewData.type,
+                    interviewer: interviewData.interviewer || "HR Manager",
+                    status: "scheduled",
+                    location: "Office",
+                    notes: interviewData.notes || ""
+                  }
+                  setInterviews(prev => [...prev, newInterview])
+                  
+                  // Update application status
+                  setApplications(prev => prev.map(app => 
+                    app.id === selectedApplication.id ? { ...app, status: "interview" as const } : app
+                  ))
+                  
+                  toast({
+                    title: "Interview Scheduled",
+                    description: `Interview scheduled for ${selectedApplication.candidateName}`
+                  })
+                } else {
+                  toast({
+                    title: "No Candidate Selected",
+                    description: "Please select a candidate to schedule an interview",
+                    variant: "destructive"
+                  })
+                }
+                setShowInterviewDialog(false)
+              }}>
+                Schedule Interview
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
