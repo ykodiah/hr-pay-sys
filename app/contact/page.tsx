@@ -114,7 +114,7 @@ export default function ContactPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Send Us a Message</h2>
-            <p className="text-gray-600">Fill out the form below and we'll get back to you as soon as possible.</p>
+            <p className="text-gray-600">Fill out the form below and we&apos;ll get back to you as soon as possible.</p>
           </div>
 
           <Card className="p-8">

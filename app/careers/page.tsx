@@ -129,13 +129,13 @@ export default function CareersPage() {
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">No Open Positions Currently</h3>
               <p className="text-gray-600 leading-relaxed mb-8">
-                We're not actively hiring at the moment, but we're always interested in connecting with talented
+                We're not actively hiring at the moment, but we&apos;re always interested in connecting with talented
                 individuals who are passionate about HR technology and want to make an impact in Ghana's business
                 ecosystem.
               </p>
               <div className="space-y-4">
                 <p className="text-sm text-gray-500">
-                  Interested in future opportunities? Send us your resume and we'll keep you in mind for upcoming roles.
+                  Interested in future opportunities? Send us your resume and we&apos;ll keep you in mind for upcoming roles.
                 </p>
                 <Link href="/contact">
                   <Button className="bg-emerald-600 hover:bg-emerald-700">Send Your Resume</Button>
@@ -171,7 +171,7 @@ export default function CareersPage() {
             </div>
             <div className="bg-orange-50 p-6 rounded-lg">
               <h4 className="font-semibold text-gray-900 mb-2">Flexible Hours</h4>
-              <p className="text-gray-600 text-sm">Work when you're most productive with core collaboration hours</p>
+              <p className="text-gray-600 text-sm">Work when you&apos;re most productive with core collaboration hours</p>
             </div>
             <div className="bg-green-50 p-6 rounded-lg">
               <h4 className="font-semibold text-gray-900 mb-2">Remote Work</h4>

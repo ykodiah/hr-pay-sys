@@ -12,11 +12,11 @@ export default function NotFound() {
             <FileQuestion className="h-6 w-6 text-gray-600" />
             <CardTitle>Page Not Found</CardTitle>
           </div>
-          <CardDescription>The page you're looking for doesn't exist</CardDescription>
+          <CardDescription>The page you&apos;re looking for doesn't exist</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-gray-600">
-            The page you're trying to access may have been moved, deleted, or never existed.
+            The page you&apos;re trying to access may have been moved, deleted, or never existed.
           </p>
           <div className="flex flex-col space-y-2">
             <Link href="/">

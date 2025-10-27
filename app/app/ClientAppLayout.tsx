@@ -194,7 +194,7 @@ export default function ClientAppLayout({
     breadcrumbItems.push({ label: 'Dashboard', href: '/app', icon: Home })
     
     if (pathSegments.length > 1) {
-      const module = pathSegments[1]
+      const currentModule = pathSegments[1]
       const moduleMap = {
         'employees': { label: 'Employees', icon: Users },
         'payroll': { label: 'Payroll', icon: Calculator },
@@ -215,11 +215,11 @@ export default function ClientAppLayout({
         'integrations': { label: 'Integrations', icon: Plug }
       }
       
-      if (moduleMap[module]) {
+      if (moduleMap[currentModule]) {
         breadcrumbItems.push({
-          label: moduleMap[module].label,
+          label: moduleMap[currentModule].label,
           href: `/app/${module}`,
-          icon: moduleMap[module].icon
+          icon: moduleMap[currentModule].icon
         })
       }
       
