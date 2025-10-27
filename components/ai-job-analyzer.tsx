@@ -26,6 +26,7 @@ import {
   Zap
 } from "lucide-react"
 import { RecruitmentAI, JobAnalysis } from "@/lib/ai/recruitment-ai"
+import { toast } from "@/hooks/use-toast"
 
 interface AIJobAnalyzerProps {
   onAnalysisComplete?: (analysis: JobAnalysis) => void
@@ -44,6 +45,11 @@ export function AIJobAnalyzer({ onAnalysisComplete }: AIJobAnalyzerProps) {
 
   const handleAnalyze = async () => {
     if (!formData.title || !formData.department || !formData.location) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in job title, department, and location",
+        variant: "destructive"
+      })
       return
     }
 
@@ -61,8 +67,18 @@ export function AIJobAnalyzer({ onAnalysisComplete }: AIJobAnalyzerProps) {
       
       setAnalysis(analysis)
       onAnalysisComplete?.(analysis)
+      
+      toast({
+        title: "Analysis Complete",
+        description: "AI has analyzed the job requirements and generated insights"
+      })
     } catch (error) {
       console.error('Analysis failed:', error)
+      toast({
+        title: "Analysis Failed",
+        description: "There was an error analyzing the job. Please try again.",
+        variant: "destructive"
+      })
     } finally {
       setIsAnalyzing(false)
     }

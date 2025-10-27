@@ -18,6 +18,7 @@ import { AIJobAnalyzer } from "@/components/ai-job-analyzer"
 import { AICandidateMatcher } from "@/components/ai-candidate-matcher"
 import { AISalaryBenchmark } from "@/components/ai-salary-benchmark"
 import { AIInterviewGenerator } from "@/components/ai-interview-generator"
+import { AIRequisitionGenerator } from "@/components/ai-requisition-generator"
 import { JobAnalysis } from "@/lib/ai/recruitment-ai"
 import {
   Briefcase,
@@ -172,7 +173,7 @@ export default function RecruitmentPage() {
   const [jobAnalysis, setJobAnalysis] = useState<JobAnalysis | null>(null)
   const [selectedJobForAnalysis, setSelectedJobForAnalysis] = useState<JobPosting | null>(null)
 
-  const [requisitions] = useState<JobRequisition[]>([
+  const [requisitions, setRequisitions] = useState<JobRequisition[]>([
     {
       id: "1",
       title: "Senior Software Engineer",
@@ -646,38 +647,24 @@ export default function RecruitmentPage() {
                 New Requisition
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Create Job Requisition</DialogTitle>
+                <DialogTitle className="flex items-center space-x-2">
+                  <Brain className="w-5 h-5 text-purple-600" />
+                  <span>AI-Powered Job Requisition</span>
+                </DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="title">Job Title</Label>
-                    <Input id="title" placeholder="e.g. Senior Software Engineer" />
-                  </div>
-                  <div>
-                    <Label htmlFor="department">Department</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="engineering">Engineering</SelectItem>
-                        <SelectItem value="hr">Human Resources</SelectItem>
-                        <SelectItem value="finance">Finance</SelectItem>
-                        <SelectItem value="marketing">Marketing</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setShowRequisitionDialog(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateRequisition}>Create Requisition</Button>
-                </div>
-              </div>
+              <AIRequisitionGenerator 
+                onRequisitionCreated={(requisition) => {
+                  setRequisitions(prev => [...prev, requisition])
+                  toast({
+                    title: "Requisition Created",
+                    description: `Successfully created requisition for ${requisition.title}`
+                  })
+                  setShowRequisitionDialog(false)
+                }}
+                onClose={() => setShowRequisitionDialog(false)}
+              />
             </DialogContent>
           </Dialog>
           <Button onClick={handlePostJob}>
@@ -1269,6 +1256,200 @@ export default function RecruitmentPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="interviews" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Interview Management</h2>
+              <p className="text-gray-600">Schedule and manage candidate interviews</p>
+            </div>
+            <div className="flex space-x-2">
+              <Button onClick={() => setShowInterviewDialog(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Schedule Interview
+              </Button>
+              <Button variant="outline">
+                <Calendar className="w-4 h-4 mr-2" />
+                View Calendar
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Scheduled</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {interviews.filter(i => i.status === 'scheduled').length}
+                    </p>
+                  </div>
+                  <Calendar className="w-8 h-8 text-blue-600" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Completed</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {interviews.filter(i => i.status === 'completed').length}
+                    </p>
+                  </div>
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">This Week</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {interviews.filter(i => {
+                        const interviewDate = new Date(i.date)
+                        const now = new Date()
+                        const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+                        return interviewDate >= now && interviewDate <= weekFromNow
+                      }).length}
+                    </p>
+                  </div>
+                  <Clock className="w-8 h-8 text-orange-600" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Upcoming Interviews ({interviews.length})</CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Select defaultValue="all">
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {interviews.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No interviews scheduled</h3>
+                    <p className="text-gray-600 mb-4">Get started by scheduling your first interview</p>
+                    <Button onClick={() => setShowInterviewDialog(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Schedule Interview
+                    </Button>
+                  </div>
+                ) : (
+                  interviews.map((interview) => (
+                    <div key={interview.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Calendar className="w-6 h-6 text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900">{interview.candidateName}</h3>
+                            <p className="text-sm text-gray-600">{interview.jobTitle}</p>
+                            <div className="flex items-center space-x-4 mt-1">
+                              <div className="flex items-center text-xs text-gray-500">
+                                <Calendar className="w-3 h-3 mr-1" />
+                                {interview.date} at {interview.time}
+                              </div>
+                              <div className="flex items-center text-xs text-gray-500">
+                                <Users className="w-3 h-3 mr-1" />
+                                {interview.interviewer}
+                              </div>
+                              <div className="flex items-center text-xs text-gray-500">
+                                <Phone className="w-3 h-3 mr-1" />
+                                {interview.type}
+                              </div>
+                            </div>
+                            {interview.feedback && (
+                              <div className="mt-2 p-2 bg-gray-50 rounded text-xs text-gray-600">
+                                <strong>Feedback:</strong> {interview.feedback}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <Badge className={getStatusColor(interview.status)}>{interview.status}</Badge>
+                          {interview.rating && (
+                            <div className="flex items-center space-x-1">
+                              <Star className="w-4 h-4 text-yellow-500" />
+                              <span className="text-sm font-medium">{interview.rating}/5</span>
+                            </div>
+                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedApplication(applications.find(app => app.candidateName === interview.candidateName) || null)
+                                toast({
+                                  title: "Viewing Details",
+                                  description: `Showing details for ${interview.candidateName}`
+                                })
+                              }}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                toast({
+                                  title: "Edit Interview",
+                                  description: "Interview editing functionality will be implemented"
+                                })
+                              }}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Interview
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                toast({
+                                  title: "Reminder Sent",
+                                  description: `Interview reminder sent to ${interview.candidateName}`
+                                })
+                              }}>
+                                <Send className="w-4 h-4 mr-2" />
+                                Send Reminder
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                toast({
+                                  title: "Interview Completed",
+                                  description: "Marking interview as completed"
+                                })
+                              }}>
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Mark Complete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
