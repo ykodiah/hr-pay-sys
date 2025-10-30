@@ -154,8 +154,8 @@ export default function CommunicationPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Mock data - in real app, this would come from API
-  const channels: Channel[] = [
+  // Channels state (seeded with sample, will append on create)
+  const [channels, setChannels] = useState<Channel[]>([
     {
       id: "general",
       name: "general",
@@ -209,9 +209,10 @@ export default function CommunicationPage() {
         sender: "John Doe"
       }
     }
-  ]
+  ])
 
-  const users: User[] = [
+  // Users state for Direct Messages (searchable)
+  const [users, setUsers] = useState<User[]>([
     {
       id: "1",
       name: "John Doe",
@@ -244,7 +245,7 @@ export default function CommunicationPage() {
       status: "busy",
       lastSeen: new Date(Date.now() - 1000 * 60 * 5)
     }
-  ]
+  ])
 
   const messages: Message[] = [
     {
@@ -318,6 +319,11 @@ export default function CommunicationPage() {
   ]
 
   const emojis = ["👍", "❤️", "😂", "😮", "😢", "😡", "🎉", "🚀", "💯", "🔥", "✨", "👏"]
+
+  // Create channel modal state
+  const [newChannelName, setNewChannelName] = useState("")
+  const [newChannelDescription, setNewChannelDescription] = useState("")
+  const [newChannelPrivate, setNewChannelPrivate] = useState(false)
 
   const startVideoCall = async () => {
     try {
@@ -399,10 +405,66 @@ export default function CommunicationPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Fetch users from API when searching in Direct Messages tab
+  useEffect(() => {
+    const load = async () => {
+      if (selectedTab !== 'direct') return
+      if (!searchQuery || searchQuery.trim().length < 2) return
+      try {
+        const res = await fetch(`/api/communication/users?q=${encodeURIComponent(searchQuery.trim())}`)
+        const json = await res.json()
+        if (json?.data) setUsers(json.data)
+      } catch (e) {
+        console.warn('User search failed, keeping local list')
+      }
+    }
+    load()
+  }, [searchQuery, selectedTab])
+
+  const createChannel = async () => {
+    if (!newChannelName.trim()) return
+    try {
+      const payload = {
+        name: newChannelName.trim(),
+        description: newChannelDescription.trim() || null,
+        type: newChannelPrivate ? 'private' : 'public',
+      }
+      const res = await fetch('/api/communication/channels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      const json = await res.json()
+      if (res.ok && json?.data) {
+        const created = json.data
+        setChannels(prev => [
+          {
+            id: created.id || created.name,
+            name: created.name,
+            type: created.type,
+            description: created.description || undefined,
+            members: 1,
+            unread: 0,
+            lastMessage: undefined,
+          },
+          ...prev
+        ])
+        setShowCreateChannel(false)
+        setNewChannelName("")
+        setNewChannelDescription("")
+        setNewChannelPrivate(false)
+      } else {
+        console.error('Failed to create channel', json?.error)
+      }
+    } catch (e) {
+      console.error('Failed to create channel', e)
+    }
+  }
+
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-gray-50">
       {/* Sidebar */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+      <div className="w-full sm:w-80 bg-white border-r border-gray-200 flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-4">
@@ -431,7 +493,7 @@ export default function CommunicationPage() {
 
         {/* Tabs */}
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex-1 flex flex-col">
-          <TabsList className="grid w-full grid-cols-2 m-4 mb-0">
+          <TabsList className="grid w-full grid-cols-2 m-2 sm:m-4 mb-0">
             <TabsTrigger value="channels">Channels</TabsTrigger>
             <TabsTrigger value="direct">Direct Messages</TabsTrigger>
           </TabsList>
@@ -545,7 +607,7 @@ export default function CommunicationPage() {
         {activeChannel ? (
           <>
             {/* Chat Header */}
-            <div className="bg-white border-b border-gray-200 p-4">
+            <div className="bg-white border-b border-gray-200 p-2 sm:p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-2">
@@ -582,7 +644,7 @@ export default function CommunicationPage() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-4">
               {messages.map((msg) => (
                 <div key={msg.id} className="flex space-x-3 group hover:bg-gray-50 p-2 rounded-lg">
                   <Avatar className="w-8 h-8 mt-1">
@@ -684,7 +746,7 @@ export default function CommunicationPage() {
             </div>
 
             {/* Message Input */}
-            <div className="bg-white border-t border-gray-200 p-4">
+            <div className="bg-white border-t border-gray-200 p-2 sm:p-4">
               <div className="flex items-end space-x-2">
                 <div className="flex-1 relative">
                   <Textarea
@@ -805,21 +867,21 @@ export default function CommunicationPage() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="channel-name">Channel Name</Label>
-              <Input id="channel-name" placeholder="e.g. marketing" />
+              <Input id="channel-name" placeholder="e.g. marketing" value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} />
             </div>
             <div>
               <Label htmlFor="channel-description">Description (optional)</Label>
-              <Input id="channel-description" placeholder="What's this channel about?" />
+              <Input id="channel-description" placeholder="What's this channel about?" value={newChannelDescription} onChange={(e) => setNewChannelDescription(e.target.value)} />
             </div>
             <div className="flex items-center space-x-2">
-              <input type="checkbox" id="private" />
+              <input type="checkbox" id="private" checked={newChannelPrivate} onChange={(e) => setNewChannelPrivate(e.target.checked)} />
               <Label htmlFor="private">Make private</Label>
             </div>
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => setShowCreateChannel(false)}>
                 Cancel
               </Button>
-              <Button className="bg-emerald-600 hover:bg-emerald-700">
+              <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={createChannel}>
                 Create Channel
               </Button>
             </div>
