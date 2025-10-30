@@ -355,9 +355,16 @@ export default function CommunicationPage() {
     }
   }
 
-  const addReaction = (messageId: string, emoji: string) => {
-    // In real app, this would update via API
-    console.log("Adding reaction:", emoji, "to message:", messageId)
+  const addReaction = async (messageId: string, emoji: string) => {
+    try {
+      await fetch('/api/communication/messages/reactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message_id: messageId, emoji })
+      })
+    } catch (e) {
+      console.error('Failed to add reaction', e)
+    }
   }
 
   const formatTime = (date: Date) => {
@@ -404,6 +411,28 @@ export default function CommunicationPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Mark messages as read when channel becomes active
+  useEffect(() => {
+    const markRead = async () => {
+      if (!activeChannel) return
+      try {
+        // Demo: mark the latest message as read
+        const latest = messages[messages.length - 1]
+        if (latest) {
+          await fetch('/api/communication/messages/read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message_id: latest.id })
+          })
+        }
+      } catch (e) {
+        console.warn('Failed to mark as read')
+      }
+    }
+    markRead()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChannel])
 
   // Fetch users from API when searching in Direct Messages tab
   useEffect(() => {
