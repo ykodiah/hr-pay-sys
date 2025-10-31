@@ -4,6 +4,8 @@ import { getCurrentCompanyId } from "@/lib/communication/integrations"
 import { fetchActiveIntegration } from "@/lib/communication/delivery"
 import { sendThroughProvider } from "@/lib/communication/providers/send"
 
+export const runtime = "nodejs"
+
 export async function POST(request: NextRequest) {
   let integration: any = null
   try {
