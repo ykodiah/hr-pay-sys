@@ -173,6 +173,25 @@ export default function SettingsPage() {
   const { toast } = useToast()
   const supabase = createClient()
 
+  const supabaseConfigured =
+    !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL !== "undefined" &&
+    !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== "undefined"
+
+  const fetchDemoResource = async <T,>(resource: string, params: Record<string, string> = {}) => {
+    const searchParams = new URLSearchParams({ resource, ...params })
+    const response = await fetch(`/api/demo/settings?${searchParams.toString()}`, { cache: "no-store" })
+
+    if (!response.ok) {
+      const message = await response.text()
+      throw new Error(message || `Failed to fetch demo resource: ${resource}`)
+    }
+
+    const json = await response.json()
+    return json.data as T
+  }
+
   const [companyData, setCompanyData] = useState<Company>({
     id: "",
     name: "",
@@ -420,7 +439,7 @@ export default function SettingsPage() {
 
   const currencyConfig = {
     ghs: {
-      symbol: "₵",
+      symbol: "?",
       name: "Ghana Cedis (GHS)",
       country: "Ghana",
       apiEndpoint: "https://api.gra.gov.gh/tax-rates",
@@ -471,7 +490,7 @@ export default function SettingsPage() {
     },
     eur: {
       country: "Germany",
-      symbol: "€",
+      symbol: "?",
       version: "2024.1",
       lastUpdated: "2024-01-01",
       taxBands: [
@@ -484,7 +503,7 @@ export default function SettingsPage() {
     },
     ngn: {
       country: "Nigeria",
-      symbol: "₦",
+      symbol: "?",
       version: "2024.1",
       lastUpdated: "2024-01-01",
       taxBands: [
@@ -1141,13 +1160,42 @@ export default function SettingsPage() {
     }
   }
 
-  // Load functions
-  const loadCompanyData = async () => {
-    console.log("[v0] Loading company data...")
+  const loadCompanyFromDemo = async () => {
+    console.log("[v0] Loading company data from demo API")
+    try {
+      const data = await fetchDemoResource<{ company: any; settings?: any }>("company")
+      const company = data?.company
+      if (!company) {
+        throw new Error("Demo company payload missing")
+      }
+      const resolvedDivisions = Array.isArray(company.divisions) ? company.divisions : []
+      const resolvedDepartments = Array.isArray(company.departments) ? company.departments : []
+      const resolvedLocations = Array.isArray(company.locations) ? company.locations : []
 
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock company data")
       setCompanyData({
+        id: company.id ?? "",
+        name: company.name ?? "",
+        email_address: company.email_address ?? company.email ?? "",
+        tax_id: company.tax_id ?? "",
+        ssnit_number: company.ssnit_number ?? "",
+        industry: company.industry ?? "",
+        status: company.status ?? "active",
+        address: company.address ?? "",
+        phone_number: company.phone_number ?? company.phone ?? "",
+        divisions: resolvedDivisions,
+        departments: resolvedDepartments,
+        locations: resolvedLocations,
+        logo_url: company.logo_url ?? company.logo,
+      })
+
+      setDivisions(resolvedDivisions)
+      setDepartments(resolvedDepartments)
+      setLocations(resolvedLocations)
+      setLogoPreview(company.logo_url ?? "")
+      return true
+    } catch (error) {
+      console.error("[v0] Demo company data error:", error)
+      const fallbackCompany = {
         id: "demo-company-001",
         name: "Akwaaba Technologies Ltd",
         email_address: "ykodiah@gmail.com",
@@ -1160,78 +1208,27 @@ export default function SettingsPage() {
         divisions: ["Head Office", "Regional Office"],
         departments: ["Technology", "Human Resources", "Finance"],
         locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-      })
-      setDivisions(["Head Office", "Regional Office"])
-      setDepartments(["Technology", "Human Resources", "Finance"])
-      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-      return
-    }
-
-    try {
-      const { data, error } = await supabase.from("companies").select("*").single()
-
-      if (error) throw error
-
-      if (data) {
-        setCompanyData({
-          id: data.id,
-          name: data.name || "",
-          email_address: data.email_address || "",
-          tax_id: data.tax_id || "",
-          ssnit_number: data.ssnit_number || "",
-          industry: data.industry || "",
-          status: "active",
-          address: data.address || "",
-          phone_number: data.phone_number || "",
-          divisions: data.divisions || [],
-          departments: data.departments || [],
-          locations: data.locations || [],
-        })
-
-        setDivisions(data.divisions || [])
-        setDepartments(data.departments || [])
-        setLocations(data.locations || [])
-        setLogoPreview(data.logo_url || "")
       }
-    } catch (error) {
-      console.error("[v0] Error loading company data:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode")
-        // Set demo session cookie to prevent future database calls
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        // Load demo data
-        setCompanyData({
-          id: "demo-company-001",
-          name: "Akwaaba Technologies Ltd",
-          email_address: "ykodiah@gmail.com",
-          tax_id: "C0012345678",
-          ssnit_number: "1234567890",
-          industry: "Technology",
-          status: "active",
-          address: "123 Liberation Road, Labone, Accra, Ghana",
-          phone_number: "0249397960",
-          divisions: ["Head Office", "Regional Office"],
-          departments: ["Technology", "Human Resources", "Finance"],
-          locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-        })
-        setDivisions(["Head Office", "Regional Office"])
-        setDepartments(["Technology", "Human Resources", "Finance"])
-        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-        return
-      }
-      toast({
-        title: "Error",
-        description: "Failed to load company data",
-        variant: "destructive",
-      })
+      setCompanyData(fallbackCompany as Company)
+      setDivisions(fallbackCompany.divisions)
+      setDepartments(fallbackCompany.departments)
+      setLocations(fallbackCompany.locations)
+      setLogoPreview("")
+      return false
     }
   }
 
-  const loadEmployees = async () => {
-    console.log("[v0] Loading employees...")
-
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock employees data")
+  const loadEmployeesFromDemo = async () => {
+    console.log("[v0] Loading employees from demo API")
+    try {
+      const data = await fetchDemoResource<Employee[]>("employees")
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid employees payload")
+      }
+      setEmployees(data)
+      return true
+    } catch (error) {
+      console.error("[v0] Demo employees data error:", error)
       setEmployees([
         {
           id: "emp-001",
@@ -1256,58 +1253,36 @@ export default function SettingsPage() {
           status: "active",
         },
       ])
-      return
-    }
-
-    try {
-      const { data, error } = await supabase.from("employees").select("*").order("created_at", { ascending: false })
-
-      if (error) throw error
-      setEmployees(data || [])
-    } catch (error) {
-      console.error("Error loading employees:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode for employees")
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        setEmployees([
-          {
-            id: "emp-001",
-            first_name: "John",
-            last_name: "Doe",
-            full_name: "John Doe",
-            corporate_email: "john.doe@akwaaba.com",
-            personal_email: "john.doe@gmail.com",
-            position: "Software Engineer",
-            department: "Technology",
-            status: "active",
-          },
-          {
-            id: "emp-002",
-            first_name: "Jane",
-            last_name: "Smith",
-            full_name: "Jane Smith",
-            corporate_email: "jane.smith@akwaaba.com",
-            personal_email: "jane.smith@gmail.com",
-            position: "HR Manager",
-            department: "Human Resources",
-            status: "active",
-          },
-        ])
-        return
-      }
-      toast({
-        title: "Error",
-        description: "Failed to load employees",
-        variant: "destructive",
-      })
+      return false
     }
   }
 
-  const loadSubsidiaries = async () => {
-    console.log("[v0] Loading subsidiaries...")
-
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock subsidiaries data")
+  const loadSubsidiariesFromDemo = async () => {
+    console.log("[v0] Loading subsidiaries from demo API")
+    try {
+      const data = await fetchDemoResource<any[]>("subsidiaries")
+      const processedSubsidiaries = (data || []).map((sub) => {
+        const divisions = Array.isArray(sub.divisions) ? sub.divisions : []
+        const departments = Array.isArray(sub.departments) ? sub.departments : []
+        const locations = Array.isArray(sub.locations) ? sub.locations : []
+        return {
+          ...sub,
+          divisions,
+          departments,
+          locations,
+          divisions_count: divisions.length,
+          departments_count: departments.length,
+          locations_count: locations.length,
+          employee_count:
+            sub.employee_count ??
+            sub.employees_count ??
+            (Array.isArray(sub.employees) ? sub.employees?.[0]?.count ?? 0 : 0),
+        }
+      }) as Subsidiary[]
+      setSubsidiaries(processedSubsidiaries)
+      return true
+    } catch (error) {
+      console.error("[v0] Demo subsidiaries data error:", error)
       setSubsidiaries([
         {
           id: "sub-001",
@@ -1349,111 +1324,22 @@ export default function SettingsPage() {
           employee_count: 32,
           created_at: new Date().toISOString(),
         },
-        {
-          id: "sub-003",
-          company_id: "comp-001",
-          name: "Akwaaba Financial Services",
-          email_address: "finance@akwaabafs.com",
-          phone_number: "+233 30 276 5434",
-          tax_id: "TIN-AFS-2023-003",
-          ssnit_number: "SSNIT-AFS-789014",
-          address: "25 Independence Avenue, Accra, Ghana",
-          status: "active",
-          industry: "Financial Technology & Services",
-          divisions: ["Fintech Solutions", "Payment Processing", "Financial Advisory"],
-          departments: ["Finance", "Technology", "Compliance", "Customer Service"],
-          locations: ["Accra - Independence Ave", "Ho Regional Office"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 28,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-004",
-          company_id: "comp-001",
-          name: "Akwaaba Logistics Ltd",
-          email_address: "logistics@akwaabalog.com",
-          phone_number: "+233 30 276 5435",
-          tax_id: "TIN-ALL-2023-004",
-          ssnit_number: "SSNIT-ALL-789015",
-          address: "12 Spintex Road, Accra, Ghana",
-          status: "active",
-          industry: "Supply Chain & Logistics",
-          divisions: ["Transportation", "Warehousing", "Supply Chain Management"],
-          departments: ["Operations", "Fleet Management", "Warehousing", "Customer Service"],
-          locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 3,
-          employee_count: 67,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-005",
-          company_id: "comp-001",
-          name: "Akwaaba Training Institute",
-          email_address: "training@akwaabainstitute.com",
-          phone_number: "+233 30 276 5436",
-          tax_id: "TIN-ATI-2023-005",
-          ssnit_number: "SSNIT-ATI-789016",
-          address: "5 Cantonments Road, Accra, Ghana",
-          status: "active",
-          industry: "Education & Professional Training",
-          divisions: ["Corporate Training", "IT Certification", "Professional Development"],
-          departments: ["Training", "Curriculum Development", "Student Services", "Administration"],
-          locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 3,
-          employee_count: 23,
-          created_at: new Date().toISOString(),
-        },
       ])
-      return
-    }
-
-    try {
-      // Load subsidiaries with employee counts
-      const { data: subsidiariesData, error: subsidiariesError } = await supabase
-        .from("subsidiaries")
-        .select(`
-          *,
-          employees:employees(count)
-        `)
-        .order("created_at", { ascending: false })
-
-      if (subsidiariesError) throw subsidiariesError
-
-      // Process the data to add computed fields
-      const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => ({
-        ...sub,
-        divisions: Array.isArray(sub.divisions) ? sub.divisions : [],
-        departments: Array.isArray(sub.departments) ? sub.departments : [],
-        locations: Array.isArray(sub.locations) ? sub.locations : [],
-        divisions_count: Array.isArray(sub.divisions) ? sub.divisions.length : 0,
-        departments_count: Array.isArray(sub.departments) ? sub.departments.length : 0,
-        locations_count: Array.isArray(sub.locations) ? sub.locations.length : 0,
-        employee_count: sub.employees?.[0]?.count || 0,
-      }))
-
-      setSubsidiaries(processedSubsidiaries)
-      console.log("[v0] Loaded subsidiaries:", processedSubsidiaries.length)
-    } catch (error) {
-      console.error("Subsidiaries loading error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load subsidiaries",
-        variant: "destructive",
-      })
+      return false
     }
   }
 
-  const loadRoles = async () => {
-    console.log("[v0] Loading roles...")
-
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock roles data")
+  const loadRolesFromDemo = async () => {
+    console.log("[v0] Loading roles from demo API")
+    try {
+      const data = await fetchDemoResource<Role[]>("roles")
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid roles payload")
+      }
+      setRoles(data)
+      return true
+    } catch (error) {
+      console.error("[v0] Demo roles data error:", error)
       setRoles([
         {
           id: "role-001",
@@ -1477,6 +1363,151 @@ export default function SettingsPage() {
           user_count: 45,
         },
       ])
+      return false
+    }
+  }
+
+  // Load functions
+  const loadCompanyData = async () => {
+    console.log("[v0] Loading company data...")
+
+    if (!supabaseConfigured || isDemoMode()) {
+      await loadCompanyFromDemo()
+      return
+    }
+
+    try {
+      const { data, error } = await supabase.from("companies").select("*").single()
+
+      if (error) throw error
+
+      if (data) {
+        setCompanyData({
+          id: data.id,
+          name: data.name || "",
+          email_address: data.email_address || "",
+          tax_id: data.tax_id || "",
+          ssnit_number: data.ssnit_number || "",
+          industry: data.industry || "",
+          status: "active",
+          address: data.address || "",
+          phone_number: data.phone_number || "",
+          divisions: data.divisions || [],
+          departments: data.departments || [],
+          locations: data.locations || [],
+        })
+
+        setDivisions(data.divisions || [])
+        setDepartments(data.departments || [])
+        setLocations(data.locations || [])
+        setLogoPreview(data.logo_url || "")
+        return
+      }
+
+      await loadCompanyFromDemo()
+    } catch (error) {
+      console.error("[v0] Error loading company data:", error)
+      const handledDemo = await loadCompanyFromDemo()
+      if (!handledDemo) {
+        toast({
+          title: "Error",
+          description: "Failed to load company data",
+          variant: "destructive",
+        })
+      }
+    }
+  }
+
+  const loadEmployees = async () => {
+    console.log("[v0] Loading employees...")
+
+    if (!supabaseConfigured || isDemoMode()) {
+      await loadEmployeesFromDemo()
+      return
+    }
+
+    try {
+      const { data, error } = await supabase.from("employees").select("*").order("created_at", { ascending: false })
+
+      if (error) throw error
+
+      if (Array.isArray(data) && data.length > 0) {
+        setEmployees(data)
+        return
+      }
+
+      await loadEmployeesFromDemo()
+    } catch (error: any) {
+      console.error("Error loading employees:", error)
+      if (error?.message && error.message.includes("infinite recursion detected in policy")) {
+        document.cookie = "demo-session=active; path=/; max-age=86400"
+      }
+      const handledDemo = await loadEmployeesFromDemo()
+      if (!handledDemo) {
+        toast({
+          title: "Error",
+          description: "Failed to load employees",
+          variant: "destructive",
+        })
+      }
+    }
+  }
+
+  const loadSubsidiaries = async () => {
+    console.log("[v0] Loading subsidiaries...")
+
+    if (!supabaseConfigured || isDemoMode()) {
+      await loadSubsidiariesFromDemo()
+      return
+    }
+
+    try {
+      const { data: subsidiariesData, error: subsidiariesError } = await supabase
+        .from("subsidiaries")
+        .select(`
+          *,
+          employees:employees(count)
+        `)
+        .order("created_at", { ascending: false })
+
+      if (subsidiariesError) throw subsidiariesError
+
+      if (Array.isArray(subsidiariesData) && subsidiariesData.length > 0) {
+        const processedSubsidiaries = subsidiariesData.map((sub: any) => ({
+          ...sub,
+          divisions: Array.isArray(sub.divisions) ? sub.divisions : [],
+          departments: Array.isArray(sub.departments) ? sub.departments : [],
+          locations: Array.isArray(sub.locations) ? sub.locations : [],
+          divisions_count: Array.isArray(sub.divisions) ? sub.divisions.length : 0,
+          departments_count: Array.isArray(sub.departments) ? sub.departments.length : 0,
+          locations_count: Array.isArray(sub.locations) ? sub.locations.length : 0,
+          employee_count: sub.employees?.[0]?.count || 0,
+        }))
+
+        setSubsidiaries(processedSubsidiaries)
+        console.log("[v0] Loaded subsidiaries:", processedSubsidiaries.length)
+        return
+      }
+
+      await loadSubsidiariesFromDemo()
+    } catch (error) {
+      console.error("Subsidiaries loading error:", error)
+      const handledDemo = await loadSubsidiariesFromDemo()
+      if (!handledDemo) {
+        toast({
+          title: "Error",
+          description: "Failed to load subsidiaries",
+          variant: "destructive",
+        })
+      }
+    }
+  }
+
+  const loadRoles = async () => {
+    console.log("[v0] Loading roles...")
+
+    if (!supabaseConfigured || isDemoMode()) {
+      await loadRolesFromDemo()
       return
     }
 
@@ -1484,35 +1515,26 @@ export default function SettingsPage() {
       const { data, error } = await supabase.from("roles").select("*").order("created_at", { ascending: false })
 
       if (error) throw error
-      setRoles(data || [])
-    } catch (error) {
-      console.error("Error loading roles:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode for roles")
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        setRoles([
-          {
-            id: "role-001",
-            name: "Administrator",
-            description: "Full system access",
-            permissions: ["read", "write", "delete", "admin"],
-            status: "active",
-          },
-          {
-            id: "role-002",
-            name: "HR Manager",
-            description: "Human Resources management",
-            permissions: ["read", "write"],
-            status: "active",
-          },
-        ])
+
+      if (Array.isArray(data) && data.length > 0) {
+        setRoles(data)
         return
       }
-      toast({
-        title: "Error",
-        description: "Failed to load roles",
-        variant: "destructive",
-      })
+
+      await loadRolesFromDemo()
+    } catch (error: any) {
+      console.error("Error loading roles:", error)
+      if (error?.message && error.message.includes("infinite recursion detected in policy")) {
+        document.cookie = "demo-session=active; path=/; max-age=86400"
+      }
+      const handledDemo = await loadRolesFromDemo()
+      if (!handledDemo) {
+        toast({
+          title: "Error",
+          description: "Failed to load roles",
+          variant: "destructive",
+        })
+      }
     }
   }
 
@@ -1649,8 +1671,7 @@ export default function SettingsPage() {
   const refreshEmployeeCount = async (subsidiaryId: string) => {
     console.log("[v0] Refreshing employee count for subsidiary:", subsidiaryId)
 
-    if (isDemoMode()) {
-      // Simulate employee count refresh in demo mode
+    if (!supabaseConfigured || isDemoMode()) {
       const mockCount = Math.floor(Math.random() * 100) + 10 // Random count between 10-110
       const updatedSubsidiaries = subsidiaries.map((sub) =>
         sub.id === subsidiaryId ? { ...sub, employee_count: mockCount } : sub,
@@ -1686,22 +1707,32 @@ export default function SettingsPage() {
 
     const currentCount = await refreshEmployeeCount(subsidiaryId)
 
-    if (isDemoMode()) {
-      const mockEmployees = Array.from({ length: currentCount }, (_, i) => ({
+    const openModalWithEmployees = (employees: any[]) => {
+      setViewEmployeesModal({
+        isOpen: true,
+        subsidiaryId,
+        employees,
+      })
+    }
+
+    if (!supabaseConfigured || isDemoMode()) {
+      try {
+        const employees = await fetchDemoResource<any[]>("subsidiary-employees", { subsidiaryId })
+        openModalWithEmployees(employees ?? [])
+        return
+      } catch (error) {
+        console.error("[v0] Demo subsidiary employees error:", error)
+      }
+
+      const fallbackEmployees = Array.from({ length: currentCount }, (_, i) => ({
         id: `emp-${i + 1}`,
         name: `Employee ${i + 1}`,
-        position: ["Software Engineer", "Marketing Manager", "HR Specialist", "Sales Representative", "Accountant"][
-          i % 5
-        ],
+        position: ["Software Engineer", "Marketing Manager", "HR Specialist", "Sales Representative", "Accountant"][i % 5],
         department: ["Technology", "Marketing", "Human Resources", "Sales", "Finance"][i % 5],
         email: `employee${i + 1}@company.com`,
       }))
 
-      setViewEmployeesModal({
-        isOpen: true,
-        subsidiaryId,
-        employees: mockEmployees,
-      })
+      openModalWithEmployees(fallbackEmployees)
       return
     }
 
@@ -1710,18 +1741,26 @@ export default function SettingsPage() {
 
       if (error) throw error
 
-      setViewEmployeesModal({
-        isOpen: true,
-        subsidiaryId,
-        employees: employees || [],
-      })
+      openModalWithEmployees(employees || [])
     } catch (error) {
       console.error("View employees error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load employees",
-        variant: "destructive",
-      })
+      const handledDemo = await loadSubsidiariesFromDemo()
+      if (!handledDemo) {
+        toast({
+          title: "Error",
+          description: "Failed to load employees",
+          variant: "destructive",
+        })
+      } else {
+        const fallbackEmployees = Array.from({ length: currentCount }, (_, i) => ({
+          id: `emp-${i + 1}`,
+          name: `Employee ${i + 1}`,
+          position: ["Software Engineer", "Marketing Manager", "HR Specialist", "Sales Representative", "Accountant"][i % 5],
+          department: ["Technology", "Marketing", "Human Resources", "Sales", "Finance"][i % 5],
+          email: `employee${i + 1}@company.com`,
+        }))
+        openModalWithEmployees(fallbackEmployees)
+      }
     }
   }
 
@@ -2485,22 +2524,22 @@ export default function SettingsPage() {
     const insights = []
 
     if (days > 30) {
-      insights.push("⚠️ Consider if this extended leave period aligns with industry standards")
+      insights.push("?? Consider if this extended leave period aligns with industry standards")
     }
     if (days < 5) {
-      insights.push("💡 Short leave periods may require frequent approvals - consider automation")
+      insights.push("?? Short leave periods may require frequent approvals - consider automation")
     }
     if (name.toLowerCase().includes("sick")) {
-      insights.push("🏥 Recommend integrating with health insurance policies")
+      insights.push("?? Recommend integrating with health insurance policies")
     }
     if (name.toLowerCase().includes("maternity") || name.toLowerCase().includes("paternity")) {
-      insights.push("👶 Ensure compliance with local family leave regulations")
+      insights.push("?? Ensure compliance with local family leave regulations")
     }
     if (description.length < 20) {
-      insights.push("📝 Consider adding more detailed policy description for clarity")
+      insights.push("?? Consider adding more detailed policy description for clarity")
     }
 
-    insights.push("✨ AI suggests reviewing similar policies in your industry for benchmarking")
+    insights.push("? AI suggests reviewing similar policies in your industry for benchmarking")
 
     return insights
   }
@@ -4214,7 +4253,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
           if (result.currentModel.performanceScore >= 95) {
             setShowModelUpgrade(true)
             toast({
-              title: "AI Model Updated! 🚀",
+              title: "AI Model Updated! ??",
               description: `Now using ${result.currentModel.name} with ${result.currentModel.performanceScore}% performance`,
             })
           }
@@ -4244,7 +4283,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
           setShowModelUpgrade(true)
           
           toast({
-            title: "GPT-5 Upgrade Complete! 🎉",
+            title: "GPT-5 Upgrade Complete! ??",
             description: `Successfully upgraded to ${result.newModel.name} with advanced capabilities!`,
           })
         }
@@ -4315,7 +4354,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
       if (isSuccess) {
         setTestConnectionStatus("success")
         toast({
-          title: "Connection Successful! ✅",
+          title: "Connection Successful! ?",
           description: "SMTP connection established successfully. Email configuration is working properly.",
         })
       } else {
@@ -4324,7 +4363,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     } catch (error) {
       setTestConnectionStatus("error")
       toast({
-        title: "Connection Failed ❌",
+        title: "Connection Failed ?",
         description: "Unable to connect to SMTP server. Please check your credentials and settings.",
         variant: "destructive",
       })
@@ -5723,7 +5762,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <CardContent className="space-y-4">
                           <div className="space-y-2">
                             <p className="text-sm">
-                              <span className="font-medium">Range:</span> ₵{grade.minSalary.toLocaleString()} - ₵
+                              <span className="font-medium">Range:</span> ?{grade.minSalary.toLocaleString()} - ?
                               {grade.maxSalary.toLocaleString()}
                             </p>
                             <p className="text-sm">
@@ -5740,7 +5779,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 {grade.notches.map((notch) => (
                                   <div key={notch.step} className="flex justify-between text-xs">
                                     <span>Step {notch.step}</span>
-                                    <span className="font-medium">₵{notch.amount.toLocaleString()}</span>
+                                    <span className="font-medium">?{notch.amount.toLocaleString()}</span>
                                   </div>
                                 ))}
                               </div>
@@ -5778,7 +5817,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 <span className="text-sm font-semibold text-green-900">
                                   {grade.generalIncrement.type === "percentage"
                                     ? `${grade.generalIncrement.value}%`
-                                    : `₵${grade.generalIncrement.value.toLocaleString()}`}
+                                    : `?${grade.generalIncrement.value.toLocaleString()}`}
                                 </span>
                               </div>
                             </div>
@@ -5789,7 +5828,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 <span className="text-sm font-semibold text-blue-900">
                                   {grade.performanceIncrement.type === "percentage"
                                     ? `${grade.performanceIncrement.value}%`
-                                    : `₵${grade.performanceIncrement.value.toLocaleString()}`}
+                                    : `?${grade.performanceIncrement.value.toLocaleString()}`}
                                 </span>
                               </div>
                             </div>
@@ -5976,7 +6015,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                               {band.from ? band.from.toLocaleString() : "0"}
                             </td>
                             <td className="border border-gray-200 px-4 py-3">
-                              {band.to ? band.to.toLocaleString() : "∞"}
+                              {band.to ? band.to.toLocaleString() : "?"}
                             </td>
                             <td className="border border-gray-200 px-4 py-3 font-medium text-green-600">
                               {band.cumulativeTax ? band.cumulativeTax.toLocaleString() : "0"}
@@ -6721,7 +6760,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                               </Button>
                             </div>
                             <p className="text-xs text-blue-700">
-                              💡 AI will generate a professional template based on your description. You can edit the generated content before saving.
+                              ?? AI will generate a professional template based on your description. You can edit the generated content before saving.
                             </p>
                             
                             {/* GPT-5 Upgrade Simulation Button (for testing) */}
@@ -7008,7 +7047,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                               </Button>
                             </div>
                             <p className="text-xs text-blue-700">
-                              💡 AI will generate a professional template based on your description. You can edit the generated content before saving.
+                              ?? AI will generate a professional template based on your description. You can edit the generated content before saving.
                             </p>
                             
                             {/* GPT-5 Upgrade Simulation Button (for testing) */}
@@ -7171,20 +7210,23 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         />
                       </div>
                       <div className="flex justify-end space-x-2">
-                        <Button variant="outline" onClick={() => {
-                          setShowTemplateModal(false)
-                          setIsAddingTemplate(false)
-                          setAiDescription("")
-                          setShowAiPanel(false)
-                          setIsGeneratingAi(false)
-                          setShowFeedbackPanel(false)
-                          setTemplateRating(0)
-                          setTemplateFeedback("")
-                          setTemplateImprovements("")
-                          setLastGeneratedTemplateId("")
-                          setCurrentAIModel(null)
-                          setShowModelUpgrade(false)
-                        }}>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setShowTemplateModal(false)
+                            setIsAddingTemplate(false)
+                            setAiDescription("")
+                            setShowAiPanel(false)
+                            setIsGeneratingAi(false)
+                            setShowFeedbackPanel(false)
+                            setTemplateRating(0)
+                            setTemplateFeedback("")
+                            setTemplateImprovements("")
+                            setLastGeneratedTemplateId("")
+                            setCurrentAIModel(null)
+                            setShowModelUpgrade(false)
+                          }}
+                        >
                           Cancel
                         </Button>
                         <Button onClick={handleSaveTemplate} disabled={isSaving}>
@@ -7197,5 +7239,18 @@ Format the response in a professional, actionable manner for HR decision-makers.
                             <>
                               <Save className="w-4 h-4 mr-2" />
                               Save Template
--4 mr-2" />
-                              Save Template\
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
