@@ -8,8 +8,18 @@ import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Loader2, Send } from "lucide-react"
+import { Loader2, Send, Check, CheckCheck } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
 
 interface ChannelRecord {
   id: string
@@ -80,7 +90,7 @@ export default function CommunicationPage() {
 
   const activeChannel = useMemo(
     () => channels.find((channel) => channel.id === activeChannelId) ?? null,
-    [channels, activeChannelId]
+    [channels, activeChannelId],
   )
 
   const loadChannels = useCallback(async () => {
@@ -127,7 +137,7 @@ export default function CommunicationPage() {
         setMessagesLoading(false)
       }
     },
-    [toast]
+    [toast],
   )
 
   const sendMessage = useCallback(async () => {
@@ -219,9 +229,7 @@ export default function CommunicationPage() {
       <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Communication Hub</h1>
-          <p className="text-muted-foreground">
-            Real-time collaboration across HR, payroll, and workforce teams.
-          </p>
+          <p className="text-muted-foreground">Real-time collaboration across HR, payroll, and workforce teams.</p>
         </div>
       </header>
 
@@ -236,9 +244,7 @@ export default function CommunicationPage() {
                 </div>
               )}
               {!channelsLoading && channels.length === 0 && (
-                <div className="px-2 py-2 text-sm text-muted-foreground">
-                  No channels available yet.
-                </div>
+                <div className="px-2 py-2 text-sm text-muted-foreground">No channels available yet.</div>
               )}
               {channels.map((channel) => {
                 const isActive = channel.id === activeChannelId
@@ -248,7 +254,7 @@ export default function CommunicationPage() {
                     onClick={() => setActiveChannelId(channel.id)}
                     className={cn(
                       "flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm transition hover:bg-muted/70",
-                      isActive && "bg-muted"
+                      isActive && "bg-muted",
                     )}
                   >
                     <span className="font-medium">
@@ -256,9 +262,7 @@ export default function CommunicationPage() {
                       {channel.channel_name}
                     </span>
                     {channel.description && (
-                      <span className="line-clamp-1 text-xs text-muted-foreground">
-                        {channel.description}
-                      </span>
+                      <span className="line-clamp-1 text-xs text-muted-foreground">{channel.description}</span>
                     )}
                   </button>
                 )
@@ -272,7 +276,9 @@ export default function CommunicationPage() {
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 <span className="text-lg font-semibold">
-                  {activeChannel ? `${activeChannel.channel_type === "direct" ? "@" : "#"}${activeChannel.channel_name}` : "Select a channel"}
+                  {activeChannel
+                    ? `${activeChannel.channel_type === "direct" ? "@" : "#"}${activeChannel.channel_name}`
+                    : "Select a channel"}
                 </span>
                 {activeChannel && (
                   <Badge variant="outline" className="capitalize">
@@ -313,9 +319,7 @@ export default function CommunicationPage() {
                         <span className="font-medium text-sm text-foreground">{sender}</span>
                         <span>{formatDistanceToNow(new Date(message.sent_at), { addSuffix: true })}</span>
                       </div>
-                      <div className="rounded-lg border bg-card/60 px-4 py-2 text-sm shadow-sm">
-                        {message.content}
-                      </div>
+                      <div className="rounded-lg border bg-card/60 px-4 py-2 text-sm shadow-sm">{message.content}</div>
                       {readReceipts.length > 0 && (
                         <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                           {readReceipts.length > 1 ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />}
@@ -335,7 +339,11 @@ export default function CommunicationPage() {
               <Textarea
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
-                placeholder={activeChannel ? `Message ${activeChannel.channel_type === "direct" ? "@" : "#"}${activeChannel.channel_name}` : "Select a channel to start chatting"}
+                placeholder={
+                  activeChannel
+                    ? `Message ${activeChannel.channel_type === "direct" ? "@" : "#"}${activeChannel.channel_name}`
+                    : "Select a channel to start chatting"
+                }
                 rows={3}
               />
               <div className="flex items-center justify-between gap-2">
@@ -356,18 +364,24 @@ export default function CommunicationPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create channel</DialogTitle>
-            <DialogDescription>
-              Launch a new space for HR, payroll, or workforce collaboration.
-            </DialogDescription>
+            <DialogDescription>Launch a new space for HR, payroll, or workforce collaboration.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 py-2">
             <div className="grid gap-1">
               <label className="text-sm font-medium">Channel name</label>
-              <Input value={newChannelName} onChange={(event) => setNewChannelName(event.target.value)} placeholder="payroll-ops" />
+              <Input
+                value={newChannelName}
+                onChange={(event) => setNewChannelName(event.target.value)}
+                placeholder="payroll-ops"
+              />
             </div>
             <div className="grid gap-1">
               <label className="text-sm font-medium">Description</label>
-              <Input value={newChannelDescription} onChange={(event) => setNewChannelDescription(event.target.value)} placeholder="Purpose of this channel" />
+              <Input
+                value={newChannelDescription}
+                onChange={(event) => setNewChannelDescription(event.target.value)}
+                placeholder="Purpose of this channel"
+              />
             </div>
             <div className="grid gap-1">
               <label className="text-sm font-medium">Channel type</label>
