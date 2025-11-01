@@ -94,6 +94,14 @@ export default function CommunicationPage() {
     [channels, activeChannelId],
   )
 
+  const supabaseConfigured =
+    !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL !== "undefined" &&
+    !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== "undefined"
+
+  const effectiveDemoMode = isDemoMode || !supabaseConfigured
+
   useEffect(() => {
     if (typeof window === "undefined") return
     const hasDemoCookie = document.cookie.includes("demo-session=active")
@@ -126,7 +134,7 @@ export default function CommunicationPage() {
       try {
         data = await fetchPrimary()
       } catch (primaryError) {
-        if (isDemoMode) {
+        if (effectiveDemoMode) {
           console.warn("[channels] primary fetch failed, attempting demo fallback", primaryError)
           data = await fetchDemo()
         } else {
@@ -148,7 +156,7 @@ export default function CommunicationPage() {
     } finally {
       setChannelsLoading(false)
     }
-  }, [activeChannelId, isDemoMode, toast])
+  }, [activeChannelId, effectiveDemoMode, toast])
 
   const loadMessages = useCallback(
     async (channelId: string) => {
@@ -178,7 +186,7 @@ export default function CommunicationPage() {
         try {
           data = await fetchPrimary()
         } catch (primaryError) {
-          if (isDemoMode) {
+          if (effectiveDemoMode) {
             console.warn("[messages] primary fetch failed, attempting demo fallback", primaryError)
             data = await fetchDemo()
           } else {
@@ -198,13 +206,13 @@ export default function CommunicationPage() {
         setMessagesLoading(false)
       }
     },
-    [isDemoMode, toast],
+    [effectiveDemoMode, toast],
   )
 
   const sendMessage = useCallback(async () => {
     if (!activeChannelId || !draft.trim() || sending) return
 
-    if (isDemoMode) {
+    if (effectiveDemoMode) {
       const now = new Date().toISOString()
       const simulatedMessage: MessageRecord = {
         id: `demo-${Date.now()}`,
@@ -248,7 +256,7 @@ export default function CommunicationPage() {
     } finally {
       setSending(false)
     }
-  }, [activeChannelId, draft, isDemoMode, sending, toast])
+  }, [activeChannelId, draft, effectiveDemoMode, sending, toast])
 
   useEffect(() => {
     loadChannels()
@@ -279,7 +287,7 @@ export default function CommunicationPage() {
     }
 
     try {
-      if (isDemoMode) {
+      if (effectiveDemoMode) {
         const id = `demo-channel-${Date.now()}`
         const channel: ChannelRecord = {
           id,
@@ -330,7 +338,7 @@ export default function CommunicationPage() {
         description: error.message || "Unexpected error",
       })
     }
-  }, [isDemoMode, loadChannels, newChannelDescription, newChannelName, newChannelType, toast])
+  }, [effectiveDemoMode, loadChannels, newChannelDescription, newChannelName, newChannelType, toast])
 
   return (
     <div className="flex h-full min-h-[560px] flex-col gap-4 p-4">

@@ -173,6 +173,12 @@ export default function SettingsPage() {
   const { toast } = useToast()
   const supabase = createClient()
 
+  const supabaseConfigured =
+    !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL !== "undefined" &&
+    !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== "undefined"
+
   const fetchDemoResource = async <T,>(resource: string, params: Record<string, string> = {}) => {
     const searchParams = new URLSearchParams({ resource, ...params })
     const response = await fetch(`/api/demo/settings?${searchParams.toString()}`, { cache: "no-store" })
@@ -1154,66 +1160,220 @@ export default function SettingsPage() {
     }
   }
 
+  const loadCompanyFromDemo = async () => {
+    console.log("[v0] Loading company data from demo API")
+    try {
+      const data = await fetchDemoResource<{ company: any; settings?: any }>("company")
+      const company = data?.company
+      if (!company) {
+        throw new Error("Demo company payload missing")
+      }
+      const resolvedDivisions = Array.isArray(company.divisions) ? company.divisions : []
+      const resolvedDepartments = Array.isArray(company.departments) ? company.departments : []
+      const resolvedLocations = Array.isArray(company.locations) ? company.locations : []
+
+      setCompanyData({
+        id: company.id ?? "",
+        name: company.name ?? "",
+        email_address: company.email_address ?? company.email ?? "",
+        tax_id: company.tax_id ?? "",
+        ssnit_number: company.ssnit_number ?? "",
+        industry: company.industry ?? "",
+        status: company.status ?? "active",
+        address: company.address ?? "",
+        phone_number: company.phone_number ?? company.phone ?? "",
+        divisions: resolvedDivisions,
+        departments: resolvedDepartments,
+        locations: resolvedLocations,
+        logo_url: company.logo_url ?? company.logo,
+      })
+
+      setDivisions(resolvedDivisions)
+      setDepartments(resolvedDepartments)
+      setLocations(resolvedLocations)
+      setLogoPreview(company.logo_url ?? "")
+      return true
+    } catch (error) {
+      console.error("[v0] Demo company data error:", error)
+      const fallbackCompany = {
+        id: "demo-company-001",
+        name: "Akwaaba Technologies Ltd",
+        email_address: "ykodiah@gmail.com",
+        tax_id: "C0012345678",
+        ssnit_number: "1234567890",
+        industry: "Technology",
+        status: "active",
+        address: "123 Liberation Road, Labone, Accra, Ghana",
+        phone_number: "0249397960",
+        divisions: ["Head Office", "Regional Office"],
+        departments: ["Technology", "Human Resources", "Finance"],
+        locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
+      }
+      setCompanyData(fallbackCompany as Company)
+      setDivisions(fallbackCompany.divisions)
+      setDepartments(fallbackCompany.departments)
+      setLocations(fallbackCompany.locations)
+      setLogoPreview("")
+      return false
+    }
+  }
+
+  const loadEmployeesFromDemo = async () => {
+    console.log("[v0] Loading employees from demo API")
+    try {
+      const data = await fetchDemoResource<Employee[]>("employees")
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid employees payload")
+      }
+      setEmployees(data)
+      return true
+    } catch (error) {
+      console.error("[v0] Demo employees data error:", error)
+      setEmployees([
+        {
+          id: "emp-001",
+          first_name: "John",
+          last_name: "Doe",
+          full_name: "John Doe",
+          corporate_email: "john.doe@akwaaba.com",
+          personal_email: "john.doe@gmail.com",
+          position: "Software Engineer",
+          department: "Technology",
+          status: "active",
+        },
+        {
+          id: "emp-002",
+          first_name: "Jane",
+          last_name: "Smith",
+          full_name: "Jane Smith",
+          corporate_email: "jane.smith@akwaaba.com",
+          personal_email: "jane.smith@gmail.com",
+          position: "HR Manager",
+          department: "Human Resources",
+          status: "active",
+        },
+      ])
+      return false
+    }
+  }
+
+  const loadSubsidiariesFromDemo = async () => {
+    console.log("[v0] Loading subsidiaries from demo API")
+    try {
+      const data = await fetchDemoResource<any[]>("subsidiaries")
+      const processedSubsidiaries = (data || []).map((sub) => {
+        const divisions = Array.isArray(sub.divisions) ? sub.divisions : []
+        const departments = Array.isArray(sub.departments) ? sub.departments : []
+        const locations = Array.isArray(sub.locations) ? sub.locations : []
+        return {
+          ...sub,
+          divisions,
+          departments,
+          locations,
+          divisions_count: divisions.length,
+          departments_count: departments.length,
+          locations_count: locations.length,
+          employee_count:
+            sub.employee_count ??
+            sub.employees_count ??
+            (Array.isArray(sub.employees) ? sub.employees?.[0]?.count ?? 0 : 0),
+        }
+      }) as Subsidiary[]
+      setSubsidiaries(processedSubsidiaries)
+      return true
+    } catch (error) {
+      console.error("[v0] Demo subsidiaries data error:", error)
+      setSubsidiaries([
+        {
+          id: "sub-001",
+          company_id: "comp-001",
+          name: "Akwaaba Digital Solutions",
+          email_address: "info@akwaabadigital.com",
+          phone_number: "+233 30 276 5432",
+          tax_id: "TIN-ADS-2023-001",
+          ssnit_number: "SSNIT-ADS-789012",
+          address: "15 Liberation Road, Ridge, Accra, Ghana",
+          status: "active",
+          industry: "Digital Marketing & Web Development",
+          divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
+          departments: ["Marketing", "Development", "Design", "Sales"],
+          locations: ["Accra - Ridge", "Kumasi Branch"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 2,
+          employee_count: 45,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: "sub-002",
+          company_id: "comp-001",
+          name: "Akwaaba Consulting Group",
+          email_address: "consulting@akwaaba.com",
+          phone_number: "+233 30 276 5433",
+          tax_id: "TIN-ACG-2023-002",
+          ssnit_number: "SSNIT-ACG-789013",
+          address: "8 Airport Residential Area, Accra, Ghana",
+          status: "active",
+          industry: "Business Consulting & Strategy",
+          divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
+          departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
+          locations: ["Accra - Airport", "Tema Office"],
+          divisions_count: 3,
+          departments_count: 4,
+          locations_count: 2,
+          employee_count: 32,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      return false
+    }
+  }
+
+  const loadRolesFromDemo = async () => {
+    console.log("[v0] Loading roles from demo API")
+    try {
+      const data = await fetchDemoResource<Role[]>("roles")
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid roles payload")
+      }
+      setRoles(data)
+      return true
+    } catch (error) {
+      console.error("[v0] Demo roles data error:", error)
+      setRoles([
+        {
+          id: "role-001",
+          name: "Administrator",
+          description: "Full system access and management capabilities",
+          permissions: ["all"],
+          user_count: 2,
+        },
+        {
+          id: "role-002",
+          name: "HR Manager",
+          description: "Human resources management and employee oversight",
+          permissions: ["hr", "employees", "reports"],
+          user_count: 3,
+        },
+        {
+          id: "role-003",
+          name: "Employee",
+          description: "Standard employee access to personal information",
+          permissions: ["profile", "payslip", "leave"],
+          user_count: 45,
+        },
+      ])
+      return false
+    }
+  }
+
   // Load functions
   const loadCompanyData = async () => {
     console.log("[v0] Loading company data...")
 
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, loading company data from Supabase")
-      try {
-        const data = await fetchDemoResource<{ company: any; settings?: any }>("company")
-        const company = data?.company
-
-        if (!company) {
-          throw new Error("Demo company payload missing")
-        }
-
-        const resolvedDivisions = Array.isArray(company.divisions) ? company.divisions : []
-        const resolvedDepartments = Array.isArray(company.departments) ? company.departments : []
-        const resolvedLocations = Array.isArray(company.locations) ? company.locations : []
-
-        setCompanyData({
-          id: company.id ?? "",
-          name: company.name ?? "",
-          email_address: company.email_address ?? company.email ?? "",
-          tax_id: company.tax_id ?? "",
-          ssnit_number: company.ssnit_number ?? "",
-          industry: company.industry ?? "",
-          status: company.status ?? "active",
-          address: company.address ?? "",
-          phone_number: company.phone_number ?? company.phone ?? "",
-          divisions: resolvedDivisions,
-          departments: resolvedDepartments,
-          locations: resolvedLocations,
-          logo_url: company.logo_url ?? company.logo,
-        })
-
-        setDivisions(resolvedDivisions)
-        setDepartments(resolvedDepartments)
-        setLocations(resolvedLocations)
-        setLogoPreview(company.logo_url ?? "")
-        return
-      } catch (error) {
-        console.error("[v0] Demo company data error:", error)
-        setCompanyData({
-          id: "demo-company-001",
-          name: "Akwaaba Technologies Ltd",
-          email_address: "ykodiah@gmail.com",
-          tax_id: "C0012345678",
-          ssnit_number: "1234567890",
-          industry: "Technology",
-          status: "active",
-          address: "123 Liberation Road, Labone, Accra, Ghana",
-          phone_number: "0249397960",
-          divisions: ["Head Office", "Regional Office"],
-          departments: ["Technology", "Human Resources", "Finance"],
-          locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-        })
-        setDivisions(["Head Office", "Regional Office"])
-        setDepartments(["Technology", "Human Resources", "Finance"])
-        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-        return
-      }
+    if (!supabaseConfigured || isDemoMode()) {
+      await loadCompanyFromDemo()
+      return
     }
 
     try {
@@ -1241,206 +1401,67 @@ export default function SettingsPage() {
         setDepartments(data.departments || [])
         setLocations(data.locations || [])
         setLogoPreview(data.logo_url || "")
-      }
-    } catch (error) {
-      console.error("[v0] Error loading company data:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode")
-        // Set demo session cookie to prevent future database calls
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        // Load demo data
-        setCompanyData({
-          id: "demo-company-001",
-          name: "Akwaaba Technologies Ltd",
-          email_address: "ykodiah@gmail.com",
-          tax_id: "C0012345678",
-          ssnit_number: "1234567890",
-          industry: "Technology",
-          status: "active",
-          address: "123 Liberation Road, Labone, Accra, Ghana",
-          phone_number: "0249397960",
-          divisions: ["Head Office", "Regional Office"],
-          departments: ["Technology", "Human Resources", "Finance"],
-          locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-        })
-        setDivisions(["Head Office", "Regional Office"])
-        setDepartments(["Technology", "Human Resources", "Finance"])
-        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
         return
       }
-      toast({
-        title: "Error",
-        description: "Failed to load company data",
-        variant: "destructive",
-      })
+
+      await loadCompanyFromDemo()
+    } catch (error) {
+      console.error("[v0] Error loading company data:", error)
+      const handledDemo = await loadCompanyFromDemo()
+      if (!handledDemo) {
+        toast({
+          title: "Error",
+          description: "Failed to load company data",
+          variant: "destructive",
+        })
+      }
     }
   }
 
   const loadEmployees = async () => {
     console.log("[v0] Loading employees...")
 
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, loading employees from Supabase")
-      try {
-        const data = await fetchDemoResource<Employee[]>("employees")
-        if (Array.isArray(data)) {
-          setEmployees(data)
-          return
-        }
-        throw new Error("Invalid employees payload")
-      } catch (error) {
-        console.error("[v0] Demo employees data error:", error)
-        setEmployees([
-          {
-            id: "emp-001",
-            first_name: "John",
-            last_name: "Doe",
-            full_name: "John Doe",
-            corporate_email: "john.doe@akwaaba.com",
-            personal_email: "john.doe@gmail.com",
-            position: "Software Engineer",
-            department: "Technology",
-            status: "active",
-          },
-          {
-            id: "emp-002",
-            first_name: "Jane",
-            last_name: "Smith",
-            full_name: "Jane Smith",
-            corporate_email: "jane.smith@akwaaba.com",
-            personal_email: "jane.smith@gmail.com",
-            position: "HR Manager",
-            department: "Human Resources",
-            status: "active",
-          },
-        ])
-        return
-      }
+    if (!supabaseConfigured || isDemoMode()) {
+      await loadEmployeesFromDemo()
+      return
     }
 
     try {
       const { data, error } = await supabase.from("employees").select("*").order("created_at", { ascending: false })
 
       if (error) throw error
-      setEmployees(data || [])
-    } catch (error) {
-      console.error("Error loading employees:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode for employees")
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        setEmployees([
-          {
-            id: "emp-001",
-            first_name: "John",
-            last_name: "Doe",
-            full_name: "John Doe",
-            corporate_email: "john.doe@akwaaba.com",
-            personal_email: "john.doe@gmail.com",
-            position: "Software Engineer",
-            department: "Technology",
-            status: "active",
-          },
-          {
-            id: "emp-002",
-            first_name: "Jane",
-            last_name: "Smith",
-            full_name: "Jane Smith",
-            corporate_email: "jane.smith@akwaaba.com",
-            personal_email: "jane.smith@gmail.com",
-            position: "HR Manager",
-            department: "Human Resources",
-            status: "active",
-          },
-        ])
+
+      if (Array.isArray(data) && data.length > 0) {
+        setEmployees(data)
         return
       }
-      toast({
-        title: "Error",
-        description: "Failed to load employees",
-        variant: "destructive",
-      })
+
+      await loadEmployeesFromDemo()
+    } catch (error: any) {
+      console.error("Error loading employees:", error)
+      if (error?.message && error.message.includes("infinite recursion detected in policy")) {
+        document.cookie = "demo-session=active; path=/; max-age=86400"
+      }
+      const handledDemo = await loadEmployeesFromDemo()
+      if (!handledDemo) {
+        toast({
+          title: "Error",
+          description: "Failed to load employees",
+          variant: "destructive",
+        })
+      }
     }
   }
 
   const loadSubsidiaries = async () => {
     console.log("[v0] Loading subsidiaries...")
 
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, loading subsidiaries from Supabase")
-      try {
-        const data = await fetchDemoResource<any[]>("subsidiaries")
-        const processedSubsidiaries = (data || []).map((sub: any) => {
-          const divisions = Array.isArray(sub.divisions) ? sub.divisions : []
-          const departments = Array.isArray(sub.departments) ? sub.departments : []
-          const locations = Array.isArray(sub.locations) ? sub.locations : []
-
-          return {
-            ...sub,
-            divisions,
-            departments,
-            locations,
-            divisions_count: divisions.length,
-            departments_count: departments.length,
-            locations_count: locations.length,
-            employee_count:
-              sub.employee_count ??
-              sub.employees_count ??
-              (Array.isArray(sub.employees) ? sub.employees?.[0]?.count ?? 0 : 0),
-          }
-        })
-
-        setSubsidiaries(processedSubsidiaries)
-        return
-      } catch (error) {
-        console.error("[v0] Demo subsidiaries data error:", error)
-        setSubsidiaries([
-          {
-            id: "sub-001",
-            company_id: "comp-001",
-            name: "Akwaaba Digital Solutions",
-            email_address: "info@akwaabadigital.com",
-            phone_number: "+233 30 276 5432",
-            tax_id: "TIN-ADS-2023-001",
-            ssnit_number: "SSNIT-ADS-789012",
-            address: "15 Liberation Road, Ridge, Accra, Ghana",
-            status: "active",
-            industry: "Digital Marketing & Web Development",
-            divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
-            departments: ["Marketing", "Development", "Design", "Sales"],
-            locations: ["Accra - Ridge", "Kumasi Branch"],
-            divisions_count: 3,
-            departments_count: 4,
-            locations_count: 2,
-            employee_count: 45,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: "sub-002",
-            company_id: "comp-001",
-            name: "Akwaaba Consulting Group",
-            email_address: "consulting@akwaaba.com",
-            phone_number: "+233 30 276 5433",
-            tax_id: "TIN-ACG-2023-002",
-            ssnit_number: "SSNIT-ACG-789013",
-            address: "8 Airport Residential Area, Accra, Ghana",
-            status: "active",
-            industry: "Business Consulting & Strategy",
-            divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
-            departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
-            locations: ["Accra - Airport", "Tema Office"],
-            divisions_count: 3,
-            departments_count: 4,
-            locations_count: 2,
-            employee_count: 32,
-            created_at: new Date().toISOString(),
-          },
-        ])
-        return
-      }
+    if (!supabaseConfigured || isDemoMode()) {
+      await loadSubsidiariesFromDemo()
+      return
     }
 
     try {
-      // Load subsidiaries with employee counts
       const { data: subsidiariesData, error: subsidiariesError } = await supabase
         .from("subsidiaries")
         .select(`
@@ -1451,104 +1472,69 @@ export default function SettingsPage() {
 
       if (subsidiariesError) throw subsidiariesError
 
-      // Process the data to add computed fields
-      const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => ({
-        ...sub,
-        divisions: Array.isArray(sub.divisions) ? sub.divisions : [],
-        departments: Array.isArray(sub.departments) ? sub.departments : [],
-        locations: Array.isArray(sub.locations) ? sub.locations : [],
-        divisions_count: Array.isArray(sub.divisions) ? sub.divisions.length : 0,
-        departments_count: Array.isArray(sub.departments) ? sub.departments.length : 0,
-        locations_count: Array.isArray(sub.locations) ? sub.locations.length : 0,
-        employee_count: sub.employees?.[0]?.count || 0,
-      }))
+      if (Array.isArray(subsidiariesData) && subsidiariesData.length > 0) {
+        const processedSubsidiaries = subsidiariesData.map((sub: any) => ({
+          ...sub,
+          divisions: Array.isArray(sub.divisions) ? sub.divisions : [],
+          departments: Array.isArray(sub.departments) ? sub.departments : [],
+          locations: Array.isArray(sub.locations) ? sub.locations : [],
+          divisions_count: Array.isArray(sub.divisions) ? sub.divisions.length : 0,
+          departments_count: Array.isArray(sub.departments) ? sub.departments.length : 0,
+          locations_count: Array.isArray(sub.locations) ? sub.locations.length : 0,
+          employee_count: sub.employees?.[0]?.count || 0,
+        }))
 
-      setSubsidiaries(processedSubsidiaries)
-      console.log("[v0] Loaded subsidiaries:", processedSubsidiaries.length)
+        setSubsidiaries(processedSubsidiaries)
+        console.log("[v0] Loaded subsidiaries:", processedSubsidiaries.length)
+        return
+      }
+
+      await loadSubsidiariesFromDemo()
     } catch (error) {
       console.error("Subsidiaries loading error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load subsidiaries",
-        variant: "destructive",
-      })
+      const handledDemo = await loadSubsidiariesFromDemo()
+      if (!handledDemo) {
+        toast({
+          title: "Error",
+          description: "Failed to load subsidiaries",
+          variant: "destructive",
+        })
+      }
     }
   }
 
   const loadRoles = async () => {
     console.log("[v0] Loading roles...")
 
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, loading roles from Supabase")
-      try {
-        const data = await fetchDemoResource<Role[]>("roles")
-        if (Array.isArray(data)) {
-          setRoles(data)
-          return
-        }
-        throw new Error("Invalid roles payload")
-      } catch (error) {
-        console.error("[v0] Demo roles data error:", error)
-        setRoles([
-          {
-            id: "role-001",
-            name: "Administrator",
-            description: "Full system access and management capabilities",
-            permissions: ["all"],
-            user_count: 2,
-          },
-          {
-            id: "role-002",
-            name: "HR Manager",
-            description: "Human resources management and employee oversight",
-            permissions: ["hr", "employees", "reports"],
-            user_count: 3,
-          },
-          {
-            id: "role-003",
-            name: "Employee",
-            description: "Standard employee access to personal information",
-            permissions: ["profile", "payslip", "leave"],
-            user_count: 45,
-          },
-        ])
-        return
-      }
+    if (!supabaseConfigured || isDemoMode()) {
+      await loadRolesFromDemo()
+      return
     }
 
     try {
       const { data, error } = await supabase.from("roles").select("*").order("created_at", { ascending: false })
 
       if (error) throw error
-      setRoles(data || [])
-    } catch (error) {
-      console.error("Error loading roles:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode for roles")
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        setRoles([
-          {
-            id: "role-001",
-            name: "Administrator",
-            description: "Full system access",
-            permissions: ["read", "write", "delete", "admin"],
-            status: "active",
-          },
-          {
-            id: "role-002",
-            name: "HR Manager",
-            description: "Human Resources management",
-            permissions: ["read", "write"],
-            status: "active",
-          },
-        ])
+
+      if (Array.isArray(data) && data.length > 0) {
+        setRoles(data)
         return
       }
-      toast({
-        title: "Error",
-        description: "Failed to load roles",
-        variant: "destructive",
-      })
+
+      await loadRolesFromDemo()
+    } catch (error: any) {
+      console.error("Error loading roles:", error)
+      if (error?.message && error.message.includes("infinite recursion detected in policy")) {
+        document.cookie = "demo-session=active; path=/; max-age=86400"
+      }
+      const handledDemo = await loadRolesFromDemo()
+      if (!handledDemo) {
+        toast({
+          title: "Error",
+          description: "Failed to load roles",
+          variant: "destructive",
+        })
+      }
     }
   }
 
@@ -1685,8 +1671,7 @@ export default function SettingsPage() {
   const refreshEmployeeCount = async (subsidiaryId: string) => {
     console.log("[v0] Refreshing employee count for subsidiary:", subsidiaryId)
 
-    if (isDemoMode()) {
-      // Simulate employee count refresh in demo mode
+    if (!supabaseConfigured || isDemoMode()) {
       const mockCount = Math.floor(Math.random() * 100) + 10 // Random count between 10-110
       const updatedSubsidiaries = subsidiaries.map((sub) =>
         sub.id === subsidiaryId ? { ...sub, employee_count: mockCount } : sub,
@@ -1722,34 +1707,33 @@ export default function SettingsPage() {
 
     const currentCount = await refreshEmployeeCount(subsidiaryId)
 
-    if (isDemoMode()) {
+    const openModalWithEmployees = (employees: any[]) => {
+      setViewEmployeesModal({
+        isOpen: true,
+        subsidiaryId,
+        employees,
+      })
+    }
+
+    if (!supabaseConfigured || isDemoMode()) {
       try {
         const employees = await fetchDemoResource<any[]>("subsidiary-employees", { subsidiaryId })
-        setViewEmployeesModal({
-          isOpen: true,
-          subsidiaryId,
-          employees: employees ?? [],
-        })
+        openModalWithEmployees(employees ?? [])
         return
       } catch (error) {
         console.error("[v0] Demo subsidiary employees error:", error)
-        const fallbackEmployees = Array.from({ length: currentCount }, (_, i) => ({
-          id: `emp-${i + 1}`,
-          name: `Employee ${i + 1}`,
-          position: ["Software Engineer", "Marketing Manager", "HR Specialist", "Sales Representative", "Accountant"][
-            i % 5
-          ],
-          department: ["Technology", "Marketing", "Human Resources", "Sales", "Finance"][i % 5],
-          email: `employee${i + 1}@company.com`,
-        }))
-
-        setViewEmployeesModal({
-          isOpen: true,
-          subsidiaryId,
-          employees: fallbackEmployees,
-        })
-        return
       }
+
+      const fallbackEmployees = Array.from({ length: currentCount }, (_, i) => ({
+        id: `emp-${i + 1}`,
+        name: `Employee ${i + 1}`,
+        position: ["Software Engineer", "Marketing Manager", "HR Specialist", "Sales Representative", "Accountant"][i % 5],
+        department: ["Technology", "Marketing", "Human Resources", "Sales", "Finance"][i % 5],
+        email: `employee${i + 1}@company.com`,
+      }))
+
+      openModalWithEmployees(fallbackEmployees)
+      return
     }
 
     try {
@@ -1757,18 +1741,26 @@ export default function SettingsPage() {
 
       if (error) throw error
 
-      setViewEmployeesModal({
-        isOpen: true,
-        subsidiaryId,
-        employees: employees || [],
-      })
+      openModalWithEmployees(employees || [])
     } catch (error) {
       console.error("View employees error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load employees",
-        variant: "destructive",
-      })
+      const handledDemo = await loadSubsidiariesFromDemo()
+      if (!handledDemo) {
+        toast({
+          title: "Error",
+          description: "Failed to load employees",
+          variant: "destructive",
+        })
+      } else {
+        const fallbackEmployees = Array.from({ length: currentCount }, (_, i) => ({
+          id: `emp-${i + 1}`,
+          name: `Employee ${i + 1}`,
+          position: ["Software Engineer", "Marketing Manager", "HR Specialist", "Sales Representative", "Accountant"][i % 5],
+          department: ["Technology", "Marketing", "Human Resources", "Sales", "Finance"][i % 5],
+          email: `employee${i + 1}@company.com`,
+        }))
+        openModalWithEmployees(fallbackEmployees)
+      }
     }
   }
 
