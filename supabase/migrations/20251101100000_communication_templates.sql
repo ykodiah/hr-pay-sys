@@ -287,3 +287,170 @@ CREATE TRIGGER trg_comm_template_versions_updated
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+-- =====================================================================================
+-- Seed default templates for core automation events
+-- =====================================================================================
+
+WITH template_defs AS (
+    SELECT
+        'PAYROLL.COMPLETED'::text AS template_key,
+        'Payslip Release Notification'::text AS name,
+        'Employees receive a notice when payroll completes and payslips are available.'::text AS description,
+        'email'::text AS channel_type,
+        'automation'::text AS category,
+        ARRAY['automation', 'payroll', 'default']::text[] AS tags,
+        $$Payslip for {{payroll.period_name}} ready$$::text AS subject,
+        $$Hi {{employee.first_name}}, your payslip for {{payroll.period_name}} is now available in the self-service portal.$$::text AS content_text,
+        $$<p>Hi {{employee.first_name}},</p><p>Your payslip for {{payroll.period_name}} is ready. <a href="{{links.payslip_url}}">View your payslip</a>.</p>$$::text AS content_html,
+        jsonb_build_array(
+            jsonb_build_object('key', 'employee.first_name', 'label', 'Employee first name', 'required', false),
+            jsonb_build_object('key', 'payroll.period_name', 'label', 'Payroll period', 'required', true),
+            jsonb_build_object('key', 'links.payslip_url', 'label', 'Payslip download link', 'required', false)
+        ) AS variables
+    UNION ALL
+    SELECT
+        'PAYROLL.VARIANCE_DETECTED',
+        'Payroll Variance Alert',
+        'Alerts an employee when their net pay changes significantly.',
+        'email',
+        'automation',
+        ARRAY['automation', 'payroll', 'variance'],
+        $$Change detected in your {{payroll.period_name}} pay$$,
+        $$Hi {{employee.first_name}}, we noticed a change of {{payroll.net_change}} to your pay for {{payroll.period_name}}. Open your payslip to review the breakdown.$$,
+        $$<p>Hi {{employee.first_name}},</p><p>We noticed a change of {{payroll.net_change}} to your pay for {{payroll.period_name}}. <a href="{{links.payslip_url}}">Review your detailed payslip</a> for the full breakdown.</p><p>If something looks incorrect, reply to this message or contact payroll support.</p>$$,
+        jsonb_build_array(
+            jsonb_build_object('key', 'employee.first_name', 'label', 'Employee first name', 'required', false),
+            jsonb_build_object('key', 'payroll.period_name', 'label', 'Payroll period', 'required', true),
+            jsonb_build_object('key', 'payroll.net_change', 'label', 'Net pay difference', 'required', true),
+            jsonb_build_object('key', 'links.payslip_url', 'label', 'Payslip download link', 'required', false)
+        )
+    UNION ALL
+    SELECT
+        'LEAVE.APPROVED',
+        'Leave Approval Confirmation',
+        'Confirms approved leave requests and highlights the approved dates.',
+        'email',
+        'automation',
+        ARRAY['automation', 'leave'],
+        $$Your leave request has been approved$$,
+        $$Hi {{employee.first_name}}, your {{leave.type}} request from {{leave.start_date}} to {{leave.end_date}} has been approved. Enjoy your time off!$$,
+        $$<p>Hi {{employee.first_name}},</p><p>Your {{leave.type}} request covering {{leave.start_date}} to {{leave.end_date}} has been approved. Enjoy your time off!</p>$$,
+        jsonb_build_array(
+            jsonb_build_object('key', 'employee.first_name', 'label', 'Employee first name', 'required', false),
+            jsonb_build_object('key', 'leave.type', 'label', 'Leave type', 'required', true),
+            jsonb_build_object('key', 'leave.start_date', 'label', 'Leave start date', 'required', true),
+            jsonb_build_object('key', 'leave.end_date', 'label', 'Leave end date', 'required', true)
+        )
+    UNION ALL
+    SELECT
+        'LEAVE.REJECTED',
+        'Leave Decision Update',
+        'Lets an employee know their leave request needs attention.',
+        'email',
+        'automation',
+        ARRAY['automation', 'leave', 'default'],
+        $$Update on your leave request$$,
+        $$Hi {{employee.first_name}}, your {{leave.type}} request for {{leave.start_date}} to {{leave.end_date}} was updated. Please review the comments from {{manager.name}}.$$,
+        $$<p>Hi {{employee.first_name}},</p><p>Your {{leave.type}} request for {{leave.start_date}} to {{leave.end_date}} was updated. Please review the comments from {{manager.name}} in the self-service portal.</p>$$,
+        jsonb_build_array(
+            jsonb_build_object('key', 'employee.first_name', 'label', 'Employee first name', 'required', false),
+            jsonb_build_object('key', 'leave.type', 'label', 'Leave type', 'required', true),
+            jsonb_build_object('key', 'leave.start_date', 'label', 'Leave start date', 'required', true),
+            jsonb_build_object('key', 'leave.end_date', 'label', 'Leave end date', 'required', true),
+            jsonb_build_object('key', 'manager.name', 'label', 'Approver name', 'required', false)
+        )
+    UNION ALL
+    SELECT
+        'HR.DOC_EXPIRING',
+        'Document Expiry Reminder',
+        'Short SMS-style reminder for expiring compliance documents.',
+        'sms',
+        'automation',
+        ARRAY['automation', 'compliance', 'default'],
+        $$Reminder: {{document.type}} expires on {{document.expiry_date}}$$,
+        $$Hi {{employee.first_name}}, your {{document.type}} expires on {{document.expiry_date}}. Update it in the portal to stay compliant.$$,
+        NULL::text,
+        jsonb_build_array(
+            jsonb_build_object('key', 'employee.first_name', 'label', 'Employee first name', 'required', false),
+            jsonb_build_object('key', 'document.type', 'label', 'Document type', 'required', true),
+            jsonb_build_object('key', 'document.expiry_date', 'label', 'Document expiry date', 'required', true)
+        )
+),
+target_companies AS (
+    SELECT id AS company_id FROM companies
+),
+inserted_templates AS (
+    INSERT INTO communication_templates (
+        company_id,
+        template_key,
+        name,
+        description,
+        channel_type,
+        category,
+        tags,
+        language,
+        metadata,
+        is_active,
+        created_by,
+        updated_by
+    )
+    SELECT
+        c.company_id,
+        d.template_key,
+        d.name,
+        d.description,
+        d.channel_type,
+        d.category,
+        d.tags,
+        'en',
+        '{}'::jsonb,
+        TRUE,
+        NULL,
+        NULL
+    FROM target_companies c
+    CROSS JOIN template_defs d
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM communication_templates existing
+        WHERE existing.company_id = c.company_id
+          AND existing.template_key = d.template_key
+    )
+    RETURNING id, company_id, template_key
+),
+inserted_versions AS (
+    INSERT INTO communication_template_versions (
+        template_id,
+        version_number,
+        status,
+        subject,
+        content_text,
+        content_html,
+        preview_json,
+        variables,
+        metadata,
+        created_by,
+        updated_by,
+        published_at
+    )
+    SELECT
+        it.id,
+        1,
+        'published',
+        d.subject,
+        d.content_text,
+        d.content_html,
+        '{}'::jsonb,
+        d.variables,
+        '{}'::jsonb,
+        NULL,
+        NULL,
+        NOW()
+    FROM inserted_templates it
+    JOIN template_defs d ON d.template_key = it.template_key
+    RETURNING id, template_id
+)
+UPDATE communication_templates t
+SET current_version_id = iv.id
+FROM inserted_versions iv
+WHERE t.id = iv.template_id;
+
