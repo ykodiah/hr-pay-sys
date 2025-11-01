@@ -420,7 +420,7 @@ export default function SettingsPage() {
 
   const currencyConfig = {
     ghs: {
-      symbol: "₵",
+      symbol: "?",
       name: "Ghana Cedis (GHS)",
       country: "Ghana",
       apiEndpoint: "https://api.gra.gov.gh/tax-rates",
@@ -471,7 +471,7 @@ export default function SettingsPage() {
     },
     eur: {
       country: "Germany",
-      symbol: "€",
+      symbol: "?",
       version: "2024.1",
       lastUpdated: "2024-01-01",
       taxBands: [
@@ -484,7 +484,7 @@ export default function SettingsPage() {
     },
     ngn: {
       country: "Nigeria",
-      symbol: "₦",
+      symbol: "?",
       version: "2024.1",
       lastUpdated: "2024-01-01",
       taxBands: [
@@ -2485,22 +2485,22 @@ export default function SettingsPage() {
     const insights = []
 
     if (days > 30) {
-      insights.push("⚠️ Consider if this extended leave period aligns with industry standards")
+      insights.push("?? Consider if this extended leave period aligns with industry standards")
     }
     if (days < 5) {
-      insights.push("💡 Short leave periods may require frequent approvals - consider automation")
+      insights.push("?? Short leave periods may require frequent approvals - consider automation")
     }
     if (name.toLowerCase().includes("sick")) {
-      insights.push("🏥 Recommend integrating with health insurance policies")
+      insights.push("?? Recommend integrating with health insurance policies")
     }
     if (name.toLowerCase().includes("maternity") || name.toLowerCase().includes("paternity")) {
-      insights.push("👶 Ensure compliance with local family leave regulations")
+      insights.push("?? Ensure compliance with local family leave regulations")
     }
     if (description.length < 20) {
-      insights.push("📝 Consider adding more detailed policy description for clarity")
+      insights.push("?? Consider adding more detailed policy description for clarity")
     }
 
-    insights.push("✨ AI suggests reviewing similar policies in your industry for benchmarking")
+    insights.push("? AI suggests reviewing similar policies in your industry for benchmarking")
 
     return insights
   }
@@ -4214,7 +4214,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
           if (result.currentModel.performanceScore >= 95) {
             setShowModelUpgrade(true)
             toast({
-              title: "AI Model Updated! 🚀",
+              title: "AI Model Updated! ??",
               description: `Now using ${result.currentModel.name} with ${result.currentModel.performanceScore}% performance`,
             })
           }
@@ -4244,7 +4244,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
           setShowModelUpgrade(true)
           
           toast({
-            title: "GPT-5 Upgrade Complete! 🎉",
+            title: "GPT-5 Upgrade Complete! ??",
             description: `Successfully upgraded to ${result.newModel.name} with advanced capabilities!`,
           })
         }
@@ -4315,7 +4315,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
       if (isSuccess) {
         setTestConnectionStatus("success")
         toast({
-          title: "Connection Successful! ✅",
+          title: "Connection Successful! ?",
           description: "SMTP connection established successfully. Email configuration is working properly.",
         })
       } else {
@@ -4324,7 +4324,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     } catch (error) {
       setTestConnectionStatus("error")
       toast({
-        title: "Connection Failed ❌",
+        title: "Connection Failed ?",
         description: "Unable to connect to SMTP server. Please check your credentials and settings.",
         variant: "destructive",
       })
@@ -5723,7 +5723,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <CardContent className="space-y-4">
                           <div className="space-y-2">
                             <p className="text-sm">
-                              <span className="font-medium">Range:</span> ₵{grade.minSalary.toLocaleString()} - ₵
+                              <span className="font-medium">Range:</span> ?{grade.minSalary.toLocaleString()} - ?
                               {grade.maxSalary.toLocaleString()}
                             </p>
                             <p className="text-sm">
@@ -5740,7 +5740,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 {grade.notches.map((notch) => (
                                   <div key={notch.step} className="flex justify-between text-xs">
                                     <span>Step {notch.step}</span>
-                                    <span className="font-medium">₵{notch.amount.toLocaleString()}</span>
+                                    <span className="font-medium">?{notch.amount.toLocaleString()}</span>
                                   </div>
                                 ))}
                               </div>
@@ -5778,7 +5778,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 <span className="text-sm font-semibold text-green-900">
                                   {grade.generalIncrement.type === "percentage"
                                     ? `${grade.generalIncrement.value}%`
-                                    : `₵${grade.generalIncrement.value.toLocaleString()}`}
+                                    : `?${grade.generalIncrement.value.toLocaleString()}`}
                                 </span>
                               </div>
                             </div>
@@ -5789,7 +5789,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 <span className="text-sm font-semibold text-blue-900">
                                   {grade.performanceIncrement.type === "percentage"
                                     ? `${grade.performanceIncrement.value}%`
-                                    : `₵${grade.performanceIncrement.value.toLocaleString()}`}
+                                    : `?${grade.performanceIncrement.value.toLocaleString()}`}
                                 </span>
                               </div>
                             </div>
@@ -5976,7 +5976,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                               {band.from ? band.from.toLocaleString() : "0"}
                             </td>
                             <td className="border border-gray-200 px-4 py-3">
-                              {band.to ? band.to.toLocaleString() : "∞"}
+                              {band.to ? band.to.toLocaleString() : "?"}
                             </td>
                             <td className="border border-gray-200 px-4 py-3 font-medium text-green-600">
                               {band.cumulativeTax ? band.cumulativeTax.toLocaleString() : "0"}
@@ -6721,7 +6721,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                               </Button>
                             </div>
                             <p className="text-xs text-blue-700">
-                              💡 AI will generate a professional template based on your description. You can edit the generated content before saving.
+                              ?? AI will generate a professional template based on your description. You can edit the generated content before saving.
                             </p>
                             
                             {/* GPT-5 Upgrade Simulation Button (for testing) */}
@@ -7008,7 +7008,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                               </Button>
                             </div>
                             <p className="text-xs text-blue-700">
-                              💡 AI will generate a professional template based on your description. You can edit the generated content before saving.
+                              ?? AI will generate a professional template based on your description. You can edit the generated content before saving.
                             </p>
                             
                             {/* GPT-5 Upgrade Simulation Button (for testing) */}
@@ -7171,20 +7171,23 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         />
                       </div>
                       <div className="flex justify-end space-x-2">
-                        <Button variant="outline" onClick={() => {
-                          setShowTemplateModal(false)
-                          setIsAddingTemplate(false)
-                          setAiDescription("")
-                          setShowAiPanel(false)
-                          setIsGeneratingAi(false)
-                          setShowFeedbackPanel(false)
-                          setTemplateRating(0)
-                          setTemplateFeedback("")
-                          setTemplateImprovements("")
-                          setLastGeneratedTemplateId("")
-                          setCurrentAIModel(null)
-                          setShowModelUpgrade(false)
-                        }}>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setShowTemplateModal(false)
+                            setIsAddingTemplate(false)
+                            setAiDescription("")
+                            setShowAiPanel(false)
+                            setIsGeneratingAi(false)
+                            setShowFeedbackPanel(false)
+                            setTemplateRating(0)
+                            setTemplateFeedback("")
+                            setTemplateImprovements("")
+                            setLastGeneratedTemplateId("")
+                            setCurrentAIModel(null)
+                            setShowModelUpgrade(false)
+                          }}
+                        >
                           Cancel
                         </Button>
                         <Button onClick={handleSaveTemplate} disabled={isSaving}>
@@ -7197,5 +7200,18 @@ Format the response in a professional, actionable manner for HR decision-makers.
                             <>
                               <Save className="w-4 h-4 mr-2" />
                               Save Template
--4 mr-2" />
-                              Save Template\
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
