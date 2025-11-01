@@ -2,6 +2,7 @@ import { SupabaseClient } from "@supabase/supabase-js"
 import { fetchActiveIntegration } from "./delivery"
 import { sendThroughProvider } from "./providers/send"
 import type { IntegrationChannelType } from "./integrations"
+import { renderTemplate, TemplateRenderResult, TemplateVersionPayload } from "./templates"
 
 export type CommunicationEventType =
   | "PAYROLL.COMPLETED"
@@ -20,6 +21,10 @@ interface CommunicationEventPayload {
   employeeIds?: string[]
   recipients?: string[]
   data?: Record<string, unknown>
+  templateKey?: string
+  templateVariables?: Record<string, unknown>
+  templateScopes?: Record<string, Record<string, unknown>>
+  allowTemplateFallback?: boolean
 }
 
 type ResolvedAudience = {
@@ -69,7 +74,20 @@ async function resolveAudience(
   }
 }
 
-function buildMessageBody(event: CommunicationEventPayload) {
+type TemplateResolution = {
+  key: string
+  versionId: string
+  result: TemplateRenderResult
+}
+
+function buildMessageBody(event: CommunicationEventPayload, template?: TemplateResolution) {
+  if (template) {
+    const subject = event.subject ?? template.result.subject ?? inferSubject(event)
+    const text = event.message ?? template.result.text ?? inferMessage(event)
+    const html = event.html ?? template.result.html ?? undefined
+    return { subject, text, html }
+  }
+
   const subject = event.subject || inferSubject(event)
   const text = event.message || inferMessage(event)
   const html = event.html || undefined
@@ -123,6 +141,79 @@ function inferChannelType(event: CommunicationEventPayload): IntegrationChannelT
   }
 }
 
+async function resolvePublishedTemplate(
+  supabase: SupabaseClient<any, "public", any>,
+  companyId: string,
+  key: string,
+  channelType: IntegrationChannelType
+): Promise<{ summary: any; version: TemplateVersionPayload } | null> {
+  let { data: summary, error: summaryError } = await supabase
+    .from("communication_template_summaries")
+    .select("id, template_key, channel_type, version_id, version_number, status")
+    .match({ company_id: companyId, template_key: key, status: "published" })
+    .eq("channel_type", channelType)
+    .maybeSingle()
+
+  if (summaryError) throw summaryError
+  if (!summary?.version_id) {
+    const fallbackQuery = await supabase
+      .from("communication_template_summaries")
+      .select("id, template_key, channel_type, version_id, version_number, status")
+      .match({ company_id: companyId, template_key: key, status: "published" })
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (fallbackQuery.error) throw fallbackQuery.error
+    summary = fallbackQuery.data
+    if (!summary?.version_id) {
+      return null
+    }
+  }
+
+  const { data: version, error: versionError } = await supabase
+    .from("communication_template_versions")
+    .select("*")
+    .eq("id", summary.version_id)
+    .maybeSingle()
+
+  if (versionError) throw versionError
+  if (!version) {
+    return null
+  }
+
+  return { summary, version }
+}
+
+function buildTemplateScopes(event: CommunicationEventPayload) {
+  const variables = {
+    ...(event.templateVariables ?? {}),
+    ...(event.data ?? {}),
+    ...(event.metadata ?? {}),
+  }
+
+  const scopes: Record<string, Record<string, unknown>> = {
+    event: event as unknown as Record<string, unknown>,
+    data: event.data ?? {},
+    metadata: event.metadata ?? {},
+  }
+
+  const customScopeOrder: string[] = []
+
+  if (event.templateScopes) {
+    for (const [scopeKey, scopeValue] of Object.entries(event.templateScopes)) {
+      scopes[scopeKey] = scopeValue
+      customScopeOrder.push(scopeKey)
+    }
+  }
+
+  return {
+    variables,
+    scopes,
+    fallbackScopeOrder: ["data", "metadata", ...customScopeOrder, "event"],
+  }
+}
+
 export async function handleCommunicationEvent(
   supabase: SupabaseClient<any, "public", any>,
   companyId: string,
@@ -138,14 +229,51 @@ export async function handleCommunicationEvent(
   }
 
   const integration = await fetchActiveIntegration(supabase, companyId, channelType)
-  const body = buildMessageBody(event)
+  let templateResolution: TemplateResolution | undefined
+
+  const effectiveTemplateKey = event.templateKey ?? event.type
+
+  if (effectiveTemplateKey) {
+    const template = await resolvePublishedTemplate(supabase, companyId, effectiveTemplateKey, channelType)
+
+    if (template) {
+      const scopes = buildTemplateScopes(event)
+      const render = renderTemplate(template.version as TemplateVersionPayload, scopes)
+
+      const hasBlockingMissing = render.missingRequired.length > 0 && event.allowTemplateFallback !== true
+
+      if (!hasBlockingMissing) {
+        templateResolution = {
+          key: effectiveTemplateKey,
+          versionId: template.version.id as string,
+          result: render,
+        }
+      }
+    }
+  }
+
+  const body = buildMessageBody(event, templateResolution)
+
+  const metadata = {
+    ...(event.metadata ?? {}),
+    ...(event.data ?? {}),
+    template: templateResolution
+      ? {
+          key: templateResolution.key,
+          versionId: templateResolution.versionId,
+          missingRequired: templateResolution.result.missingRequired,
+          missingOptional: templateResolution.result.missingOptional,
+          referencedVariables: templateResolution.result.referencedVariables,
+        }
+      : undefined,
+  }
 
   const delivery = await sendThroughProvider(integration, {
     to: recipients,
     subject: body.subject,
     text: body.text,
     html: body.html,
-    metadata: event.metadata || event.data,
+    metadata,
   })
 
   await supabase
@@ -158,5 +286,12 @@ export async function handleCommunicationEvent(
     deliveredTo: recipients.length,
     channelType,
     externalId: delivery.externalId,
+    templateWarnings: templateResolution
+      ? {
+          missingRequired: templateResolution.result.missingRequired,
+          missingOptional: templateResolution.result.missingOptional,
+          unusedSuppliedKeys: templateResolution.result.unusedSuppliedKeys,
+        }
+      : undefined,
   }
 }

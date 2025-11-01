@@ -8,8 +8,11 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2, RefreshCcw, Save, ShieldCheck, Wrench } from "lucide-react"
+import { TemplateManager } from "@/components/communication/template-manager"
+import { SnippetManager } from "@/components/communication/snippet-manager"
 
 type ChannelType = "email" | "sms" | "whatsapp" | "push" | "teams" | "slack" | "webhook"
 
@@ -429,202 +432,236 @@ export default function CommunicationIntegrationSettings() {
 
   return (
     <div className="space-y-8">
-      <header className="space-y-2">
-        <Badge className="bg-emerald-100 text-emerald-700">Tenant-controlled credentials</Badge>
-        <h1 className="text-3xl font-semibold tracking-tight">Communication Channels</h1>
+      <div className="space-y-2">
+        <h1 className="text-3xl font-semibold tracking-tight">Communication workspace</h1>
         <p className="text-muted-foreground max-w-2xl">
-          Connect your email, SMS, WhatsApp, and collaboration providers. Credentials stay encrypted, and you can rotate them at any time without involving support.
+          Connect outbound channels, author reusable templates, and centralize snippets for automation journeys.
         </p>
-      </header>
+      </div>
 
-      <div className="grid gap-6">
-        {CHANNEL_CONFIG.map((channel) => {
-          const current = state[channel.type]
-          const rotateEnabled = current.rotateCredentials || !current.hasCredentials
-          return (
-            <Card key={channel.type} className="border border-slate-200 shadow-sm">
-              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-xl">
-                    {channel.title}
-                    <StatusBadge status={current.status} />
-                  </CardTitle>
-                  <CardDescription className="mt-3 text-sm text-muted-foreground max-w-3xl">
-                    {channel.description}
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={current.isActive}
-                      onCheckedChange={(value) =>
-                        dispatch({ type: "updateField", channel: channel.type, field: "isActive", value })
-                      }
-                      id={`${channel.type}-active`}
-                    />
-                    <Label htmlFor={`${channel.type}-active`} className="text-sm font-medium">
-                      {current.isActive ? "Channel active" : "Channel inactive"}
-                    </Label>
-                  </div>
-                </div>
-              </CardHeader>
-              <Separator className="my-2" />
-              <CardContent className="space-y-6">
-                <section className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor={`${channel.type}-provider`}>Provider name</Label>
-                    <Input
-                      id={`${channel.type}-provider`}
-                      placeholder={channel.providerHint}
-                      value={current.providerName}
-                      onChange={(event) =>
-                        dispatch({ type: "updateField", channel: channel.type, field: "providerName", value: event.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`${channel.type}-identifier`}>Provider identifier</Label>
-                    <Input
-                      id={`${channel.type}-identifier`}
-                      placeholder="Account ID / workspace"
-                      value={current.providerIdentifier}
-                      onChange={(event) =>
-                        dispatch({
-                          type: "updateField",
-                          channel: channel.type,
-                          field: "providerIdentifier",
-                          value: event.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`${channel.type}-label`}>Display label</Label>
-                    <Input
-                      id={`${channel.type}-label`}
-                      placeholder="Visible name to admins"
-                      value={current.displayLabel}
-                      onChange={(event) =>
-                        dispatch({ type: "updateField", channel: channel.type, field: "displayLabel", value: event.target.value })
-                      }
-                    />
-                  </div>
-                </section>
+      <Tabs defaultValue="channels" className="space-y-6">
+        <TabsList className="grid w-full gap-2 sm:w-auto sm:grid-cols-3">
+          <TabsTrigger value="channels">Channels</TabsTrigger>
+          <TabsTrigger value="templates">Templates</TabsTrigger>
+          <TabsTrigger value="snippets">Snippets</TabsTrigger>
+        </TabsList>
 
-                <section className="grid gap-4 sm:grid-cols-2">
-                  {channel.configFields.map((field) => (
-                    <div className="space-y-2" key={`${channel.type}-config-${field.key}`}>
-                      <Label htmlFor={`${channel.type}-config-${field.key}`}>{field.label}</Label>
-                      <Input
-                        id={`${channel.type}-config-${field.key}`}
-                        type={field.type ?? "text"}
-                        placeholder={field.placeholder}
-                        value={current.configuration?.[field.key] ?? ""}
-                        onChange={(event) =>
-                          dispatch({
-                            type: "updateConfig",
-                            channel: channel.type,
-                            key: field.key,
-                            value: event.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  ))}
-                </section>
+        <TabsContent value="channels" className="space-y-8">
+          <div className="space-y-2">
+            <Badge className="bg-emerald-100 text-emerald-700">Tenant-controlled credentials</Badge>
+            <p className="text-muted-foreground max-w-2xl">
+              Connect your email, SMS, WhatsApp, and collaboration providers. Credentials stay encrypted, and you can rotate them at any time without involving support.
+            </p>
+          </div>
 
-                <section className="space-y-3">
-                  <div className="flex items-center justify-between">
+          <div className="grid gap-6">
+            {CHANNEL_CONFIG.map((channel) => {
+              const current = state[channel.type]
+              const rotateEnabled = current.rotateCredentials || !current.hasCredentials
+              return (
+                <Card key={channel.type} className="border border-slate-200 shadow-sm">
+                  <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Credential vault</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Credentials are encrypted with your tenant secret. {current.hasCredentials ? "Rotate to update" : "Add credentials to activate."}
-                      </p>
+                      <CardTitle className="flex items-center gap-2 text-xl">
+                        {channel.title}
+                        <StatusBadge status={current.status} />
+                      </CardTitle>
+                      <CardDescription className="mt-3 text-sm text-muted-foreground max-w-3xl">
+                        {channel.description}
+                      </CardDescription>
                     </div>
-                    {current.hasCredentials && (
-                      <Button
-                        type="button"
-                        variant={current.rotateCredentials ? "secondary" : "outline"}
-                        size="sm"
-                        onClick={() =>
-                          dispatch({
-                            type: "toggleRotate",
-                            channel: channel.type,
-                            value: !current.rotateCredentials,
-                          })
-                        }
-                        className="gap-2"
-                      >
-                        <RefreshCcw className="h-4 w-4" />
-                        {current.rotateCredentials ? "Cancel rotation" : "Rotate credentials"}
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {channel.credentialFields.map((field) => (
-                      <div className="space-y-2" key={`${channel.type}-credential-${field.key}`}>
-                        <Label htmlFor={`${channel.type}-credential-${field.key}`}>{field.label}</Label>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={current.isActive}
+                          onCheckedChange={(value) =>
+                            dispatch({ type: "updateField", channel: channel.type, field: "isActive", value })
+                          }
+                          id={`${channel.type}-active`}
+                        />
+                        <Label htmlFor={`${channel.type}-active`} className="text-sm font-medium">
+                          {current.isActive ? "Channel active" : "Channel inactive"}
+                        </Label>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <Separator className="my-2" />
+                  <CardContent className="space-y-6">
+                    <section className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor={`${channel.type}-provider`}>Provider name</Label>
                         <Input
-                          id={`${channel.type}-credential-${field.key}`}
-                          type="password"
-                          placeholder={rotateEnabled ? field.placeholder : "????????"}
-                          value={rotateEnabled ? current.credentials?.[field.key] ?? "" : ""}
-                          disabled={!rotateEnabled}
+                          id={`${channel.type}-provider`}
+                          placeholder={channel.providerHint}
+                          value={current.providerName}
                           onChange={(event) =>
                             dispatch({
-                              type: "updateCredential",
+                              type: "updateField",
                               channel: channel.type,
-                              key: field.key,
+                              field: "providerName",
                               value: event.target.value,
                             })
                           }
                         />
                       </div>
-                    ))}
-                  </div>
-                </section>
+                      <div className="space-y-2">
+                        <Label htmlFor={`${channel.type}-identifier`}>Provider identifier</Label>
+                        <Input
+                          id={`${channel.type}-identifier`}
+                          placeholder="Account ID / workspace"
+                          value={current.providerIdentifier}
+                          onChange={(event) =>
+                            dispatch({
+                              type: "updateField",
+                              channel: channel.type,
+                              field: "providerIdentifier",
+                              value: event.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`${channel.type}-label`}>Display label</Label>
+                        <Input
+                          id={`${channel.type}-label`}
+                          placeholder="Visible name to admins"
+                          value={current.displayLabel}
+                          onChange={(event) =>
+                            dispatch({
+                              type: "updateField",
+                              channel: channel.type,
+                              field: "displayLabel",
+                              value: event.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </section>
 
-                <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                    {current.lastValidatedAt && (
-                      <span className="flex items-center gap-1">
-                        <ShieldCheck className="h-3 w-3 text-emerald-500" />
-                        Validated {new Date(current.lastValidatedAt).toLocaleString()}
-                      </span>
-                    )}
-                    {current.validationError && (
-                      <span className="text-red-500">Last validation failed: {current.validationError}</span>
-                    )}
-                  </div>
+                    <section className="grid gap-4 sm:grid-cols-2">
+                      {channel.configFields.map((field) => (
+                        <div className="space-y-2" key={`${channel.type}-config-${field.key}`}>
+                          <Label htmlFor={`${channel.type}-config-${field.key}`}>{field.label}</Label>
+                          <Input
+                            id={`${channel.type}-config-${field.key}`}
+                            type={field.type ?? "text"}
+                            placeholder={field.placeholder}
+                            value={current.configuration?.[field.key] ?? ""}
+                            onChange={(event) =>
+                              dispatch({
+                                type: "updateConfig",
+                                channel: channel.type,
+                                key: field.key,
+                                value: event.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      ))}
+                    </section>
 
-                  <div className="flex flex-wrap gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="gap-2"
-                      disabled={current.testing}
-                      onClick={() => handleTest(channel)}
-                    >
-                      {current.testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
-                      Test connection
-                    </Button>
-                    <Button
-                      type="button"
-                      className="gap-2"
-                      disabled={current.saving || (!current.dirty && !current.rotateCredentials)}
-                      onClick={() => handleSave(channel)}
-                    >
-                      {current.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                      Save settings
-                    </Button>
-                  </div>
-                </section>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+                    <section className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Credential vault</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Credentials are encrypted with your tenant secret. {current.hasCredentials ? "Rotate to update" : "Add credentials to activate."}
+                          </p>
+                        </div>
+                        {current.hasCredentials && (
+                          <Button
+                            type="button"
+                            variant={current.rotateCredentials ? "secondary" : "outline"}
+                            size="sm"
+                            onClick={() =>
+                              dispatch({
+                                type: "toggleRotate",
+                                channel: channel.type,
+                                value: !current.rotateCredentials,
+                              })
+                            }
+                            className="gap-2"
+                          >
+                            <RefreshCcw className="h-4 w-4" />
+                            {current.rotateCredentials ? "Cancel rotation" : "Rotate credentials"}
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {channel.credentialFields.map((field) => (
+                          <div className="space-y-2" key={`${channel.type}-credential-${field.key}`}>
+                            <Label htmlFor={`${channel.type}-credential-${field.key}`}>{field.label}</Label>
+                            <Input
+                              id={`${channel.type}-credential-${field.key}`}
+                              type="password"
+                              placeholder={rotateEnabled ? field.placeholder : "????????"}
+                              value={rotateEnabled ? current.credentials?.[field.key] ?? "" : ""}
+                              disabled={!rotateEnabled}
+                              onChange={(event) =>
+                                dispatch({
+                                  type: "updateCredential",
+                                  channel: channel.type,
+                                  key: field.key,
+                                  value: event.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                        {current.lastValidatedAt && (
+                          <span className="flex items-center gap-1">
+                            <ShieldCheck className="h-3 w-3 text-emerald-500" />
+                            Validated {new Date(current.lastValidatedAt).toLocaleString()}
+                          </span>
+                        )}
+                        {current.validationError && (
+                          <span className="text-red-500">Last validation failed: {current.validationError}</span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="gap-2"
+                          disabled={current.testing}
+                          onClick={() => handleTest(channel)}
+                        >
+                          {current.testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
+                          Test connection
+                        </Button>
+                        <Button
+                          type="button"
+                          className="gap-2"
+                          disabled={current.saving || (!current.dirty && !current.rotateCredentials)}
+                          onClick={() => handleSave(channel)}
+                        >
+                          {current.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          Save settings
+                        </Button>
+                      </div>
+                    </section>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="templates">
+          <TemplateManager />
+        </TabsContent>
+
+        <TabsContent value="snippets">
+          <SnippetManager />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
