@@ -74,6 +74,7 @@ const getInitials = (name: string) =>
     .join("") || "?"
 
 export default function CommunicationPage() {
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [channels, setChannels] = useState<ChannelRecord[]>([])
   const [channelsLoading, setChannelsLoading] = useState(true)
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null)
@@ -93,13 +94,46 @@ export default function CommunicationPage() {
     [channels, activeChannelId],
   )
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const hasDemoCookie = document.cookie.includes("demo-session=active")
+    const demoProfile = localStorage.getItem("demo_user")
+    setIsDemoMode(hasDemoCookie || !!demoProfile)
+  }, [])
+
   const loadChannels = useCallback(async () => {
-    try {
-      setChannelsLoading(true)
+    const fetchPrimary = async () => {
       const response = await fetch("/api/communication/channels")
       const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || "Failed to load channels")
-      const data: ChannelRecord[] = payload.data ?? []
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to load channels")
+      }
+      return payload.data ?? []
+    }
+
+    const fetchDemo = async () => {
+      const response = await fetch("/api/demo/communication?resource=channels", { cache: "no-store" })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to load demo channels")
+      }
+      return payload.data ?? []
+    }
+
+    try {
+      setChannelsLoading(true)
+      let data: ChannelRecord[]
+      try {
+        data = await fetchPrimary()
+      } catch (primaryError) {
+        if (isDemoMode) {
+          console.warn("[channels] primary fetch failed, attempting demo fallback", primaryError)
+          data = await fetchDemo()
+        } else {
+          throw primaryError
+        }
+      }
+
       setChannels(data)
       if (!activeChannelId && data.length > 0) {
         setActiveChannelId(data[0].id)
@@ -114,17 +148,44 @@ export default function CommunicationPage() {
     } finally {
       setChannelsLoading(false)
     }
-  }, [activeChannelId, toast])
+  }, [activeChannelId, isDemoMode, toast])
 
   const loadMessages = useCallback(
     async (channelId: string) => {
-      try {
-        setMessagesLoading(true)
+      const fetchPrimary = async () => {
         const params = new URLSearchParams({ channelId, limit: "50" })
         const response = await fetch(`/api/communication/messages?${params.toString()}`)
         const payload = await response.json()
-        if (!response.ok) throw new Error(payload.error || "Failed to load messages")
-        const data: MessageRecord[] = payload.data ?? []
+        if (!response.ok) {
+          throw new Error(payload.error || "Failed to load messages")
+        }
+        return payload.data ?? []
+      }
+
+      const fetchDemo = async () => {
+        const params = new URLSearchParams({ resource: "messages", channelId })
+        const response = await fetch(`/api/demo/communication?${params.toString()}`, { cache: "no-store" })
+        const payload = await response.json()
+        if (!response.ok) {
+          throw new Error(payload.error || "Failed to load demo messages")
+        }
+        return payload.data ?? []
+      }
+
+      try {
+        setMessagesLoading(true)
+        let data: MessageRecord[]
+        try {
+          data = await fetchPrimary()
+        } catch (primaryError) {
+          if (isDemoMode) {
+            console.warn("[messages] primary fetch failed, attempting demo fallback", primaryError)
+            data = await fetchDemo()
+          } else {
+            throw primaryError
+          }
+        }
+
         setMessages([...data].reverse())
       } catch (error: any) {
         console.error("[messages]", error)
@@ -137,11 +198,35 @@ export default function CommunicationPage() {
         setMessagesLoading(false)
       }
     },
-    [toast],
+    [isDemoMode, toast],
   )
 
   const sendMessage = useCallback(async () => {
     if (!activeChannelId || !draft.trim() || sending) return
+
+    if (isDemoMode) {
+      const now = new Date().toISOString()
+      const simulatedMessage: MessageRecord = {
+        id: `demo-${Date.now()}`,
+        channel_id: activeChannelId,
+        thread_id: null,
+        sender_id: "demo-user",
+        content: draft.trim(),
+        attachments: [],
+        metadata: { demo: true },
+        priority: "normal",
+        sent_at: now,
+        sender: { id: "demo-user", display_name: "Demo User", full_name: "Demo User" },
+        read_receipts: [],
+        reactions: [],
+      }
+
+      setMessages((previous) => [...previous, simulatedMessage])
+      setDraft("")
+      toast({ title: "Demo message sent", description: "Messages are simulated in demo mode." })
+      return
+    }
+
     try {
       setSending(true)
       const response = await fetch("/api/communication/messages", {
@@ -163,7 +248,7 @@ export default function CommunicationPage() {
     } finally {
       setSending(false)
     }
-  }, [activeChannelId, draft, sending, toast])
+  }, [activeChannelId, draft, isDemoMode, sending, toast])
 
   useEffect(() => {
     loadChannels()
@@ -194,6 +279,29 @@ export default function CommunicationPage() {
     }
 
     try {
+      if (isDemoMode) {
+        const id = `demo-channel-${Date.now()}`
+        const channel: ChannelRecord = {
+          id,
+          channel_name: newChannelName.trim(),
+          channel_type: newChannelType,
+          description: newChannelDescription.trim() || null,
+          channel_members: [],
+        }
+
+        setChannels((previous) => [channel, ...previous])
+        setActiveChannelId(id)
+        setChannelDialogOpen(false)
+        setNewChannelName("")
+        setNewChannelDescription("")
+        setNewChannelType("public")
+        toast({
+          title: "Channel created",
+          description: `#${channel.channel_name} is ready (demo mode).`,
+        })
+        return
+      }
+
       const response = await fetch("/api/communication/channels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -222,7 +330,7 @@ export default function CommunicationPage() {
         description: error.message || "Unexpected error",
       })
     }
-  }, [loadChannels, newChannelDescription, newChannelName, newChannelType, toast])
+  }, [isDemoMode, loadChannels, newChannelDescription, newChannelName, newChannelType, toast])
 
   return (
     <div className="flex h-full min-h-[560px] flex-col gap-4 p-4">

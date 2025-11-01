@@ -173,6 +173,19 @@ export default function SettingsPage() {
   const { toast } = useToast()
   const supabase = createClient()
 
+  const fetchDemoResource = async <T,>(resource: string, params: Record<string, string> = {}) => {
+    const searchParams = new URLSearchParams({ resource, ...params })
+    const response = await fetch(`/api/demo/settings?${searchParams.toString()}`, { cache: "no-store" })
+
+    if (!response.ok) {
+      const message = await response.text()
+      throw new Error(message || `Failed to fetch demo resource: ${resource}`)
+    }
+
+    const json = await response.json()
+    return json.data as T
+  }
+
   const [companyData, setCompanyData] = useState<Company>({
     id: "",
     name: "",
@@ -1146,25 +1159,61 @@ export default function SettingsPage() {
     console.log("[v0] Loading company data...")
 
     if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock company data")
-      setCompanyData({
-        id: "demo-company-001",
-        name: "Akwaaba Technologies Ltd",
-        email_address: "ykodiah@gmail.com",
-        tax_id: "C0012345678",
-        ssnit_number: "1234567890",
-        industry: "Technology",
-        status: "active",
-        address: "123 Liberation Road, Labone, Accra, Ghana",
-        phone_number: "0249397960",
-        divisions: ["Head Office", "Regional Office"],
-        departments: ["Technology", "Human Resources", "Finance"],
-        locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-      })
-      setDivisions(["Head Office", "Regional Office"])
-      setDepartments(["Technology", "Human Resources", "Finance"])
-      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-      return
+      console.log("[v0] Demo mode detected, loading company data from Supabase")
+      try {
+        const data = await fetchDemoResource<{ company: any; settings?: any }>("company")
+        const company = data?.company
+
+        if (!company) {
+          throw new Error("Demo company payload missing")
+        }
+
+        const resolvedDivisions = Array.isArray(company.divisions) ? company.divisions : []
+        const resolvedDepartments = Array.isArray(company.departments) ? company.departments : []
+        const resolvedLocations = Array.isArray(company.locations) ? company.locations : []
+
+        setCompanyData({
+          id: company.id ?? "",
+          name: company.name ?? "",
+          email_address: company.email_address ?? company.email ?? "",
+          tax_id: company.tax_id ?? "",
+          ssnit_number: company.ssnit_number ?? "",
+          industry: company.industry ?? "",
+          status: company.status ?? "active",
+          address: company.address ?? "",
+          phone_number: company.phone_number ?? company.phone ?? "",
+          divisions: resolvedDivisions,
+          departments: resolvedDepartments,
+          locations: resolvedLocations,
+          logo_url: company.logo_url ?? company.logo,
+        })
+
+        setDivisions(resolvedDivisions)
+        setDepartments(resolvedDepartments)
+        setLocations(resolvedLocations)
+        setLogoPreview(company.logo_url ?? "")
+        return
+      } catch (error) {
+        console.error("[v0] Demo company data error:", error)
+        setCompanyData({
+          id: "demo-company-001",
+          name: "Akwaaba Technologies Ltd",
+          email_address: "ykodiah@gmail.com",
+          tax_id: "C0012345678",
+          ssnit_number: "1234567890",
+          industry: "Technology",
+          status: "active",
+          address: "123 Liberation Road, Labone, Accra, Ghana",
+          phone_number: "0249397960",
+          divisions: ["Head Office", "Regional Office"],
+          departments: ["Technology", "Human Resources", "Finance"],
+          locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
+        })
+        setDivisions(["Head Office", "Regional Office"])
+        setDepartments(["Technology", "Human Resources", "Finance"])
+        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+        return
+      }
     }
 
     try {
@@ -1231,32 +1280,42 @@ export default function SettingsPage() {
     console.log("[v0] Loading employees...")
 
     if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock employees data")
-      setEmployees([
-        {
-          id: "emp-001",
-          first_name: "John",
-          last_name: "Doe",
-          full_name: "John Doe",
-          corporate_email: "john.doe@akwaaba.com",
-          personal_email: "john.doe@gmail.com",
-          position: "Software Engineer",
-          department: "Technology",
-          status: "active",
-        },
-        {
-          id: "emp-002",
-          first_name: "Jane",
-          last_name: "Smith",
-          full_name: "Jane Smith",
-          corporate_email: "jane.smith@akwaaba.com",
-          personal_email: "jane.smith@gmail.com",
-          position: "HR Manager",
-          department: "Human Resources",
-          status: "active",
-        },
-      ])
-      return
+      console.log("[v0] Demo mode detected, loading employees from Supabase")
+      try {
+        const data = await fetchDemoResource<Employee[]>("employees")
+        if (Array.isArray(data)) {
+          setEmployees(data)
+          return
+        }
+        throw new Error("Invalid employees payload")
+      } catch (error) {
+        console.error("[v0] Demo employees data error:", error)
+        setEmployees([
+          {
+            id: "emp-001",
+            first_name: "John",
+            last_name: "Doe",
+            full_name: "John Doe",
+            corporate_email: "john.doe@akwaaba.com",
+            personal_email: "john.doe@gmail.com",
+            position: "Software Engineer",
+            department: "Technology",
+            status: "active",
+          },
+          {
+            id: "emp-002",
+            first_name: "Jane",
+            last_name: "Smith",
+            full_name: "Jane Smith",
+            corporate_email: "jane.smith@akwaaba.com",
+            personal_email: "jane.smith@gmail.com",
+            position: "HR Manager",
+            department: "Human Resources",
+            status: "active",
+          },
+        ])
+        return
+      }
     }
 
     try {
@@ -1307,110 +1366,77 @@ export default function SettingsPage() {
     console.log("[v0] Loading subsidiaries...")
 
     if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock subsidiaries data")
-      setSubsidiaries([
-        {
-          id: "sub-001",
-          company_id: "comp-001",
-          name: "Akwaaba Digital Solutions",
-          email_address: "info@akwaabadigital.com",
-          phone_number: "+233 30 276 5432",
-          tax_id: "TIN-ADS-2023-001",
-          ssnit_number: "SSNIT-ADS-789012",
-          address: "15 Liberation Road, Ridge, Accra, Ghana",
-          status: "active",
-          industry: "Digital Marketing & Web Development",
-          divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
-          departments: ["Marketing", "Development", "Design", "Sales"],
-          locations: ["Accra - Ridge", "Kumasi Branch"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 45,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-002",
-          company_id: "comp-001",
-          name: "Akwaaba Consulting Group",
-          email_address: "consulting@akwaaba.com",
-          phone_number: "+233 30 276 5433",
-          tax_id: "TIN-ACG-2023-002",
-          ssnit_number: "SSNIT-ACG-789013",
-          address: "8 Airport Residential Area, Accra, Ghana",
-          status: "active",
-          industry: "Business Consulting & Strategy",
-          divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
-          departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
-          locations: ["Accra - Airport", "Tema Office"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 32,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-003",
-          company_id: "comp-001",
-          name: "Akwaaba Financial Services",
-          email_address: "finance@akwaabafs.com",
-          phone_number: "+233 30 276 5434",
-          tax_id: "TIN-AFS-2023-003",
-          ssnit_number: "SSNIT-AFS-789014",
-          address: "25 Independence Avenue, Accra, Ghana",
-          status: "active",
-          industry: "Financial Technology & Services",
-          divisions: ["Fintech Solutions", "Payment Processing", "Financial Advisory"],
-          departments: ["Finance", "Technology", "Compliance", "Customer Service"],
-          locations: ["Accra - Independence Ave", "Ho Regional Office"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 28,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-004",
-          company_id: "comp-001",
-          name: "Akwaaba Logistics Ltd",
-          email_address: "logistics@akwaabalog.com",
-          phone_number: "+233 30 276 5435",
-          tax_id: "TIN-ALL-2023-004",
-          ssnit_number: "SSNIT-ALL-789015",
-          address: "12 Spintex Road, Accra, Ghana",
-          status: "active",
-          industry: "Supply Chain & Logistics",
-          divisions: ["Transportation", "Warehousing", "Supply Chain Management"],
-          departments: ["Operations", "Fleet Management", "Warehousing", "Customer Service"],
-          locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 3,
-          employee_count: 67,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-005",
-          company_id: "comp-001",
-          name: "Akwaaba Training Institute",
-          email_address: "training@akwaabainstitute.com",
-          phone_number: "+233 30 276 5436",
-          tax_id: "TIN-ATI-2023-005",
-          ssnit_number: "SSNIT-ATI-789016",
-          address: "5 Cantonments Road, Accra, Ghana",
-          status: "active",
-          industry: "Education & Professional Training",
-          divisions: ["Corporate Training", "IT Certification", "Professional Development"],
-          departments: ["Training", "Curriculum Development", "Student Services", "Administration"],
-          locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 3,
-          employee_count: 23,
-          created_at: new Date().toISOString(),
-        },
-      ])
-      return
+      console.log("[v0] Demo mode detected, loading subsidiaries from Supabase")
+      try {
+        const data = await fetchDemoResource<any[]>("subsidiaries")
+        const processedSubsidiaries = (data || []).map((sub: any) => {
+          const divisions = Array.isArray(sub.divisions) ? sub.divisions : []
+          const departments = Array.isArray(sub.departments) ? sub.departments : []
+          const locations = Array.isArray(sub.locations) ? sub.locations : []
+
+          return {
+            ...sub,
+            divisions,
+            departments,
+            locations,
+            divisions_count: divisions.length,
+            departments_count: departments.length,
+            locations_count: locations.length,
+            employee_count:
+              sub.employee_count ??
+              sub.employees_count ??
+              (Array.isArray(sub.employees) ? sub.employees?.[0]?.count ?? 0 : 0),
+          }
+        })
+
+        setSubsidiaries(processedSubsidiaries)
+        return
+      } catch (error) {
+        console.error("[v0] Demo subsidiaries data error:", error)
+        setSubsidiaries([
+          {
+            id: "sub-001",
+            company_id: "comp-001",
+            name: "Akwaaba Digital Solutions",
+            email_address: "info@akwaabadigital.com",
+            phone_number: "+233 30 276 5432",
+            tax_id: "TIN-ADS-2023-001",
+            ssnit_number: "SSNIT-ADS-789012",
+            address: "15 Liberation Road, Ridge, Accra, Ghana",
+            status: "active",
+            industry: "Digital Marketing & Web Development",
+            divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
+            departments: ["Marketing", "Development", "Design", "Sales"],
+            locations: ["Accra - Ridge", "Kumasi Branch"],
+            divisions_count: 3,
+            departments_count: 4,
+            locations_count: 2,
+            employee_count: 45,
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: "sub-002",
+            company_id: "comp-001",
+            name: "Akwaaba Consulting Group",
+            email_address: "consulting@akwaaba.com",
+            phone_number: "+233 30 276 5433",
+            tax_id: "TIN-ACG-2023-002",
+            ssnit_number: "SSNIT-ACG-789013",
+            address: "8 Airport Residential Area, Accra, Ghana",
+            status: "active",
+            industry: "Business Consulting & Strategy",
+            divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
+            departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
+            locations: ["Accra - Airport", "Tema Office"],
+            divisions_count: 3,
+            departments_count: 4,
+            locations_count: 2,
+            employee_count: 32,
+            created_at: new Date().toISOString(),
+          },
+        ])
+        return
+      }
     }
 
     try {
@@ -1453,31 +1479,41 @@ export default function SettingsPage() {
     console.log("[v0] Loading roles...")
 
     if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock roles data")
-      setRoles([
-        {
-          id: "role-001",
-          name: "Administrator",
-          description: "Full system access and management capabilities",
-          permissions: ["all"],
-          user_count: 2,
-        },
-        {
-          id: "role-002",
-          name: "HR Manager",
-          description: "Human resources management and employee oversight",
-          permissions: ["hr", "employees", "reports"],
-          user_count: 3,
-        },
-        {
-          id: "role-003",
-          name: "Employee",
-          description: "Standard employee access to personal information",
-          permissions: ["profile", "payslip", "leave"],
-          user_count: 45,
-        },
-      ])
-      return
+      console.log("[v0] Demo mode detected, loading roles from Supabase")
+      try {
+        const data = await fetchDemoResource<Role[]>("roles")
+        if (Array.isArray(data)) {
+          setRoles(data)
+          return
+        }
+        throw new Error("Invalid roles payload")
+      } catch (error) {
+        console.error("[v0] Demo roles data error:", error)
+        setRoles([
+          {
+            id: "role-001",
+            name: "Administrator",
+            description: "Full system access and management capabilities",
+            permissions: ["all"],
+            user_count: 2,
+          },
+          {
+            id: "role-002",
+            name: "HR Manager",
+            description: "Human resources management and employee oversight",
+            permissions: ["hr", "employees", "reports"],
+            user_count: 3,
+          },
+          {
+            id: "role-003",
+            name: "Employee",
+            description: "Standard employee access to personal information",
+            permissions: ["profile", "payslip", "leave"],
+            user_count: 45,
+          },
+        ])
+        return
+      }
     }
 
     try {
@@ -1687,22 +1723,33 @@ export default function SettingsPage() {
     const currentCount = await refreshEmployeeCount(subsidiaryId)
 
     if (isDemoMode()) {
-      const mockEmployees = Array.from({ length: currentCount }, (_, i) => ({
-        id: `emp-${i + 1}`,
-        name: `Employee ${i + 1}`,
-        position: ["Software Engineer", "Marketing Manager", "HR Specialist", "Sales Representative", "Accountant"][
-          i % 5
-        ],
-        department: ["Technology", "Marketing", "Human Resources", "Sales", "Finance"][i % 5],
-        email: `employee${i + 1}@company.com`,
-      }))
+      try {
+        const employees = await fetchDemoResource<any[]>("subsidiary-employees", { subsidiaryId })
+        setViewEmployeesModal({
+          isOpen: true,
+          subsidiaryId,
+          employees: employees ?? [],
+        })
+        return
+      } catch (error) {
+        console.error("[v0] Demo subsidiary employees error:", error)
+        const fallbackEmployees = Array.from({ length: currentCount }, (_, i) => ({
+          id: `emp-${i + 1}`,
+          name: `Employee ${i + 1}`,
+          position: ["Software Engineer", "Marketing Manager", "HR Specialist", "Sales Representative", "Accountant"][
+            i % 5
+          ],
+          department: ["Technology", "Marketing", "Human Resources", "Sales", "Finance"][i % 5],
+          email: `employee${i + 1}@company.com`,
+        }))
 
-      setViewEmployeesModal({
-        isOpen: true,
-        subsidiaryId,
-        employees: mockEmployees,
-      })
-      return
+        setViewEmployeesModal({
+          isOpen: true,
+          subsidiaryId,
+          employees: fallbackEmployees,
+        })
+        return
+      }
     }
 
     try {

@@ -419,7 +419,7 @@ export default function ClientAppLayout({
                       <Button
                         variant="ghost"
                         onClick={handleSignOut}
-                        className="w-full justify-start text-gray-700 hover:text-red-600 hover:bg-red-50"
+                        className="w-full justify-start text-gray-700 hover:text-gray-900 hover:bg-gray-100"
                       >
                         <LogOut className="w-4 h-4 mr-2" />
                         Sign Out
@@ -794,7 +794,7 @@ export default function ClientAppLayout({
                   <Button
                     variant="ghost"
                     onClick={handleSignOut}
-                    className={`w-full justify-start text-gray-700 hover:text-red-600 hover:bg-red-50 ${
+                    className={`w-full justify-start text-gray-700 hover:text-gray-900 hover:bg-gray-100 ${
                       sidebarCollapsed ? 'px-3' : ''
                     }`}
                     title={sidebarCollapsed ? 'Sign Out' : undefined}

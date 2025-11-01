@@ -34,6 +34,7 @@ import {
 } from "lucide-react"
 
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
+import { AdvancedDocumentService } from "@/lib/storage/advancedDocumentService"
 import { useToast } from "@/hooks/use-toast"
 // import { EmployeeProfile } from "@/components/employee-profile"
 
@@ -1878,6 +1879,29 @@ function ImportDataDialog({
         notes: `Uploaded during employee onboarding - ${doc.title}`,
       })
 
+      const storedDocument = documentService.getAllDocuments().find((item) => item.id === documentId)
+
+      const advancedDocumentService = AdvancedDocumentService.getInstance()
+      try {
+        await advancedDocumentService.uploadDocument({
+          file,
+          employeeId: formData.employee_id || "temp-id",
+          employeeName: `${formData.first_name} ${formData.last_name}`.trim() || "New Employee",
+          documentType,
+          source: "employee-onboarding",
+          uploadedBy: "HR Admin",
+          notes: `Uploaded during employee onboarding - ${doc.title}`,
+          accessLevel: "confidential",
+          tags: [documentType, "employee-onboarding"],
+          metadata: {
+            onboardingStep: "documents",
+            employeeId: formData.employee_id || "temp-id",
+          },
+        })
+      } catch (advancedError) {
+        console.warn("[v0] Advanced document upload failed", advancedError)
+      }
+
       // Add to uploaded documents
       const uploadedDoc = {
         id: documentId,
@@ -1887,6 +1911,7 @@ function ImportDataDialog({
         fileType: file.type,
         uploadDate: new Date(),
         uploadedBy: "HR Admin",
+        fileUrl: storedDocument?.fileUrl ?? "",
       }
 
       setUploadedDocuments((prev) => {
@@ -4825,7 +4850,7 @@ function AddEmployeeForm({
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-3">
+                      <div className="flex flex-col items-end space-y-2">
                         {isUploaded ? (
                           <div className="flex items-center space-x-3">
                             <Button
@@ -4851,7 +4876,6 @@ function AddEmployeeForm({
                           </div>
                         ) : (
                           <div className="flex items-center space-x-2">
-                            {/* Hidden file input for desktop */}
                             <input
                               ref={(el) => {
                                 if (el) {
@@ -4861,61 +4885,26 @@ function AddEmployeeForm({
                               type="file"
                               accept={doc.acceptTypes}
                               onChange={(e) => handleFileSelect(doc.id, e)}
-                              className="hidden md:block"
+                              className="sr-only"
                               id={`file-input-${doc.id}`}
-                              style={{ position: "absolute", left: "-9999px", opacity: 0 }}
                             />
-
-                            {/* Mobile file input - visible but styled */}
-                            <input
-                              type="file"
-                              accept={doc.acceptTypes}
-                              onChange={(e) => handleFileSelect(doc.id, e)}
-                              className="block md:hidden w-full min-h-[44px] text-sm text-blue-600 border border-blue-300 rounded-md bg-white hover:bg-blue-50 active:bg-blue-100 file:mr-4 file:py-2 file:px-4 file:rounded-l-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                              id={`mobile-file-input-${doc.id}`}
-                            />
-
-                            {/* Desktop button */}
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
+                              disabled={isUploading}
                               onClick={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                console.log("[v0] Desktop upload button clicked for:", doc.id)
-
-                                // Try the hidden input first
-                                const hiddenInput = document.getElementById(`file-input-${doc.id}`) as HTMLInputElement
+                                const hiddenInput = fileInputRefs.current[doc.id] as HTMLInputElement | undefined
                                 if (hiddenInput) {
-                                  console.log("[v0] Using hidden input for:", doc.id)
                                   hiddenInput.value = ""
                                   hiddenInput.click()
                                 } else {
-                                  console.log("[v0] Using handleUploadClick for:", doc.id)
-                                  // Fallback to dynamic creation
                                   handleUploadClick(doc.id)
                                 }
                               }}
-                              onTouchEnd={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                console.log("[v0] Desktop upload button touch end for:", doc.id)
-
-                                // Try the hidden input first
-                                const hiddenInput = document.getElementById(`file-input-${doc.id}`) as HTMLInputElement
-                                if (hiddenInput) {
-                                  console.log("[v0] Using hidden input (touch) for:", doc.id)
-                                  hiddenInput.value = ""
-                                  hiddenInput.click()
-                                } else {
-                                  console.log("[v0] Using handleUploadClick (touch) for:", doc.id)
-                                  // Fallback to dynamic creation
-                                  handleUploadClick(doc.id)
-                                }
-                              }}
-                              disabled={isUploading}
-                              className="hidden md:flex text-blue-600 hover:text-blue-700 hover:bg-blue-50 active:bg-blue-100 touch-manipulation min-h-[44px] min-w-[140px] text-sm font-medium border-2 hover:border-blue-400"
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 active:bg-blue-100 touch-manipulation min-h-[44px] min-w-[140px] text-sm font-medium border-2 hover:border-blue-400"
                             >
                               {isUploading ? (
                                 <>
@@ -4925,11 +4914,14 @@ function AddEmployeeForm({
                               ) : (
                                 <>
                                   <Upload className="w-4 h-4 mr-2" />
-                                  Choose File
+                                  Upload
                                 </>
                               )}
                             </Button>
                           </div>
+                        )}
+                        {isUploaded && uploadedDoc && (
+                          <p className="text-xs text-green-700">{uploadedDoc.fileName}</p>
                         )}
                       </div>
                     </div>
