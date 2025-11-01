@@ -230,4 +230,3 @@ SELECT
     created_at,
     updated_at
 FROM communication_provider_integrations;
-

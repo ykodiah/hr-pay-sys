@@ -110,4 +110,3 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
     return NextResponse.json({ error: error.message || "Failed to delete integration" }, { status: 500 })
   }
 }
-

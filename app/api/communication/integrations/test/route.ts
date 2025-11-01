@@ -131,4 +131,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message || "Unable to validate integration" }, { status: 500 })
   }
 }
-

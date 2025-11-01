@@ -111,4 +111,3 @@ export async function DELETE(request: NextRequest, { params }: { params: { chann
     return NextResponse.json({ error: error.message || "Failed to remove member" }, { status: 500 })
   }
 }
-

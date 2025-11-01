@@ -146,4 +146,3 @@ export const HealthEvaluators: Record<string, (configuration: Record<string, any
   slack: evaluateSlackHealth,
   webhook: evaluateWebhookHealth,
 }
-

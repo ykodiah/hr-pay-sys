@@ -10,19 +10,19 @@ Add the following entries to your deployment environment and local `.env` file (
 
 Install new runtime dependencies:
 
-```bash
+\`\`\`bash
 npm install
-```
+\`\`\`
 
 ## Database Migration
 
 Run the new Supabase migration before deploying the updated application:
 
-```bash
+\`\`\`bash
 supabase db push
 # or, if you prefer manual migration execution
 supabase migration up 20251031121000
-```
+\`\`\`
 
 This creates `communication_provider_integrations`, the associated audit log table, triggers, policies, and the sanitized view consumed by the application.
 
@@ -36,7 +36,7 @@ This creates `communication_provider_integrations`, the associated audit log tab
 
 Call the event endpoint whenever payroll or HR workflows emit lifecycle events:
 
-```http
+\`\`\`http
 POST /api/communication/events
 Content-Type: application/json
 
@@ -44,7 +44,7 @@ Content-Type: application/json
   "type": "PAYROLL.COMPLETED",
   "employeeIds": ["<employee-uuid>"]
 }
-```
+\`\`\`
 
 The automation layer resolves employee contact details, selects the appropriate provider, and delivers notifications through the configured channel.
 
@@ -57,4 +57,3 @@ Supported event types out of the box:
 - `HR.DOC_EXPIRING`
 
 Extend `lib/communication/automations.ts` to add new event handlers or customise template text.
-

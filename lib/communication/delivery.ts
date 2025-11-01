@@ -57,4 +57,3 @@ export async function runIntegrationHealthCheck(integration: ChannelIntegration)
 
   return evaluator(integration.configuration, integration.credentials)
 }
-

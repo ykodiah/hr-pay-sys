@@ -93,4 +93,3 @@ export function redactStoredCredentials(payload: string | null) {
   if (!payload) return {}
   return decryptCredentials(payload)
 }
-

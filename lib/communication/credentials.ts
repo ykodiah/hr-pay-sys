@@ -86,4 +86,3 @@ export function redactCredentialsMap(secrets: CredentialMap) {
 export function hasStoredCredentials(payload?: string | null) {
   return Boolean(payload && payload.length > 0)
 }
-

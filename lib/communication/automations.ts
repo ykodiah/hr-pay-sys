@@ -160,4 +160,3 @@ export async function handleCommunicationEvent(
     externalId: delivery.externalId,
   }
 }
-

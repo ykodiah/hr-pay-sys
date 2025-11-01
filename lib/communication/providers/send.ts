@@ -347,4 +347,3 @@ export async function sendThroughProvider(
       throw new Error(`Channel ${integration.channelType} delivery not yet implemented`)
   }
 }
-

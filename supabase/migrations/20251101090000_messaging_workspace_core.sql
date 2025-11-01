@@ -369,4 +369,3 @@ SELECT resource, action FROM (
 WHERE NOT EXISTS (
     SELECT 1 FROM permissions p WHERE p.resource = perm.resource AND p.action = perm.action
 );
-
