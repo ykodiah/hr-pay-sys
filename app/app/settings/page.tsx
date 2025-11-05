@@ -84,7 +84,7 @@ interface Company {
   phone_number: string
   email_address: string
   logo_file_id?: string
-  logo_url?: string
+  logo_url?: string | null
   divisions?: string[]
   departments?: string[]
   locations?: string[]
@@ -114,7 +114,7 @@ interface Subsidiary {
   email_address: string
   phone_number: string
   address: string
-  logo_url?: string
+  logo_url?: string | null
   divisions: any[] | string[]
   departments: any[] | string[]
   locations: any[] | string[]
@@ -275,6 +275,7 @@ export default function SettingsPage() {
     divisions: [],
     departments: [],
     locations: [],
+    logo_url: null,
   })
 
   const [hrConfig, setHrConfig] = useState<HrConfig>({
@@ -385,6 +386,17 @@ export default function SettingsPage() {
 
   const [isManagingLeaveTypes, setIsManagingLeaveTypes] = useState(false)
   const [selectedPolicy, setSelectedPolicy] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (selectedSubsidiary) {
+      const nextPreview = selectedSubsidiary.logo_url || ""
+      if (subsidiaryLogoPreview !== nextPreview) {
+        setSubsidiaryLogoPreview(nextPreview)
+      }
+    } else if (!showEditSubsidiary && !showSubsidiaryDetails) {
+      setSubsidiaryLogoPreview("")
+    }
+  }, [selectedSubsidiary?.id, selectedSubsidiary?.logo_url, showEditSubsidiary, showSubsidiaryDetails, subsidiaryLogoPreview])
 
   const [isSaving, setIsSaving] = useState(false) // General saving state
   const [showAddLeaveTypeModal, setShowAddLeaveTypeModal] = useState(false)
@@ -1254,6 +1266,29 @@ export default function SettingsPage() {
   }
 
   // Load functions
+  const fetchCurrentCompanyId = async (): Promise<string | null> => {
+    if (isDemoMode()) return "demo-company-001"
+
+    if (companyData.id) {
+      const trimmed = companyData.id.trim()
+      if (trimmed.length > 0) return trimmed
+    }
+
+    try {
+      const { data, error } = await supabase.rpc("get_current_user_company_id")
+      if (error) {
+        console.warn("[v0] get_current_user_company_id RPC failed", error)
+        return null
+      }
+      if (typeof data === "string" && data.trim().length > 0) {
+        return data
+      }
+    } catch (error) {
+      console.warn("[v0] RPC get_current_user_company_id threw", error)
+    }
+    return null
+  }
+
   const loadCompanyData = async (): Promise<string | null> => {
     console.log("[v0] Loading company data...")
 
@@ -1276,11 +1311,21 @@ export default function SettingsPage() {
       setDivisions(["Head Office", "Regional Office"])
       setDepartments(["Technology", "Human Resources", "Finance"])
       setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+      setCompanyLogoPreview("/placeholder.svg")
+      setLogoPreview("/placeholder.svg")
       return "demo-company-001"
     }
 
     try {
-      const { data, error } = await supabase.from("companies").select("*").single()
+      const currentCompanyId = await fetchCurrentCompanyId()
+
+      const companyBaseQuery = supabase.from("companies").select("*")
+
+      const companyRequest = currentCompanyId
+        ? companyBaseQuery.eq("id", currentCompanyId).maybeSingle()
+        : companyBaseQuery.order("created_at", { ascending: false }).limit(1).maybeSingle()
+
+      const { data, error } = await companyRequest
 
       if (error) throw error
 
@@ -1315,14 +1360,14 @@ export default function SettingsPage() {
           divisions,
           departments,
           locations,
-          logo_url: resolvedLogoUrl,
+          logo_url: resolvedLogoUrl || null,
         })
 
         setDivisions(divisions)
         setDepartments(departments)
         setLocations(locations)
-        setCompanyLogoPreview(resolvedLogoUrl)
-        setLogoPreview(resolvedLogoUrl)
+        setCompanyLogoPreview(resolvedLogoUrl || "/placeholder.svg")
+        setLogoPreview(resolvedLogoUrl || "/placeholder.svg")
         return data.id
       }
     } catch (error) {
@@ -1345,6 +1390,7 @@ export default function SettingsPage() {
           divisions: ["Head Office", "Regional Office"],
           departments: ["Technology", "Human Resources", "Finance"],
           locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
+          logo_url: "/placeholder.svg",
         })
         setDivisions(["Head Office", "Regional Office"])
         setDepartments(["Technology", "Human Resources", "Finance"])
@@ -2657,6 +2703,15 @@ export default function SettingsPage() {
         throw new Error("No company identifier available")
       }
 
+      const normalizedCompanyLogo = (() => {
+        const preview = companyLogoPreview?.trim() || ""
+        const current = companyData.logo_url ? companyData.logo_url.toString().trim() : ""
+        const preferred = preview && !preview.includes("/placeholder") ? preview : ""
+        const fallback = current && !current.includes("/placeholder") ? current : ""
+        const value = preferred || fallback
+        return value || null
+      })()
+
       const { error: companyError } = await supabase
         .from("companies")
         .update({
@@ -2670,7 +2725,7 @@ export default function SettingsPage() {
           divisions,
           departments,
           locations,
-          logo_url: companyLogoPreview || companyData.logo_url || null,
+          logo_url: normalizedCompanyLogo,
           updated_at: new Date().toISOString(),
         })
         .eq("id", companyId)
@@ -2686,6 +2741,7 @@ export default function SettingsPage() {
               divisions,
               departments,
               locations,
+              logo_url: normalizedCompanyLogo,
             },
             updated_at: new Date().toISOString(),
           },
@@ -5836,27 +5892,27 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 <MoreVertical className="h-3 w-3" />
                               </Button>
                             </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setSelectedSubsidiary(subsidiary)
-                                    setSubsidiaryLogoPreview(subsidiary.logo_url || "")
-                                    setShowSubsidiaryDetails(true)
-                                  }}
-                                >
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setSelectedSubsidiary(subsidiary)
-                                    setSubsidiaryLogoPreview(subsidiary.logo_url || "")
-                                    setShowEditSubsidiary(true)
-                                  }}
-                                >
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit Subsidiary
-                                </DropdownMenuItem>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setSubsidiaryLogoPreview(subsidiary.logo_url || "")
+                                  setShowSubsidiaryDetails(true)
+                                }}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedSubsidiary(subsidiary)
+                                  setSubsidiaryLogoPreview(subsidiary.logo_url || "")
+                                  setShowEditSubsidiary(true)
+                                }}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Subsidiary
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => syncSubsidiarySettings(subsidiary.id)}>
                                 <RefreshCw className="w-4 h-4 mr-2" />
                                 Sync Settings
