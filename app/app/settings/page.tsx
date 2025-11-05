@@ -1285,6 +1285,23 @@ export default function SettingsPage() {
       if (error) throw error
 
       if (data) {
+        const { data: rawCompanySettings, error: companySettingsError } = await supabase
+          .from("company_settings")
+          .select("settings_data, fiscal_year_start, default_currency, timezone, language")
+          .eq("company_id", data.id)
+          .maybeSingle()
+
+        if (companySettingsError) {
+          console.warn("[v0] Unable to load company_settings entry", companySettingsError)
+        }
+
+        const settingsPayload = rawCompanySettings?.settings_data || {}
+        const divisions = ensureStringArray(settingsPayload.divisions ?? data.divisions)
+        const departments = ensureStringArray(settingsPayload.departments ?? data.departments)
+        const locations = ensureStringArray(settingsPayload.locations ?? data.locations)
+        const logoFromSettings = typeof settingsPayload.logo_url === "string" ? settingsPayload.logo_url : undefined
+        const resolvedLogoUrl = (data.logo_url as string | undefined) || logoFromSettings || ""
+
         setCompanyData({
           id: data.id,
           name: data.name || "",
@@ -1295,15 +1312,17 @@ export default function SettingsPage() {
           status: "active",
           address: data.address || "",
           phone_number: data.phone_number || "",
-          divisions: data.divisions || [],
-          departments: data.departments || [],
-          locations: data.locations || [],
+          divisions,
+          departments,
+          locations,
+          logo_url: resolvedLogoUrl,
         })
 
-        setDivisions(data.divisions || [])
-        setDepartments(data.departments || [])
-        setLocations(data.locations || [])
-        setLogoPreview(data.logo_url || "")
+        setDivisions(divisions)
+        setDepartments(departments)
+        setLocations(locations)
+        setCompanyLogoPreview(resolvedLogoUrl)
+        setLogoPreview(resolvedLogoUrl)
         return data.id
       }
     } catch (error) {
@@ -1330,6 +1349,8 @@ export default function SettingsPage() {
         setDivisions(["Head Office", "Regional Office"])
         setDepartments(["Technology", "Human Resources", "Finance"])
         setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+        setCompanyLogoPreview("/placeholder.svg")
+        setLogoPreview("/placeholder.svg")
         return "demo-company-001"
       }
       toast({
@@ -1562,16 +1583,23 @@ export default function SettingsPage() {
         return acc
       }, {})
 
-      const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => ({
-        ...sub,
-        divisions: Array.isArray(sub.divisions) ? sub.divisions : [],
-        departments: Array.isArray(sub.departments) ? sub.departments : [],
-        locations: Array.isArray(sub.locations) ? sub.locations : [],
-        divisions_count: Array.isArray(sub.divisions) ? sub.divisions.length : 0,
-        departments_count: Array.isArray(sub.departments) ? sub.departments.length : 0,
-        locations_count: Array.isArray(sub.locations) ? sub.locations.length : 0,
-        employee_count: employeeCounts[sub.id] ?? sub.employee_count ?? 0,
-      }))
+      const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => {
+        const divisions = ensureStringArray(sub.divisions)
+        const departments = ensureStringArray(sub.departments)
+        const locations = ensureStringArray(sub.locations)
+
+        return {
+          ...sub,
+          divisions,
+          departments,
+          locations,
+          divisions_count: divisions.length,
+          departments_count: departments.length,
+          locations_count: locations.length,
+          employee_count: employeeCounts[sub.id] ?? sub.employee_count ?? 0,
+          logo_url: sub.logo_url || null,
+        }
+      })
 
       setSubsidiaries(processedSubsidiaries)
       console.log("[v0] Loaded subsidiaries:", processedSubsidiaries.length)
@@ -5761,6 +5789,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 className="h-7 px-2 text-xs bg-transparent"
                                 onClick={() => {
                                   setSelectedSubsidiary(subsidiary)
+                                  setSubsidiaryLogoPreview(subsidiary.logo_url || "")
                                   setShowSubsidiaryDetails(true)
                                 }}
                               >
@@ -5773,6 +5802,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 className="h-7 px-2 text-xs bg-transparent"
                                 onClick={() => {
                                   setSelectedSubsidiary(subsidiary)
+                                  setSubsidiaryLogoPreview(subsidiary.logo_url || "")
                                   setShowEditSubsidiary(true)
                                 }}
                               >
@@ -5806,25 +5836,27 @@ Format the response in a professional, actionable manner for HR decision-makers.
                                 <MoreVertical className="h-3 w-3" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedSubsidiary(subsidiary)
-                                  setShowSubsidiaryDetails(true)
-                                }}
-                              >
-                                <Eye className="w-4 h-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedSubsidiary(subsidiary)
-                                  setShowEditSubsidiary(true)
-                                }}
-                              >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit Subsidiary
-                              </DropdownMenuItem>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setSelectedSubsidiary(subsidiary)
+                                    setSubsidiaryLogoPreview(subsidiary.logo_url || "")
+                                    setShowSubsidiaryDetails(true)
+                                  }}
+                                >
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setSelectedSubsidiary(subsidiary)
+                                    setSubsidiaryLogoPreview(subsidiary.logo_url || "")
+                                    setShowEditSubsidiary(true)
+                                  }}
+                                >
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit Subsidiary
+                                </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => syncSubsidiarySettings(subsidiary.id)}>
                                 <RefreshCw className="w-4 h-4 mr-2" />
                                 Sync Settings
