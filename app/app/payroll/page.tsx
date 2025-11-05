@@ -883,8 +883,9 @@ export default function PayrollPage() {
               ) : (
                 <p className="text-sm text-gray-500">No intercompany transfers recorded yet.</p>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Employee Payroll Details */}
         <Card>
