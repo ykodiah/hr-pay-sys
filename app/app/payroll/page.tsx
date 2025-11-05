@@ -1,6 +1,6 @@
 "use client"
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -11,6 +11,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
 import { toast } from "@/hooks/use-toast"
 import {
   Calculator,
@@ -29,6 +33,9 @@ import {
   Filter,
   Search,
   FileSpreadsheet,
+  ArrowRightLeft,
+  Building2,
+  Clock,
 } from "lucide-react"
 
 const calculateSSNIT = (basicSalary: number) => {
@@ -83,6 +90,112 @@ const calculatePAYE = (
   return Math.round(tax)
 }
 
+type TransferType = "permanent" | "temporary"
+
+type Subsidiary = {
+  id: string
+  name: string
+  code: string
+  location: string
+  description?: string
+}
+
+type TransferEmployeeRecord = {
+  id: number
+  name: string
+  fromSubsidiaryId: string
+  fromSubsidiaryName: string
+}
+
+type TransferRecord = {
+  id: string
+  initiatedOn: string
+  effectiveDate: string
+  transferType: TransferType
+  targetSubsidiaryId: string
+  targetSubsidiaryName: string
+  reason?: string
+  employees: TransferEmployeeRecord[]
+}
+
+const subsidiaries: Subsidiary[] = [
+  {
+    id: "accra-hq",
+    name: "Accra Headquarters",
+    code: "SUB-001",
+    location: "Accra",
+    description: "Corporate head office",
+  },
+  {
+    id: "kumasi-branch",
+    name: "Kumasi Branch",
+    code: "SUB-002",
+    location: "Kumasi",
+    description: "Northern region operations",
+  },
+  {
+    id: "takoradi-ops",
+    name: "Takoradi Operations Centre",
+    code: "SUB-003",
+    location: "Takoradi",
+    description: "Western corridor services",
+  },
+]
+
+const getSubsidiaryName = (id: string) => subsidiaries.find((subsidiary) => subsidiary.id === id)?.name ?? "Unknown subsidiary"
+
+const getSubsidiaryCode = (id: string) => subsidiaries.find((subsidiary) => subsidiary.id === id)?.code ?? "—"
+
+const formatDisplayDate = (date?: string | null) => {
+  if (!date) {
+    return "Immediate"
+  }
+
+  if (date.includes("T")) {
+    return formatDisplayDate(date.split("T")[0])
+  }
+
+  const [year, month, day] = date.split("-").map(Number)
+
+  if (!year || !month || !day) {
+    return date
+  }
+
+  return new Date(year, month - 1, day).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+const toTitleCase = (value: string) =>
+  value
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
+
+const formatTransferCount = (count: number) => `${count} ${count === 1 ? "employee" : "employees"}`
+
+const normalizeStatus = (status: string) => status.toLowerCase().replace(/\s+/g, "-")
+
+const getStatusBadgeAppearance = (status: string) => {
+  const normalized = normalizeStatus(status)
+
+  if (normalized === "processed") {
+    return { variant: "default" as const, className: "bg-emerald-100 text-emerald-800" }
+  }
+
+  if (normalized === "calculated") {
+    return { variant: "secondary" as const, className: "bg-blue-100 text-blue-800" }
+  }
+
+  if (normalized === "pending-transfer") {
+    return { variant: "secondary" as const, className: "bg-amber-100 text-amber-800 border-amber-200" }
+  }
+
+  return { variant: "outline" as const, className: "bg-gray-100 text-gray-800" }
+}
+
 const initialPayrollPeriods = [
   {
     id: 1,
@@ -135,6 +248,8 @@ const initialEmployeePayroll = [
     avatar: "/placeholder.svg?height=40&width=40",
     position: "Senior Software Engineer",
     employeeId: "EMP001",
+    subsidiaryId: "accra-hq",
+    subsidiary: getSubsidiaryName("accra-hq"),
     basicSalary: 8500,
     allowances: {
       transport: 500,
@@ -165,6 +280,8 @@ const initialEmployeePayroll = [
     avatar: "/placeholder.svg?height=40&width=40",
     position: "HR Manager",
     employeeId: "EMP002",
+    subsidiaryId: "kumasi-branch",
+    subsidiary: getSubsidiaryName("kumasi-branch"),
     basicSalary: 7200,
     allowances: {
       transport: 400,
@@ -195,6 +312,8 @@ const initialEmployeePayroll = [
     avatar: "/placeholder.svg?height=40&width=40",
     position: "Marketing Specialist",
     employeeId: "EMP003",
+    subsidiaryId: "takoradi-ops",
+    subsidiary: getSubsidiaryName("takoradi-ops"),
     basicSalary: 5800,
     allowances: {
       transport: 300,
@@ -221,16 +340,69 @@ const initialEmployeePayroll = [
   },
 ]
 
+const initialTransferHistory: TransferRecord[] = [
+  {
+    id: "TR-2024-12-01",
+    initiatedOn: "2024-12-01",
+    effectiveDate: "2025-01-01",
+    transferType: "permanent",
+    targetSubsidiaryId: "kumasi-branch",
+    targetSubsidiaryName: getSubsidiaryName("kumasi-branch"),
+    reason: "Align workforce with regional expansion",
+    employees: [
+      {
+        id: 105,
+        name: "Yaw Boateng",
+        fromSubsidiaryId: "accra-hq",
+        fromSubsidiaryName: getSubsidiaryName("accra-hq"),
+      },
+      {
+        id: 117,
+        name: "Abena Koomson",
+        fromSubsidiaryId: "accra-hq",
+        fromSubsidiaryName: getSubsidiaryName("accra-hq"),
+      },
+    ],
+  },
+  {
+    id: "TR-2024-10-15",
+    initiatedOn: "2024-10-15",
+    effectiveDate: "2024-11-01",
+    transferType: "temporary",
+    targetSubsidiaryId: "takoradi-ops",
+    targetSubsidiaryName: getSubsidiaryName("takoradi-ops"),
+    reason: "Support offshore project go-live",
+    employees: [
+      {
+        id: 202,
+        name: "Esi Nyarko",
+        fromSubsidiaryId: "kumasi-branch",
+        fromSubsidiaryName: getSubsidiaryName("kumasi-branch"),
+      },
+    ],
+  },
+]
+
+type TransferFormData = {
+  targetSubsidiaryId: string
+  effectiveDate: string
+  reason: string
+  transferType: TransferType
+}
+
 export default function PayrollPage() {
   const [payrollPeriods, setPayrollPeriods] = useState(initialPayrollPeriods)
   const [employeePayroll, setEmployeePayroll] = useState(initialEmployeePayroll)
   const [selectedPeriod, setSelectedPeriod] = useState("January 2025")
   const [isProcessDialogOpen, setIsProcessDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [selectAll, setSelectAll] = useState(false)
+  const [transferCandidates, setTransferCandidates] = useState<any[]>([])
+  const [transferHistory, setTransferHistory] = useState(initialTransferHistory)
 
   const currentPeriod = payrollPeriods.find((p) => p.period === selectedPeriod)
 
@@ -305,16 +477,115 @@ export default function PayrollPage() {
     setEmployeePayroll(employeePayroll.map((emp) => (emp.id === employeeId ? { ...emp, selected: checked } : emp)))
   }
 
+  const handleOpenTransferDialog = (candidates: any[]) => {
+    if (!candidates.length) {
+      toast({
+        variant: "destructive",
+        title: "No employees selected",
+        description: "Select at least one employee to transfer across subsidiaries.",
+      })
+      return
+    }
+
+    setTransferCandidates(candidates)
+    setIsTransferDialogOpen(true)
+  }
+
+  const handleTransferConfirm = ({ targetSubsidiaryId, effectiveDate, reason, transferType }: TransferFormData) => {
+    if (!transferCandidates.length) {
+      toast({
+        variant: "destructive",
+        title: "No employees selected",
+        description: "Select the employees you want to move and try again.",
+      })
+      return
+    }
+
+    const employeesToTransfer = transferCandidates.filter((employee) => employee.subsidiaryId !== targetSubsidiaryId)
+    const alreadyAssignedCount = transferCandidates.length - employeesToTransfer.length
+
+    if (!employeesToTransfer.length) {
+      toast({
+        variant: "destructive",
+        title: "Transfer not required",
+        description: "All selected employees already belong to the destination subsidiary.",
+      })
+      return
+    }
+
+    const targetName = getSubsidiaryName(targetSubsidiaryId)
+    const normalizedEffectiveDate = effectiveDate || new Date().toISOString().split("T")[0]
+    const candidateIdSet = new Set(transferCandidates.map((candidate) => candidate.id))
+    const transferIdSet = new Set(employeesToTransfer.map((candidate) => candidate.id))
+
+    setEmployeePayroll((prev) =>
+      prev.map((employee) => {
+        if (!candidateIdSet.has(employee.id)) {
+          return employee
+        }
+
+        if (!transferIdSet.has(employee.id)) {
+          return {
+            ...employee,
+            selected: false,
+          }
+        }
+
+        return {
+          ...employee,
+          previousSubsidiaryId: employee.subsidiaryId,
+          previousSubsidiary: employee.subsidiary,
+          subsidiaryId: targetSubsidiaryId,
+          subsidiary: targetName,
+          status: "Pending Transfer",
+          selected: false,
+          transferEffectiveDate: normalizedEffectiveDate,
+          transferType,
+          transferNotes: reason,
+        }
+      }),
+    )
+
+    setTransferHistory((prev) => [
+      {
+        id: `TR-${Date.now()}`,
+        initiatedOn: new Date().toISOString().split("T")[0],
+        effectiveDate: normalizedEffectiveDate,
+        transferType,
+        targetSubsidiaryId,
+        targetSubsidiaryName: targetName,
+        reason,
+        employees: employeesToTransfer.map((employee) => ({
+          id: employee.id,
+          name: employee.name,
+          fromSubsidiaryId: employee.subsidiaryId,
+          fromSubsidiaryName: employee.subsidiary,
+        })),
+      },
+      ...prev,
+    ])
+
+    setTransferCandidates([])
+    setIsTransferDialogOpen(false)
+    setSelectAll(false)
+
+    toast({
+      title: "Transfer scheduled",
+      description: `Transferring ${formatTransferCount(employeesToTransfer.length)} to ${targetName}${alreadyAssignedCount > 0 ? ` • ${alreadyAssignedCount} already assigned` : ""}.`,
+    })
+  }
+
   const filteredEmployees = employeePayroll.filter((employee) => {
     const matchesSearch =
       employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       employee.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       employee.position.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || employee.status.toLowerCase() === statusFilter.toLowerCase()
+    const matchesStatus = statusFilter === "all" || normalizeStatus(employee.status) === statusFilter
     return matchesSearch && matchesStatus
   })
 
   const selectedCount = employeePayroll.filter((e) => e.selected).length
+  const latestTransfer = transferHistory[0]
 
   const handleExportPayslips = (format: string) => {
     // Placeholder function for exporting payslips
@@ -515,36 +786,146 @@ export default function PayrollPage() {
         </CardContent>
       </Card>
 
-      {/* Employee Payroll Details */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Employee Payroll Details - {selectedPeriod}</CardTitle>
-            <div className="flex space-x-2">
-              {selectedCount > 0 && (
-                <Button onClick={handleCalculateSelected} variant="outline" size="sm">
-                  <Calculator className="w-4 h-4 mr-2" />
-                  Calculate Selected ({selectedCount})
-                </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={() => handleExportPayslips("pdf")}>
-                <Download className="w-4 h-4 mr-2" />
-                Export Payslips (PDF)
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => handleExportPayslips("excel")}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Export Payslips (Excel)
-              </Button>
-              <Button variant="outline" size="sm" onClick={handlePreviewReport}>
-                <Eye className="w-4 h-4 mr-2" />
-                Preview Report
-              </Button>
+        {/* Intercompany Transfers */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="h-5 w-5 text-emerald-600" />
+              <span>Intercompany Transfer Center</span>
+            </CardTitle>
+            <CardDescription>Move employees between subsidiaries and keep payroll aligned.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 p-4">
+                <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-emerald-700">
+                  <span>Active Subsidiaries</span>
+                  <Building2 className="h-4 w-4" />
+                </div>
+                <p className="mt-2 text-2xl font-semibold text-emerald-900">{subsidiaries.length}</p>
+                <p className="mt-1 text-xs text-emerald-700">Configured in this payroll group</p>
+              </div>
+              <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-4">
+                <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-blue-700">
+                  <span>Selected Employees</span>
+                  <Users className="h-4 w-4" />
+                </div>
+                <p className="mt-2 text-2xl font-semibold text-blue-900">{selectedCount}</p>
+                <p className="mt-1 text-xs text-blue-700">Ready to transfer this period</p>
+              </div>
+              <div className="rounded-lg border border-amber-100 bg-amber-50/70 p-4">
+                <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-amber-700">
+                  <span>Last Transfer</span>
+                  <Clock className="h-4 w-4" />
+                </div>
+                <p className="mt-2 text-2xl font-semibold text-amber-900">
+                  {latestTransfer ? formatDisplayDate(latestTransfer.initiatedOn) : "—"}
+                </p>
+                <p className="mt-1 text-xs text-amber-700">
+                  {latestTransfer ? `${formatTransferCount(latestTransfer.employees.length)} moved` : "No records yet"}
+                </p>
+              </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {/* Search and Filter */}
-          <div className="flex items-center space-x-4 mb-6">
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={() => handleOpenTransferDialog(employeePayroll.filter((employee) => employee.selected))}
+                disabled={selectedCount === 0}
+              >
+                <ArrowRightLeft className="h-4 w-4" />
+                Transfer Selected ({selectedCount})
+              </Button>
+              <p className="text-sm text-gray-500">
+                Tip: use the checkboxes below to choose employees for transfer.
+              </p>
+            </div>
+
+            <Separator />
+
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-gray-700">Recent transfer activity</h4>
+                <span className="text-xs text-gray-500">{formatTransferCount(transferHistory.length)} total</span>
+              </div>
+              {transferHistory.length > 0 ? (
+                <ScrollArea className="h-48 pr-3">
+                  <div className="space-y-3">
+                    {transferHistory.map((record) => (
+                      <div key={record.id} className="rounded-lg border border-gray-100 bg-gray-50/80 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                          <span className="font-medium text-gray-900">
+                            {toTitleCase(record.transferType)} transfer to {record.targetSubsidiaryName}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            Effective {formatDisplayDate(record.effectiveDate)}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-xs text-gray-500">
+                          Initiated {formatDisplayDate(record.initiatedOn)} • {formatTransferCount(record.employees.length)}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {record.employees.map((employee) => (
+                            <Badge key={`${record.id}-${employee.id}`} variant="outline" className="text-xs">
+                              {employee.name} ({employee.fromSubsidiaryName} → {record.targetSubsidiaryName})
+                            </Badge>
+                          ))}
+                        </div>
+                        {record.reason && (
+                          <p className="mt-2 text-xs italic text-gray-500">Reason: {record.reason}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              ) : (
+                <p className="text-sm text-gray-500">No intercompany transfers recorded yet.</p>
+              )}
+            </CardContent>
+          </Card>
+
+        {/* Employee Payroll Details */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Employee Payroll Details - {selectedPeriod}</CardTitle>
+              <div className="flex space-x-2">
+                {selectedCount > 0 && (
+                  <Button onClick={handleCalculateSelected} variant="outline" size="sm">
+                    <Calculator className="w-4 h-4 mr-2" />
+                    Calculate Selected ({selectedCount})
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => handleOpenTransferDialog(employeePayroll.filter((employee) => employee.selected))}
+                  disabled={selectedCount === 0}
+                >
+                  <ArrowRightLeft className="h-4 w-4" />
+                  Transfer Selected
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleExportPayslips("pdf")}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Payslips (PDF)
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleExportPayslips("excel")}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Export Payslips (Excel)
+                </Button>
+                <Button variant="outline" size="sm" onClick={handlePreviewReport}>
+                  <Eye className="w-4 h-4 mr-2" />
+                  Preview Report
+                </Button>
+                </div>
+              </div>
+          </CardHeader>
+          <CardContent>
+            {/* Search and Filter */}
+            <div className="flex items-center space-x-4 mb-6">
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <Input
@@ -562,6 +943,7 @@ export default function PayrollPage() {
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="pending-transfer">Pending Transfer</SelectItem>
                 <SelectItem value="calculated">Calculated</SelectItem>
                 <SelectItem value="processed">Processed</SelectItem>
               </SelectContent>
@@ -576,105 +958,150 @@ export default function PayrollPage() {
             </Label>
           </div>
 
-          <div className="space-y-4">
-            {filteredEmployees.map((employee) => (
-              <div
-                key={employee.id}
-                className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
-                  employee.selected ? "border-emerald-200 bg-emerald-50" : "border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                <div className="flex items-center space-x-4">
-                  <Checkbox
-                    checked={employee.selected}
-                    onCheckedChange={(checked) => handleSelectEmployee(employee.id, checked as boolean)}
-                  />
-                  <Avatar className="w-12 h-12">
-                    <AvatarImage src={employee.avatar || "/placeholder.svg"} />
-                    <AvatarFallback>
-                      {employee.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <h3 className="font-semibold text-gray-900">{employee.name}</h3>
-                      <Badge variant="outline" className="text-xs">
-                        {employee.employeeId}
-                      </Badge>
+            <div className="space-y-4">
+              {filteredEmployees.map((employee) => {
+                const statusBadge = getStatusBadgeAppearance(employee.status)
+
+                return (
+                  <div
+                    key={employee.id}
+                    className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
+                      employee.selected ? "border-emerald-200 bg-emerald-50" : "border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    <div className="flex items-center space-x-4">
+                      <Checkbox
+                        checked={employee.selected}
+                        onCheckedChange={(checked) => handleSelectEmployee(employee.id, checked as boolean)}
+                      />
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={employee.avatar || "/placeholder.svg"} />
+                        <AvatarFallback>
+                          {employee.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold text-gray-900">{employee.name}</h3>
+                          <Badge variant="outline" className="text-xs">
+                            {employee.employeeId}
+                          </Badge>
+                          {employee.subsidiary && (
+                            <Badge className="text-xs bg-emerald-100 text-emerald-700 border-emerald-100">
+                              {employee.subsidiary}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600">{employee.position}</p>
+                        {employee.previousSubsidiary && employee.previousSubsidiary !== employee.subsidiary && (
+                          <p className="text-xs text-gray-500">
+                            From {employee.previousSubsidiary}
+                          </p>
+                        )}
+                        {employee.transferEffectiveDate && (
+                          <p className="text-xs text-amber-600">
+                            Transfer effective {formatDisplayDate(employee.transferEffectiveDate)}
+                          </p>
+                        )}
+                        {employee.transferNotes && (
+                          <p className="text-xs text-gray-500 italic">{employee.transferNotes}</p>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-600">{employee.position}</p>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-7 gap-4 text-center text-sm">
-                  <div>
-                    <p className="font-medium text-gray-900">GHS {employee.basicSalary.toLocaleString()}</p>
-                    <p className="text-gray-500">Basic</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">GHS {employee.allowances.total.toLocaleString()}</p>
-                    <p className="text-gray-500">Allowances</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">GHS {employee.grossPay.toLocaleString()}</p>
-                    <p className="text-gray-500">Gross</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-red-600">-GHS {employee.paye.toLocaleString()}</p>
-                    <p className="text-gray-500">PAYE</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-blue-600">-GHS {employee.ssnit.employee.toLocaleString()}</p>
-                    <p className="text-gray-500">SSNIT</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-purple-600">-GHS {employee.tier3.employee.toLocaleString()}</p>
-                    <p className="text-gray-500">Tier 3</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-emerald-600">GHS {employee.netPay.toLocaleString()}</p>
-                    <p className="text-gray-500">Net Pay</p>
-                  </div>
-                </div>
+                    <div className="grid grid-cols-7 gap-4 text-center text-sm">
+                      <div>
+                        <p className="font-medium text-gray-900">GHS {employee.basicSalary.toLocaleString()}</p>
+                        <p className="text-gray-500">Basic</p>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">GHS {employee.allowances.total.toLocaleString()}</p>
+                        <p className="text-gray-500">Allowances</p>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">GHS {employee.grossPay.toLocaleString()}</p>
+                        <p className="text-gray-500">Gross</p>
+                      </div>
+                      <div>
+                        <p className="font-medium text-red-600">-GHS {employee.paye.toLocaleString()}</p>
+                        <p className="text-gray-500">PAYE</p>
+                      </div>
+                      <div>
+                        <p className="font-medium text-blue-600">-GHS {employee.ssnit.employee.toLocaleString()}</p>
+                        <p className="text-gray-500">SSNIT</p>
+                      </div>
+                      <div>
+                        <p className="font-medium text-purple-600">-GHS {employee.tier3.employee.toLocaleString()}</p>
+                        <p className="text-gray-500">Tier 3</p>
+                      </div>
+                      <div>
+                        <p className="font-medium text-emerald-600">GHS {employee.netPay.toLocaleString()}</p>
+                        <p className="text-gray-500">Net Pay</p>
+                      </div>
+                    </div>
 
-                <div className="flex items-center space-x-2">
-                  <Badge
-                    variant={
-                      employee.status === "Processed"
-                        ? "default"
-                        : employee.status === "Calculated"
-                          ? "secondary"
-                          : "outline"
-                    }
-                    className={
-                      employee.status === "Processed"
-                        ? "bg-emerald-100 text-emerald-800"
-                        : employee.status === "Calculated"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-gray-100 text-gray-800"
-                    }
-                  >
-                    {employee.status}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedEmployee(employee)
-                      setIsEditDialogOpen(true)
-                    }}
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={statusBadge.variant} className={statusBadge.className}>
+                        {employee.status}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenTransferDialog([employee])}
+                        title="Schedule intercompany transfer"
+                      >
+                        <ArrowRightLeft className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedEmployee(employee)
+                          setIsEditDialogOpen(true)
+                        }}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
         </CardContent>
       </Card>
+
+        {/* Intercompany Transfer Dialog */}
+        <Dialog
+          open={isTransferDialogOpen}
+          onOpenChange={(open) => {
+            setIsTransferDialogOpen(open)
+            if (!open) {
+              setTransferCandidates([])
+            }
+          }}
+        >
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {transferCandidates.length > 1
+                  ? `Transfer ${formatTransferCount(transferCandidates.length)}`
+                  : `Transfer ${transferCandidates[0]?.name ?? "Employee"}`}
+              </DialogTitle>
+            </DialogHeader>
+            <IntercompanyTransferDialog
+              employees={transferCandidates}
+              subsidiaries={subsidiaries}
+              onSubmit={handleTransferConfirm}
+              onClose={() => {
+                setIsTransferDialogOpen(false)
+                setTransferCandidates([])
+              }}
+            />
+          </DialogContent>
+        </Dialog>
 
       {/* Edit Employee Payroll Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -1203,5 +1630,181 @@ function EditEmployeePayrollForm({
         </Button>
       </div>
     </Tabs>
+  )
+}
+
+function IntercompanyTransferDialog({
+  employees,
+  subsidiaries,
+  onSubmit,
+  onClose,
+}: {
+  employees: any[]
+  subsidiaries: Subsidiary[]
+  onSubmit: (data: TransferFormData) => void
+  onClose: () => void
+}) {
+  const [targetSubsidiary, setTargetSubsidiary] = useState("")
+  const [transferType, setTransferType] = useState<TransferType>("permanent")
+  const [effectiveDate, setEffectiveDate] = useState("")
+  const [reason, setReason] = useState("")
+
+  useEffect(() => {
+    if (!employees.length) {
+      setTargetSubsidiary("")
+      return
+    }
+
+    const currentSubsidiaryIds = new Set(employees.map((employee) => employee.subsidiaryId))
+    const fallbackSubsidiary =
+      subsidiaries.find((subsidiary) => !currentSubsidiaryIds.has(subsidiary.id))?.id || subsidiaries[0]?.id || ""
+
+    setTargetSubsidiary(fallbackSubsidiary)
+    setTransferType("permanent")
+    setEffectiveDate("")
+    setReason("")
+  }, [employees, subsidiaries])
+
+  const handleSubmit = () => {
+    if (!targetSubsidiary) {
+      toast({
+        variant: "destructive",
+        title: "Select destination subsidiary",
+        description: "Choose the subsidiary the employees should be moved to.",
+      })
+      return
+    }
+
+    onSubmit({
+      targetSubsidiaryId: targetSubsidiary,
+      effectiveDate,
+      reason,
+      transferType,
+    })
+  }
+
+  const currentSubsidiaryList = employees.length
+    ? Array.from(new Set(employees.map((employee) => employee.subsidiary || "—"))).join(", ")
+    : "—"
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+        <h4 className="text-sm font-semibold text-gray-700">Employees selected</h4>
+        {employees.length > 0 ? (
+          <ScrollArea className="mt-3 max-h-32 pr-2">
+            <div className="space-y-2 text-sm text-gray-700">
+              {employees.map((employee) => (
+                <div key={employee.id} className="flex items-center justify-between">
+                  <span className="font-medium text-gray-900">{employee.name}</span>
+                  <span className="text-xs text-gray-500">{employee.subsidiary}</span>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        ) : (
+          <p className="mt-2 text-sm text-gray-500">Select employees from the payroll table to begin.</p>
+        )}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label>Destination subsidiary</Label>
+          <Select value={targetSubsidiary} onValueChange={setTargetSubsidiary}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select subsidiary" />
+            </SelectTrigger>
+            <SelectContent>
+              {subsidiaries.map((subsidiary) => (
+                <SelectItem key={subsidiary.id} value={subsidiary.id}>
+                  {subsidiary.name} ({subsidiary.code}) • {subsidiary.location}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="transfer-effective-date">Effective date</Label>
+          <Input
+            id="transfer-effective-date"
+            type="date"
+            value={effectiveDate}
+            onChange={(event) => setEffectiveDate(event.target.value)}
+            min={new Date().toISOString().split("T")[0]}
+          />
+          <p className="text-xs text-gray-500">Leave blank for an immediate (current period) transfer.</p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Transfer type</Label>
+        <RadioGroup
+          value={transferType}
+          onValueChange={(value) => setTransferType(value as TransferType)}
+          className="flex flex-col gap-2 md:flex-row"
+        >
+          {([
+            {
+              id: "transfer-permanent",
+              value: "permanent" as TransferType,
+              title: "Permanent Transfer",
+              description: "Employee relocates indefinitely",
+              activeClasses: "border-emerald-300 bg-emerald-50",
+            },
+            {
+              id: "transfer-temporary",
+              value: "temporary" as TransferType,
+              title: "Temporary Transfer",
+              description: "Employee returns to home subsidiary later",
+              activeClasses: "border-blue-300 bg-blue-50",
+            },
+          ] as const).map((option) => (
+            <div
+              key={option.id}
+              className={`flex items-start space-x-3 rounded-lg border p-3 text-sm transition-colors ${
+                transferType === option.value ? option.activeClasses : "border-gray-200"
+              }`}
+            >
+              <RadioGroupItem id={option.id} value={option.value} className="mt-1" />
+              <Label htmlFor={option.id} className="flex flex-col space-y-1 text-sm">
+                <span className="font-medium text-gray-900">{option.title}</span>
+                <span className="text-xs text-gray-500">{option.description}</span>
+              </Label>
+            </div>
+          ))}
+        </RadioGroup>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="transfer-notes">Transfer notes (optional)</Label>
+        <Textarea
+          id="transfer-notes"
+          placeholder="Provide context so HR, payroll, and line managers understand this move."
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          rows={4}
+        />
+      </div>
+
+      <div className="flex items-center justify-between rounded-lg border border-gray-100 bg-white p-4 text-sm text-gray-600">
+        <div>
+          <p className="font-medium text-gray-900">Current subsidiaries</p>
+          <p>{currentSubsidiaryList}</p>
+        </div>
+        <div className="text-right">
+          <p className="font-medium text-gray-900">Destination</p>
+          <p>{targetSubsidiary ? getSubsidiaryName(targetSubsidiary) : "Select subsidiary"}</p>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-3">
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700" disabled={employees.length === 0}>
+          Confirm Transfer
+        </Button>
+      </div>
+    </div>
   )
 }
