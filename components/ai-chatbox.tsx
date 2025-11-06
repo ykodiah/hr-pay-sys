@@ -5,7 +5,9 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
 import {
   MessageCircle,
   Send,
@@ -18,6 +20,8 @@ import {
   ChevronDown,
   Volume2,
   VolumeX,
+  Sparkles,
+  Lightbulb,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -27,6 +31,62 @@ interface Message {
   content: string
   timestamp: Date
 }
+
+interface StrategicPrompt {
+  id: string
+  label: string
+  helper: string
+  message: string
+}
+
+interface AssistantInsight {
+  id: string
+  title: string
+  detail: string
+  confidence: number
+  nextStep: string
+}
+
+const STRATEGIC_PROMPTS: StrategicPrompt[] = [
+  {
+    id: "attendance-digest",
+    label: "Attendance digest",
+    helper: "Predictive variance by location",
+    message:
+      "Provide an attendance risk digest for this week, highlighting locations with risk scores above 0.65 and suggested coaching actions.",
+  },
+  {
+    id: "payroll-variance",
+    label: "Payroll variance",
+    helper: "Spot >5% swings",
+    message:
+      "Summarise payroll variances greater than 5% by department compared to the last cycle and propose follow-up checks.",
+  },
+  {
+    id: "attrition-watch",
+    label: "Attrition watch",
+    helper: "Blend performance + sentiment",
+    message:
+      "List employees with elevated attrition risk combining performance, attendance, and sentiment trends, and recommend retention steps.",
+  },
+]
+
+const CONTROL_ROOM_INSIGHTS: AssistantInsight[] = [
+  {
+    id: "variance-alert",
+    title: "Payroll variance detected",
+    detail: "Sales net pay increased 6.2% vs last month while Finance dipped 1.4% (overtime + bonus overlap).",
+    confidence: 0.88,
+    nextStep: "Draft a summary for the CFO outlining payroll variance drivers and recommended approvals.",
+  },
+  {
+    id: "attendance-risk",
+    title: "Hybrid lateness trending down",
+    detail: "Late arrivals in Accra HQ dropped 12% week-on-week after nudges; Tema Plant remains flat.",
+    confidence: 0.74,
+    nextStep: "Generate a note to plant managers with best practices from the HQ experiment.",
+  },
+]
 
 export function AIChatbox() {
   const [isOpen, setIsOpen] = useState(false)
@@ -45,6 +105,8 @@ export function AIChatbox() {
   const [inputMessage, setInputMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [showScrollButtons, setShowScrollButtons] = useState(false)
+  const [recentPromptId, setRecentPromptId] = useState<string | null>(null)
+  const [insights, setInsights] = useState<AssistantInsight[]>(CONTROL_ROOM_INSIGHTS)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)

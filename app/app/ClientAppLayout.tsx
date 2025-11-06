@@ -55,7 +55,6 @@ import {
   GraduationCap,
   DollarSign,
   PieChart,
-  Activity,
   Globe,
   Cog,
   ArrowRight,
@@ -63,6 +62,7 @@ import {
 } from "lucide-react"
 import { Suspense, useState, useEffect } from "react"
 import { AIChatbox } from "@/components/ai-chatbox"
+import { EmployeeAIChatbox } from "@/components/employee-ai-chatbox"
 import { CurrencyProvider } from "@/lib/currency-context"
 
 // Theme configuration and state management
@@ -193,116 +193,124 @@ export default function ClientAppLayout({
     // Add home
     breadcrumbItems.push({ label: 'Dashboard', href: '/app', icon: Home })
     
-    if (pathSegments.length > 1) {
-      const module = pathSegments[1]
-      const moduleMap = {
-        'employees': { label: 'Employees', icon: Users },
-        'payroll': { label: 'Payroll', icon: Calculator },
-        'attendance': { label: 'Attendance', icon: Clock },
-        'leave': { label: 'Leave Management', icon: Calendar },
-        'performance': { label: 'Performance', icon: Target },
-        'learning': { label: 'Learning', icon: BookOpen },
-        'documents': { label: 'Documents', icon: FileText },
-        'analytics': { label: 'Analytics', icon: BarChart3 },
-        'settings': { label: 'Settings', icon: Settings },
-        'recruitment': { label: 'Recruitment', icon: UserPlus },
-        'communication': { label: 'Communication', icon: MessageSquare },
-        'org-chart': { label: 'Org Chart', icon: Sitemap },
-        'disciplinary': { label: 'Disciplinary', icon: Shield },
-        'offboarding': { label: 'Offboarding', icon: LogOut },
-        'promotions': { label: 'Promotions', icon: Award },
-        'loans': { label: 'Loans', icon: CreditCard },
-        'integrations': { label: 'Integrations', icon: Plug }
-      }
-      
-      if (moduleMap[module]) {
-        breadcrumbItems.push({
-          label: moduleMap[module].label,
-          href: `/app/${module}`,
-          icon: moduleMap[module].icon
-        })
-      }
-      
-      // Add sub-pages
-      if (pathSegments.length > 2) {
-        const subPage = pathSegments[2]
-        const subPageMap = {
-          'history': 'History',
-          'reports': 'Reports',
-          'profile': 'Profile',
-          'settings': 'Settings'
+      if (pathSegments.length > 1) {
+        const module = pathSegments[1]
+        const moduleMap = {
+          'employees': { label: 'Employees', icon: Users },
+          'payroll': { label: 'Payroll', icon: Calculator },
+          'attendance': { label: 'Attendance', icon: Clock },
+          'leave': { label: 'Leave Management', icon: Calendar },
+          'performance': { label: 'Performance', icon: Target },
+          'learning': { label: 'Learning', icon: BookOpen },
+          'documents': { label: 'Documents', icon: FileText },
+          'analytics': { label: 'Analytics', icon: BarChart3 },
+          'settings': { label: 'Settings', icon: Settings },
+          'recruitment': { label: 'Recruitment', icon: UserPlus },
+          'communication': { label: 'Communication', icon: MessageSquare },
+          'org-chart': { label: 'Org Chart', icon: Sitemap },
+          'self-service': { label: 'My Portal', icon: UserCheck },
+          'disciplinary': { label: 'Disciplinary', icon: Shield },
+          'offboarding': { label: 'Offboarding', icon: LogOut },
+          'promotions': { label: 'Promotions', icon: Award },
+          'loans': { label: 'Loans', icon: CreditCard },
+          'integrations': { label: 'Integrations', icon: Plug },
         }
-        
-        if (subPageMap[subPage]) {
+
+        if (moduleMap[module]) {
           breadcrumbItems.push({
-            label: subPageMap[subPage],
-            href: path,
-            icon: null
+            label: moduleMap[module].label,
+            href: `/app/${module}`,
+            icon: moduleMap[module].icon,
           })
         }
+
+        if (pathSegments.length > 2) {
+          const subPage = pathSegments[2]
+          const subPageMap = {
+            history: "History",
+            reports: "Reports",
+            profile: "Profile",
+            settings: "Settings",
+            "update-details": "Update details",
+          }
+
+          if (subPageMap[subPage as keyof typeof subPageMap]) {
+            breadcrumbItems.push({
+              label: subPageMap[subPage as keyof typeof subPageMap],
+              href: path,
+              icon: null,
+            })
+          }
+        }
       }
-    }
     
     setBreadcrumbs(breadcrumbItems)
   }, [])
 
   // Navigation data structure for better organization
-  const navigationSections = [
-    {
-      title: "Overview",
-      items: [
-        { name: "Dashboard", href: "/app", icon: LayoutDashboard, description: "Overview and key metrics" }
-      ]
-    },
-    {
-      title: "HR Management",
-      items: [
-        { name: "Employees", href: "/app/employees", icon: Users, description: "Manage employee records" },
-        { name: "Recruitment", href: "/app/recruitment", icon: UserPlus, description: "Hire new talent" },
-        { name: "Org Chart", href: "/app/org-chart", icon: Sitemap, description: "Organizational structure" },
-        { name: "Documents", href: "/app/documents", icon: FileText, description: "Document vault" },
-        { name: "Communication", href: "/app/communication", icon: MessageSquare, description: "Team communication" }
-      ]
-    },
-    {
-      title: "Time & Attendance",
-      items: [
-        { name: "Attendance", href: "/app/attendance", icon: Clock, description: "Track work hours" },
-        { name: "Leave Management", href: "/app/leave", icon: Calendar, description: "Manage leave requests" }
-      ]
-    },
-    {
-      title: "Performance",
-      items: [
-        { name: "Performance", href: "/app/performance", icon: Target, description: "Performance reviews" },
-        { name: "Promotions", href: "/app/promotions", icon: Award, description: "Career advancement" },
-        { name: "Learning", href: "/app/learning", icon: BookOpen, description: "Training & development" }
-      ]
-    },
-    {
-      title: "Payroll",
-      items: [
-        { name: "Payroll", href: "/app/payroll", icon: Calculator, description: "Process payroll" },
-        { name: "Payroll History", href: "/app/payroll/history", icon: History, description: "Past payroll records" },
-        { name: "Loans", href: "/app/loans", icon: CreditCard, description: "Employee loans" }
-      ]
-    },
-    {
-      title: "Analytics",
-      items: [
-        { name: "Reports", href: "/app/analytics", icon: BarChart3, description: "Reports & insights" }
-      ]
-    },
-    {
-      title: "Administration",
-      items: [
-        { name: "Disciplinary", href: "/app/disciplinary", icon: Shield, description: "Disciplinary actions" },
-        { name: "Offboarding", href: "/app/offboarding", icon: LogOut, description: "Employee exit process" },
-        { name: "Integrations", href: "/app/integrations", icon: Plug, description: "Third-party integrations" },
-        { name: "Settings", href: "/app/settings", icon: Settings, description: "System settings" }
-      ]
-    }
-  ]
+    const navigationSections = [
+      {
+        title: "Overview",
+        items: [
+          { name: "Dashboard", href: "/app", icon: LayoutDashboard, description: "Overview and key metrics" },
+        ],
+      },
+      {
+        title: "HR Management",
+        items: [
+          { name: "Employees", href: "/app/employees", icon: Users, description: "Manage employee records" },
+          { name: "Recruitment", href: "/app/recruitment", icon: UserPlus, description: "Hire new talent" },
+          { name: "Org Chart", href: "/app/org-chart", icon: Sitemap, description: "Organizational structure" },
+          { name: "Documents", href: "/app/documents", icon: FileText, description: "Document vault" },
+          { name: "Communication", href: "/app/communication", icon: MessageSquare, description: "Team communication" },
+        ],
+      },
+      {
+        title: "Time & Attendance",
+        items: [
+          { name: "Attendance", href: "/app/attendance", icon: Clock, description: "Track work hours" },
+          { name: "Leave Management", href: "/app/leave", icon: Calendar, description: "Manage leave requests" },
+        ],
+      },
+      {
+        title: "Performance",
+        items: [
+          { name: "Performance", href: "/app/performance", icon: Target, description: "Performance reviews" },
+          { name: "Promotions", href: "/app/promotions", icon: Award, description: "Career advancement" },
+          { name: "Learning", href: "/app/learning", icon: BookOpen, description: "Training & development" },
+        ],
+      },
+      {
+        title: "Payroll",
+        items: [
+          { name: "Payroll", href: "/app/payroll", icon: Calculator, description: "Process payroll" },
+          { name: "Payroll History", href: "/app/payroll/history", icon: History, description: "Past payroll records" },
+          { name: "Loans", href: "/app/loans", icon: CreditCard, description: "Employee loans" },
+        ],
+      },
+      {
+        title: "Analytics",
+        items: [
+          { name: "Reports", href: "/app/analytics", icon: BarChart3, description: "Reports & insights" },
+        ],
+      },
+      {
+        title: "Employee Hub",
+        items: [
+          { name: "My Portal", href: "/app/self-service", icon: UserCheck, description: "Personalised employee workspace" },
+          { name: "Update My Details", href: "/app/self-service/update-details", icon: FileCheck, description: "Submit change requests" },
+        ],
+      },
+      {
+        title: "Administration",
+        items: [
+          { name: "Disciplinary", href: "/app/disciplinary", icon: Shield, description: "Disciplinary actions" },
+          { name: "Offboarding", href: "/app/offboarding", icon: LogOut, description: "Employee exit process" },
+          { name: "Integrations", href: "/app/integrations", icon: Plug, description: "Third-party integrations" },
+          { name: "Settings", href: "/app/settings", icon: Settings, description: "System settings" },
+        ],
+      },
+    ]
 
   // Quick actions for common tasks
   const quickActions = [
@@ -812,8 +820,7 @@ export default function ClientAppLayout({
             {children}
           </main>
         </div>
-
-        <AIChatbox />
+          {currentPath.startsWith("/app/self-service") ? <EmployeeAIChatbox /> : <AIChatbox />}
       </div>
     </CurrencyProvider>
   )
