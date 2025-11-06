@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useEffect, useRef, useState } from "react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -15,7 +14,6 @@ import {
   MessageCircle,
   Minimize2,
   Send,
-  Sparkles,
   User,
   Volume2,
   VolumeX,
@@ -30,21 +28,6 @@ interface Message {
   timestamp: Date
 }
 
-interface StrategicPrompt {
-  id: string
-  label: string
-  helper: string
-  message: string
-}
-
-interface AssistantInsight {
-  id: string
-  title: string
-  detail: string
-  confidence: number
-  nextStep: string
-}
-
 interface KnowledgeArticle {
   id: string
   title: string
@@ -52,47 +35,6 @@ interface KnowledgeArticle {
   keywords: string[]
   response: string
 }
-
-const STRATEGIC_PROMPTS: StrategicPrompt[] = [
-  {
-    id: "attendance-digest",
-    label: "Attendance digest",
-    helper: "Predictive variance by location",
-    message:
-      "Provide an attendance risk digest for this week, highlighting locations with risk scores above 0.65 and suggested coaching actions.",
-  },
-  {
-    id: "payroll-variance",
-    label: "Payroll variance",
-    helper: "Spot >5% swings",
-    message:
-      "Summarise payroll variances greater than 5% by department compared to the last cycle and propose follow-up checks.",
-  },
-  {
-    id: "attrition-watch",
-    label: "Attrition watch",
-    helper: "Blend performance + sentiment",
-    message:
-      "List employees with elevated attrition risk combining performance, attendance, and sentiment trends, and recommend retention steps.",
-  },
-]
-
-const CONTROL_ROOM_INSIGHTS: AssistantInsight[] = [
-  {
-    id: "variance-alert",
-    title: "Payroll variance detected",
-    detail: "Sales net pay increased 6.2% vs last month while Finance dipped 1.4% (overtime + bonus overlap).",
-    confidence: 0.88,
-    nextStep: "Draft a summary for the CFO outlining payroll variance drivers and recommended approvals.",
-  },
-  {
-    id: "attendance-risk",
-    title: "Hybrid lateness trending down",
-    detail: "Late arrivals in Accra HQ dropped 12% week-on-week after nudges; Tema Plant remains flat.",
-    confidence: 0.74,
-    nextStep: "Generate a note to plant managers with best practices from the HQ experiment.",
-  },
-]
 
 const KNOWLEDGE_BASE: KnowledgeArticle[] = [
   {
@@ -154,9 +96,6 @@ export function AIChatbox() {
   const [inputMessage, setInputMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [showScrollButtons, setShowScrollButtons] = useState(false)
-  const [recentPromptId, setRecentPromptId] = useState<string | null>(null)
-  const [insights, setInsights] = useState<AssistantInsight[]>(CONTROL_ROOM_INSIGHTS)
-  const [knowledgeMatches, setKnowledgeMatches] = useState<KnowledgeArticle[]>(KNOWLEDGE_BASE)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -218,19 +157,6 @@ export function AIChatbox() {
     scrollToBottom()
   }, [messages])
 
-  useEffect(() => {
-    const query = inputMessage.toLowerCase().trim()
-    if (!query) {
-      setKnowledgeMatches(KNOWLEDGE_BASE)
-      return
-    }
-    setKnowledgeMatches(
-      KNOWLEDGE_BASE.filter((article) =>
-        article.keywords.some((keyword) => keyword.includes(query) || query.includes(keyword)),
-      ),
-    )
-  }, [inputMessage])
-
   const injectKnowledgeResponse = (article: KnowledgeArticle) => {
     const assistantMessage: Message = {
       id: (Date.now() + 1).toString(),
@@ -239,7 +165,6 @@ export function AIChatbox() {
       timestamp: new Date(),
     }
     setMessages((prev) => [...prev, assistantMessage])
-    setRecentPromptId(article.id)
     setIsLoading(false)
   }
 
@@ -337,11 +262,6 @@ export function AIChatbox() {
     }
   }
 
-  const handleKnowledgePrompt = (prompt: StrategicPrompt) => {
-    setInputMessage(prompt.message)
-    setRecentPromptId(prompt.id)
-  }
-
   const clearChat = () => {
     stopSpeaking()
     setMessages([
@@ -353,9 +273,6 @@ export function AIChatbox() {
         timestamp: new Date(),
       },
     ])
-    setInsights(CONTROL_ROOM_INSIGHTS)
-    setRecentPromptId(null)
-    setKnowledgeMatches(KNOWLEDGE_BASE)
   }
 
   if (!isOpen) {
@@ -411,34 +328,6 @@ export function AIChatbox() {
 
       {!isMinimized && (
         <CardContent className="flex h-[calc(600px-80px)] flex-col p-0">
-          <div className="flex flex-col gap-3 border-b bg-white px-4 pb-2 pt-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="gap-1 text-xs">
-                <Sparkles className="h-3 w-3" /> Knowledge centre
-              </Badge>
-              <span className="text-xs text-muted-foreground">Ask for an overview or tap to auto-populate questions.</span>
-            </div>
-            <div className="flex max-h-16 flex-wrap gap-2 overflow-y-auto pr-1">
-              {knowledgeMatches.slice(0, 4).map((article) => (
-                <Button
-                  key={article.id}
-                  variant={recentPromptId === article.id ? "default" : "outline"}
-                  size="sm"
-                  className={`h-7 text-xs ${recentPromptId === article.id ? "bg-blue-600" : "bg-white"}`}
-                  onClick={() => {
-                    setInputMessage(article.title)
-                    injectKnowledgeResponse(article)
-                  }}
-                >
-                  {article.title}
-                </Button>
-              ))}
-              {knowledgeMatches.length === 0 && (
-                <span className="text-[11px] text-muted-foreground">No quick matches—try a strategic prompt below.</span>
-              )}
-            </div>
-          </div>
-
           <div className="flex items-center justify-between border-b bg-gray-50 p-3">
             {isTTSEnabled ? (
               <div className="flex items-center gap-2 text-xs text-green-600">
@@ -550,50 +439,6 @@ export function AIChatbox() {
               <Button onClick={sendMessage} disabled={!inputMessage.trim() || isLoading} size="icon" className="bg-blue-600 hover:bg-blue-700">
                 <Send className="h-4 w-4" />
               </Button>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {STRATEGIC_PROMPTS.map((prompt) => (
-                <Button
-                  key={prompt.id}
-                  variant={recentPromptId === prompt.id ? "default" : "outline"}
-                  size="sm"
-                  className={`h-7 text-xs ${recentPromptId === prompt.id ? "bg-blue-600" : "bg-white"}`}
-                  onClick={() => handleKnowledgePrompt(prompt)}
-                  title={prompt.helper}
-                >
-                  {prompt.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          <div className="border-t bg-slate-50 p-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-900">Control-room insights</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs text-blue-600"
-                onClick={() => setInsights(CONTROL_ROOM_INSIGHTS)}
-              >
-                Refresh
-              </Button>
-            </div>
-            <div className="mt-3 max-h-32 space-y-3 overflow-y-auto pr-1">
-              {insights.map((insight) => (
-                <div key={insight.id} className="rounded-lg border border-slate-100 bg-white p-3 text-xs">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold text-slate-900">{insight.title}</p>
-                    <Badge variant="outline" className="text-[10px]">
-                      {(insight.confidence * 100).toFixed(0)}% conf.
-                    </Badge>
-                  </div>
-                  <p className="mt-2 text-slate-600">{insight.detail}</p>
-                  <p className="mt-2 text-[11px] text-slate-500">Next: {insight.nextStep}</p>
-                </div>
-              ))}
-              {insights.length === 0 && <p className="text-[11px] text-muted-foreground">No live insights right now.</p>}
             </div>
           </div>
         </CardContent>

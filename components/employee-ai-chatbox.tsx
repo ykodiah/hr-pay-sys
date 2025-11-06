@@ -3,20 +3,18 @@
 import type React from "react"
 
 import { useEffect, useRef, useState } from "react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Bot,
   ChevronDown,
   ChevronUp,
-  HeartPulse,
   Maximize2,
   MessageCircle,
   Minimize2,
   Send,
-  Sparkles,
   User,
   Volume2,
   VolumeX,
@@ -31,13 +29,6 @@ interface Message {
   timestamp: Date
 }
 
-interface EmployeePrompt {
-  id: string
-  label: string
-  helper: string
-  message: string
-}
-
 interface KnowledgeArticle {
   id: string
   title: string
@@ -46,48 +37,6 @@ interface KnowledgeArticle {
   response: string
 }
 
-interface WellbeingNudge {
-  id: string
-  title: string
-  detail: string
-  action: string
-  sentiment: "positive" | "neutral" | "attention"
-  confidence: number
-}
-
-const EMPLOYEE_PROMPTS: EmployeePrompt[] = [
-  {
-    id: "check-leave",
-    label: "Leave balance",
-    helper: "See current days remaining",
-    message: "How many leave days do I have left and what is the fastest way to request more time off?",
-  },
-  {
-    id: "download-payslip",
-    label: "Latest payslip",
-    helper: "Download instructions",
-    message: "Where can I download my latest payslip and what deductions should I double check?",
-  },
-  {
-    id: "performance-goals",
-    label: "Performance goals",
-    helper: "Track goals & reviews",
-    message: "Show my current performance goals, progress, and the next review milestone I should prepare for.",
-  },
-  {
-    id: "skills-growth",
-    label: "Learning plan",
-    helper: "Courses + mentors",
-    message: "Recommend learning courses or mentors aligned with my growth track and project needs.",
-  },
-  {
-    id: "loan-status",
-    label: "Loan status",
-    helper: "Outstanding requests",
-    message: "Give me an update on my salary advance/loan request, including approvals and expected payout date.",
-  },
-]
-
 const EMPLOYEE_KNOWLEDGE_BASE: KnowledgeArticle[] = [
   {
     id: "self-service-overview",
@@ -95,7 +44,7 @@ const EMPLOYEE_KNOWLEDGE_BASE: KnowledgeArticle[] = [
     summary: "Portal modules & quick wins",
     keywords: ["overview", "portal", "self-service", "what can", "everything"],
     response:
-      "Your portal is the personalised side of AkwaabaHRPay. You can request leave, download payslips, track attendance streaks, review performance goals, access learning plans, submit reimbursements, update personal details, and chat with HR support. Each widget on the dashboard mirrors a live module, so any action here reflects in the core system instantly.",
+      "Your portal is the personalised side of AkwaabaHRPay. You can request leave, download payslips, track attendance streaks, review performance goals, access learning plans, submit reimbursements, update personal details, and chat with HR support. Each widget mirrors a live module so every action syncs back instantly.",
   },
   {
     id: "leave-workflows",
@@ -103,7 +52,7 @@ const EMPLOYEE_KNOWLEDGE_BASE: KnowledgeArticle[] = [
     summary: "Balances, approvals, escalations",
     keywords: ["leave", "time off", "vacation", "sick", "holidays"],
     response:
-      "You can request annual, sick, study, parental, or compassionate leave directly from the Leave card. Balances update after every approval. Once you submit, the workflow notifies your manager, HR, and any delegates. Auto-escalation kicks in if approvals stagnate. You can also attach supporting documents and see the audit trail on the Leave history tab.",
+      "Request annual, sick, parental, study, or compassionate leave directly from the Leave tile. Balances update in real time once approvals land. The workflow notifies your manager and HR, supports attachments, and escalates automatically if responses lag.",
   },
   {
     id: "payslip-guidance",
@@ -111,7 +60,7 @@ const EMPLOYEE_KNOWLEDGE_BASE: KnowledgeArticle[] = [
     summary: "Download, taxes, discrepancies",
     keywords: ["payslip", "salary", "payroll", "tax", "deduction"],
     response:
-      "Payslips are published after payroll finalisation. Download them from the Payslip tile or the Quick actions drawer. Each payslip explains gross pay, PAYE, SSNIT, Tier 2/3, loans, and allowances. If numbers look off, ask the assistant to flag discrepancies—it can draft a ticket for payroll with the right attachments.",
+      "Payslips publish after payroll closes. Download them from the Payslip tile or Quick actions drawer. Each slip explains gross pay, PAYE, SSNIT, Tier 2/3, loans, and allowances. If something looks off, ask me to draft a ticket for payroll with the right context.",
   },
   {
     id: "learning-growth",
@@ -119,7 +68,7 @@ const EMPLOYEE_KNOWLEDGE_BASE: KnowledgeArticle[] = [
     summary: "Courses, mentors, nudges",
     keywords: ["learning", "training", "growth", "courses", "career"],
     response:
-      "The Growth cockpit shows mandatory and elective learning mapped to your role family. You can enrol in courses, request mentors, and mark milestones as complete. AI nudges highlight skills gaps, recommend micro-learning, and connect you to peers who recently completed similar paths.",
+      "The Growth cockpit shows required and elective learning mapped to your role. Enrol in courses, request mentors, tick milestones, and get AI nudges that highlight skill gaps, micro-learning, and peers who recently completed the same journey.",
   },
   {
     id: "benefits-support",
@@ -127,34 +76,7 @@ const EMPLOYEE_KNOWLEDGE_BASE: KnowledgeArticle[] = [
     summary: "Loans, medical, wellness",
     keywords: ["benefits", "loan", "medical", "wellness", "support"],
     response:
-      "Benefits live in the Support hub: medical enrolments, wellness sessions, salary advances, and reimbursements. The assistant can surface policy documents, status of approvals, and point you to the right HR contact if human intervention is required.",
-  },
-]
-
-const WELLBEING_NUDGES: WellbeingNudge[] = [
-  {
-    id: "hydration",
-    title: "Hydration reminder",
-    detail: "You've been active in back-to-back meetings today. Take a 5-minute recharge and hydrate.",
-    action: "Log a break",
-    sentiment: "attention",
-    confidence: 0.78,
-  },
-  {
-    id: "learning",
-    title: "Growth opportunity",
-    detail: "A new AI compliance course aligns with your current project. Completing it boosts your competency score by +12%.",
-    action: "Preview course",
-    sentiment: "positive",
-    confidence: 0.84,
-  },
-  {
-    id: "attendance",
-    title: "Attendance streak",
-    detail: "You're on a 14-day punctuality streak. Keep it going to unlock recognition badges in the portal.",
-    action: "View streak",
-    sentiment: "positive",
-    confidence: 0.9,
+      "The Support hub covers medical enrolments, wellness sessions, salary advances, reimbursements, and policy documents. I can surface status updates, next steps, or point you to the right HR contact when human intervention is needed.",
   },
 ]
 
@@ -175,13 +97,10 @@ export function EmployeeAIChatbox() {
   const [inputMessage, setInputMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [showScrollButtons, setShowScrollButtons] = useState(false)
-  const [recentPromptId, setRecentPromptId] = useState<string | null>(null)
-  const [knowledgeMatches, setKnowledgeMatches] = useState<KnowledgeArticle[]>(EMPLOYEE_KNOWLEDGE_BASE)
-  const [nudges, setNudges] = useState<WellbeingNudge[]>(WELLBEING_NUDGES)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
 
   const speakText = (text: string) => {
     if (!isTTSEnabled || !("speechSynthesis" in window)) return
@@ -214,17 +133,13 @@ export function EmployeeAIChatbox() {
   }
 
   const scrollToBottom = () => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTo({
-        top: messagesContainerRef.current.scrollHeight,
-        behavior: "smooth",
-      })
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
   const scrollToTop = () => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTo({ top: 0, behavior: "smooth" })
+    const viewport = scrollAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]")
+    if (viewport) {
+      viewport.scrollTo({ top: 0, behavior: "smooth" })
     }
   }
 
@@ -236,19 +151,6 @@ export function EmployeeAIChatbox() {
     scrollToBottom()
   }, [messages])
 
-  useEffect(() => {
-    const query = inputMessage.toLowerCase().trim()
-    if (!query) {
-      setKnowledgeMatches(EMPLOYEE_KNOWLEDGE_BASE)
-      return
-    }
-    setKnowledgeMatches(
-      EMPLOYEE_KNOWLEDGE_BASE.filter((article) =>
-        article.keywords.some((keyword) => keyword.includes(query) || query.includes(keyword)),
-      ),
-    )
-  }, [inputMessage])
-
   const injectKnowledgeResponse = (article: KnowledgeArticle) => {
     const assistantMessage: Message = {
       id: (Date.now() + 1).toString(),
@@ -257,7 +159,6 @@ export function EmployeeAIChatbox() {
       timestamp: new Date(),
     }
     setMessages((prev) => [...prev, assistantMessage])
-    setRecentPromptId(article.id)
     setIsLoading(false)
   }
 
@@ -299,7 +200,8 @@ export function EmployeeAIChatbox() {
             department: "Technology",
             position: "Senior Software Engineer",
             leaveBalance: 18,
-            currentModule: typeof window !== "undefined" ? window.location.pathname.split("/").pop() || "dashboard" : "dashboard",
+            currentModule:
+              typeof window !== "undefined" ? window.location.pathname.split("/").pop() || "dashboard" : "dashboard",
           },
         }),
       })
@@ -358,11 +260,6 @@ export function EmployeeAIChatbox() {
     }
   }
 
-  const handlePromptSelect = (prompt: EmployeePrompt) => {
-    setInputMessage(prompt.message)
-    setRecentPromptId(prompt.id)
-  }
-
   const clearChat = () => {
     stopSpeaking()
     setMessages([
@@ -374,9 +271,6 @@ export function EmployeeAIChatbox() {
         timestamp: new Date(),
       },
     ])
-    setRecentPromptId(null)
-    setKnowledgeMatches(EMPLOYEE_KNOWLEDGE_BASE)
-    setNudges(WELLBEING_NUDGES)
   }
 
   if (!isOpen) {
@@ -432,34 +326,6 @@ export function EmployeeAIChatbox() {
 
       {!isMinimized && (
         <CardContent className="flex h-[calc(600px-80px)] flex-col p-0">
-          <div className="flex flex-col gap-3 border-b bg-white px-4 pb-2 pt-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="gap-1 text-xs">
-                <Sparkles className="h-3 w-3" /> Quick answers
-              </Badge>
-              <span className="text-xs text-muted-foreground">Ask something or tap below to auto-fill a question.</span>
-            </div>
-            <div className="flex max-h-16 flex-wrap gap-2 overflow-y-auto pr-1">
-              {knowledgeMatches.slice(0, 4).map((article) => (
-                <Button
-                  key={article.id}
-                  variant={recentPromptId === article.id ? "default" : "outline"}
-                  size="sm"
-                  className={`h-7 text-xs ${recentPromptId === article.id ? "bg-emerald-600" : "bg-white"}`}
-                  onClick={() => {
-                    setInputMessage(article.title)
-                    injectKnowledgeResponse(article)
-                  }}
-                >
-                  {article.title}
-                </Button>
-              ))}
-              {knowledgeMatches.length === 0 && (
-                <span className="text-[11px] text-muted-foreground">No quick matches—try a prompt below or rephrase.</span>
-              )}
-            </div>
-          </div>
-
           <div className="flex items-center justify-between border-b bg-emerald-50 p-3">
             {isTTSEnabled ? (
               <div className="flex items-center gap-2 text-xs text-emerald-700">
@@ -473,88 +339,90 @@ export function EmployeeAIChatbox() {
             </Button>
           </div>
 
-          <div ref={messagesContainerRef} className="relative flex-1 overflow-y-auto px-4 py-3 pr-3">
-            {showScrollButtons && (
-              <div className="pointer-events-none absolute right-2 top-2 z-10 flex flex-col gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={scrollToTop}
-                  className="pointer-events-auto h-8 w-8 bg-white/90 shadow-sm hover:bg-white"
-                  title="Scroll to top"
-                >
-                  <ChevronUp className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={scrollToBottom}
-                  className="pointer-events-auto h-8 w-8 bg-white/90 shadow-sm hover:bg-white"
-                  title="Scroll to bottom"
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+          <div className="flex-1">
+            <ScrollArea ref={scrollAreaRef} className="relative h-full">
+              <div className="space-y-4 p-4">
+                {showScrollButtons && (
+                  <div className="pointer-events-none absolute right-6 top-6 z-10 flex flex-col gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={scrollToTop}
+                      className="pointer-events-auto h-8 w-8 bg-white/90 shadow-sm hover:bg-white"
+                      title="Scroll to top"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={scrollToBottom}
+                      className="pointer-events-auto h-8 w-8 bg-white/90 shadow-sm hover:bg-white"
+                      title="Scroll to bottom"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
 
-            <div className="space-y-4 pb-6">
-              {messages.map((message) => (
-                <div key={message.id} className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                  {message.role === "assistant" && (
+                {messages.map((message) => (
+                  <div key={message.id} className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                    {message.role === "assistant" && (
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                        <Bot className="h-4 w-4 text-emerald-600" />
+                      </div>
+                    )}
+                    <div
+                      className={`max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-sm ${
+                        message.role === "user" ? "bg-emerald-600 text-white" : "bg-white text-slate-900"
+                      }`}
+                    >
+                      <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                      <div className="mt-1 flex items-center justify-between">
+                        <span className={`text-xs opacity-70 ${message.role === "user" ? "text-emerald-100" : "text-slate-500"}`}>
+                          {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        {message.role === "assistant" && isTTSEnabled && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => speakText(message.content)}
+                            className="h-6 w-6 opacity-60 hover:opacity-100"
+                            title="Speak this message"
+                          >
+                            <Volume2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {message.role === "user" && (
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-100">
+                        <User className="h-4 w-4 text-slate-600" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {isLoading && (
+                  <div className="flex gap-3">
                     <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
                       <Bot className="h-4 w-4 text-emerald-600" />
                     </div>
-                  )}
-                  <div
-                    className={`max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-sm ${
-                      message.role === "user" ? "bg-emerald-600 text-white" : "bg-white text-slate-900"
-                    }`}
-                  >
-                    <div className="whitespace-pre-wrap break-words">{message.content}</div>
-                    <div className="mt-1 flex items-center justify-between">
-                      <span className={`text-xs opacity-70 ${message.role === "user" ? "text-emerald-100" : "text-slate-500"}`}>
-                        {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                      {message.role === "assistant" && isTTSEnabled && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => speakText(message.content)}
-                          className="h-6 w-6 opacity-60 hover:opacity-100"
-                          title="Speak this message"
-                        >
-                          <Volume2 className="h-3 w-3" />
-                        </Button>
-                      )}
+                    <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm">
+                      <div className="flex space-x-1">
+                        <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500"></div>
+                        <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "0.1s" }}></div>
+                        <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "0.2s" }}></div>
+                      </div>
                     </div>
                   </div>
-                  {message.role === "user" && (
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-100">
-                      <User className="h-4 w-4 text-slate-600" />
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {isLoading && (
-                <div className="flex gap-3">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
-                    <Bot className="h-4 w-4 text-emerald-600" />
-                  </div>
-                  <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm">
-                    <div className="flex space-x-1">
-                      <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500"></div>
-                      <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "0.1s" }}></div>
-                      <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "0.2s" }}></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            </ScrollArea>
           </div>
 
-          <div className="flex-shrink-0 border-t bg-white p-4">
+          <div className="border-t bg-white p-4">
             <div className="flex gap-2">
               <Input
                 ref={inputRef}
@@ -568,47 +436,6 @@ export function EmployeeAIChatbox() {
               <Button onClick={sendMessage} disabled={!inputMessage.trim() || isLoading} size="icon" className="bg-emerald-600 hover:bg-emerald-700">
                 <Send className="h-4 w-4" />
               </Button>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {EMPLOYEE_PROMPTS.map((prompt) => (
-                <Button
-                  key={prompt.id}
-                  variant={recentPromptId === prompt.id ? "default" : "outline"}
-                  size="sm"
-                  className={`h-7 text-xs ${recentPromptId === prompt.id ? "bg-emerald-600" : "bg-white"}`}
-                  onClick={() => handlePromptSelect(prompt)}
-                  title={prompt.helper}
-                >
-                  {prompt.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          <div className="border-t bg-emerald-50/60 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
-              <HeartPulse className="h-4 w-4" /> Personal wellbeing & nudges
-            </div>
-            <div className="mt-3 max-h-32 space-y-3 overflow-y-auto pr-1">
-              {nudges.map((nudge) => (
-                <div key={nudge.id} className="rounded-lg border border-emerald-100 bg-white p-3 text-xs shadow-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold text-emerald-900">{nudge.title}</p>
-                    <Badge variant="outline" className="text-[10px]">
-                      {(nudge.confidence * 100).toFixed(0)}% signal
-                    </Badge>
-                  </div>
-                  <p className="mt-2 text-emerald-800">{nudge.detail}</p>
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-emerald-700">
-                    <span className="capitalize">Sentiment: {nudge.sentiment}</span>
-                    <Button variant="link" size="sm" className="h-auto p-0 text-xs text-emerald-700">
-                      {nudge.action}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              {nudges.length === 0 && <p className="text-[11px] text-emerald-700/70">No live nudges right now.</p>}
             </div>
           </div>
         </CardContent>
