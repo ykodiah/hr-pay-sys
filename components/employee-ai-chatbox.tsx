@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Bot,
   ChevronDown,
@@ -78,6 +77,38 @@ const EMPLOYEE_KNOWLEDGE_BASE: KnowledgeArticle[] = [
     response:
       "The Support hub covers medical enrolments, wellness sessions, salary advances, reimbursements, and policy documents. I can surface status updates, next steps, or point you to the right HR contact when human intervention is needed.",
   },
+  {
+    id: "attendance-checkins",
+    title: "Attendance & check-ins",
+    summary: "Geo clocking, biometrics, streaks",
+    keywords: ["attendance", "clock in", "check in", "geo", "biometric"],
+    response:
+      "You can clock in from mobile or web with geo verification if HR enables it. If you use a biometric device, the sync runs every few minutes and updates your portal history. I can remind you of your current streak, missed check-ins, and how to submit corrections if you forgot to clock.",
+  },
+  {
+    id: "performance-feedback",
+    title: "Performance & feedback",
+    summary: "Goals, 1:1s, reviews",
+    keywords: ["performance", "feedback", "review", "goal", "check-in"],
+    response:
+      "Track goals, quarterly reviews, and 1:1 notes from the Performance tile. You can request feedback, log achievements, and preview upcoming review cycles. Ask me for preparation tips or to draft a self-evaluation outline based on your recent progress.",
+  },
+  {
+    id: "personal-data-updates",
+    title: "Update my details",
+    summary: "Personal info, documents",
+    keywords: ["update", "details", "address", "documents", "profile"],
+    response:
+      "Head to Update My Details to change your address, emergency contacts, dependent info, or upload IDs. Requests route to HR for approval with a full audit trail. I can help list the documents you need or draft a change request message.",
+  },
+  {
+    id: "expenses-reimbursements",
+    title: "Expenses & reimbursements",
+    summary: "Claims, receipts, approvals",
+    keywords: ["expense", "reimbursement", "claim", "allowance", "receipt"],
+    response:
+      "Submit travel, meal, or allowance claims from the Expenses quick action. Attach receipts, pick the cost centre, and check approval status from the history tab. I can outline the policy limits, help you prepare a summary for finance, or flag overdue approvals.",
+  },
 ]
 
 export function EmployeeAIChatbox() {
@@ -100,7 +131,7 @@ export function EmployeeAIChatbox() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
   const speakText = (text: string) => {
     if (!isTTSEnabled || !("speechSynthesis" in window)) return
@@ -133,13 +164,17 @@ export function EmployeeAIChatbox() {
   }
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      })
+    }
   }
 
   const scrollToTop = () => {
-    const viewport = scrollAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]")
-    if (viewport) {
-      viewport.scrollTo({ top: 0, behavior: "smooth" })
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({ top: 0, behavior: "smooth" })
     }
   }
 
@@ -339,87 +374,88 @@ export function EmployeeAIChatbox() {
             </Button>
           </div>
 
-          <div className="flex-1">
-            <ScrollArea ref={scrollAreaRef} className="relative h-full">
-              <div className="space-y-4 p-4">
-                {showScrollButtons && (
-                  <div className="pointer-events-none absolute right-6 top-6 z-10 flex flex-col gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={scrollToTop}
-                      className="pointer-events-auto h-8 w-8 bg-white/90 shadow-sm hover:bg-white"
-                      title="Scroll to top"
-                    >
-                      <ChevronUp className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={scrollToBottom}
-                      className="pointer-events-auto h-8 w-8 bg-white/90 shadow-sm hover:bg-white"
-                      title="Scroll to bottom"
-                    >
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
+          <div
+            ref={messagesContainerRef}
+            className="relative flex-1 overflow-y-auto px-4 py-3 pr-3"
+          >
+            {showScrollButtons && (
+              <div className="pointer-events-none absolute right-2 top-2 z-10 flex flex-col gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={scrollToTop}
+                  className="pointer-events-auto h-8 w-8 bg-white/90 shadow-sm hover:bg-white"
+                  title="Scroll to top"
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={scrollToBottom}
+                  className="pointer-events-auto h-8 w-8 bg-white/90 shadow-sm hover:bg-white"
+                  title="Scroll to bottom"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
 
-                {messages.map((message) => (
-                  <div key={message.id} className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                    {message.role === "assistant" && (
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
-                        <Bot className="h-4 w-4 text-emerald-600" />
-                      </div>
-                    )}
-                    <div
-                      className={`max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-sm ${
-                        message.role === "user" ? "bg-emerald-600 text-white" : "bg-white text-slate-900"
-                      }`}
-                    >
-                      <div className="whitespace-pre-wrap break-words">{message.content}</div>
-                      <div className="mt-1 flex items-center justify-between">
-                        <span className={`text-xs opacity-70 ${message.role === "user" ? "text-emerald-100" : "text-slate-500"}`}>
-                          {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                        {message.role === "assistant" && isTTSEnabled && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => speakText(message.content)}
-                            className="h-6 w-6 opacity-60 hover:opacity-100"
-                            title="Speak this message"
-                          >
-                            <Volume2 className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                    {message.role === "user" && (
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-100">
-                        <User className="h-4 w-4 text-slate-600" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {isLoading && (
-                  <div className="flex gap-3">
+            <div className="space-y-4 pb-6">
+              {messages.map((message) => (
+                <div key={message.id} className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                  {message.role === "assistant" && (
                     <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
                       <Bot className="h-4 w-4 text-emerald-600" />
                     </div>
-                    <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm">
-                      <div className="flex space-x-1">
-                        <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500"></div>
-                        <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "0.1s" }}></div>
-                        <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "0.2s" }}></div>
-                      </div>
+                  )}
+                  <div
+                    className={`max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-sm ${
+                      message.role === "user" ? "bg-emerald-600 text-white" : "bg-white text-slate-900"
+                    }`}
+                  >
+                    <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className={`text-xs opacity-70 ${message.role === "user" ? "text-emerald-100" : "text-slate-500"}`}>
+                        {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      {message.role === "assistant" && isTTSEnabled && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => speakText(message.content)}
+                          className="h-6 w-6 opacity-60 hover:opacity-100"
+                          title="Speak this message"
+                        >
+                          <Volume2 className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
                   </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            </ScrollArea>
+                  {message.role === "user" && (
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-100">
+                      <User className="h-4 w-4 text-slate-600" />
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {isLoading && (
+                <div className="flex gap-3">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                    <Bot className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm">
+                    <div className="flex space-x-1">
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500"></div>
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "0.1s" }}></div>
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "0.2s" }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
           </div>
 
           <div className="border-t bg-white p-4">
