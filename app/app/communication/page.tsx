@@ -82,16 +82,26 @@ export default function CommunicationHubPage() {
 
   useEffect(() => {
     const bootstrap = async () => {
-      const data = await listChannels()
-      setChannels(data)
-      if (data.length > 0) {
-        setActiveChannelId(data[0].id)
+      try {
+        const data = await listChannels()
+        setChannels(data)
+        if (data.length > 0) {
+          setActiveChannelId(data[0].id)
+        }
+      } catch (error) {
+        console.error("Failed to load channels", error)
+        pushToast({
+          variant: "destructive",
+          title: "Unable to load channels",
+          description: "Showing cached view while the communications service is offline.",
+        })
+      } finally {
+        setChannelsLoading(false)
       }
-      setChannelsLoading(false)
     }
 
     bootstrap()
-  }, [])
+  }, [pushToast])
 
   useEffect(() => {
     if (!activeChannelId) {
@@ -102,15 +112,25 @@ export default function CommunicationHubPage() {
 
     const load = async () => {
       setMessagesLoading(true)
-      const data = await listMessages(activeChannelId)
-      const sorted = [...data].sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
-      setMessages(sorted)
-      setSelectedMessageId((prev) => prev ?? sorted.at(-1)?.id ?? null)
-      setMessagesLoading(false)
+      try {
+        const data = await listMessages(activeChannelId)
+        const sorted = [...data].sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
+        setMessages(sorted)
+        setSelectedMessageId((prev) => prev ?? sorted.at(-1)?.id ?? null)
+      } catch (error) {
+        console.error("Failed to load messages", error)
+        pushToast({
+          variant: "destructive",
+          title: "Unable to load messages",
+          description: "Showing cached messages while the backend is unreachable.",
+        })
+      } finally {
+        setMessagesLoading(false)
+      }
     }
 
     load()
-  }, [activeChannelId])
+  }, [activeChannelId, pushToast])
 
   const activeChannel = channels.find((channel) => channel.id === activeChannelId) ?? null
 
@@ -164,32 +184,50 @@ export default function CommunicationHubPage() {
       sentAt: new Date().toISOString(),
     }
 
-    const persisted = await sendMessageService(messagePayload)
-    const updated = [...messages, persisted].sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
-    setMessages(updated)
-    setComposer({ content: "", priority: "normal", requestAck: false, attachments: [], tag: "" })
-    setSelectedMessageId(persisted.id)
+    try {
+      const persisted = await sendMessageService(messagePayload)
+      const updated = [...messages, persisted].sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
+      setMessages(updated)
+      setComposer({ content: "", priority: "normal", requestAck: false, attachments: [], tag: "" })
+      setSelectedMessageId(persisted.id)
 
-    pushToast({
-      title: "Message sent",
-      description: `Shared to ${activeChannel.type === "direct" ? "direct chat" : `#${activeChannel.name}`}.`,
-    })
+      pushToast({
+        title: "Message sent",
+        description: `Shared to ${activeChannel.type === "direct" ? "direct chat" : `#${activeChannel.name}`}.`,
+      })
+    } catch (error) {
+      console.error("Failed to send message", error)
+      pushToast({
+        variant: "destructive",
+        title: "Send failed",
+        description: "We could not deliver this message to the backend.",
+      })
+    }
   }
 
   const handleAcknowledge = async (messageId: string) => {
-    await acknowledgeMessage(messageId, "You")
-    setMessages((previous) =>
-      previous.map((message) =>
-        message.id === messageId
-          ? {
-              ...message,
-              acknowledgedBy: message.acknowledgedBy.includes("You")
-                ? message.acknowledgedBy
-                : [...message.acknowledgedBy, "You"],
-            }
-          : message,
-      ),
-    )
+    try {
+      await acknowledgeMessage(messageId, "You")
+      setMessages((previous) =>
+        previous.map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                acknowledgedBy: message.acknowledgedBy.includes("You")
+                  ? message.acknowledgedBy
+                  : [...message.acknowledgedBy, "You"],
+              }
+            : message,
+        ),
+      )
+    } catch (error) {
+      console.error("Failed to acknowledge message", error)
+      pushToast({
+        variant: "destructive",
+        title: "Acknowledgement failed",
+        description: "We could not record your acknowledgement.",
+      })
+    }
   }
 
   const handleAddAttachment = () => {
@@ -212,10 +250,20 @@ export default function CommunicationHubPage() {
       retentionPolicy: "standard",
       encryption: "end-to-end",
     }
-    const persisted = await createChannelService(channel)
-    setChannels((previous) => [persisted, ...previous.filter((item) => item.id !== persisted.id)])
-    setActiveChannelId(persisted.id)
-    pushToast({ title: "Channel created", description: `#${persisted.name} is ready.` })
+
+    try {
+      const persisted = await createChannelService(channel)
+      setChannels((previous) => [persisted, ...previous.filter((item) => item.id !== persisted.id)])
+      setActiveChannelId(persisted.id)
+      pushToast({ title: "Channel created", description: `#${persisted.name} is ready.` })
+    } catch (error) {
+      console.error("Failed to create channel", error)
+      pushToast({
+        variant: "destructive",
+        title: "Channel creation failed",
+        description: "We could not create the channel on the backend.",
+      })
+    }
   }
 
   return (
@@ -223,96 +271,97 @@ export default function CommunicationHubPage() {
       <RoleGuard requiredRoles={["hr-admin", "payroll-ops", "communications"]}>
         <div className="space-y-6">
           <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Communication Control Centre</h1>
-          <p className="text-sm text-muted-foreground">
-            Secure collaboration for payroll, compliance and workforce operations — with audit-ready controls.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="gap-2" onClick={handleCreateChannel}>
-            <Plus className="h-4 w-4" /> New channel
-          </Button>
-          <Button variant="outline" className="gap-2">
-            <Laptop className="h-4 w-4" /> Start secure call
-          </Button>
-          <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700">
-            <Zap className="h-4 w-4" /> Launch automation
-          </Button>
-        </div>
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight">Communication Control Centre</h1>
+              <p className="text-sm text-muted-foreground">
+                Secure collaboration for payroll, compliance and workforce operations — with audit-ready controls.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="gap-2" onClick={handleCreateChannel}>
+                <Plus className="h-4 w-4" /> New channel
+              </Button>
+              <Button variant="outline" className="gap-2">
+                <Laptop className="h-4 w-4" /> Start secure call
+              </Button>
+              <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                <Zap className="h-4 w-4" /> Launch automation
+              </Button>
+            </div>
           </header>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <MetricCard
-          title="Active channels"
-          value={channels.length}
-          description="Spaces monitored for workforce operations"
-          icon={<MessageSquare className="h-5 w-5 text-emerald-600" />}
-        />
-        <MetricCard
-          title="Ack compliance"
-          value={`${ackCompliance}%`}
-          description="Mandatory comms acknowledged"
-          icon={<CheckSquare className="h-5 w-5 text-blue-600" />}
-        />
-        <MetricCard
-          title="Open incidents"
-          value={messages.filter((message) => message.priority === "critical").length}
-          description="Critical alerts awaiting closure"
-          icon={<AlertCircle className="h-5 w-5 text-amber-600" />}
-        />
-      </section>
+          <section className="grid gap-4 md:grid-cols-3">
+            <MetricCard
+              title="Active channels"
+              value={channels.length}
+              description="Spaces monitored for workforce operations"
+              icon={<MessageSquare className="h-5 w-5 text-emerald-600" />}
+            />
+            <MetricCard
+              title="Ack compliance"
+              value={`${ackCompliance}%`}
+              description="Mandatory comms acknowledged"
+              icon={<CheckSquare className="h-5 w-5 text-blue-600" />}
+            />
+            <MetricCard
+              title="Open incidents"
+              value={messages.filter((message) => message.priority === "critical").length}
+              description="Critical alerts awaiting closure"
+              icon={<AlertCircle className="h-5 w-5 text-amber-600" />}
+            />
+          </section>
 
           <div className="grid gap-4 lg:grid-cols-[260px_1fr_320px]">
-        <aside className="flex h-[720px] flex-col rounded-xl border bg-card">
-          <ChannelSidebar
-            channels={channels}
-            activeId={activeChannelId}
-            onSelect={setActiveChannelId}
-            isLoading={channelsLoading}
-          />
-        </aside>
+            <aside className="flex h-[720px] flex-col rounded-xl border bg-card">
+              <ChannelSidebar
+                channels={channels}
+                activeId={activeChannelId}
+                onSelect={setActiveChannelId}
+                isLoading={channelsLoading}
+              />
+            </aside>
 
-        <main className="flex h-[720px] flex-col rounded-xl border bg-card">
-          <ConversationHeader
-            channel={activeChannel}
-            filters={filters}
-            onFiltersChange={setFilters}
-          />
-          <Separator />
-          <ScrollArea className="flex-1">
-            <div className="flex flex-col gap-3 px-4 py-4">
-              {filteredMessages.length === 0 ? (
-                <div className="h-[420px] flex items-center justify-center text-sm text-muted-foreground">
-                  No messages match the current filters.
+            <main className="flex h-[720px] flex-col rounded-xl border bg-card">
+              <ConversationHeader channel={activeChannel} filters={filters} onFiltersChange={setFilters} />
+              <Separator />
+              <ScrollArea className="flex-1">
+                <div className="flex flex-col gap-3 px-4 py-4">
+                  {filteredMessages.length === 0 ? (
+                    <div className="h-[420px] flex items-center justify-center text-sm text-muted-foreground">
+                      No messages match the current filters.
+                    </div>
+                  ) : (
+                    filteredMessages.map((message) => (
+                      <MessageBubble
+                        key={message.id}
+                        message={message}
+                        selected={selectedMessageId === message.id}
+                        onSelect={setSelectedMessageId}
+                        onAcknowledge={handleAcknowledge}
+                      />
+                    ))
+                  )}
+                  {messagesLoading && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Loading messages…
+                    </div>
+                  )}
                 </div>
-              ) : (
-                filteredMessages.map((message) => (
-                  <MessageBubble
-                    key={message.id}
-                    message={message}
-                    selected={selectedMessageId === message.id}
-                    onSelect={setSelectedMessageId}
-                    onAcknowledge={handleAcknowledge}
-                  />
-                ))
-              )}
-            </div>
-          </ScrollArea>
-          <Separator />
-          <Composer
-            value={composer}
-            onChange={setComposer}
-            onSend={handleSendMessage}
-            onAddAttachment={handleAddAttachment}
-            disabled={!activeChannel}
-          />
-        </main>
+              </ScrollArea>
+              <Separator />
+              <Composer
+                value={composer}
+                onChange={setComposer}
+                onSend={handleSendMessage}
+                onAddAttachment={handleAddAttachment}
+                disabled={!activeChannel}
+              />
+            </main>
 
-        <aside className="flex h-[720px] flex-col gap-4">
-          <CompliancePanel channel={activeChannel} />
-          <MessageInspector message={selectedMessage} onAcknowledge={handleAcknowledge} />
-        </aside>
+            <aside className="flex h-[720px] flex-col gap-4">
+              <CompliancePanel channel={activeChannel} />
+              <MessageInspector message={selectedMessage} onAcknowledge={handleAcknowledge} />
+            </aside>
           </div>
         </div>
       </RoleGuard>

@@ -83,6 +83,7 @@ export default function SelfServiceUpdateDetailsPage() {
   const [reason, setReason] = useState("")
   const [attachments, setAttachments] = useState<string[]>([])
   const [attachmentInput, setAttachmentInput] = useState("")
+  const pushToast = toast
 
   const diffs: ChangeFieldDiff[] = useMemo(() => {
     return fieldCatalog
@@ -113,9 +114,9 @@ export default function SelfServiceUpdateDetailsPage() {
     })
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (diffs.length === 0) {
-      toast({
+      pushToast({
         variant: "destructive",
         title: "No changes detected",
         description: "Update at least one field before submitting a change request.",
@@ -124,6 +125,8 @@ export default function SelfServiceUpdateDetailsPage() {
     }
 
     const requestId = `CR-${Date.now()}`
+
+    try {
       await submitChangeRequest({
         id: requestId,
         employeeId: "EMP002",
@@ -136,15 +139,23 @@ export default function SelfServiceUpdateDetailsPage() {
         attachments: attachments.map((name, index) => ({ id: `${requestId}-att-${index}`, name, type: "Supporting document" })),
       })
 
-    toast({
-      title: "Change request submitted",
-      description: "HR will verify your updates and notify you once processed.",
-    })
+      pushToast({
+        title: "Change request submitted",
+        description: "HR will verify your updates and notify you once processed.",
+      })
 
-    setReason("")
-    setAttachments([])
-    setAttachmentInput("")
-    setDraft(structuredClone(currentProfile))
+      setReason("")
+      setAttachments([])
+      setAttachmentInput("")
+      setDraft(structuredClone(currentProfile))
+    } catch (error) {
+      console.error("Failed to submit change request", error)
+      pushToast({
+        variant: "destructive",
+        title: "Submission failed",
+        description: "We could not submit your update right now. Please try again later.",
+      })
+    }
   }
 
   const handleAddAttachment = () => {
@@ -154,16 +165,16 @@ export default function SelfServiceUpdateDetailsPage() {
     setAttachmentInput("")
   }
 
-    return (
-      <AuthGuard>
-        <RoleGuard requiredRoles={["employee", "hr-admin"]}>
-          <div className="space-y-6">
-            <header className="space-y-2">
-              <h1 className="text-2xl font-semibold tracking-tight">Update my details</h1>
-              <p className="text-sm text-muted-foreground">
-                Submit secure change requests for HR to review. Sensitive changes (e.g. bank details) require supporting documents.
-              </p>
-            </header>
+  return (
+    <AuthGuard>
+      <RoleGuard requiredRoles={["employee", "hr-admin"]}>
+        <div className="space-y-6">
+          <header className="space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight">Update my details</h1>
+            <p className="text-sm text-muted-foreground">
+              Submit secure change requests for HR to review. Sensitive changes (e.g. bank details) require supporting documents.
+            </p>
+          </header>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-5">

@@ -94,13 +94,23 @@ export default function PromotionsPage() {
 
   useEffect(() => {
     const bootstrap = async () => {
-      const payload = await listPromotionCases()
-      setCases(payload)
-      setIsLoadingCases(false)
+      try {
+        const payload = await listPromotionCases()
+        setCases(payload)
+      } catch (error) {
+        console.error("Failed to load promotion cases", error)
+        pushToast({
+          variant: "destructive",
+          title: "Unable to load promotions",
+          description: "Showing cached cases while the backend is unreachable.",
+        })
+      } finally {
+        setIsLoadingCases(false)
+      }
     }
 
     bootstrap()
-  }, [])
+  }, [pushToast])
 
   const filteredCases = useMemo(() => {
     return cases.filter((promotionCase) => {
@@ -130,19 +140,28 @@ export default function PromotionsPage() {
   const closeWizard = () => setWizardOpen(false)
 
   const handleCreateCase = async (promotionCase: PromotionCase) => {
-    const persisted = await createPromotionCaseMutation(promotionCase)
-    setCases((previous) => [persisted, ...previous.filter((item) => item.id !== persisted.id)])
-    setStatusFilter("all")
-    setDepartmentFilter("all")
-    setSearchTerm("")
-    setDetailCaseId(persisted.id)
-    pushToast({
-      title: "Promotion case submitted",
-      description:
-        persisted.status === "draft"
-          ? "Eligibility gaps detected – saved as draft for HR to review."
-          : "Routing approvals and notifying stakeholders.",
-    })
+    try {
+      const persisted = await createPromotionCaseMutation(promotionCase)
+      setCases((previous) => [persisted, ...previous.filter((item) => item.id !== persisted.id)])
+      setStatusFilter("all")
+      setDepartmentFilter("all")
+      setSearchTerm("")
+      setDetailCaseId(persisted.id)
+      pushToast({
+        title: "Promotion case submitted",
+        description:
+          persisted.status === "draft"
+            ? "Eligibility gaps detected – saved as draft for HR to review."
+            : "Routing approvals and notifying stakeholders.",
+      })
+    } catch (error) {
+      console.error("Failed to submit promotion case", error)
+      pushToast({
+        variant: "destructive",
+        title: "Submission failed",
+        description: "We could not save the promotion case. Please try again.",
+      })
+    }
   }
 
   const handleStageDecision = async (caseId: string, role: string, decision: "approve" | "reject", comment?: string) => {
@@ -205,7 +224,16 @@ export default function PromotionsPage() {
     })
 
     if (updatedRecord) {
-      await syncPromotionCase(updatedRecord)
+      try {
+        await syncPromotionCase(updatedRecord)
+      } catch (error) {
+        console.error("Failed to sync promotion case", error)
+        pushToast({
+          variant: "destructive",
+          title: "Sync failed",
+          description: "Decision saved locally but not synced to the backend.",
+        })
+      }
     }
   }
 

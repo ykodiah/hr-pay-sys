@@ -50,7 +50,8 @@ const providerSecurityNotes: Record<MeetingProvider, string> = {
 }
 
 export default function MeetingsWorkspacePage() {
-  const [meetings, setMeetings] = useState<MeetingRecord[]>(meetingSeed)
+  const [meetings, setMeetings] = useState<MeetingRecord[]>([])
+  const [isLoadingMeetings, setIsLoadingMeetings] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState({
     title: "",
@@ -63,10 +64,31 @@ export default function MeetingsWorkspacePage() {
     encryption: true,
     recording: true,
   })
-  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(meetingSeed[0]?.id ?? null)
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null)
   const [minutesProcessing, setMinutesProcessing] = useState<{ meetingId: string; step: number } | null>(null)
 
   const pushToast = toast
+
+  useEffect(() => {
+    const bootstrap = async () => {
+      try {
+        const payload = await listMeetings()
+        setMeetings(payload)
+        setSelectedMeetingId(payload[0]?.id ?? null)
+      } catch (error) {
+        console.error("Failed to load meetings", error)
+        pushToast({
+          variant: "destructive",
+          title: "Unable to load meetings",
+          description: "We could not reach the meetings service. Showing cached view.",
+        })
+      } finally {
+        setIsLoadingMeetings(false)
+      }
+    }
+
+    bootstrap()
+  }, [pushToast])
 
   const upcomingMeetings = useMemo(() => {
     return meetings
@@ -81,7 +103,7 @@ export default function MeetingsWorkspacePage() {
 
   const selectedMeeting = selectedMeetingId ? meetings.find((meeting) => meeting.id === selectedMeetingId) ?? null : null
 
-  const handleCreateMeeting = () => {
+  const handleCreateMeeting = async () => {
     if (!form.title.trim() || !form.date || !form.time) {
       pushToast({
         variant: "destructive",
@@ -108,15 +130,25 @@ export default function MeetingsWorkspacePage() {
       minutesStatus: "not-started",
     }
 
-    setMeetings((previous) => [meeting, ...previous])
-    setDialogOpen(false)
-    setForm({ title: "", provider: "Zoom", date: "", time: "", duration: 60, agenda: "", passcode: true, encryption: true, recording: true })
-    setSelectedMeetingId(meeting.id)
+    try {
+      const persisted = await scheduleMeetingService(meeting)
+      setMeetings((previous) => [persisted, ...previous])
+      setDialogOpen(false)
+      setForm({ title: "", provider: "Zoom", date: "", time: "", duration: 60, agenda: "", passcode: true, encryption: true, recording: true })
+      setSelectedMeetingId(persisted.id)
 
-    pushToast({
-      title: "Meeting scheduled",
-      description: `${meeting.title} booked via ${meeting.provider}. Invitations will be triggered shortly.`,
-    })
+      pushToast({
+        title: "Meeting scheduled",
+        description: `${persisted.title} booked via ${persisted.provider}. Invitations will be triggered shortly.`,
+      })
+    } catch (error) {
+      console.error("Failed to schedule meeting", error)
+      pushToast({
+        variant: "destructive",
+        title: "Scheduling failed",
+        description: "We could not save the meeting. Please try again shortly.",
+      })
+    }
   }
 
   const handleGenerateMinutes = (meetingId: string) => {
@@ -135,240 +167,256 @@ export default function MeetingsWorkspacePage() {
     setTimeout(() => setMinutesProcessing({ meetingId, step: 2 }), 800)
     setTimeout(() => setMinutesProcessing({ meetingId, step: 3 }), 1600)
     setTimeout(() => {
+      const summary =
+        "AI summary drafted. Key decisions captured, actions assigned to payroll ops and finance leads. Confidence score: 0.92."
+      let updatedRecord: MeetingRecord | null = null
       setMeetings((previous) =>
-        previous.map((record) =>
-          record.id === meetingId
-            ? {
-                ...record,
-                minutesStatus: "ready",
-                minutesSummary:
-                  "AI summary drafted. Key decisions captured, actions assigned to payroll ops and finance leads. Confidence score: 0.92.",
-              }
-            : record,
-        ),
+        previous.map((record) => {
+          if (record.id !== meetingId) return record
+          const next = { ...record, minutesStatus: "ready", minutesSummary: summary }
+          updatedRecord = next
+          return next
+        }),
       )
+      if (updatedRecord) {
+        void updateMeeting(updatedRecord).catch((error) => {
+          console.error("Failed to persist minutes status", error)
+          pushToast({
+            variant: "destructive",
+            title: "Minutes sync failed",
+            description: "Minutes ready locally but not synced to the backend.",
+          })
+        })
+      }
       setMinutesProcessing(null)
       pushToast({ title: "Minutes ready", description: "Draft minutes and transcript are prepared for review." })
     }, 2400)
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Secure Meetings Workspace</h1>
-          <p className="text-sm text-muted-foreground">
-            Schedule confidential sessions, enforce security controls, and generate AI-powered meeting minutes.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="gap-2">
-            <Link2 className="h-4 w-4" /> Provider directory
-          </Button>
-          <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={() => setDialogOpen(true)}>
-            <Plus className="h-4 w-4" /> Schedule meeting
-          </Button>
-        </div>
-      </header>
-
-      <section className="grid gap-4 md:grid-cols-3">
-        <MeetingMetricCard
-          icon={<CalendarClock className="h-5 w-5 text-emerald-600" />}
-          label="Next session"
-          value={upcomingMeetings.length > 0 ? formatDistanceToNow(new Date(upcomingMeetings[0].startTime), { addSuffix: true }) : "None"}
-          description={upcomingMeetings[0]?.title ?? "All clear"}
-        />
-        <MeetingMetricCard
-          icon={<ShieldCheck className="h-5 w-5 text-blue-600" />}
-          label="Security posture"
-          value={`${Math.round((meetings.filter((meeting) => meeting.e2ee).length / meetings.length) * 100)}%`}
-          description="Meetings with end-to-end encryption"
-        />
-        <MeetingMetricCard
-          icon={<MicVocal className="h-5 w-5 text-amber-600" />}
-          label="Minutes ready"
-          value={meetings.filter((meeting) => meeting.minutesStatus === "ready").length}
-          description="AI-generated summaries available"
-        />
-      </section>
-
-      <div className="grid gap-4 lg:grid-cols-[340px_1fr_320px]">
-        <aside className="flex h-[720px] flex-col rounded-xl border bg-card">
-          <MeetingList
-            label="Upcoming & live"
-            meetings={upcomingMeetings}
-            selectedId={selectedMeetingId}
-            onSelect={setSelectedMeetingId}
-          />
-          <Separator />
-          <MeetingList
-            label="Completed"
-            meetings={completedMeetings}
-            selectedId={selectedMeetingId}
-            onSelect={setSelectedMeetingId}
-          />
-        </aside>
-
-        <main className="flex h-[720px] flex-col gap-4">
-          <Card className="flex-1">
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">Meeting details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {selectedMeeting ? (
-                <MeetingDetails
-                  meeting={selectedMeeting}
-                  onGenerateMinutes={handleGenerateMinutes}
-                  minutesProcessing={minutesProcessing}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">Select a meeting to view its profile, security controls and AI minutes.</p>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">Provider integration</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>
-                Connected providers use SSO and SCIM provisioning. Payloads are routed via secure webhooks for recordings and transcripts.
+    <AuthGuard>
+      <RoleGuard requiredRoles={["hr-admin", "payroll-ops", "executive"]}>
+        <div className="space-y-6">
+          <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight">Secure Meetings Workspace</h1>
+              <p className="text-sm text-muted-foreground">
+                Schedule confidential sessions, enforce security controls, and generate AI-powered meeting minutes.
               </p>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(providerSecurityNotes).map(([provider, note]) => (
-                  <div key={provider} className="rounded-lg border p-3 text-xs">
-                    <p className="font-semibold text-foreground">{provider}</p>
-                    <p>{note}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="gap-2">
+                <Link2 className="h-4 w-4" /> Provider directory
+              </Button>
+              <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={() => setDialogOpen(true)}>
+                <Plus className="h-4 w-4" /> Schedule meeting
+              </Button>
+            </div>
+          </header>
+
+          <section className="grid gap-4 md:grid-cols-3">
+            <MeetingMetricCard
+              icon={<CalendarClock className="h-5 w-5 text-emerald-600" />}
+              label="Next session"
+              value={upcomingMeetings.length > 0 ? formatDistanceToNow(new Date(upcomingMeetings[0].startTime), { addSuffix: true }) : "None"}
+              description={upcomingMeetings[0]?.title ?? "All clear"}
+            />
+            <MeetingMetricCard
+              icon={<ShieldCheck className="h-5 w-5 text-blue-600" />}
+              label="Security posture"
+              value={
+                meetings.length === 0
+                  ? "0%"
+                  : `${Math.round((meetings.filter((record) => record.e2ee).length / meetings.length) * 100)}%`
+              }
+              description="Meetings with end-to-end encryption"
+            />
+            <MeetingMetricCard
+              icon={<MicVocal className="h-5 w-5 text-amber-600" />}
+              label="Minutes ready"
+              value={meetings.filter((meeting) => meeting.minutesStatus === "ready").length}
+              description="AI-generated summaries available"
+            />
+          </section>
+
+          <div className="grid gap-4 lg:grid-cols-[340px_1fr_320px]">
+            <aside className="flex h-[720px] flex-col rounded-xl border bg-card">
+              <MeetingList
+                label="Upcoming & live"
+                meetings={upcomingMeetings}
+                selectedId={selectedMeetingId}
+                onSelect={setSelectedMeetingId}
+              />
+              <Separator />
+              <MeetingList
+                label="Completed"
+                meetings={completedMeetings}
+                selectedId={selectedMeetingId}
+                onSelect={setSelectedMeetingId}
+              />
+            </aside>
+
+            <main className="flex h-[720px] flex-col gap-4">
+              <Card className="flex-1">
+                <CardHeader>
+                  <CardTitle className="text-sm font-semibold">Meeting details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {isLoadingMeetings ? (
+                    <p className="text-sm text-muted-foreground">Loading meeting details…</p>
+                  ) : selectedMeeting ? (
+                    <MeetingDetails
+                      meeting={selectedMeeting}
+                      onGenerateMinutes={handleGenerateMinutes}
+                      minutesProcessing={minutesProcessing}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Select a meeting to view its profile, security controls and AI minutes.</p>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-semibold">Provider integration</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm text-muted-foreground">
+                  <p>
+                    Connected providers use SSO and SCIM provisioning. Payloads are routed via secure webhooks for recordings and transcripts.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(providerSecurityNotes).map(([provider, note]) => (
+                      <div key={provider} className="rounded-lg border p-3 text-xs">
+                        <p className="font-semibold text-foreground">{provider}</p>
+                        <p>{note}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </main>
+                </CardContent>
+              </Card>
+            </main>
 
-        <aside className="flex h-[720px] flex-col gap-4">
-          <MinutesPipeline
-            meeting={selectedMeeting}
-            minutesProcessing={minutesProcessing}
-          />
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">Action items</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>• Auto-synchronise approved action items with Jira and Asana.</p>
-              <p>• Meeting recordings stored in encrypted S3 bucket with 90-day retention.</p>
-              <p>• Notify compliance when finance stakeholders join external meetings.</p>
-            </CardContent>
-          </Card>
-        </aside>
-      </div>
+            <aside className="flex h-[720px] flex-col gap-4">
+              <MinutesPipeline meeting={selectedMeeting} minutesProcessing={minutesProcessing} />
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-semibold">Action items</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p>• Auto-synchronise approved action items with Jira and Asana.</p>
+                  <p>• Meeting recordings stored in encrypted S3 bucket with 90-day retention.</p>
+                  <p>• Notify compliance when finance stakeholders join external meetings.</p>
+                </CardContent>
+              </Card>
+            </aside>
+          </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Schedule secure meeting</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-2 text-sm">
-            <div className="grid gap-2">
-              <Label htmlFor="title">Meeting title</Label>
-              <Input
-                id="title"
-                value={form.title}
-                onChange={(event) => setForm((previous) => ({ ...previous, title: event.target.value }))}
-                placeholder="Payroll steering committee"
-              />
-            </div>
-            <div className="grid gap-2 md:grid-cols-3">
-              <div className="grid gap-2">
-                <Label htmlFor="date">Date</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={form.date}
-                  onChange={(event) => setForm((previous) => ({ ...previous, date: event.target.value }))}
-                />
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Schedule secure meeting</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-2 text-sm">
+                <div className="grid gap-2">
+                  <Label htmlFor="title">Meeting title</Label>
+                  <Input
+                    id="title"
+                    value={form.title}
+                    onChange={(event) => setForm((previous) => ({ ...previous, title: event.target.value }))}
+                    placeholder="Payroll steering committee"
+                  />
+                </div>
+                <div className="grid gap-2 md:grid-cols-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="date">Date</Label>
+                    <Input
+                      id="date"
+                      type="date"
+                      value={form.date}
+                      onChange={(event) => setForm((previous) => ({ ...previous, date: event.target.value }))}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="time">Start time</Label>
+                    <Input
+                      id="time"
+                      type="time"
+                      value={form.time}
+                      onChange={(event) => setForm((previous) => ({ ...previous, time: event.target.value }))}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="duration">Duration (minutes)</Label>
+                    <Input
+                      id="duration"
+                      type="number"
+                      min={15}
+                      value={form.duration}
+                      onChange={(event) => setForm((previous) => ({ ...previous, duration: Number(event.target.value) }))}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Provider</Label>
+                  <Select
+                    value={form.provider}
+                    onValueChange={(provider) => setForm((previous) => ({ ...previous, provider: provider as MeetingProvider }))}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Zoom">Zoom</SelectItem>
+                      <SelectItem value="Microsoft Teams">Microsoft Teams</SelectItem>
+                      <SelectItem value="Google Meet">Google Meet</SelectItem>
+                      <SelectItem value="Daily">Daily</SelectItem>
+                      <SelectItem value="Cisco Webex">Cisco Webex</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">{providerSecurityNotes[form.provider]}</p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="agenda">Agenda (one line per item)</Label>
+                  <Textarea
+                    id="agenda"
+                    rows={3}
+                    value={form.agenda}
+                    onChange={(event) => setForm((previous) => ({ ...previous, agenda: event.target.value }))}
+                  />
+                </div>
+                <div className="rounded-lg border p-3 text-xs">
+                  <p className="font-semibold text-foreground">Security controls</p>
+                  <div className="mt-2 grid gap-2 md:grid-cols-3">
+                    <SecuritySwitch
+                      label="Require passcode"
+                      checked={form.passcode}
+                      onChange={(checked) => setForm((previous) => ({ ...previous, passcode: checked }))}
+                    />
+                    <SecuritySwitch
+                      label="End-to-end encryption"
+                      checked={form.encryption}
+                      onChange={(checked) => setForm((previous) => ({ ...previous, encryption: checked }))}
+                    />
+                    <SecuritySwitch
+                      label="Recording enabled"
+                      checked={form.recording}
+                      onChange={(checked) => setForm((previous) => ({ ...previous, recording: checked }))}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="time">Start time</Label>
-                <Input
-                  id="time"
-                  type="time"
-                  value={form.time}
-                  onChange={(event) => setForm((previous) => ({ ...previous, time: event.target.value }))}
-                />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleCreateMeeting}>
+                  Schedule meeting
+                </Button>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="duration">Duration (minutes)</Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  min={15}
-                  value={form.duration}
-                  onChange={(event) => setForm((previous) => ({ ...previous, duration: Number(event.target.value) }))}
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label>Provider</Label>
-              <Select
-                value={form.provider}
-                onValueChange={(provider) => setForm((previous) => ({ ...previous, provider: provider as MeetingProvider }))}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Zoom">Zoom</SelectItem>
-                  <SelectItem value="Microsoft Teams">Microsoft Teams</SelectItem>
-                  <SelectItem value="Google Meet">Google Meet</SelectItem>
-                  <SelectItem value="Daily">Daily</SelectItem>
-                  <SelectItem value="Cisco Webex">Cisco Webex</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">{providerSecurityNotes[form.provider]}</p>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="agenda">Agenda (one line per item)</Label>
-              <Textarea
-                id="agenda"
-                rows={3}
-                value={form.agenda}
-                onChange={(event) => setForm((previous) => ({ ...previous, agenda: event.target.value }))}
-              />
-            </div>
-            <div className="rounded-lg border p-3 text-xs">
-              <p className="font-semibold text-foreground">Security controls</p>
-              <div className="mt-2 grid gap-2 md:grid-cols-3">
-                <SecuritySwitch
-                  label="Require passcode"
-                  checked={form.passcode}
-                  onChange={(checked) => setForm((previous) => ({ ...previous, passcode: checked }))}
-                />
-                <SecuritySwitch
-                  label="End-to-end encryption"
-                  checked={form.encryption}
-                  onChange={(checked) => setForm((previous) => ({ ...previous, encryption: checked }))}
-                />
-                <SecuritySwitch
-                  label="Recording enabled"
-                  checked={form.recording}
-                  onChange={(checked) => setForm((previous) => ({ ...previous, recording: checked }))}
-                />
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleCreateMeeting}>
-              Schedule meeting
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </RoleGuard>
+    </AuthGuard>
   )
 }
 

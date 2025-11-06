@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { format } from "date-fns"
 
 import { AuthGuard } from "@/components/auth-guard"
@@ -44,16 +44,27 @@ export default function ChangeRequestsReviewPage() {
   const [statusFilter, setStatusFilter] = useState<ChangeRequest["status"] | "all">("all")
   const [searchTerm, setSearchTerm] = useState("")
   const [dialogId, setDialogId] = useState<string | null>(null)
+  const pushToast = toast
 
   useEffect(() => {
     const bootstrap = async () => {
-      const payload = await listChangeRequests()
-      setRequests(payload)
-      setIsLoading(false)
+      try {
+        const payload = await listChangeRequests()
+        setRequests(payload)
+      } catch (error) {
+        console.error("Failed to load change requests", error)
+        pushToast({
+          variant: "destructive",
+          title: "Unable to load change requests",
+          description: "Showing cached entries while the API is unavailable.",
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
 
     bootstrap()
-  }, [])
+  }, [pushToast])
 
   const filtered = useMemo(() => {
     return requests.filter((request) => {
@@ -78,19 +89,37 @@ export default function ChangeRequestsReviewPage() {
   const selectedRequest = dialogId ? requests.find((request) => request.id === dialogId) ?? null : null
 
   const refresh = async () => {
-    const payload = await listChangeRequests()
-    setRequests(payload)
+    try {
+      const payload = await listChangeRequests()
+      setRequests(payload)
+    } catch (error) {
+      console.error("Failed to refresh change requests", error)
+      pushToast({
+        variant: "destructive",
+        title: "Refresh failed",
+        description: "Could not refresh from the backend. View may be stale.",
+      })
+    }
   }
 
   const handleDecision = async (requestId: string, status: ChangeRequest["status"], notes?: string) => {
     const reviewer = { name: "HR Verification", notes }
-    await updateChangeRequestStatusApi(requestId, status, reviewer)
-    await refresh()
-    toast({
-      title: status === "approved" ? "Change request approved" : status === "declined" ? "Request declined" : "Marked for verification",
-      description: status === "approved" ? "Records will update overnight after payroll sync." : undefined,
-      variant: status === "declined" ? "destructive" : "default",
-    })
+    try {
+      await updateChangeRequestStatusApi(requestId, status, reviewer)
+      await refresh()
+      pushToast({
+        title: status === "approved" ? "Change request approved" : status === "declined" ? "Request declined" : "Marked for verification",
+        description: status === "approved" ? "Records will update overnight after payroll sync." : undefined,
+        variant: status === "declined" ? "destructive" : "default",
+      })
+    } catch (error) {
+      console.error("Failed to update change request", error)
+      pushToast({
+        variant: "destructive",
+        title: "Decision failed",
+        description: "Could not persist the decision. Please retry.",
+      })
+    }
   }
 
   return (
