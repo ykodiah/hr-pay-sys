@@ -17,7 +17,6 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useToast } from "@/hooks/use-toast"
 import {
   ArrowRight,
@@ -234,9 +233,8 @@ export default function EmployeePortalPage() {
     setAcknowledgedSignals((previous) => [...previous, title])
   }
 
-  return (
-    <TooltipProvider delayDuration={120}>
-      <div className="space-y-6">
+      return (
+        <div className="space-y-6">
         <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
             <Badge variant="outline" className="w-fit border-emerald-200 text-emerald-700">
@@ -303,32 +301,32 @@ export default function EmployeePortalPage() {
                       <span className="text-xs text-slate-500">Confidence {(signal.confidence * 100).toFixed(0)}%</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-2 bg-white"
-                          onClick={() => toast({
-                            title: "Applied recommendation",
-                            description: signal.recommendation,
-                          })}
-                        >
-                          <Lightbulb className="h-3.5 w-3.5 text-amber-500" /> Apply tip
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent className="text-xs">Send to your task list and assistant</TooltipContent>
-                    </Tooltip>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => acknowledgeSignal(signal.title)}
-                      disabled={acknowledgedSignals.includes(signal.title)}
-                    >
-                      {acknowledgedSignals.includes(signal.title) ? "Saved" : "Acknowledge"}
-                    </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 bg-white"
+                            onClick={() =>
+                              toast({
+                                title: "Applied recommendation",
+                                description: signal.recommendation,
+                              })
+                            }
+                          >
+                            <Lightbulb className="h-3.5 w-3.5 text-amber-500" /> Apply tip
+                          </Button>
+                          <span className="hidden text-[10px] text-muted-foreground sm:inline">
+                            Sends to your task list and assistant
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => acknowledgeSignal(signal.title)}
+                            disabled={acknowledgedSignals.includes(signal.title)}
+                          >
+                            {acknowledgedSignals.includes(signal.title) ? "Saved" : "Acknowledge"}
+                          </Button>
                   </div>
                 </div>
               ))}
@@ -627,6 +625,6 @@ export default function EmployeePortalPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </TooltipProvider>
+    </div>
   )
 }
