@@ -2,26 +2,24 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useEffect, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
+import { Input } from "@/components/ui/input"
 import {
-  MessageCircle,
-  Send,
-  X,
   Bot,
-  User,
-  Minimize2,
-  Maximize2,
-  ChevronUp,
   ChevronDown,
+  ChevronUp,
+  Maximize2,
+  MessageCircle,
+  Minimize2,
+  Send,
+  Sparkles,
+  User,
   Volume2,
   VolumeX,
-  Sparkles,
-  Lightbulb,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -45,6 +43,14 @@ interface AssistantInsight {
   detail: string
   confidence: number
   nextStep: string
+}
+
+interface KnowledgeArticle {
+  id: string
+  title: string
+  summary: string
+  keywords: string[]
+  response: string
 }
 
 const STRATEGIC_PROMPTS: StrategicPrompt[] = [
@@ -88,6 +94,49 @@ const CONTROL_ROOM_INSIGHTS: AssistantInsight[] = [
   },
 ]
 
+const KNOWLEDGE_BASE: KnowledgeArticle[] = [
+  {
+    id: "platform-overview",
+    title: "AkwaabaHRPay overview",
+    summary: "Modules, AI copilots, compliance, analytics",
+    keywords: ["overview", "software", "what is", "platform", "everything"],
+    response:
+      "AkwaabaHRPay is an end-to-end HR, payroll, and compliance suite tuned for Ghana. It manages employee records, attendance (biometric + geo), leave, performance, promotions, learning, disciplinary cases, payroll with PAYE/SSNIT/Tier 3, analytics dashboards, document storage, communications, and integrations. AI assistants support both administrators and employees across modules.",
+  },
+  {
+    id: "attendance-module",
+    title: "Attendance & overtime AI",
+    summary: "Risk scoring, geo capture, device sync",
+    keywords: ["attendance", "overtime", "geo", "clock", "missed"],
+    response:
+      "Attendance now includes predictive risk scoring, overtime forecasting, geo-fence capture, missed-check-in escalations, and biometric device orchestration. HR can configure alerts, pause/activate devices, sync fingerprint/face/card readers, and export filtered reports by location, department, division, subsidiary, and capture method.",
+  },
+  {
+    id: "employee-portal",
+    title: "Employee portal upgrades",
+    summary: "AI highlights, wellbeing, growth cockpit",
+    keywords: ["employee", "portal", "self-service", "my portal", "employee hub"],
+    response:
+      "Employees see personalised AI highlights (leave balance, payslip availability, attendance streaks), adaptive nudges, wellbeing recommendations, a growth cockpit, and quick actions for leave, courses, feedback, and details updates. The employee assistant answers questions about leave, payslips, goals, learning, loans, and benefits.",
+  },
+  {
+    id: "admin-assistant",
+    title: "Admin AI assistant",
+    summary: "Strategic prompts, analytics, playbooks",
+    keywords: ["assistant", "chatbot", "control room", "ai"],
+    response:
+      "The admin AI assistant synthesises data across attendance, payroll, recruitment, performance, learning, compliance, and integrations. Use strategic prompts like attendance digest, payroll variance, or attrition watch. It surfaces control-room insights, drafts summaries, and recommends follow-up actions and playbooks.",
+  },
+  {
+    id: "integrations",
+    title: "Integrations",
+    summary: "Biometrics, Supabase, GRA, reporting hooks",
+    keywords: ["integration", "biometric", "supabase", "gra", "api"],
+    response:
+      "Integrations include biometric devices (REST, SDK, CSV), Supabase storage and auth, GRA submissions, payroll exports, and webhook-ready reporting. Device health, sync, and onboarding are managed within the Attendance and Integrations modules.",
+  },
+]
+
 export function AIChatbox() {
   const [isOpen, setIsOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
@@ -98,7 +147,7 @@ export function AIChatbox() {
       id: "1",
       role: "assistant",
       content:
-        "Hello! I'm your HR & Payroll assistant. I can help you with employee management, payroll settings, organizational charts, and more. How can I assist you today?",
+        "Hello! I'm your HR & Payroll assistant. I understand the full AkwaabaHRPay platform—attendance AI, payroll, analytics, compliance, integrations, and the employee portal. Ask me for an overview, run a strategic prompt, or request templates and summaries.",
       timestamp: new Date(),
     },
   ])
@@ -107,6 +156,8 @@ export function AIChatbox() {
   const [showScrollButtons, setShowScrollButtons] = useState(false)
   const [recentPromptId, setRecentPromptId] = useState<string | null>(null)
   const [insights, setInsights] = useState<AssistantInsight[]>(CONTROL_ROOM_INSIGHTS)
+  const [knowledgeMatches, setKnowledgeMatches] = useState<KnowledgeArticle[]>(KNOWLEDGE_BASE)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -114,7 +165,6 @@ export function AIChatbox() {
   const speakText = (text: string) => {
     if (!isTTSEnabled || !("speechSynthesis" in window)) return
 
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel()
 
     const utterance = new SpeechSynthesisUtterance(text)
@@ -161,12 +211,37 @@ export function AIChatbox() {
   }
 
   useEffect(() => {
-    setShowScrollButtons(messages.length > 5)
+    setShowScrollButtons(messages.length > 6)
   }, [messages])
 
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  useEffect(() => {
+    const query = inputMessage.toLowerCase().trim()
+    if (!query) {
+      setKnowledgeMatches(KNOWLEDGE_BASE)
+      return
+    }
+    setKnowledgeMatches(
+      KNOWLEDGE_BASE.filter((article) =>
+        article.keywords.some((keyword) => keyword.includes(query) || query.includes(keyword)),
+      ),
+    )
+  }, [inputMessage])
+
+  const injectKnowledgeResponse = (article: KnowledgeArticle) => {
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: "assistant",
+      content: `${article.response}\n\nNeed more detail? Ask about ${article.summary.toLowerCase()}.`,
+      timestamp: new Date(),
+    }
+    setMessages((prev) => [...prev, assistantMessage])
+    setRecentPromptId(article.id)
+    setIsLoading(false)
+  }
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return
@@ -183,7 +258,14 @@ export function AIChatbox() {
     setIsLoading(true)
 
     try {
-      console.log("[v0] Sending message to API...")
+      const knowledgeHit = KNOWLEDGE_BASE.find((article) =>
+        article.keywords.some((keyword) => userMessage.content.toLowerCase().includes(keyword)),
+      )
+
+      if (knowledgeHit) {
+        injectKnowledgeResponse(knowledgeHit)
+        return
+      }
 
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -199,17 +281,12 @@ export function AIChatbox() {
         }),
       })
 
-      console.log("[v0] API response status:", response.status)
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error("[v0] API error:", errorData)
         throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
       const data = await response.json()
-      console.log("[v0] API response data received")
-
       if (!data.response) {
         throw new Error("Invalid response format")
       }
@@ -227,8 +304,6 @@ export function AIChatbox() {
         speakText(data.response)
       }
     } catch (error) {
-      console.error("[v0] Chat error:", error)
-
       let errorMessage = "Failed to send message. Please try again."
       if (error instanceof Error) {
         if (error.message.includes("timeout")) {
@@ -262,6 +337,11 @@ export function AIChatbox() {
     }
   }
 
+  const handleKnowledgePrompt = (prompt: StrategicPrompt) => {
+    setInputMessage(prompt.message)
+    setRecentPromptId(prompt.id)
+  }
+
   const clearChat = () => {
     stopSpeaking()
     setMessages([
@@ -269,17 +349,20 @@ export function AIChatbox() {
         id: "1",
         role: "assistant",
         content:
-          "Hello! I'm your HR & Payroll assistant. I can help you with employee management, payroll settings, organizational charts, and more. How can I assist you today?",
+          "Hello! I'm your HR & Payroll assistant. I understand the full AkwaabaHRPay platform—attendance AI, payroll, analytics, compliance, integrations, and the employee portal. Ask me for an overview, run a strategic prompt, or request templates and summaries.",
         timestamp: new Date(),
       },
     ])
+    setInsights(CONTROL_ROOM_INSIGHTS)
+    setRecentPromptId(null)
+    setKnowledgeMatches(KNOWLEDGE_BASE)
   }
 
   if (!isOpen) {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg z-50"
+        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-blue-600 shadow-lg hover:bg-blue-700"
         size="icon"
       >
         <MessageCircle className="h-6 w-6 text-white" />
@@ -290,13 +373,12 @@ export function AIChatbox() {
   return (
     <Card
       className={`fixed bottom-6 right-6 z-50 shadow-2xl transition-all duration-300 ${
-        isMinimized ? "w-80 h-16" : "w-96 h-[600px]"
+        isMinimized ? "h-16 w-80" : "h-[600px] w-96"
       }`}
     >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-blue-600 text-white rounded-t-lg">
-        <CardTitle className="text-lg font-semibold flex items-center gap-2">
-          <Bot className="h-5 w-5" />
-          HR Assistant
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 rounded-t-lg bg-blue-600 pb-2 text-white">
+        <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+          <Bot className="h-5 w-5" /> HR Assistant
         </CardTitle>
         <div className="flex items-center gap-1">
           <Button
@@ -306,15 +388,7 @@ export function AIChatbox() {
             className={`h-8 w-8 text-white hover:bg-blue-700 ${isTTSEnabled ? "bg-blue-700" : ""}`}
             title={isTTSEnabled ? "Disable voice" : "Enable voice"}
           >
-            {isTTSEnabled ? (
-              isSpeaking ? (
-                <VolumeX className="h-4 w-4" />
-              ) : (
-                <Volume2 className="h-4 w-4" />
-              )
-            ) : (
-              <VolumeX className="h-4 w-4 opacity-50" />
-            )}
+            {isTTSEnabled ? (isSpeaking ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />) : <VolumeX className="h-4 w-4 opacity-50" />}
           </Button>
           <Button
             variant="ghost"
@@ -336,35 +410,59 @@ export function AIChatbox() {
       </CardHeader>
 
       {!isMinimized && (
-        <CardContent className="flex flex-col p-0 h-[calc(600px-80px)]">
-          {/* Status bar */}
-          <div className="flex justify-between items-center p-3 border-b bg-gray-50 flex-shrink-0">
-            {isTTSEnabled && (
+        <CardContent className="flex h-[calc(600px-80px)] flex-col p-0">
+          <div className="flex flex-col gap-3 border-b bg-white px-4 pb-2 pt-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="gap-1 text-xs">
+                <Sparkles className="h-3 w-3" /> Knowledge centre
+              </Badge>
+              <span className="text-xs text-muted-foreground">Ask for an overview or tap to auto-populate questions.</span>
+            </div>
+            <div className="flex max-h-16 flex-wrap gap-2 overflow-y-auto pr-1">
+              {knowledgeMatches.slice(0, 4).map((article) => (
+                <Button
+                  key={article.id}
+                  variant={recentPromptId === article.id ? "default" : "outline"}
+                  size="sm"
+                  className={`h-7 text-xs ${recentPromptId === article.id ? "bg-blue-600" : "bg-white"}`}
+                  onClick={() => {
+                    setInputMessage(article.title)
+                    injectKnowledgeResponse(article)
+                  }}
+                >
+                  {article.title}
+                </Button>
+              ))}
+              {knowledgeMatches.length === 0 && (
+                <span className="text-[11px] text-muted-foreground">No quick matches—try a strategic prompt below.</span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between border-b bg-gray-50 p-3">
+            {isTTSEnabled ? (
               <div className="flex items-center gap-2 text-xs text-green-600">
-                <Volume2 className="h-3 w-3" />
-                {isSpeaking ? "Speaking..." : "Voice enabled"}
+                <Volume2 className="h-3 w-3" /> {isSpeaking ? "Speaking..." : "Voice enabled"}
               </div>
+            ) : (
+              <div className="text-xs text-muted-foreground">Voice disabled</div>
             )}
-            {!isTTSEnabled && <div></div>}
             <Button variant="ghost" size="sm" onClick={clearChat} className="text-xs text-gray-500 hover:text-gray-700">
-              Clear Chat
+              Clear chat
             </Button>
           </div>
 
-          {/* Messages container with fixed height and proper scrolling */}
           <div
             ref={messagesContainerRef}
-            className="flex-1 p-4 overflow-y-auto scroll-smooth relative min-h-0"
-            style={{ maxHeight: "calc(100% - 120px)" }}
+            className="relative flex-1 overflow-y-auto px-4 py-3 pr-3"
           >
-            {/* Scroll buttons */}
             {showScrollButtons && (
-              <div className="absolute right-2 top-2 z-10 flex flex-col gap-1">
+              <div className="pointer-events-none absolute right-2 top-2 z-10 flex flex-col gap-1">
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={scrollToTop}
-                  className="h-8 w-8 bg-white/90 hover:bg-white shadow-sm"
+                  className="pointer-events-auto h-8 w-8 bg-white/90 shadow-sm hover:bg-white"
                   title="Scroll to top"
                 >
                   <ChevronUp className="h-4 w-4" />
@@ -373,7 +471,7 @@ export function AIChatbox() {
                   variant="outline"
                   size="icon"
                   onClick={scrollToBottom}
-                  className="h-8 w-8 bg-white/90 hover:bg-white shadow-sm"
+                  className="pointer-events-auto h-8 w-8 bg-white/90 shadow-sm hover:bg-white"
                   title="Scroll to bottom"
                 >
                   <ChevronDown className="h-4 w-4" />
@@ -381,39 +479,30 @@ export function AIChatbox() {
               </div>
             )}
 
-            {/* Messages */}
-            <div className="space-y-4 pb-4">
+            <div className="space-y-4 pb-6">
               {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                >
+                <div key={message.id} className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                   {message.role === "assistant" && (
-                    <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
                       <Bot className="h-4 w-4 text-blue-600" />
                     </div>
                   )}
                   <div
-                    className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
-                      message.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
+                    className={`max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-sm ${
+                      message.role === "user" ? "bg-blue-600 text-white" : "bg-white text-gray-900"
                     }`}
                   >
                     <div className="whitespace-pre-wrap break-words">{message.content}</div>
-                    <div className="flex items-center justify-between mt-1">
-                      <div
-                        className={`text-xs opacity-70 ${message.role === "user" ? "text-blue-100" : "text-gray-500"}`}
-                      >
-                        {message.timestamp.toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className={`text-xs opacity-70 ${message.role === "user" ? "text-blue-100" : "text-gray-500"}`}>
+                        {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
                       {message.role === "assistant" && isTTSEnabled && (
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => speakText(message.content)}
-                          className="h-6 w-6 opacity-50 hover:opacity-100"
+                          className="h-6 w-6 opacity-60 hover:opacity-100"
                           title="Speak this message"
                         >
                           <Volume2 className="h-3 w-3" />
@@ -422,28 +511,23 @@ export function AIChatbox() {
                     </div>
                   </div>
                   {message.role === "user" && (
-                    <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-100">
                       <User className="h-4 w-4 text-gray-600" />
                     </div>
                   )}
                 </div>
               ))}
+
               {isLoading && (
-                <div className="flex gap-3 justify-start">
-                  <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <div className="flex gap-3">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
                     <Bot className="h-4 w-4 text-blue-600" />
                   </div>
-                  <div className="bg-gray-100 rounded-lg px-3 py-2 text-sm">
+                  <div className="rounded-lg bg-gray-100 px-3 py-2 text-sm">
                     <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                      <div
-                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: "0.1s" }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: "0.2s" }}
-                      ></div>
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-gray-400"></div>
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "0.1s" }}></div>
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "0.2s" }}></div>
                     </div>
                   </div>
                 </div>
@@ -452,26 +536,64 @@ export function AIChatbox() {
             </div>
           </div>
 
-          {/* Input area - fixed at bottom */}
-          <div className="border-t p-4 bg-white flex-shrink-0">
+          <div className="flex-shrink-0 border-t bg-white p-4">
             <div className="flex gap-2">
               <Input
                 ref={inputRef}
                 value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
+                onChange={(event) => setInputMessage(event.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Ask me about HR, payroll, employees..."
+                placeholder="Ask about HR, payroll, attendance, analytics..."
                 disabled={isLoading}
                 className="flex-1"
               />
-              <Button
-                onClick={sendMessage}
-                disabled={!inputMessage.trim() || isLoading}
-                size="icon"
-                className="bg-blue-600 hover:bg-blue-700"
-              >
+              <Button onClick={sendMessage} disabled={!inputMessage.trim() || isLoading} size="icon" className="bg-blue-600 hover:bg-blue-700">
                 <Send className="h-4 w-4" />
               </Button>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {STRATEGIC_PROMPTS.map((prompt) => (
+                <Button
+                  key={prompt.id}
+                  variant={recentPromptId === prompt.id ? "default" : "outline"}
+                  size="sm"
+                  className={`h-7 text-xs ${recentPromptId === prompt.id ? "bg-blue-600" : "bg-white"}`}
+                  onClick={() => handleKnowledgePrompt(prompt)}
+                  title={prompt.helper}
+                >
+                  {prompt.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t bg-slate-50 p-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Control-room insights</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-blue-600"
+                onClick={() => setInsights(CONTROL_ROOM_INSIGHTS)}
+              >
+                Refresh
+              </Button>
+            </div>
+            <div className="mt-3 max-h-32 space-y-3 overflow-y-auto pr-1">
+              {insights.map((insight) => (
+                <div key={insight.id} className="rounded-lg border border-slate-100 bg-white p-3 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold text-slate-900">{insight.title}</p>
+                    <Badge variant="outline" className="text-[10px]">
+                      {(insight.confidence * 100).toFixed(0)}% conf.
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-slate-600">{insight.detail}</p>
+                  <p className="mt-2 text-[11px] text-slate-500">Next: {insight.nextStep}</p>
+                </div>
+              ))}
+              {insights.length === 0 && <p className="text-[11px] text-muted-foreground">No live insights right now.</p>}
             </div>
           </div>
         </CardContent>
