@@ -1,491 +1,475 @@
 "use client"
-import { useState } from "react"
-import type React from "react"
-import { useCurrency } from "@/lib/currency-context"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { useMemo, useState } from "react"
+import { format } from "date-fns"
+
+import { useCurrency } from "@/lib/currency-context"
+import {
+  gradeCatalog,
+  approvalMatrix,
+  PromotionCase,
+  computeSalaryDelta,
+  evaluateEligibility,
+  generatePromotionLetter,
+} from "@/lib/promotions"
+
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { toast } from "@/hooks/use-toast"
+import { Textarea } from "@/components/ui/textarea"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
+import { toast, useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
+
 import {
-  TrendingUp,
-  Users,
-  Clock,
-  CheckCircle,
-  XCircle,
   AlertCircle,
-  Plus,
-  Search,
-  Eye,
+  ArrowRight,
+  ArrowUpRight,
+  CheckCircle,
+  ChevronRight,
+  Clock,
   Download,
-  DollarSign,
+  Eye,
+  FileText,
+  ShieldCheck,
+  TrendingUp,
+  Upload,
+  Users,
+  XCircle,
 } from "lucide-react"
 
-const initialPromotions = [
-  {
-    id: 1,
-    employeeName: "Ama Osei",
-    employeeId: "EMP002",
-    employeeAvatar: "/placeholder.svg?height=40&width=40",
-    department: "Human Resources",
-    currentGrade: "Grade 7",
-    currentStep: "Step 3",
-    currentSalary: 4500,
-    proposedGrade: "Grade 8",
-    proposedStep: "Step 1",
-    proposedSalary: 5200,
-    effectiveDate: "2025-03-01",
-    reason: "Excellent performance and completion of leadership training",
-    status: "Pending",
-    initiatedBy: "John Doe",
-    initiatedDate: "2025-01-20",
-    approvalStage: "Line Manager",
-    attachments: ["performance_appraisal_2024.pdf", "leadership_certificate.pdf"],
-    comments: [],
-    eligibilityChecks: {
-      tenure: { passed: true, details: "2.5 years in current grade" },
-      appraisal: { passed: true, details: "Exceeds expectations (4.2/5.0)" },
-      training: { passed: true, details: "Leadership training completed" },
-      disciplinary: { passed: true, details: "No disciplinary issues" },
-      budget: { passed: true, details: "Within budget allocation" },
-    },
-  },
-  {
-    id: 2,
-    employeeName: "Kofi Mensah",
-    employeeId: "EMP003",
-    employeeAvatar: "/placeholder.svg?height=40&width=40",
-    department: "Marketing",
-    currentGrade: "Grade 6",
-    currentStep: "Step 5",
-    currentSalary: 3800,
-    proposedGrade: "Grade 7",
-    proposedStep: "Step 1",
-    proposedSalary: 4200,
-    effectiveDate: "2025-02-15",
-    reason: "Outstanding sales performance and team leadership",
-    status: "Approved",
-    initiatedBy: "Jane Smith",
-    initiatedDate: "2025-01-10",
-    approvedDate: "2025-01-25",
-    approvalStage: "Completed",
-    attachments: ["sales_report_2024.pdf", "team_feedback.pdf"],
-    comments: [
-      { author: "Jane Smith", message: "Exceptional performance this year", date: "2025-01-10" },
-      { author: "HR Director", message: "Approved for promotion", date: "2025-01-25" },
-    ],
-    eligibilityChecks: {
-      tenure: { passed: true, details: "3 years in current grade" },
-      appraisal: { passed: true, details: "Outstanding performance (4.8/5.0)" },
-      training: { passed: true, details: "All required training completed" },
-      disciplinary: { passed: true, details: "No disciplinary issues" },
-      budget: { passed: true, details: "Within budget allocation" },
-    },
-  },
-]
-
-const salaryGrades = [
-  { grade: "Grade 1", steps: [1800, 1950, 2100, 2250, 2400] },
-  { grade: "Grade 2", steps: [2200, 2380, 2560, 2740, 2920] },
-  { grade: "Grade 3", steps: [2600, 2810, 3020, 3230, 3440] },
-  { grade: "Grade 4", steps: [3000, 3240, 3480, 3720, 3960] },
-  { grade: "Grade 5", steps: [3400, 3670, 3940, 4210, 4480] },
-  { grade: "Grade 6", steps: [3800, 4100, 4400, 4700, 5000] },
-  { grade: "Grade 7", steps: [4200, 4530, 4860, 5190, 5520] },
-  { grade: "Grade 8", steps: [4600, 4960, 5320, 5680, 6040] },
-  { grade: "Grade 9", steps: [5000, 5390, 5780, 6170, 6560] },
-  { grade: "Grade 10", steps: [5400, 5820, 6240, 6660, 7080] },
-]
-
-const approvalWorkflow = [
-  { stage: "Line Manager", role: "Direct Supervisor" },
-  { stage: "HOD", role: "Head of Department" },
-  { stage: "HR", role: "HR Director" },
-  { stage: "Finance", role: "Finance Director" },
-  { stage: "CEO", role: "Chief Executive Officer" },
-]
-
-function getStatusIcon(status: string) {
-  switch (status) {
-    case "Approved":
-      return <CheckCircle className="w-4 h-4 text-green-600" />
-    case "Rejected":
-      return <XCircle className="w-4 h-4 text-red-600" />
-    case "Pending":
-      return <AlertCircle className="w-4 h-4 text-orange-600" />
-    default:
-      return <Clock className="w-4 h-4 text-gray-600" />
-  }
+type EmployeeProfile = {
+  id: string
+  name: string
+  department: string
+  grade: string
+  step: number
+  tenureMonths: number
+  appraisalScore: number
+  trainingCompleted: boolean
+  hasDisciplinary: boolean
+  supervisor: string
+  headOfDepartment: string
 }
 
-function getStatusBadge(status: string) {
-  switch (status) {
-    case "Approved":
-      return <Badge className="bg-green-100 text-green-800">Approved</Badge>
-    case "Rejected":
-      return <Badge className="bg-red-100 text-red-800">Rejected</Badge>
-    case "Pending":
-      return <Badge className="bg-orange-100 text-orange-800">Pending</Badge>
-    default:
-      return <Badge variant="secondary">{status}</Badge>
-  }
+const employeeDirectory: EmployeeProfile[] = [
+  {
+    id: "EMP002",
+    name: "Ama Osei",
+    department: "Human Resources",
+    grade: "G7",
+    step: 3,
+    tenureMonths: 30,
+    appraisalScore: 4.2,
+    trainingCompleted: true,
+    hasDisciplinary: false,
+    supervisor: "John Mensah",
+    headOfDepartment: "Akua Boateng",
+  },
+  {
+    id: "EMP003",
+    name: "Kofi Mensah",
+    department: "Marketing",
+    grade: "G6",
+    step: 5,
+    tenureMonths: 36,
+    appraisalScore: 4.7,
+    trainingCompleted: true,
+    hasDisciplinary: false,
+    supervisor: "Linda Asare",
+    headOfDepartment: "Yaw Darko",
+  },
+  {
+    id: "EMP014",
+    name: "Selorm Adjei",
+    department: "Finance",
+    grade: "G7",
+    step: 2,
+    tenureMonths: 20,
+    appraisalScore: 3.6,
+    trainingCompleted: false,
+    hasDisciplinary: false,
+    supervisor: "Paulina Owusu",
+    headOfDepartment: "Albert Owusu",
+  },
+]
+
+const approverDirectory: Record<string, string> = {
+  "Line Manager": "Ama Koomson",
+  "Head of Department": "Kwesi Nyarko",
+  "HR Director": "Efua Bediako",
+  "Finance Director": "Yaw Sarfo",
+  "Managing Director": "Nana Akoto",
+}
+
+const toDisplayGrade = (gradeCode: string) => {
+  if (!gradeCode) return "Unknown"
+  const grade = gradeCatalog.find((entry) => entry.gradeCode === gradeCode)
+  if (!grade) return gradeCode
+  const numeric = gradeCode.replace(/[^0-9]/g, "")
+  return numeric ? `Grade ${numeric}` : gradeCode
+}
+
+const seedPromotionCases = (): PromotionCase[] => {
+  const ama = employeeDirectory[0]
+  const amaDelta = computeSalaryDelta(ama.grade, ama.step, "G8", 1)
+  const amaEligibility = evaluateEligibility(
+    ama.grade,
+    ama.step,
+    ama.tenureMonths,
+    ama.appraisalScore,
+    ama.trainingCompleted,
+    ama.hasDisciplinary,
+    false,
+  )
+
+  const kofi = employeeDirectory[1]
+  const kofiDelta = computeSalaryDelta(kofi.grade, kofi.step, "G7", 2)
+  const kofiEligibility = evaluateEligibility(
+    kofi.grade,
+    kofi.step,
+    kofi.tenureMonths,
+    kofi.appraisalScore,
+    kofi.trainingCompleted,
+    kofi.hasDisciplinary,
+    false,
+  )
+
+  return [
+    {
+      id: "PC-2025-001",
+      employeeId: ama.id,
+      employeeName: ama.name,
+      department: ama.department,
+      fromGrade: ama.grade,
+      fromStep: ama.step,
+      toGrade: "G8",
+      toStep: 1,
+      effectiveDate: "2025-03-01",
+      reason: "Leadership programme completion and 2024 performance rating above threshold.",
+      status: "in-review",
+      initiatedBy: "John Doe",
+      initiatedAt: "2025-01-20",
+      attachments: ["appraisal-summary-2024.pdf", "leadership-certificate.pdf"],
+      eligibility: amaEligibility,
+      approvals: approvalMatrix.map((entry, index) => ({
+        stage: entry.stage,
+        role: entry.role,
+        approverName: approverDirectory[entry.role] ?? entry.role,
+        status: index === 0 ? "pending" : "pending",
+      })),
+      compensationDelta: {
+        currentBase: amaDelta.currentBase,
+        proposedBase: amaDelta.proposedBase,
+        currency: amaDelta.currency,
+      },
+    },
+    {
+      id: "PC-2025-002",
+      employeeId: kofi.id,
+      employeeName: kofi.name,
+      department: kofi.department,
+      fromGrade: kofi.grade,
+      fromStep: kofi.step,
+      toGrade: "G7",
+      toStep: 2,
+      effectiveDate: "2025-02-15",
+      reason: "Exceeded sales targets for three consecutive quarters and mentoring contributions.",
+      status: "approved",
+      initiatedBy: "Jane Smith",
+      initiatedAt: "2025-01-10",
+      attachments: ["sales-report-q4.pdf", "mentorship-feedback.pdf"],
+      eligibility: kofiEligibility,
+      approvals: approvalMatrix.map((entry) => ({
+        stage: entry.stage,
+        role: entry.role,
+        approverName: approverDirectory[entry.role] ?? entry.role,
+        status: "approved",
+        decidedAt: "2025-01-25",
+        comment: "Approved as part of annual review cycle.",
+      })),
+      compensationDelta: {
+        currentBase: kofiDelta.currentBase,
+        proposedBase: kofiDelta.proposedBase,
+        currency: kofiDelta.currency,
+      },
+      letterUrl: undefined,
+    },
+  ]
 }
 
 export default function PromotionsPage() {
-  const { formatAmount, currencySymbol } = useCurrency()
+  const { formatAmount } = useCurrency()
+  const { toast: pushToast } = useToast()
 
-  const [promotions, setPromotions] = useState(initialPromotions)
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [cases, setCases] = useState<PromotionCase[]>(() => seedPromotionCases())
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedPromotion, setSelectedPromotion] = useState<any>(null)
-  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
-  const [isNewPromotionDialogOpen, setIsNewPromotionDialogOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState("promotions")
+  const [activeTab, setActiveTab] = useState("pipeline")
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [detailCaseId, setDetailCaseId] = useState<string | null>(null)
 
-  const filteredPromotions = promotions.filter((promotion) => {
-    const matchesStatus = statusFilter === "all" || promotion.status.toLowerCase() === statusFilter
-    const matchesDepartment = departmentFilter === "all" || promotion.department === departmentFilter
-    const matchesSearch =
-      promotion.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      promotion.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      promotion.currentGrade.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesStatus && matchesDepartment && matchesSearch
-  })
+  const departments = useMemo(() => Array.from(new Set(employeeDirectory.map((emp) => emp.department))), [])
 
-  const departments = [...new Set(promotions.map((promo) => promo.department))]
+  const filteredCases = useMemo(() => {
+    return cases.filter((promotionCase) => {
+      const matchesStatus = statusFilter === "all" || promotionCase.status === statusFilter
+      const matchesDepartment = departmentFilter === "all" || promotionCase.department === departmentFilter
+      const matchesSearch =
+        promotionCase.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        promotionCase.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        promotionCase.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        promotionCase.toGrade.toLowerCase().includes(searchTerm.toLowerCase())
+      return matchesStatus && matchesDepartment && matchesSearch
+    })
+  }, [cases, departmentFilter, searchTerm, statusFilter])
 
-  const handleApprovePromotion = async (promotionId: number, comment = "") => {
-    setPromotions((promotions) =>
-      promotions.map((promo) =>
-        promo.id === promotionId
-          ? {
-              ...promo,
-              status: "Approved",
-              approvedDate: new Date().toISOString().split("T")[0],
-              comments: [
-                ...promo.comments,
-                {
-                  author: "Current User",
-                  message: comment || "Promotion approved",
-                  date: new Date().toISOString().split("T")[0],
-                },
-              ],
-            }
-          : promo,
-      ),
-    )
-    toast({
-      title: "Promotion Approved",
-      description: "The promotion has been approved and will be processed.",
+  const pipelineStats = useMemo(() => {
+    const approved = cases.filter((c) => c.status === "approved")
+    const inReview = cases.filter((c) => c.status === "in-review")
+    const rejected = cases.filter((c) => c.status === "rejected")
+    const draft = cases.filter((c) => c.status === "draft")
+    const deltaTotal = approved.reduce((sum, c) => sum + (c.compensationDelta.proposedBase - c.compensationDelta.currentBase), 0)
+    return { approved: approved.length, inReview: inReview.length, rejected: rejected.length, draft: draft.length, deltaTotal }
+  }, [cases])
+
+  const detailCase = detailCaseId ? cases.find((item) => item.id === detailCaseId) ?? null : null
+
+  const openWizard = () => setWizardOpen(true)
+  const closeWizard = () => setWizardOpen(false)
+
+  const handleCreateCase = (promotionCase: PromotionCase) => {
+    setCases((previous) => [promotionCase, ...previous])
+    setStatusFilter("all")
+    setDepartmentFilter("all")
+    setSearchTerm("")
+    setDetailCaseId(promotionCase.id)
+    pushToast({
+      title: "Promotion case submitted",
+      description: promotionCase.status === "draft"
+        ? "Eligibility gaps detected – saved as draft for HR to review."
+        : "Routing approvals and notifying stakeholders.",
     })
   }
 
-  const handleRejectPromotion = (promotionId: number, comment: string) => {
-    setPromotions((promotions) =>
-      promotions.map((promo) =>
-        promo.id === promotionId
-          ? {
-              ...promo,
-              status: "Rejected",
-              rejectedDate: new Date().toISOString().split("T")[0],
-              comments: [
-                ...promo.comments,
-                {
-                  author: "Current User",
-                  message: comment,
-                  date: new Date().toISOString().split("T")[0],
-                },
-              ],
+  const handleStageDecision = (caseId: string, role: string, decision: "approve" | "reject", comment?: string) => {
+    setCases((previous) =>
+      previous.map((promotionCase) => {
+        if (promotionCase.id !== caseId || promotionCase.status === "approved" || promotionCase.status === "rejected") {
+          return promotionCase
+        }
+
+        const approvals = promotionCase.approvals.map((stage) =>
+          stage.role === role && stage.status === "pending"
+            ? {
+                ...stage,
+                status: decision === "approve" ? "approved" : "rejected",
+                decidedAt: new Date().toISOString(),
+                comment,
+              }
+            : stage,
+        )
+
+        let status: PromotionCase["status"] = promotionCase.status
+        let letterUrl = promotionCase.letterUrl
+
+        if (decision === "reject") {
+          status = "rejected"
+          if (letterUrl) {
+            URL.revokeObjectURL(letterUrl)
+            letterUrl = undefined
+          }
+        } else {
+          const pendingStage = approvals.find((stage) => stage.status === "pending")
+          if (!pendingStage) {
+            status = "approved"
+            const content = generatePromotionLetter({ ...promotionCase, approvals, status })
+            if (letterUrl) {
+              URL.revokeObjectURL(letterUrl)
             }
-          : promo,
-      ),
+            const blob = new Blob([content], { type: "text/plain" })
+            letterUrl = URL.createObjectURL(blob)
+          } else {
+            status = "in-review"
+          }
+        }
+
+        return { ...promotionCase, approvals, status, letterUrl }
+      }),
     )
-    toast({
-      title: "Promotion Rejected",
-      description: "The promotion request has been rejected.",
-      variant: "destructive",
+
+    pushToast({
+      title: decision === "approve" ? "Approval recorded" : "Promotion rejected",
+      description:
+        decision === "approve"
+          ? `${role} approved the case.`
+          : `${role} rejected the case${comment ? ` – ${comment}` : ""}.`,
+      variant: decision === "approve" ? "default" : "destructive",
     })
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Promotions Management</h1>
-          <p className="text-gray-600">Manage employee promotions, grades, and salary progressions</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Promotion Workflow</h1>
+          <p className="text-muted-foreground">Manage grade progressions, salary scales, and delegated approvals across the group.</p>
         </div>
-        <div className="flex space-x-2">
-          <Button variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Export Report
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="gap-2">
+            <Download className="h-4 w-4" />
+            Export pipeline
           </Button>
-          <Dialog open={isNewPromotionDialogOpen} onOpenChange={setIsNewPromotionDialogOpen}>
+          <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-emerald-600 hover:bg-emerald-700">
-                <Plus className="w-4 h-4 mr-2" />
-                New Promotion
+              <Button className="bg-emerald-600 hover:bg-emerald-700 gap-2" onClick={openWizard}>
+                <ArrowUpRight className="h-4 w-4" />
+                New promotion
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Create Promotion Case</DialogTitle>
+                <DialogTitle>Create promotion case</DialogTitle>
               </DialogHeader>
-              <NewPromotionForm onClose={() => setIsNewPromotionDialogOpen(false)} />
+              <PromotionWizard
+                employees={employeeDirectory}
+                onSubmit={handleCreateCase}
+                onClose={closeWizard}
+              />
             </DialogContent>
           </Dialog>
         </div>
-      </div>
+      </header>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="promotions">Promotion Cases</TabsTrigger>
-          <TabsTrigger value="grades">Salary Grades</TabsTrigger>
-          <TabsTrigger value="workflow">Approval Workflow</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
+          <TabsTrigger value="grades">Salary scales</TabsTrigger>
+          <TabsTrigger value="workflow">Approval map</TabsTrigger>
+          <TabsTrigger value="analytics">Insights</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="promotions" className="space-y-6">
-          {/* Promotion Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <AlertCircle className="w-5 h-5 text-orange-600" />
-                  <div>
-                    <div className="text-2xl font-bold text-gray-900">
-                      {promotions.filter((promo) => promo.status === "Pending").length}
-                    </div>
-                    <p className="text-sm text-gray-600">Pending</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <div>
-                    <div className="text-2xl font-bold text-gray-900">
-                      {promotions.filter((promo) => promo.status === "Approved").length}
-                    </div>
-                    <p className="text-sm text-gray-600">Approved</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <XCircle className="w-5 h-5 text-red-600" />
-                  <div>
-                    <div className="text-2xl font-bold text-gray-900">
-                      {promotions.filter((promo) => promo.status === "Rejected").length}
-                    </div>
-                    <p className="text-sm text-gray-600">Rejected</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <DollarSign className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <div className="text-2xl font-bold text-gray-900">
-                      {formatAmount(
-                        promotions.reduce((sum, promo) => sum + (promo.proposedSalary - promo.currentSalary), 0),
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600">Salary Impact</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <Users className="w-5 h-5 text-purple-600" />
-                  <div>
-                    <div className="text-2xl font-bold text-gray-900">{promotions.length}</div>
-                    <p className="text-sm text-gray-600">Total Cases</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <TabsContent value="pipeline" className="space-y-6">
+          <PipelineStats stats={pipelineStats} formatAmount={formatAmount} />
 
-          {/* Filters and Search */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <Input
-                    placeholder="Search by employee name, ID, or grade..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full md:w-48">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="rejected">Rejected</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                  <SelectTrigger className="w-full md:w-48">
-                    <SelectValue placeholder="Filter by department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Departments</SelectItem>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Promotion Cases */}
           <Card>
             <CardHeader>
-              <CardTitle>Promotion Cases ({filteredPromotions.length})</CardTitle>
+              <CardTitle className="text-base font-semibold">Filters</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {filteredPromotions.map((promotion) => (
-                  <div
-                    key={promotion.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <Avatar className="w-12 h-12">
-                        <AvatarImage src={promotion.employeeAvatar || "/placeholder.svg"} />
-                        <AvatarFallback>
-                          {promotion.employeeName
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="font-semibold text-gray-900">{promotion.employeeName}</h3>
-                          <Badge variant="outline" className="text-xs">
-                            {promotion.employeeId}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-gray-600">{promotion.department}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {promotion.currentGrade} → {promotion.proposedGrade} | {formatAmount(promotion.currentSalary)}{" "}
-                          → {formatAmount(promotion.proposedSalary)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-6">
-                      <div className="text-center">
-                        <p className="text-sm font-medium text-gray-900">
-                          {new Date(promotion.effectiveDate).toLocaleDateString()}
-                        </p>
-                        <p className="text-xs text-gray-500">Effective Date</p>
-                      </div>
-
-                      <div className="text-center">
-                        <p className="text-sm font-medium text-emerald-600">
-                          +{formatAmount(promotion.proposedSalary - promotion.currentSalary)}
-                        </p>
-                        <p className="text-xs text-gray-500">Salary Increase</p>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        {getStatusIcon(promotion.status)}
-                        {getStatusBadge(promotion.status)}
-                      </div>
-
-                      <div className="flex space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedPromotion(promotion)
-                            setIsDetailDialogOpen(true)
-                          }}
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          View
-                        </Button>
-                        {promotion.status === "Pending" && (
-                          <>
-                            <Button
-                              size="sm"
-                              className="bg-emerald-600 hover:bg-emerald-700"
-                              onClick={() => handleApprovePromotion(promotion.id)}
-                            >
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600 border-red-200 hover:bg-red-50 bg-transparent"
-                              onClick={() => handleRejectPromotion(promotion.id, "Promotion rejected")}
-                            >
-                              Reject
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            <CardContent className="space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
+              <div className="relative md:w-1/3">
+                <Input
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search by name, ID, department or grade"
+                  className="pl-8"
+                />
+                <Eye className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               </div>
+              <div className="flex flex-1 flex-col gap-3 md:flex-row md:items-center md:justify-end">
+                <div className="flex flex-col">
+                  <Label className="text-xs uppercase text-muted-foreground">Status</Label>
+                  <div className="flex gap-2">
+                    {[
+                      { value: "all", label: "All" },
+                      { value: "in-review", label: "In review" },
+                      { value: "draft", label: "Draft" },
+                      { value: "approved", label: "Approved" },
+                      { value: "rejected", label: "Rejected" },
+                    ].map((item) => (
+                      <Button
+                        key={item.value}
+                        size="sm"
+                        variant={statusFilter === item.value ? "default" : "outline"}
+                        onClick={() => setStatusFilter(item.value)}
+                      >
+                        {item.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <Label className="text-xs uppercase text-muted-foreground">Department</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={departmentFilter === "all" ? "default" : "outline"}
+                      onClick={() => setDepartmentFilter("all")}
+                    >
+                      All
+                    </Button>
+                    {departments.map((dept) => (
+                      <Button
+                        key={dept}
+                        size="sm"
+                        variant={departmentFilter === dept ? "default" : "outline"}
+                        onClick={() => setDepartmentFilter(dept)}
+                      >
+                        {dept}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-semibold">Promotion cases</CardTitle>
+                <span className="text-sm text-muted-foreground">{filteredCases.length} case(s)</span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {filteredCases.length === 0 && (
+                <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                  No promotion cases meet the current filters. Adjust your filters or create a new request.
+                </div>
+              )}
+              {filteredCases.map((promotionCase) => (
+                <PromotionCaseCard
+                  key={promotionCase.id}
+                  promotionCase={promotionCase}
+                  formatAmount={formatAmount}
+                  onView={() => setDetailCaseId(promotionCase.id)}
+                />
+              ))}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="grades" className="space-y-6">
-          <SalaryGradesView grades={salaryGrades} />
+        <TabsContent value="grades">
+          <SalaryGradesPanel />
         </TabsContent>
 
-        <TabsContent value="workflow" className="space-y-6">
-          <ApprovalWorkflowView workflow={approvalWorkflow} />
+        <TabsContent value="workflow">
+          <WorkflowPanel />
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-6">
-          <PromotionAnalyticsView promotions={promotions} />
+        <TabsContent value="analytics">
+          <PromotionInsights cases={cases} formatAmount={formatAmount} />
         </TabsContent>
       </Tabs>
 
-      {/* Promotion Detail Dialog */}
-      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={Boolean(detailCase)} onOpenChange={(open) => !open && setDetailCaseId(null)}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Promotion Case Details</DialogTitle>
+            <DialogTitle>Promotion case</DialogTitle>
           </DialogHeader>
-          {selectedPromotion && (
-            <PromotionDetail
-              promotion={selectedPromotion}
-              onApprove={handleApprovePromotion}
-              onReject={handleRejectPromotion}
-              onClose={() => setIsDetailDialogOpen(false)}
+          {detailCase && (
+            <PromotionCaseDetail
+              promotionCase={detailCase}
+              onDecision={handleStageDecision}
+              formatAmount={formatAmount}
             />
           )}
         </DialogContent>
@@ -494,314 +478,288 @@ export default function PromotionsPage() {
   )
 }
 
-function NewPromotionForm({ onClose }: { onClose: () => void }) {
-  const [formData, setFormData] = useState({
-    employeeId: "",
-    currentGrade: "",
-    currentStep: "",
-    proposedGrade: "",
-    proposedStep: "",
-    effectiveDate: "",
-    reason: "",
-    attachments: [],
-  })
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    toast({
-      title: "Promotion Case Created",
-      description: "The promotion case has been submitted for approval.",
-    })
-    onClose()
-  }
-
+function PipelineStats({
+  stats,
+  formatAmount,
+}: {
+  stats: { approved: number; inReview: number; rejected: number; draft: number; deltaTotal: number }
+  formatAmount: (value: number) => string
+}) {
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="employeeId">Employee ID</Label>
-          <Input
-            id="employeeId"
-            value={formData.employeeId}
-            onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
-            placeholder="EMP001"
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="effectiveDate">Effective Date</Label>
-          <Input
-            id="effectiveDate"
-            type="date"
-            value={formData.effectiveDate}
-            onChange={(e) => setFormData({ ...formData, effectiveDate: e.target.value })}
-            required
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-4 gap-4">
-        <div>
-          <Label htmlFor="currentGrade">Current Grade</Label>
-          <Select
-            value={formData.currentGrade}
-            onValueChange={(value) => setFormData({ ...formData, currentGrade: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select grade" />
-            </SelectTrigger>
-            <SelectContent>
-              {salaryGrades.map((grade) => (
-                <SelectItem key={grade.grade} value={grade.grade}>
-                  {grade.grade}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="currentStep">Current Step</Label>
-          <Select
-            value={formData.currentStep}
-            onValueChange={(value) => setFormData({ ...formData, currentStep: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select step" />
-            </SelectTrigger>
-            <SelectContent>
-              {[1, 2, 3, 4, 5].map((step) => (
-                <SelectItem key={step} value={`Step ${step}`}>
-                  Step {step}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="proposedGrade">Proposed Grade</Label>
-          <Select
-            value={formData.proposedGrade}
-            onValueChange={(value) => setFormData({ ...formData, proposedGrade: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select grade" />
-            </SelectTrigger>
-            <SelectContent>
-              {salaryGrades.map((grade) => (
-                <SelectItem key={grade.grade} value={grade.grade}>
-                  {grade.grade}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="proposedStep">Proposed Step</Label>
-          <Select
-            value={formData.proposedStep}
-            onValueChange={(value) => setFormData({ ...formData, proposedStep: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select step" />
-            </SelectTrigger>
-            <SelectContent>
-              {[1, 2, 3, 4, 5].map((step) => (
-                <SelectItem key={step} value={`Step ${step}`}>
-                  Step {step}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="reason">Reason for Promotion</Label>
-        <Textarea
-          id="reason"
-          value={formData.reason}
-          onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-          placeholder="Provide detailed justification for the promotion..."
-          required
-        />
-      </div>
-
-      <div className="flex justify-end space-x-3 pt-4">
-        <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">
-          Create Promotion Case
-        </Button>
-      </div>
-    </form>
+    <div className="grid gap-4 md:grid-cols-4">
+      <StatCard title="In review" value={stats.inReview} icon={<Clock className="h-5 w-5 text-orange-600" />} tone="warning" />
+      <StatCard title="Approved" value={stats.approved} icon={<CheckCircle className="h-5 w-5 text-emerald-600" />} tone="success" />
+      <StatCard title="Draft" value={stats.draft} icon={<ShieldCheck className="h-5 w-5 text-blue-600" />} tone="info" />
+      <StatCard
+        title="Annualised salary impact"
+        value={formatAmount(stats.deltaTotal)}
+        icon={<TrendingUp className="h-5 w-5 text-purple-600" />}
+        tone="accent"
+      />
+    </div>
   )
 }
 
-function PromotionDetail({
-  promotion,
-  onApprove,
-  onReject,
-  onClose,
+function StatCard({
+  title,
+  value,
+  icon,
+  tone,
 }: {
-  promotion: any
-  onApprove: (id: number, comment: string) => void
-  onReject: (id: number, comment: string) => void
-  onClose: () => void
+  title: string
+  value: string | number
+  icon: React.ReactNode
+  tone: "warning" | "success" | "info" | "accent"
 }) {
-  const [comment, setComment] = useState("")
-  const [action, setAction] = useState<"approve" | "reject" | null>(null)
-  const { formatAmount } = useCurrency()
-
-  const handleAction = () => {
-    if (action === "approve") {
-      onApprove(promotion.id, comment)
-    } else if (action === "reject") {
-      onReject(promotion.id, comment)
-    }
-    onClose()
-  }
+  const borderClass =
+    tone === "warning"
+      ? "border-orange-200"
+      : tone === "success"
+        ? "border-emerald-200"
+        : tone === "info"
+          ? "border-blue-200"
+          : "border-purple-200"
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center space-x-4">
-        <Avatar className="w-16 h-16">
-          <AvatarImage src={promotion.employeeAvatar || "/placeholder.svg"} />
-          <AvatarFallback className="text-lg">
-            {promotion.employeeName
-              .split(" ")
-              .map((n: string) => n[0])
-              .join("")}
-          </AvatarFallback>
+    <Card className={cn("border-2", borderClass)}>
+      <CardContent className="flex items-center justify-between p-4">
+        <div>
+          <p className="text-sm text-muted-foreground">{title}</p>
+          <p className="text-2xl font-semibold text-foreground">{value}</p>
+        </div>
+        <div className="rounded-full bg-muted p-3">{icon}</div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function PromotionCaseCard({
+  promotionCase,
+  formatAmount,
+  onView,
+}: {
+  promotionCase: PromotionCase
+  formatAmount: (value: number) => string
+  onView: () => void
+}) {
+  const delta = promotionCase.compensationDelta.proposedBase - promotionCase.compensationDelta.currentBase
+  const firstPendingStage = promotionCase.approvals.find((stage) => stage.status === "pending")
+
+  return (
+    <div className="flex flex-col gap-4 rounded-lg border p-4 transition hover:border-emerald-200 hover:shadow-sm md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-1 items-center gap-4">
+        <Avatar className="h-12 w-12">
+          <AvatarFallback>{promotionCase.employeeName.split(" ").map((part) => part[0]).join("")}</AvatarFallback>
         </Avatar>
         <div>
-          <h2 className="text-xl font-bold">{promotion.employeeName}</h2>
-          <p className="text-gray-600">
-            {promotion.employeeId} • {promotion.department}
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-semibold text-foreground">{promotionCase.employeeName}</h3>
+            <PromotionStatusBadge status={promotionCase.status} />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {promotionCase.employeeId} • {promotionCase.department}
           </p>
-          <div className="flex items-center space-x-2 mt-1">
-            {getStatusIcon(promotion.status)}
-            {getStatusBadge(promotion.status)}
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <span>
+              {toDisplayGrade(promotionCase.fromGrade)} → {toDisplayGrade(promotionCase.toGrade)}
+            </span>
+            <span>Effective {format(new Date(promotionCase.effectiveDate), "dd MMM yyyy")}</span>
+            <span className={cn("font-medium", delta >= 0 ? "text-emerald-600" : "text-red-600")}>{formatAmount(delta)}</span>
           </div>
         </div>
       </div>
+      <div className="flex flex-shrink-0 flex-col gap-3 md:w-[220px]">
+        <div className="text-xs text-muted-foreground">
+          <strong>Next route:</strong>{" "}
+          {firstPendingStage ? `${firstPendingStage.role} (${firstPendingStage.approverName})` : "Completed"}
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={onView}>
+            <Eye className="h-4 w-4" /> View case
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-      <div className="grid grid-cols-2 gap-6">
+function PromotionStatusBadge({ status }: { status: PromotionCase["status"] }) {
+  const config: Record<PromotionCase["status"], { label: string; className: string }> = {
+    "in-review": { label: "In review", className: "bg-emerald-50 text-emerald-700 border border-emerald-100" },
+    approved: { label: "Approved", className: "bg-blue-50 text-blue-700 border border-blue-100" },
+    rejected: { label: "Rejected", className: "bg-red-50 text-red-700 border border-red-100" },
+    draft: { label: "Draft", className: "bg-muted text-muted-foreground" },
+  }
+
+  const settings = config[status] ?? config["draft"]
+  return <Badge className={cn("px-2 py-1 text-xs", settings.className)}>{settings.label}</Badge>
+}
+
+function PromotionCaseDetail({
+  promotionCase,
+  onDecision,
+  formatAmount,
+}: {
+  promotionCase: PromotionCase
+  onDecision: (caseId: string, role: string, decision: "approve" | "reject", comment?: string) => void
+  formatAmount: (value: number) => string
+}) {
+  const [comment, setComment] = useState("")
+  const pendingStage = promotionCase.approvals.find((stage) => stage.status === "pending")
+  const canAct = Boolean(pendingStage) && promotionCase.status === "in-review"
+  const delta = promotionCase.compensationDelta.proposedBase - promotionCase.compensationDelta.currentBase
+
+  return (
+    <div className="space-y-6">
+      <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-foreground">{promotionCase.employeeName}</h2>
+          <p className="text-sm text-muted-foreground">
+            {promotionCase.employeeId} • {promotionCase.department}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <PromotionStatusBadge status={promotionCase.status} />
+          <Badge variant="outline" className="gap-1 text-xs">
+            <ArrowRight className="h-3 w-3" /> Effective {format(new Date(promotionCase.effectiveDate), "dd MMM yyyy")}
+          </Badge>
+        </div>
+      </header>
+
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Current Position</CardTitle>
+            <CardTitle className="text-sm font-semibold">Current position</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Grade:</span>
-              <span className="font-medium">{promotion.currentGrade}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Step:</span>
-              <span>{promotion.currentStep}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Current Salary:</span>
-              <span className="font-medium">{formatAmount(promotion.currentSalary)}</span>
-            </div>
+          <CardContent className="space-y-2 text-sm">
+            <Row label="Grade" value={toDisplayGrade(promotionCase.fromGrade)} />
+            <Row label="Step" value={`Step ${promotionCase.fromStep}`} />
+            <Row label="Base salary" value={formatAmount(promotionCase.compensationDelta.currentBase)} />
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Proposed Position</CardTitle>
+            <CardTitle className="text-sm font-semibold">Proposed position</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Grade:</span>
-              <span className="font-medium text-emerald-600">{promotion.proposedGrade}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Step:</span>
-              <span className="text-emerald-600">{promotion.proposedStep}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Proposed Salary:</span>
-              <span className="font-medium text-emerald-600">{formatAmount(promotion.proposedSalary)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Salary Increase:</span>
-              <span className="font-medium text-emerald-600">
-                +{formatAmount(promotion.proposedSalary - promotion.currentSalary)}
-              </span>
-            </div>
+          <CardContent className="space-y-2 text-sm">
+            <Row label="Grade" value={toDisplayGrade(promotionCase.toGrade)} highlight />
+            <Row label="Step" value={`Step ${promotionCase.toStep}`} highlight />
+            <Row label="New salary" value={formatAmount(promotionCase.compensationDelta.proposedBase)} highlight />
+            <Row label="Salary change" value={formatAmount(delta)} highlight tone={delta >= 0 ? "positive" : "negative"} />
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Eligibility Checks</CardTitle>
+          <CardTitle className="text-sm font-semibold">Eligibility review</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            {Object.entries(promotion.eligibilityChecks).map(([key, check]: [string, any]) => (
-              <div key={key} className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <p className="font-medium capitalize">{key}</p>
-                  <p className="text-sm text-gray-600">{check.details}</p>
-                </div>
-                {check.passed ? (
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                ) : (
-                  <XCircle className="w-5 h-5 text-red-600" />
-                )}
+        <CardContent className="grid gap-3 md:grid-cols-2">
+          {promotionCase.eligibility.map((rule) => (
+            <div
+              key={rule.id}
+              className="flex items-start gap-3 rounded-lg border p-3"
+            >
+              {rule.passed ? (
+                <CheckCircle className="mt-1 h-4 w-4 flex-shrink-0 text-emerald-600" />
+              ) : (
+                <XCircle className="mt-1 h-4 w-4 flex-shrink-0 text-red-600" />
+              )}
+              <div>
+                <p className="text-sm font-medium text-foreground">{rule.label}</p>
+                <p className="text-xs text-muted-foreground">{rule.details}</p>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Justification</CardTitle>
+          <CardTitle className="text-sm font-semibold">Supporting attachments</CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-gray-700">{promotion.reason}</p>
+        <CardContent className="flex flex-wrap gap-2">
+          {promotionCase.attachments.map((file) => (
+            <Badge key={file} variant="outline" className="gap-1 text-xs">
+              <FileText className="h-3 w-3" /> {file}
+            </Badge>
+          ))}
+          {promotionCase.attachments.length === 0 && <p className="text-sm text-muted-foreground">No attachments uploaded.</p>}
         </CardContent>
       </Card>
 
-      {promotion.status === "Pending" && (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold">Approval route</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {promotionCase.approvals.map((stage) => (
+            <div key={`${promotionCase.id}-${stage.role}`} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">{stage.role}</p>
+                <p className="text-xs text-muted-foreground">{stage.approverName}</p>
+                {stage.comment && <p className="mt-1 text-xs text-muted-foreground">Comment: {stage.comment}</p>}
+              </div>
+              <div className="text-xs text-muted-foreground text-right">
+                <PromotionStatusBadge status={stage.status === "approved" ? "approved" : stage.status === "rejected" ? "rejected" : "in-review"} />
+                {stage.decidedAt && <div>{format(new Date(stage.decidedAt), "dd MMM yyyy")}</div>}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold">Business justification</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm leading-relaxed text-muted-foreground">{promotionCase.reason}</p>
+        </CardContent>
+      </Card>
+
+      {promotionCase.letterUrl && (
+        <div className="flex items-center gap-3">
+          <Button asChild variant="outline" className="gap-2">
+            <a href={promotionCase.letterUrl} download={`${promotionCase.employeeId}-promotion-letter.txt`}>
+              <Download className="h-4 w-4" /> Download promotion letter
+            </a>
+          </Button>
+          <p className="text-xs text-muted-foreground">Generated automatically upon final approval.</p>
+        </div>
+      )}
+
+      {canAct && pendingStage && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Take Action</CardTitle>
+            <CardTitle className="text-sm font-semibold">Approval action ({pendingStage.role})</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="comment">Comment</Label>
+            <div className="space-y-2">
+              <Label htmlFor="approver-comment" className="text-xs uppercase text-muted-foreground">
+                Comment (optional)
+              </Label>
               <Textarea
-                id="comment"
+                id="approver-comment"
                 value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Add your comments about this promotion..."
+                onChange={(event) => setComment(event.target.value)}
+                placeholder="Add notes for the audit trail"
+                rows={3}
               />
             </div>
-            <div className="flex space-x-3">
+            <div className="flex flex-wrap gap-3">
               <Button
-                onClick={() => {
-                  setAction("approve")
-                  handleAction()
-                }}
-                className="bg-emerald-600 hover:bg-emerald-700"
+                className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => onDecision(promotionCase.id, pendingStage.role, "approve", comment || undefined)}
               >
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Approve Promotion
+                <CheckCircle className="h-4 w-4" /> Approve
               </Button>
               <Button
-                onClick={() => {
-                  setAction("reject")
-                  handleAction()
-                }}
                 variant="outline"
-                className="text-red-600 border-red-200 hover:bg-red-50"
+                className="gap-2 border-red-200 text-red-600 hover:bg-red-50"
+                onClick={() => onDecision(promotionCase.id, pendingStage.role, "reject", comment || undefined)}
               >
-                <XCircle className="w-4 h-4 mr-2" />
-                Reject Promotion
+                <XCircle className="h-4 w-4" /> Reject
               </Button>
             </div>
           </CardContent>
@@ -811,120 +769,129 @@ function PromotionDetail({
   )
 }
 
-function SalaryGradesView({ grades }: { grades: any[] }) {
+function Row({ label, value, highlight = false, tone }: { label: string; value: string; highlight?: boolean; tone?: "positive" | "negative" }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span
+        className={cn(
+          "font-medium",
+          highlight && "text-foreground",
+          tone === "positive" && "text-emerald-600",
+          tone === "negative" && "text-red-600",
+        )}
+      >
+        {value}
+      </span>
+    </div>
+  )
+}
+
+function SalaryGradesPanel() {
   const { formatAmount } = useCurrency()
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Salary Grades & Steps</CardTitle>
+        <CardTitle className="text-base font-semibold">Salary grades & steps</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {grades.map((grade, index) => (
-            <div key={index} className="border rounded-lg p-4">
-              <h3 className="font-semibold text-lg mb-3">{grade.grade}</h3>
-              <div className="grid grid-cols-5 gap-4">
-                {grade.steps.map((salary: number, stepIndex: number) => (
-                  <div key={stepIndex} className="text-center p-3 bg-gray-50 rounded">
-                    <div className="text-sm text-gray-600">Step {stepIndex + 1}</div>
-                    <div className="font-semibold text-emerald-600">{formatAmount(salary)}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function ApprovalWorkflowView({ workflow }: { workflow: any[] }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Promotion Approval Workflow</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {workflow.map((stage, index) => (
-            <div key={index} className="flex items-center space-x-4 p-4 border rounded-lg">
-              <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center font-semibold">
-                {index + 1}
-              </div>
+      <CardContent className="space-y-4">
+        {gradeCatalog.map((grade) => (
+          <div key={grade.id} className="rounded-lg border p-4">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold">{stage.stage}</h3>
-                <p className="text-sm text-gray-600">{stage.role}</p>
+                <h3 className="text-lg font-semibold text-foreground">{toDisplayGrade(grade.gradeCode)}</h3>
+                <p className="text-xs uppercase text-muted-foreground">Band: {grade.band}</p>
               </div>
+              <Badge variant="outline" className="text-xs">
+                Steps {grade.minStep} – {grade.maxStep}
+              </Badge>
             </div>
-          ))}
-        </div>
+            <Separator className="my-3" />
+            <div className="grid gap-3 md:grid-cols-5">
+              {grade.steps.map((step) => (
+                <div key={`${grade.id}-${step.step}`} className="rounded-md bg-muted p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Step {step.step}</p>
+                  <p className="text-sm font-semibold text-emerald-600">{formatAmount(step.basePay)}</p>
+                  <p className="text-[10px] text-muted-foreground">Effective {format(new Date(step.effectiveFrom), "MMM yyyy")}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </CardContent>
     </Card>
   )
 }
 
-function PromotionAnalyticsView({ promotions }: { promotions: any[] }) {
-  const totalPromotions = promotions.length
-  const approvedPromotions = promotions.filter((promo) => promo.status === "Approved").length
-  const pendingPromotions = promotions.filter((promo) => promo.status === "Pending").length
-  const rejectedPromotions = promotions.filter((promo) => promo.status === "Rejected").length
+function WorkflowPanel() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base font-semibold">Approval workflow</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {approvalMatrix.map((stage, index) => (
+          <div key={stage.role} className="flex items-center gap-4 rounded-lg border p-4">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700">
+              {index + 1}
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">{stage.role}</p>
+              <p className="text-xs text-muted-foreground">Stage {stage.stage} in approval map</p>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
 
-  const approvalRate = totalPromotions > 0 ? ((approvedPromotions / totalPromotions) * 100).toFixed(1) : 0
-  const { formatAmount } = useCurrency()
+function PromotionInsights({ cases, formatAmount }: { cases: PromotionCase[]; formatAmount: (value: number) => string }) {
+  const approved = cases.filter((promotionCase) => promotionCase.status === "approved")
+  const averageIncrease =
+    approved.length > 0
+      ? Math.round(
+          approved.reduce(
+            (sum, promotionCase) => sum + (promotionCase.compensationDelta.proposedBase - promotionCase.compensationDelta.currentBase),
+            0,
+          ) / approved.length,
+        )
+      : 0
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="w-5 h-5 text-emerald-600" />
+            <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold text-gray-900">{approvalRate}%</div>
-                <p className="text-sm text-gray-600">Approval Rate</p>
+                <p className="text-sm text-muted-foreground">Approved promotions</p>
+                <p className="text-2xl font-semibold text-foreground">{approved.length}</p>
               </div>
+              <CheckCircle className="h-5 w-5 text-emerald-600" />
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Clock className="w-5 h-5 text-orange-600" />
+            <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold text-gray-900">14</div>
-                <p className="text-sm text-gray-600">Avg. Days to Approve</p>
+                <p className="text-sm text-muted-foreground">Average salary uplift</p>
+                <p className="text-2xl font-semibold text-emerald-600">{formatAmount(averageIncrease)}</p>
               </div>
+              <TrendingUp className="h-5 w-5 text-purple-600" />
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <DollarSign className="w-5 h-5 text-blue-600" />
+            <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold text-gray-900">
-                  {formatAmount(
-                    Math.round(
-                      promotions.reduce((sum, promo) => sum + (promo.proposedSalary - promo.currentSalary), 0) /
-                        promotions.length,
-                    ),
-                  )}
-                </div>
-                <p className="text-sm text-gray-600">Avg. Salary Increase</p>
+                <p className="text-sm text-muted-foreground">Pending approvals</p>
+                <p className="text-2xl font-semibold text-foreground">{cases.filter((item) => item.status === "in-review").length}</p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Users className="w-5 h-5 text-purple-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">{totalPromotions}</div>
-                <p className="text-sm text-gray-600">Total Cases</p>
-              </div>
+              <Clock className="h-5 w-5 text-orange-600" />
             </div>
           </CardContent>
         </Card>
@@ -932,16 +899,437 @@ function PromotionAnalyticsView({ promotions }: { promotions: any[] }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Promotion Trends</CardTitle>
+          <CardTitle className="text-base font-semibold">DEI distribution by grade (snapshot)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-gray-500">
-            <TrendingUp className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>Promotion analytics and trends will be displayed here</p>
-            <p className="text-sm mt-2">Charts showing promotion patterns, department-wise analysis, and more</p>
+          <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+            Dashboards for diversity, equity & inclusion will surface once HR analytics feeds are connected.
           </div>
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+type WizardState = {
+  employeeId: string
+  effectiveDate: string
+  reason: string
+  newGrade: string
+  newStep: number
+  trainingCompleted: boolean
+  hasDisciplinary: boolean
+  payrollLocked: boolean
+  attachments: string[]
+}
+
+function PromotionWizard({
+  employees,
+  onSubmit,
+  onClose,
+}: {
+  employees: EmployeeProfile[]
+  onSubmit: (promotionCase: PromotionCase) => void
+  onClose: () => void
+}) {
+  const [step, setStep] = useState(0)
+  const [attachmentInput, setAttachmentInput] = useState("")
+  const [state, setState] = useState<WizardState>(() => ({
+    employeeId: "",
+    effectiveDate: "",
+    reason: "",
+    newGrade: gradeCatalog[0]?.gradeCode ?? "",
+    newStep: gradeCatalog[0]?.minStep ?? 1,
+    trainingCompleted: true,
+    hasDisciplinary: false,
+    payrollLocked: false,
+    attachments: [],
+  }))
+
+  const selectedEmployee = useMemo(() => employees.find((employee) => employee.id === state.employeeId) ?? null, [employees, state.employeeId])
+
+  const eligibility = useMemo(() => {
+    if (!selectedEmployee) {
+      return []
+    }
+    return evaluateEligibility(
+      selectedEmployee.grade,
+      selectedEmployee.step,
+      selectedEmployee.tenureMonths,
+      selectedEmployee.appraisalScore,
+      state.trainingCompleted,
+      state.hasDisciplinary,
+      state.payrollLocked,
+    )
+  }, [selectedEmployee, state.trainingCompleted, state.hasDisciplinary, state.payrollLocked])
+
+  const salaryPreview = useMemo(() => {
+    if (!selectedEmployee) {
+      return null
+    }
+    const delta = computeSalaryDelta(selectedEmployee.grade, selectedEmployee.step, state.newGrade, state.newStep)
+    return delta
+  }, [selectedEmployee, state.newGrade, state.newStep])
+
+  const steps = ["Employee", "Movement", "Eligibility", "Review"]
+
+  const canContinue = () => {
+    if (step === 0) {
+      return Boolean(selectedEmployee) && Boolean(state.effectiveDate)
+    }
+    if (step === 1) {
+      return Boolean(state.newGrade) && Boolean(state.newStep)
+    }
+    if (step === 2) {
+      return true
+    }
+    return true
+  }
+
+  const handleAddAttachment = () => {
+    const trimmed = attachmentInput.trim()
+    if (!trimmed) return
+    setState((previous) => ({ ...previous, attachments: [...previous.attachments, trimmed] }))
+    setAttachmentInput("")
+  }
+
+  const handleSubmit = () => {
+    if (!selectedEmployee) {
+      toast({
+        variant: "destructive",
+        title: "Select an employee",
+        description: "Choose which employee is being promoted before submitting.",
+      })
+      return
+    }
+
+    const compensationDelta = computeSalaryDelta(selectedEmployee.grade, selectedEmployee.step, state.newGrade, state.newStep)
+    const eligibilityResults = eligibility
+    const allPassed = eligibilityResults.every((result) => result.passed)
+    const newCase: PromotionCase = {
+      id: `PC-${Date.now()}`,
+      employeeId: selectedEmployee.id,
+      employeeName: selectedEmployee.name,
+      department: selectedEmployee.department,
+      fromGrade: selectedEmployee.grade,
+      fromStep: selectedEmployee.step,
+      toGrade: state.newGrade,
+      toStep: state.newStep,
+      effectiveDate: state.effectiveDate,
+      reason: state.reason || "Promotion request raised from self-service",
+      status: allPassed ? "in-review" : "draft",
+      initiatedBy: "You",
+      initiatedAt: new Date().toISOString(),
+      attachments: state.attachments,
+      eligibility: eligibilityResults,
+      approvals: approvalMatrix.map((stage) => ({
+        stage: stage.stage,
+        role: stage.role,
+        approverName: approverDirectory[stage.role] ?? stage.role,
+        status: "pending",
+      })),
+      compensationDelta: {
+        currentBase: compensationDelta.currentBase,
+        proposedBase: compensationDelta.proposedBase,
+        currency: compensationDelta.currency,
+      },
+    }
+
+    onSubmit(newCase)
+    onClose()
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 text-sm">
+        {steps.map((label, index) => {
+          const active = step === index
+          const complete = step > index
+          return (
+            <div key={label} className="flex items-center gap-2">
+              <div
+                className={cn(
+                  "flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold",
+                  complete && "border-emerald-200 bg-emerald-600 text-white",
+                  active && !complete && "border-emerald-400 text-emerald-600",
+                  !active && !complete && "border-muted text-muted-foreground",
+                )}
+              >
+                {complete ? <CheckCircle className="h-3 w-3" /> : index + 1}
+              </div>
+              <span className={cn("text-xs uppercase", active ? "text-foreground" : "text-muted-foreground")}>{label}</span>
+              {index < steps.length - 1 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+            </div>
+          )
+        })}
+      </div>
+
+      {step === 0 && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="employee">Employee</Label>
+            <select
+              id="employee"
+              className="flex h-10 w-full rounded-md border bg-background px-3 text-sm"
+              value={state.employeeId}
+              onChange={(event) => {
+                const employeeId = event.target.value
+                const employee = employees.find((profile) => profile.id === employeeId)
+                setState((previous) => ({
+                  ...previous,
+                  employeeId,
+                  newGrade: employee?.grade ?? previous.newGrade,
+                  newStep: employee?.step ? Math.max(1, employee.step + 1) : previous.newStep,
+                  trainingCompleted: employee?.trainingCompleted ?? previous.trainingCompleted,
+                  hasDisciplinary: employee?.hasDisciplinary ?? previous.hasDisciplinary,
+                }))
+              }}
+            >
+              <option value="" disabled>
+                -- Select an employee --
+              </option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.name} ({employee.id})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="effectiveDate">Effective date</Label>
+            <Input
+              id="effectiveDate"
+              type="date"
+              value={state.effectiveDate}
+              onChange={(event) => setState((previous) => ({ ...previous, effectiveDate: event.target.value }))}
+            />
+          </div>
+          <div className="md:col-span-2 space-y-2">
+            <Label htmlFor="reason">Business justification</Label>
+            <Textarea
+              id="reason"
+              rows={4}
+              placeholder="Why should this employee progress to the next grade?"
+              value={state.reason}
+              onChange={(event) => setState((previous) => ({ ...previous, reason: event.target.value }))}
+            />
+          </div>
+        </div>
+      )}
+
+      {step === 1 && selectedEmployee && (
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground">Current grade & step</Label>
+                <p className="text-sm font-medium text-foreground">
+                  {toDisplayGrade(selectedEmployee.grade)} • Step {selectedEmployee.step}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground">Target grade</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  value={state.newGrade}
+                  onChange={(event) => {
+                    const gradeCode = event.target.value
+                    const grade = gradeCatalog.find((entry) => entry.gradeCode === gradeCode)
+                    setState((previous) => ({
+                      ...previous,
+                      newGrade: gradeCode,
+                      newStep: grade ? Math.min(Math.max(previous.newStep, grade.minStep), grade.maxStep) : previous.newStep,
+                    }))
+                  }}
+                >
+                  {gradeCatalog.map((grade) => (
+                    <option key={grade.id} value={grade.gradeCode}>
+                      {toDisplayGrade(grade.gradeCode)} ({grade.band})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground">Target step</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  value={state.newStep}
+                  onChange={(event) => setState((previous) => ({ ...previous, newStep: Number(event.target.value) }))}
+                >
+                  {gradeCatalog
+                    .find((grade) => grade.gradeCode === state.newGrade)?.steps.map((step) => (
+                      <option key={`${state.newGrade}-step-${step.step}`} value={step.step}>
+                        Step {step.step} ({format(new Date(step.effectiveFrom), "MMM yyyy")})
+                      </option>
+                    ))}
+                </select>
+              </div>
+              {salaryPreview && (
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase text-muted-foreground">Salary projection</Label>
+                  <div className="rounded-lg border p-3 text-sm">
+                    <p className="text-muted-foreground">
+                      Current base: <span className="font-medium text-foreground">{formatAmount(salaryPreview.currentBase)}</span>
+                    </p>
+                    <p className="text-muted-foreground">
+                      Proposed base: <span className="font-medium text-emerald-600">{formatAmount(salaryPreview.proposedBase)}</span>
+                    </p>
+                    <Separator className="my-2" />
+                    <p className="text-sm font-semibold text-emerald-600">
+                      Δ {formatAmount(salaryPreview.proposedBase - salaryPreview.currentBase)} per month
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Eligibility flags</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <ToggleRow
+                label="Training completed"
+                description="Mandatory leadership or technical curriculum fulfilled"
+                checked={state.trainingCompleted}
+                onCheckedChange={(checked) => setState((previous) => ({ ...previous, trainingCompleted: checked }))}
+              />
+              <ToggleRow
+                label="No disciplinary flags"
+                description="Confirm no open disciplinary or PIP actions"
+                checked={!state.hasDisciplinary}
+                onCheckedChange={(checked) => setState((previous) => ({ ...previous, hasDisciplinary: !checked }))}
+              />
+              <ToggleRow
+                label="Payroll period open"
+                description="Finance confirms the effective payroll period is editable"
+                checked={!state.payrollLocked}
+                onCheckedChange={(checked) => setState((previous) => ({ ...previous, payrollLocked: !checked }))}
+              />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Supporting documents</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g. appraisal-2024.pdf"
+                  value={attachmentInput}
+                  onChange={(event) => setAttachmentInput(event.target.value)}
+                />
+                <Button type="button" onClick={handleAddAttachment} className="gap-2">
+                  <Upload className="h-4 w-4" /> Add
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                {state.attachments.length === 0 && <p className="text-muted-foreground">No files added yet.</p>}
+                {state.attachments.map((attachment) => (
+                  <Badge key={attachment} variant="outline">
+                    {attachment}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          <div className="md:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-semibold">Eligibility summary</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-2">
+                {eligibility.map((item) => (
+                  <div key={item.id} className="flex items-start gap-3 rounded-lg border p-3 text-sm">
+                    {item.passed ? (
+                      <CheckCircle className="mt-0.5 h-4 w-4 text-emerald-600" />
+                    ) : (
+                      <XCircle className="mt-0.5 h-4 w-4 text-red-600" />
+                    )}
+                    <div>
+                      <p className="font-medium text-foreground">{item.label}</p>
+                      <p className="text-xs text-muted-foreground">{item.details}</p>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && selectedEmployee && salaryPreview && (
+        <div className="space-y-4 text-sm">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Row label="Employee" value={`${selectedEmployee.name} (${selectedEmployee.id})`} />
+              <Row label="Effective date" value={state.effectiveDate ? format(new Date(state.effectiveDate), "dd MMM yyyy") : "TBC"} />
+              <Row label="Current grade" value={`${toDisplayGrade(selectedEmployee.grade)} • Step ${selectedEmployee.step}`} />
+              <Row label="Proposed grade" value={`${toDisplayGrade(state.newGrade)} • Step ${state.newStep}`} highlight />
+              <Row label="Salary delta" value={`${salaryPreview.proposedBase - salaryPreview.currentBase >= 0 ? "+" : ""}${salaryPreview.proposedBase - salaryPreview.currentBase} GHS`} highlight />
+              <Row label="Attachments" value={`${state.attachments.length} file(s)`} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Eligibility outcome</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {eligibility.every((item) => item.passed) ? (
+                <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+                  <CheckCircle className="h-4 w-4" /> All mandatory checks passed. Case will route automatically.
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-700">
+                  <AlertCircle className="h-4 w-4" /> One or more checks failed. Case will be saved as draft for HR to review.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <Separator />
+
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
+          <Button variant="outline" disabled={step === 0} onClick={() => setStep((value) => Math.max(0, value - 1))}>
+            Back
+          </Button>
+          {step < steps.length - 1 ? (
+            <Button disabled={!canContinue()} onClick={() => setStep((value) => Math.min(steps.length - 1, value + 1))}>
+              Continue
+            </Button>
+          ) : (
+            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleSubmit}>
+              Submit case
+            </Button>
+          )}
+        </div>
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function ToggleRow({ label, description, checked, onCheckedChange }: { label: string; description: string; checked: boolean; onCheckedChange: (checked: boolean) => void }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} />
     </div>
   )
 }
