@@ -1,8 +1,10 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { format, formatDistanceToNow } from "date-fns"
 
+import { AuthGuard } from "@/components/auth-guard"
+import { RoleGuard } from "@/components/role-guard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,6 +18,14 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import {
+  listMeetings,
+  scheduleMeeting as scheduleMeetingService,
+  updateMeeting,
+  type MeetingProvider,
+  type MeetingRecord,
+  type MeetingStatus,
+} from "@/lib/api/meetings-service"
 
 import {
   AlertTriangle,
@@ -30,76 +40,6 @@ import {
   Video,
   Wand2,
 } from "lucide-react"
-
-type MeetingProvider = "Zoom" | "Microsoft Teams" | "Google Meet" | "Daily" | "Cisco Webex"
-type MeetingStatus = "scheduled" | "in-progress" | "completed"
-
-type MeetingRecord = {
-  id: string
-  title: string
-  startTime: string
-  durationMinutes: number
-  provider: MeetingProvider
-  host: string
-  agenda: string[]
-  participants: number
-  status: MeetingStatus
-  passcodeEnforced: boolean
-  e2ee: boolean
-  recordingEnabled: boolean
-  minutesStatus: "not-started" | "processing" | "ready"
-  minutesSummary?: string
-}
-
-const meetingSeed: MeetingRecord[] = [
-  {
-    id: "M-9041",
-    title: "Payroll harmonisation steering committee",
-    startTime: new Date(Date.now() + 1000 * 60 * 45).toISOString(),
-    durationMinutes: 60,
-    provider: "Zoom",
-    host: "Abena Owusu",
-    agenda: ["Review intercompany payroll transfers", "Approve March pay cycle", "Escalations"],
-    participants: 12,
-    status: "scheduled",
-    passcodeEnforced: true,
-    e2ee: true,
-    recordingEnabled: true,
-    minutesStatus: "not-started",
-  },
-  {
-    id: "M-9037",
-    title: "Tax compliance alignment with GRA",
-    startTime: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    durationMinutes: 45,
-    provider: "Microsoft Teams",
-    host: "Regina Appiah",
-    agenda: ["PAYE submissions", "Tier 2 pensions", "Audit queries"],
-    participants: 8,
-    status: "completed",
-    passcodeEnforced: true,
-    e2ee: false,
-    recordingEnabled: true,
-    minutesStatus: "ready",
-    minutesSummary:
-      "GRA confirmed April schedules accepted; Finance to deliver variance report by Friday; prepare Tier 2 reconciliations for audit branch.",
-  },
-  {
-    id: "M-9039",
-    title: "Headcount approval board",
-    startTime: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
-    durationMinutes: 30,
-    provider: "Daily",
-    host: "Kwame Agyeman",
-    agenda: ["Approve engineering hires", "Review attrition", "Budget alignment"],
-    participants: 6,
-    status: "in-progress",
-    passcodeEnforced: true,
-    e2ee: true,
-    recordingEnabled: false,
-    minutesStatus: "processing",
-  },
-]
 
 const providerSecurityNotes: Record<MeetingProvider, string> = {
   Zoom: "Waiting room enforced, SOC 2 Type II compliant",

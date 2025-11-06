@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react"
 import { format } from "date-fns"
 
+import { AuthGuard } from "@/components/auth-guard"
+import { RoleGuard } from "@/components/role-guard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,7 +14,8 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
-import { addChangeRequest, ChangeFieldDiff } from "@/lib/change-requests-store"
+import { submitChangeRequest } from "@/lib/api/change-requests-service"
+import { ChangeFieldDiff } from "@/lib/change-requests-store"
 
 import { CheckCircle, FileText, ShieldCheck, Upload, UserCog } from "lucide-react"
 
@@ -121,17 +124,17 @@ export default function SelfServiceUpdateDetailsPage() {
     }
 
     const requestId = `CR-${Date.now()}`
-    addChangeRequest({
-      id: requestId,
-      employeeId: "EMP002",
-      employeeName: "Ama Osei",
-      submittedAt: new Date().toISOString(),
-      status: "pending",
-      reason: reason || "Self-service record update",
-      sections: sectionsTouched,
-      diffs,
-      attachments: attachments.map((name, index) => ({ id: `${requestId}-att-${index}`, name, type: "Supporting document" })),
-    })
+      await submitChangeRequest({
+        id: requestId,
+        employeeId: "EMP002",
+        employeeName: "Ama Osei",
+        submittedAt: new Date().toISOString(),
+        status: "pending",
+        reason: reason || "Self-service record update",
+        sections: sectionsTouched,
+        diffs,
+        attachments: attachments.map((name, index) => ({ id: `${requestId}-att-${index}`, name, type: "Supporting document" })),
+      })
 
     toast({
       title: "Change request submitted",
@@ -151,16 +154,18 @@ export default function SelfServiceUpdateDetailsPage() {
     setAttachmentInput("")
   }
 
-  return (
-    <div className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Update my details</h1>
-        <p className="text-sm text-muted-foreground">
-          Submit secure change requests for HR to review. Sensitive changes (e.g. bank details) require supporting documents.
-        </p>
-      </header>
+    return (
+      <AuthGuard>
+        <RoleGuard requiredRoles={["employee", "hr-admin"]}>
+          <div className="space-y-6">
+            <header className="space-y-2">
+              <h1 className="text-2xl font-semibold tracking-tight">Update my details</h1>
+              <p className="text-sm text-muted-foreground">
+                Submit secure change requests for HR to review. Sensitive changes (e.g. bank details) require supporting documents.
+              </p>
+            </header>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="identity">Identity</TabsTrigger>
           <TabsTrigger value="contact">Contact</TabsTrigger>
@@ -293,101 +298,103 @@ export default function SelfServiceUpdateDetailsPage() {
             </div>
           </SectionCard>
         </TabsContent>
-      </Tabs>
+            </Tabs>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Supporting documents</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
-            <Input
-              placeholder="Upload reference (e.g. bank_letter.pdf)"
-              value={attachmentInput}
-              onChange={(event) => setAttachmentInput(event.target.value)}
-              className="md:w-80"
-            />
-            <Button type="button" variant="outline" className="gap-2" onClick={handleAddAttachment}>
-              <Upload className="h-4 w-4" /> Add attachment
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              Accepted: bank letters, Ghana Card scans, statutory forms.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2 text-xs">
-            {attachments.length === 0 && <span className="text-muted-foreground">No documents added yet.</span>}
-            {attachments.map((file) => (
-              <Badge key={file} variant="outline">
-                <FileText className="mr-1 h-3 w-3" /> {file}
-              </Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Request review</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="reason">Reason for update</Label>
-            <Textarea
-              id="reason"
-              placeholder="Provide context – e.g. moved house, new bank account, married, etc."
-              rows={3}
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-            />
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {diffs.length === 0 ? (
-              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                No differences detected yet – edit your details using the tabs above.
-              </div>
-            ) : (
-              diffs.map((diff) => (
-                <div key={diff.path} className="rounded-lg border p-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-foreground">{diff.label}</span>
-                    <Badge variant="outline" className="text-[10px] uppercase">
-                      {diff.path.split(".")[0]}
-                    </Badge>
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">Current</p>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {maskIfNeeded(diff.previousValue, diff.pii)}
-                  </p>
-                  <Separator className="my-2" />
-                  <p className="text-xs text-muted-foreground">New</p>
-                  <p className="text-sm font-semibold text-emerald-600">
-                    {maskIfNeeded(diff.newValue, diff.pii)}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-semibold">Supporting documents</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                  <Input
+                    placeholder="Upload reference (e.g. bank_letter.pdf)"
+                    value={attachmentInput}
+                    onChange={(event) => setAttachmentInput(event.target.value)}
+                    className="md:w-80"
+                  />
+                  <Button type="button" variant="outline" className="gap-2" onClick={handleAddAttachment}>
+                    <Upload className="h-4 w-4" /> Add attachment
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Accepted: bank letters, Ghana Card scans, statutory forms.
                   </p>
                 </div>
-              ))
-            )}
-          </div>
-          <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
-            <ShieldCheck className="mr-2 inline h-3 w-3" /> Submissions are encrypted. HR verifies identity-sensitive updates before payroll is
-            released.
-          </div>
-        </CardContent>
-      </Card>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {attachments.length === 0 && <span className="text-muted-foreground">No documents added yet.</span>}
+                  {attachments.map((file) => (
+                    <Badge key={file} variant="outline">
+                      <FileText className="mr-1 h-3 w-3" /> {file}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-muted-foreground">
-          <CheckCircle className="mr-1 inline h-3 w-3 text-emerald-600" /> {diffs.length} field(s) changed • {attachments.length} attachment(s)
-        </div>
-        <div className="flex gap-2">
-          <Button variant="ghost" onClick={() => setDraft(structuredClone(currentProfile))}>
-            Reset
-          </Button>
-          <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={handleSubmit}>
-            <UserCog className="h-4 w-4" /> Submit change request
-          </Button>
-        </div>
-      </div>
-    </div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-semibold">Request review</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reason">Reason for update</Label>
+                  <Textarea
+                    id="reason"
+                    placeholder="Provide context – e.g. moved house, new bank account, married, etc."
+                    rows={3}
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                  />
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {diffs.length === 0 ? (
+                    <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                      No differences detected yet – edit your details using the tabs above.
+                    </div>
+                  ) : (
+                    diffs.map((diff) => (
+                      <div key={diff.path} className="rounded-lg border p-3 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-foreground">{diff.label}</span>
+                          <Badge variant="outline" className="text-[10px] uppercase">
+                            {diff.path.split(".")[0]}
+                          </Badge>
+                        </div>
+                        <p className="mt-2 text-xs text-muted-foreground">Current</p>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          {maskIfNeeded(diff.previousValue, diff.pii)}
+                        </p>
+                        <Separator className="my-2" />
+                        <p className="text-xs text-muted-foreground">New</p>
+                        <p className="text-sm font-semibold text-emerald-600">
+                          {maskIfNeeded(diff.newValue, diff.pii)}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
+                  <ShieldCheck className="mr-2 inline h-3 w-3" /> Submissions are encrypted. HR verifies identity-sensitive updates before payroll is
+                  released.
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-muted-foreground">
+                <CheckCircle className="mr-1 inline h-3 w-3 text-emerald-600" /> {diffs.length} field(s) changed • {attachments.length} attachment(s)
+              </div>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => setDraft(structuredClone(currentProfile))}>
+                  Reset
+                </Button>
+                <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={handleSubmit}>
+                  <UserCog className="h-4 w-4" /> Submit change request
+                </Button>
+              </div>
+            </div>
+          </div>
+      </RoleGuard>
+    </AuthGuard>
   )
 }
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { format } from "date-fns"
 
 import { useCurrency } from "@/lib/currency-context"
@@ -13,6 +13,8 @@ import {
   generatePromotionLetter,
 } from "@/lib/promotions"
 
+import { AuthGuard } from "@/components/auth-guard"
+import { RoleGuard } from "@/components/role-guard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,6 +28,13 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { toast, useToast } from "@/hooks/use-toast"
+import {
+  createPromotionCase as createPromotionCaseMutation,
+  getPromotionEmployees,
+  listPromotionCases,
+  persistPromotionCase as syncPromotionCase,
+  type PromotionEmployeeProfile,
+} from "@/lib/api/promotions-service"
 import { cn } from "@/lib/utils"
 
 import {
@@ -45,70 +54,6 @@ import {
   XCircle,
 } from "lucide-react"
 
-type EmployeeProfile = {
-  id: string
-  name: string
-  department: string
-  grade: string
-  step: number
-  tenureMonths: number
-  appraisalScore: number
-  trainingCompleted: boolean
-  hasDisciplinary: boolean
-  supervisor: string
-  headOfDepartment: string
-}
-
-const employeeDirectory: EmployeeProfile[] = [
-  {
-    id: "EMP002",
-    name: "Ama Osei",
-    department: "Human Resources",
-    grade: "G7",
-    step: 3,
-    tenureMonths: 30,
-    appraisalScore: 4.2,
-    trainingCompleted: true,
-    hasDisciplinary: false,
-    supervisor: "John Mensah",
-    headOfDepartment: "Akua Boateng",
-  },
-  {
-    id: "EMP003",
-    name: "Kofi Mensah",
-    department: "Marketing",
-    grade: "G6",
-    step: 5,
-    tenureMonths: 36,
-    appraisalScore: 4.7,
-    trainingCompleted: true,
-    hasDisciplinary: false,
-    supervisor: "Linda Asare",
-    headOfDepartment: "Yaw Darko",
-  },
-  {
-    id: "EMP014",
-    name: "Selorm Adjei",
-    department: "Finance",
-    grade: "G7",
-    step: 2,
-    tenureMonths: 20,
-    appraisalScore: 3.6,
-    trainingCompleted: false,
-    hasDisciplinary: false,
-    supervisor: "Paulina Owusu",
-    headOfDepartment: "Albert Owusu",
-  },
-]
-
-const approverDirectory: Record<string, string> = {
-  "Line Manager": "Ama Koomson",
-  "Head of Department": "Kwesi Nyarko",
-  "HR Director": "Efua Bediako",
-  "Finance Director": "Yaw Sarfo",
-  "Managing Director": "Nana Akoto",
-}
-
 const toDisplayGrade = (gradeCode: string) => {
   if (!gradeCode) return "Unknown"
   const grade = gradeCatalog.find((entry) => entry.gradeCode === gradeCode)
@@ -117,99 +62,21 @@ const toDisplayGrade = (gradeCode: string) => {
   return numeric ? `Grade ${numeric}` : gradeCode
 }
 
-const seedPromotionCases = (): PromotionCase[] => {
-  const ama = employeeDirectory[0]
-  const amaDelta = computeSalaryDelta(ama.grade, ama.step, "G8", 1)
-  const amaEligibility = evaluateEligibility(
-    ama.grade,
-    ama.step,
-    ama.tenureMonths,
-    ama.appraisalScore,
-    ama.trainingCompleted,
-    ama.hasDisciplinary,
-    false,
-  )
-
-  const kofi = employeeDirectory[1]
-  const kofiDelta = computeSalaryDelta(kofi.grade, kofi.step, "G7", 2)
-  const kofiEligibility = evaluateEligibility(
-    kofi.grade,
-    kofi.step,
-    kofi.tenureMonths,
-    kofi.appraisalScore,
-    kofi.trainingCompleted,
-    kofi.hasDisciplinary,
-    false,
-  )
-
-  return [
-    {
-      id: "PC-2025-001",
-      employeeId: ama.id,
-      employeeName: ama.name,
-      department: ama.department,
-      fromGrade: ama.grade,
-      fromStep: ama.step,
-      toGrade: "G8",
-      toStep: 1,
-      effectiveDate: "2025-03-01",
-      reason: "Leadership programme completion and 2024 performance rating above threshold.",
-      status: "in-review",
-      initiatedBy: "John Doe",
-      initiatedAt: "2025-01-20",
-      attachments: ["appraisal-summary-2024.pdf", "leadership-certificate.pdf"],
-      eligibility: amaEligibility,
-      approvals: approvalMatrix.map((entry, index) => ({
-        stage: entry.stage,
-        role: entry.role,
-        approverName: approverDirectory[entry.role] ?? entry.role,
-        status: index === 0 ? "pending" : "pending",
-      })),
-      compensationDelta: {
-        currentBase: amaDelta.currentBase,
-        proposedBase: amaDelta.proposedBase,
-        currency: amaDelta.currency,
-      },
-    },
-    {
-      id: "PC-2025-002",
-      employeeId: kofi.id,
-      employeeName: kofi.name,
-      department: kofi.department,
-      fromGrade: kofi.grade,
-      fromStep: kofi.step,
-      toGrade: "G7",
-      toStep: 2,
-      effectiveDate: "2025-02-15",
-      reason: "Exceeded sales targets for three consecutive quarters and mentoring contributions.",
-      status: "approved",
-      initiatedBy: "Jane Smith",
-      initiatedAt: "2025-01-10",
-      attachments: ["sales-report-q4.pdf", "mentorship-feedback.pdf"],
-      eligibility: kofiEligibility,
-      approvals: approvalMatrix.map((entry) => ({
-        stage: entry.stage,
-        role: entry.role,
-        approverName: approverDirectory[entry.role] ?? entry.role,
-        status: "approved",
-        decidedAt: "2025-01-25",
-        comment: "Approved as part of annual review cycle.",
-      })),
-      compensationDelta: {
-        currentBase: kofiDelta.currentBase,
-        proposedBase: kofiDelta.proposedBase,
-        currency: kofiDelta.currency,
-      },
-      letterUrl: undefined,
-    },
-  ]
+const APPROVER_DIRECTORY: Record<string, string> = {
+  "Line Manager": "Ama Koomson",
+  "Head of Department": "Kwesi Nyarko",
+  "HR Director": "Efua Bediako",
+  "Finance Director": "Yaw Sarfo",
+  "Managing Director": "Nana Akoto",
 }
 
 export default function PromotionsPage() {
   const { formatAmount } = useCurrency()
   const { toast: pushToast } = useToast()
 
-  const [cases, setCases] = useState<PromotionCase[]>(() => seedPromotionCases())
+  const promotionEmployees = useMemo(() => getPromotionEmployees(), [])
+  const [cases, setCases] = useState<PromotionCase[]>([])
+  const [isLoadingCases, setIsLoadingCases] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [departmentFilter, setDepartmentFilter] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState("")
@@ -217,7 +84,23 @@ export default function PromotionsPage() {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [detailCaseId, setDetailCaseId] = useState<string | null>(null)
 
-  const departments = useMemo(() => Array.from(new Set(employeeDirectory.map((emp) => emp.department))), [])
+  const departments = useMemo(() => {
+    const set = new Set<string>(cases.map((promo) => promo.department))
+    if (set.size === 0) {
+      promotionEmployees.forEach((employee) => set.add(employee.department))
+    }
+    return Array.from(set)
+  }, [cases, promotionEmployees])
+
+  useEffect(() => {
+    const bootstrap = async () => {
+      const payload = await listPromotionCases()
+      setCases(payload)
+      setIsLoadingCases(false)
+    }
+
+    bootstrap()
+  }, [])
 
   const filteredCases = useMemo(() => {
     return cases.filter((promotionCase) => {
@@ -246,21 +129,25 @@ export default function PromotionsPage() {
   const openWizard = () => setWizardOpen(true)
   const closeWizard = () => setWizardOpen(false)
 
-  const handleCreateCase = (promotionCase: PromotionCase) => {
-    setCases((previous) => [promotionCase, ...previous])
+  const handleCreateCase = async (promotionCase: PromotionCase) => {
+    const persisted = await createPromotionCaseMutation(promotionCase)
+    setCases((previous) => [persisted, ...previous.filter((item) => item.id !== persisted.id)])
     setStatusFilter("all")
     setDepartmentFilter("all")
     setSearchTerm("")
-    setDetailCaseId(promotionCase.id)
+    setDetailCaseId(persisted.id)
     pushToast({
       title: "Promotion case submitted",
-      description: promotionCase.status === "draft"
-        ? "Eligibility gaps detected – saved as draft for HR to review."
-        : "Routing approvals and notifying stakeholders.",
+      description:
+        persisted.status === "draft"
+          ? "Eligibility gaps detected – saved as draft for HR to review."
+          : "Routing approvals and notifying stakeholders.",
     })
   }
 
-  const handleStageDecision = (caseId: string, role: string, decision: "approve" | "reject", comment?: string) => {
+  const handleStageDecision = async (caseId: string, role: string, decision: "approve" | "reject", comment?: string) => {
+    let updatedRecord: PromotionCase | null = null
+
     setCases((previous) =>
       previous.map((promotionCase) => {
         if (promotionCase.id !== caseId || promotionCase.status === "approved" || promotionCase.status === "rejected") {
@@ -302,7 +189,9 @@ export default function PromotionsPage() {
           }
         }
 
-        return { ...promotionCase, approvals, status, letterUrl }
+        const record = { ...promotionCase, approvals, status, letterUrl }
+        updatedRecord = record
+        return record
       }),
     )
 
@@ -314,167 +203,185 @@ export default function PromotionsPage() {
           : `${role} rejected the case${comment ? ` – ${comment}` : ""}.`,
       variant: decision === "approve" ? "default" : "destructive",
     })
+
+    if (updatedRecord) {
+      await syncPromotionCase(updatedRecord)
+    }
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Promotion Workflow</h1>
-          <p className="text-muted-foreground">Manage grade progressions, salary scales, and delegated approvals across the group.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
-            Export pipeline
-          </Button>
-          <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-emerald-600 hover:bg-emerald-700 gap-2" onClick={openWizard}>
-                <ArrowUpRight className="h-4 w-4" />
-                New promotion
+    <AuthGuard>
+      <RoleGuard requiredRoles={["hr-admin", "hr-manager", "finance-director"]}>
+        <div className="space-y-6">
+          <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight">Promotion Workflow</h1>
+              <p className="text-muted-foreground">Manage grade progressions, salary scales, and delegated approvals across the group.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="gap-2">
+                <Download className="h-4 w-4" />
+                Export pipeline
               </Button>
-            </DialogTrigger>
+              <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 gap-2" onClick={openWizard}>
+                    <ArrowUpRight className="h-4 w-4" />
+                    New promotion
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Create promotion case</DialogTitle>
+                  </DialogHeader>
+                  <PromotionWizard
+                    employees={promotionEmployees}
+                    onSubmit={handleCreateCase}
+                    onClose={closeWizard}
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
+          </header>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
+              <TabsTrigger value="grades">Salary scales</TabsTrigger>
+              <TabsTrigger value="workflow">Approval map</TabsTrigger>
+              <TabsTrigger value="analytics">Insights</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="pipeline" className="space-y-6">
+              {isLoadingCases ? (
+                <Card>
+                  <CardContent className="p-8 text-center text-sm text-muted-foreground">
+                    Loading promotion pipeline…
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <PipelineStats stats={pipelineStats} formatAmount={formatAmount} />
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base font-semibold">Filters</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
+                      <div className="relative md:w-1/3">
+                        <Input
+                          value={searchTerm}
+                          onChange={(event) => setSearchTerm(event.target.value)}
+                          placeholder="Search by name, ID, department or grade"
+                          className="pl-8"
+                        />
+                        <Eye className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      </div>
+                      <div className="flex flex-1 flex-col gap-3 md:flex-row md:items-center md:justify-end">
+                        <div className="flex flex-col">
+                          <Label className="text-xs uppercase text-muted-foreground">Status</Label>
+                          <div className="flex gap-2">
+                            {[
+                              { value: "all", label: "All" },
+                              { value: "in-review", label: "In review" },
+                              { value: "draft", label: "Draft" },
+                              { value: "approved", label: "Approved" },
+                              { value: "rejected", label: "Rejected" },
+                            ].map((item) => (
+                              <Button
+                                key={item.value}
+                                size="sm"
+                                variant={statusFilter === item.value ? "default" : "outline"}
+                                onClick={() => setStatusFilter(item.value)}
+                              >
+                                {item.label}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex flex-col">
+                          <Label className="text-xs uppercase text-muted-foreground">Department</Label>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant={departmentFilter === "all" ? "default" : "outline"}
+                              onClick={() => setDepartmentFilter("all")}
+                            >
+                              All
+                            </Button>
+                            {departments.map((dept) => (
+                              <Button
+                                key={dept}
+                                size="sm"
+                                variant={departmentFilter === dept ? "default" : "outline"}
+                                onClick={() => setDepartmentFilter(dept)}
+                              >
+                                {dept}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base font-semibold">Promotion cases</CardTitle>
+                        <span className="text-sm text-muted-foreground">{filteredCases.length} case(s)</span>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {filteredCases.length === 0 && (
+                        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                          No promotion cases meet the current filters. Adjust your filters or create a new request.
+                        </div>
+                      )}
+                      {filteredCases.map((promotionCase) => (
+                        <PromotionCaseCard
+                          key={promotionCase.id}
+                          promotionCase={promotionCase}
+                          formatAmount={formatAmount}
+                          onView={() => setDetailCaseId(promotionCase.id)}
+                        />
+                      ))}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="grades">
+              <SalaryGradesPanel />
+            </TabsContent>
+
+            <TabsContent value="workflow">
+              <WorkflowPanel />
+            </TabsContent>
+
+            <TabsContent value="analytics">
+              <PromotionInsights cases={cases} formatAmount={formatAmount} />
+            </TabsContent>
+          </Tabs>
+
+          <Dialog open={Boolean(detailCase)} onOpenChange={(open) => !open && setDetailCaseId(null)}>
             <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Create promotion case</DialogTitle>
+                <DialogTitle>Promotion case</DialogTitle>
               </DialogHeader>
-              <PromotionWizard
-                employees={employeeDirectory}
-                onSubmit={handleCreateCase}
-                onClose={closeWizard}
-              />
+              {detailCase && (
+                <PromotionCaseDetail
+                  promotionCase={detailCase}
+                  onDecision={handleStageDecision}
+                  formatAmount={formatAmount}
+                />
+              )}
             </DialogContent>
           </Dialog>
         </div>
-      </header>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
-          <TabsTrigger value="grades">Salary scales</TabsTrigger>
-          <TabsTrigger value="workflow">Approval map</TabsTrigger>
-          <TabsTrigger value="analytics">Insights</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="pipeline" className="space-y-6">
-          <PipelineStats stats={pipelineStats} formatAmount={formatAmount} />
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-semibold">Filters</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
-              <div className="relative md:w-1/3">
-                <Input
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search by name, ID, department or grade"
-                  className="pl-8"
-                />
-                <Eye className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              </div>
-              <div className="flex flex-1 flex-col gap-3 md:flex-row md:items-center md:justify-end">
-                <div className="flex flex-col">
-                  <Label className="text-xs uppercase text-muted-foreground">Status</Label>
-                  <div className="flex gap-2">
-                    {[
-                      { value: "all", label: "All" },
-                      { value: "in-review", label: "In review" },
-                      { value: "draft", label: "Draft" },
-                      { value: "approved", label: "Approved" },
-                      { value: "rejected", label: "Rejected" },
-                    ].map((item) => (
-                      <Button
-                        key={item.value}
-                        size="sm"
-                        variant={statusFilter === item.value ? "default" : "outline"}
-                        onClick={() => setStatusFilter(item.value)}
-                      >
-                        {item.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex flex-col">
-                  <Label className="text-xs uppercase text-muted-foreground">Department</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant={departmentFilter === "all" ? "default" : "outline"}
-                      onClick={() => setDepartmentFilter("all")}
-                    >
-                      All
-                    </Button>
-                    {departments.map((dept) => (
-                      <Button
-                        key={dept}
-                        size="sm"
-                        variant={departmentFilter === dept ? "default" : "outline"}
-                        onClick={() => setDepartmentFilter(dept)}
-                      >
-                        {dept}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-semibold">Promotion cases</CardTitle>
-                <span className="text-sm text-muted-foreground">{filteredCases.length} case(s)</span>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {filteredCases.length === 0 && (
-                <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                  No promotion cases meet the current filters. Adjust your filters or create a new request.
-                </div>
-              )}
-              {filteredCases.map((promotionCase) => (
-                <PromotionCaseCard
-                  key={promotionCase.id}
-                  promotionCase={promotionCase}
-                  formatAmount={formatAmount}
-                  onView={() => setDetailCaseId(promotionCase.id)}
-                />
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="grades">
-          <SalaryGradesPanel />
-        </TabsContent>
-
-        <TabsContent value="workflow">
-          <WorkflowPanel />
-        </TabsContent>
-
-        <TabsContent value="analytics">
-          <PromotionInsights cases={cases} formatAmount={formatAmount} />
-        </TabsContent>
-      </Tabs>
-
-      <Dialog open={Boolean(detailCase)} onOpenChange={(open) => !open && setDetailCaseId(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Promotion case</DialogTitle>
-          </DialogHeader>
-          {detailCase && (
-            <PromotionCaseDetail
-              promotionCase={detailCase}
-              onDecision={handleStageDecision}
-              formatAmount={formatAmount}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+      </RoleGuard>
+    </AuthGuard>
   )
 }
 
@@ -928,7 +835,7 @@ function PromotionWizard({
   onSubmit,
   onClose,
 }: {
-  employees: EmployeeProfile[]
+  employees: PromotionEmployeeProfile[]
   onSubmit: (promotionCase: PromotionCase) => void
   onClose: () => void
 }) {
@@ -1022,12 +929,12 @@ function PromotionWizard({
       initiatedAt: new Date().toISOString(),
       attachments: state.attachments,
       eligibility: eligibilityResults,
-      approvals: approvalMatrix.map((stage) => ({
-        stage: stage.stage,
-        role: stage.role,
-        approverName: approverDirectory[stage.role] ?? stage.role,
-        status: "pending",
-      })),
+        approvals: approvalMatrix.map((stage) => ({
+          stage: stage.stage,
+          role: stage.role,
+          approverName: APPROVER_DIRECTORY[stage.role] ?? stage.role,
+          status: "pending",
+        })),
       compensationDelta: {
         currentBase: compensationDelta.currentBase,
         proposedBase: compensationDelta.proposedBase,

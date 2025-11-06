@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react"
 import { format } from "date-fns"
 
+import { AuthGuard } from "@/components/auth-guard"
+import { RoleGuard } from "@/components/role-guard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,12 +14,8 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
-import {
-  ChangeFieldDiff,
-  ChangeRequest,
-  getChangeRequests,
-  updateChangeRequestStatus,
-} from "@/lib/change-requests-store"
+import { listChangeRequests, updateChangeRequestStatus as updateChangeRequestStatusApi } from "@/lib/api/change-requests-service"
+import { ChangeFieldDiff, ChangeRequest } from "@/lib/change-requests-store"
 import { cn } from "@/lib/utils"
 
 import {
@@ -41,10 +39,21 @@ const statusLabels: Record<ChangeRequest["status"], { label: string; className: 
 }
 
 export default function ChangeRequestsReviewPage() {
-  const [requests, setRequests] = useState<ChangeRequest[]>(() => getChangeRequests())
+  const [requests, setRequests] = useState<ChangeRequest[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<ChangeRequest["status"] | "all">("all")
   const [searchTerm, setSearchTerm] = useState("")
   const [dialogId, setDialogId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const bootstrap = async () => {
+      const payload = await listChangeRequests()
+      setRequests(payload)
+      setIsLoading(false)
+    }
+
+    bootstrap()
+  }, [])
 
   const filtered = useMemo(() => {
     return requests.filter((request) => {
@@ -68,12 +77,15 @@ export default function ChangeRequestsReviewPage() {
 
   const selectedRequest = dialogId ? requests.find((request) => request.id === dialogId) ?? null : null
 
-  const refresh = () => setRequests([...getChangeRequests()])
+  const refresh = async () => {
+    const payload = await listChangeRequests()
+    setRequests(payload)
+  }
 
-  const handleDecision = (requestId: string, status: ChangeRequest["status"], notes?: string) => {
+  const handleDecision = async (requestId: string, status: ChangeRequest["status"], notes?: string) => {
     const reviewer = { name: "HR Verification", notes }
-    updateChangeRequestStatus(requestId, status, reviewer)
-    refresh()
+    await updateChangeRequestStatusApi(requestId, status, reviewer)
+    await refresh()
     toast({
       title: status === "approved" ? "Change request approved" : status === "declined" ? "Request declined" : "Marked for verification",
       description: status === "approved" ? "Records will update overnight after payroll sync." : undefined,
@@ -82,84 +94,93 @@ export default function ChangeRequestsReviewPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Employee change requests</h1>
-          <p className="text-sm text-muted-foreground">Verify self-service updates before they reach payroll and statutory filings.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2">
-            <Download className="h-4 w-4" /> Export audit file
-          </Button>
-          <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700">
-            <ArrowUpRight className="h-4 w-4" /> Route to shared inbox
-          </Button>
-        </div>
-      </header>
+    <AuthGuard>
+      <RoleGuard requiredRoles={["hr-admin", "compliance", "payroll-manager"]}>
+        <div className="space-y-6">
+          <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight">Employee change requests</h1>
+              <p className="text-sm text-muted-foreground">Verify self-service updates before they reach payroll and statutory filings.</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="gap-2">
+                <Download className="h-4 w-4" /> Export audit file
+              </Button>
+              <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                <ArrowUpRight className="h-4 w-4" /> Route to shared inbox
+              </Button>
+            </div>
+          </header>
 
-      <Tabs value={statusFilter === "all" ? "all" : statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="all">All ({requests.length})</TabsTrigger>
-          <TabsTrigger value="pending">Pending ({stats.pending})</TabsTrigger>
-          <TabsTrigger value="verifying">Verifying ({stats.verifying})</TabsTrigger>
-          <TabsTrigger value="approved">Approved ({stats.approved})</TabsTrigger>
-          <TabsTrigger value="declined">Declined ({stats.declined})</TabsTrigger>
-        </TabsList>
-        <TabsContent value={statusFilter === "all" ? "all" : statusFilter} className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                <Filter className="h-4 w-4" /> Quick filters
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="relative md:w-80">
-                <Input
-                  placeholder="Search by employee name, ID, or reason"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  className="pl-8"
-                />
-                <UserSearch className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              </div>
-              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                <Badge variant="outline" className="gap-1">
-                  <ShieldAlert className="h-3 w-3" /> Bank updates require dual approval
-                </Badge>
-                <Badge variant="outline" className="gap-1">
-                  <MailCheck className="h-3 w-3" /> Auto notify employee on decision
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-4">
-            {filtered.length === 0 && (
+          <Tabs value={statusFilter === "all" ? "all" : statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="all">All ({requests.length})</TabsTrigger>
+              <TabsTrigger value="pending">Pending ({stats.pending})</TabsTrigger>
+              <TabsTrigger value="verifying">Verifying ({stats.verifying})</TabsTrigger>
+              <TabsTrigger value="approved">Approved ({stats.approved})</TabsTrigger>
+              <TabsTrigger value="declined">Declined ({stats.declined})</TabsTrigger>
+            </TabsList>
+            <TabsContent value={statusFilter === "all" ? "all" : statusFilter} className="space-y-6">
               <Card>
-                <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                  No change requests match the current filters.
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                    <Filter className="h-4 w-4" /> Quick filters
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="relative md:w-80">
+                    <Input
+                      placeholder="Search by employee name, ID, or reason"
+                      value={searchTerm}
+                      onChange={(event) => setSearchTerm(event.target.value)}
+                      className="pl-8"
+                    />
+                    <UserSearch className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    <Badge variant="outline" className="gap-1">
+                      <ShieldAlert className="h-3 w-3" /> Bank updates require dual approval
+                    </Badge>
+                    <Badge variant="outline" className="gap-1">
+                      <MailCheck className="h-3 w-3" /> Auto notify employee on decision
+                    </Badge>
+                  </div>
                 </CardContent>
               </Card>
-            )}
-            {filtered.map((request) => (
-              <ChangeRequestCard key={request.id} request={request} onOpen={() => setDialogId(request.id)} />
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
 
-      <Dialog open={Boolean(selectedRequest)} onOpenChange={(open) => !open && setDialogId(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          {selectedRequest && (
-            <ChangeRequestDetail
-              request={selectedRequest}
-              onDecision={handleDecision}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+              <div className="grid gap-4">
+                {isLoading ? (
+                  <Card>
+                    <CardContent className="py-12 text-center text-sm text-muted-foreground">Loading change requests…</CardContent>
+                  </Card>
+                ) : filtered.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                      No change requests match the current filters.
+                    </CardContent>
+                  </Card>
+                ) : (
+                  filtered.map((request) => (
+                    <ChangeRequestCard key={request.id} request={request} onOpen={() => setDialogId(request.id)} />
+                  ))
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <Dialog open={Boolean(selectedRequest)} onOpenChange={(open) => !open && setDialogId(null)}>
+            <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+              {selectedRequest && (
+                <ChangeRequestDetail
+                  request={selectedRequest}
+                  onDecision={handleDecision}
+                />
+              )}
+            </DialogContent>
+          </Dialog>
+        </div>
+      </RoleGuard>
+    </AuthGuard>
   )
 }
 

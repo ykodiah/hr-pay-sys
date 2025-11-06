@@ -1,8 +1,10 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { format, formatDistanceToNow } from "date-fns"
 
+import { AuthGuard } from "@/components/auth-guard"
+import { RoleGuard } from "@/components/role-guard"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,6 +17,15 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import {
+  acknowledgeMessage,
+  createChannel as createChannelService,
+  listChannels,
+  listMessages,
+  sendMessage as sendMessageService,
+  type CommunicationChannel,
+  type CommunicationMessage,
+} from "@/lib/api/communication-service"
 
 import {
   AlertCircle,
@@ -25,6 +36,7 @@ import {
   CheckSquare,
   FileText,
   FlagTriangleRight,
+  Loader2,
   Laptop,
   Lock,
   MessageCircle,
@@ -38,20 +50,7 @@ import {
   Zap,
 } from "lucide-react"
 
-type ChannelType = "public" | "private" | "direct"
 type Priority = "normal" | "high" | "critical"
-
-type Channel = {
-  id: string
-  name: string
-  type: ChannelType
-  description: string
-  unread: number
-  members: number
-  retentionPolicy: "standard" | "finance" | "legal"
-  externalGuests?: boolean
-  encryption: "in-transit" | "end-to-end"
-}
 
 type Attachment = {
   id: string
@@ -59,125 +58,13 @@ type Attachment = {
   type: string
 }
 
-type Message = {
-  id: string
-  channelId: string
-  author: string
-  authorRole: string
-  content: string
-  sentAt: string
-  priority: Priority
-  requiresAck: boolean
-  acknowledgedBy: string[]
-  attachments?: Attachment[]
-  tags?: string[]
-  incidentTicket?: string
-}
-
-const channelsSeed: Channel[] = [
-  {
-    id: "channel-ops",
-    name: "payroll-ops",
-    type: "public",
-    description: "Daily payroll operations, pay cycle approvals, exceptions",
-    unread: 4,
-    members: 18,
-    retentionPolicy: "finance",
-    encryption: "end-to-end",
-  },
-  {
-    id: "channel-compliance",
-    name: "compliance-alerts",
-    type: "private",
-    description: "Regulatory, tax and statutory incident communication",
-    unread: 0,
-    members: 9,
-    retentionPolicy: "legal",
-    encryption: "end-to-end",
-    externalGuests: true,
-  },
-  {
-    id: "channel-people",
-    name: "people-experience",
-    type: "public",
-    description: "HR operations, onboarding and employee escalations",
-    unread: 1,
-    members: 23,
-    retentionPolicy: "standard",
-    encryption: "in-transit",
-  },
-  {
-    id: "channel-direct",
-    name: "@cfo",
-    type: "direct",
-    description: "Financial Controller",
-    unread: 0,
-    members: 2,
-    retentionPolicy: "finance",
-    encryption: "end-to-end",
-  },
-]
-
-const messagesSeed: Message[] = [
-  {
-    id: "msg-1",
-    channelId: "channel-ops",
-    author: "Abena Owusu",
-    authorRole: "Head of Payroll",
-    content:
-      "Reminder: submit final approvals for the March multi-company payroll bundle before 15:00. Please flag any variance above 5%.",
-    sentAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    priority: "high",
-    requiresAck: true,
-    acknowledgedBy: ["Kofi Mensah", "Selorm Adjei"],
-    attachments: [{ id: "att-1", name: "march-payroll-exceptions.xlsx", type: "Excel" }],
-    tags: ["payroll", "deadline"],
-  },
-  {
-    id: "msg-2",
-    channelId: "channel-ops",
-    author: "Kojo Tetteh",
-    authorRole: "Payroll Analyst",
-    content:
-      "Variance alert triggered for Accra subsidiary. Overtime spend up 9%. Proposed to run anomaly triage at 16:00.",
-    sentAt: new Date(Date.now() - 1000 * 60 * 20).toISOString(),
-    priority: "normal",
-    requiresAck: false,
-    acknowledgedBy: ["Abena Owusu"],
-    tags: ["analytics"],
-  },
-  {
-    id: "msg-3",
-    channelId: "channel-compliance",
-    author: "Regina Appiah",
-    authorRole: "Compliance Lead",
-    content:
-      "GRA compliance window closes Friday. Upload final PAYE withholding schedules tonight. Finance partners looped in.",
-    sentAt: new Date(Date.now() - 1000 * 60 * 70).toISOString(),
-    priority: "critical",
-    requiresAck: true,
-    acknowledgedBy: ["Ama Osei"],
-    attachments: [{ id: "att-2", name: "withholding-template.csv", type: "CSV" }],
-    incidentTicket: "INC-9042",
-  },
-  {
-    id: "msg-4",
-    channelId: "channel-direct",
-    author: "Kwabena Agyeman",
-    authorRole: "CFO",
-    content: "Please draft talking points for tomorrow's board update on payroll harmonisation.",
-    sentAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    priority: "normal",
-    requiresAck: false,
-    acknowledgedBy: [],
-  },
-]
-
 export default function CommunicationHubPage() {
-  const [channels, setChannels] = useState<Channel[]>(channelsSeed)
-  const [messages, setMessages] = useState<Message[]>(messagesSeed)
-  const [activeChannelId, setActiveChannelId] = useState<string>(channelsSeed[0]?.id ?? "")
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(messagesSeed[0]?.id ?? null)
+  const [channels, setChannels] = useState<CommunicationChannel[]>([])
+  const [messages, setMessages] = useState<CommunicationMessage[]>([])
+  const [channelsLoading, setChannelsLoading] = useState(true)
+  const [messagesLoading, setMessagesLoading] = useState(false)
+  const [activeChannelId, setActiveChannelId] = useState<string>("")
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [composer, setComposer] = useState({
     content: "",
     priority: "normal" as Priority,
@@ -192,6 +79,38 @@ export default function CommunicationHubPage() {
   })
 
   const pushToast = toast
+
+  useEffect(() => {
+    const bootstrap = async () => {
+      const data = await listChannels()
+      setChannels(data)
+      if (data.length > 0) {
+        setActiveChannelId(data[0].id)
+      }
+      setChannelsLoading(false)
+    }
+
+    bootstrap()
+  }, [])
+
+  useEffect(() => {
+    if (!activeChannelId) {
+      setMessages([])
+      setSelectedMessageId(null)
+      return
+    }
+
+    const load = async () => {
+      setMessagesLoading(true)
+      const data = await listMessages(activeChannelId)
+      const sorted = [...data].sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
+      setMessages(sorted)
+      setSelectedMessageId((prev) => prev ?? sorted.at(-1)?.id ?? null)
+      setMessagesLoading(false)
+    }
+
+    load()
+  }, [activeChannelId])
 
   const activeChannel = channels.find((channel) => channel.id === activeChannelId) ?? null
 
@@ -221,7 +140,7 @@ export default function CommunicationHubPage() {
     return Math.round((acknowledged.length / requiringAck.length) * 100)
   }, [messages])
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!activeChannel || !composer.content.trim()) {
       pushToast({
         variant: "destructive",
@@ -231,7 +150,7 @@ export default function CommunicationHubPage() {
       return
     }
 
-    const message: Message = {
+    const messagePayload: CommunicationMessage = {
       id: `msg-${Date.now()}`,
       channelId: activeChannel.id,
       author: "You",
@@ -245,9 +164,11 @@ export default function CommunicationHubPage() {
       sentAt: new Date().toISOString(),
     }
 
-    setMessages((previous) => [...previous, message])
+    const persisted = await sendMessageService(messagePayload)
+    const updated = [...messages, persisted].sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime())
+    setMessages(updated)
     setComposer({ content: "", priority: "normal", requestAck: false, attachments: [], tag: "" })
-    setSelectedMessageId(message.id)
+    setSelectedMessageId(persisted.id)
 
     pushToast({
       title: "Message sent",
@@ -255,7 +176,8 @@ export default function CommunicationHubPage() {
     })
   }
 
-  const handleAcknowledge = (messageId: string) => {
+  const handleAcknowledge = async (messageId: string) => {
+    await acknowledgeMessage(messageId, "You")
     setMessages((previous) =>
       previous.map((message) =>
         message.id === messageId
@@ -278,9 +200,9 @@ export default function CommunicationHubPage() {
     }))
   }
 
-  const handleCreateChannel = () => {
+  const handleCreateChannel = async () => {
     const id = `channel-${Date.now()}`
-    const channel: Channel = {
+    const channel: CommunicationChannel = {
       id,
       name: `new-channel-${channels.length + 1}`,
       type: "private",
@@ -290,14 +212,17 @@ export default function CommunicationHubPage() {
       retentionPolicy: "standard",
       encryption: "end-to-end",
     }
-    setChannels((previous) => [channel, ...previous])
-    setActiveChannelId(id)
-    pushToast({ title: "Channel created", description: `#${channel.name} is ready.` })
+    const persisted = await createChannelService(channel)
+    setChannels((previous) => [persisted, ...previous.filter((item) => item.id !== persisted.id)])
+    setActiveChannelId(persisted.id)
+    pushToast({ title: "Channel created", description: `#${persisted.name} is ready.` })
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <AuthGuard>
+      <RoleGuard requiredRoles={["hr-admin", "payroll-ops", "communications"]}>
+        <div className="space-y-6">
+          <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Communication Control Centre</h1>
           <p className="text-sm text-muted-foreground">
@@ -315,7 +240,7 @@ export default function CommunicationHubPage() {
             <Zap className="h-4 w-4" /> Launch automation
           </Button>
         </div>
-      </header>
+          </header>
 
       <section className="grid gap-4 md:grid-cols-3">
         <MetricCard
@@ -338,12 +263,13 @@ export default function CommunicationHubPage() {
         />
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-[260px_1fr_320px]">
+          <div className="grid gap-4 lg:grid-cols-[260px_1fr_320px]">
         <aside className="flex h-[720px] flex-col rounded-xl border bg-card">
           <ChannelSidebar
             channels={channels}
             activeId={activeChannelId}
             onSelect={setActiveChannelId}
+            isLoading={channelsLoading}
           />
         </aside>
 
@@ -387,8 +313,10 @@ export default function CommunicationHubPage() {
           <CompliancePanel channel={activeChannel} />
           <MessageInspector message={selectedMessage} onAcknowledge={handleAcknowledge} />
         </aside>
-      </div>
-    </div>
+          </div>
+        </div>
+      </RoleGuard>
+    </AuthGuard>
   )
 }
 
@@ -407,7 +335,17 @@ function MetricCard({ title, value, description, icon }: { title: string; value:
   )
 }
 
-function ChannelSidebar({ channels, activeId, onSelect }: { channels: Channel[]; activeId: string; onSelect: (id: string) => void }) {
+function ChannelSidebar({
+  channels,
+  activeId,
+  onSelect,
+  isLoading,
+}: {
+  channels: CommunicationChannel[]
+  activeId: string
+  onSelect: (id: string) => void
+  isLoading: boolean
+}) {
   return (
     <>
       <div className="px-4 pb-3 pt-4">
@@ -417,6 +355,12 @@ function ChannelSidebar({ channels, activeId, onSelect }: { channels: Channel[];
       <Separator />
       <ScrollArea className="flex-1">
         <div className="space-y-1 px-2 py-3">
+          {isLoading && (
+            <div className="px-2 py-2 text-sm text-muted-foreground">Loading channels…</div>
+          )}
+          {!isLoading && channels.length === 0 && (
+            <div className="px-2 py-2 text-sm text-muted-foreground">No channels available yet.</div>
+          )}
           {channels.map((channel) => {
             const isActive = channel.id === activeId
             return (
@@ -468,7 +412,7 @@ function ConversationHeader({
   filters,
   onFiltersChange,
 }: {
-  channel: Channel | null
+  channel: CommunicationChannel | null
   filters: { priority: "all" | Priority; requiresAck: boolean; search: string }
   onFiltersChange: (filters: { priority: "all" | Priority; requiresAck: boolean; search: string }) => void
 }) {
@@ -538,7 +482,7 @@ function MessageBubble({
   onSelect,
   onAcknowledge,
 }: {
-  message: Message
+  message: CommunicationMessage
   selected: boolean
   onSelect: (id: string) => void
   onAcknowledge: (id: string) => void
@@ -699,7 +643,7 @@ function Composer({
   )
 }
 
-function CompliancePanel({ channel }: { channel: Channel | null }) {
+function CompliancePanel({ channel }: { channel: CommunicationChannel | null }) {
   return (
     <Card className="flex-1 border-emerald-50">
       <CardHeader>
@@ -756,7 +700,7 @@ function MessageInspector({
   message,
   onAcknowledge,
 }: {
-  message: Message | null
+  message: CommunicationMessage | null
   onAcknowledge: (id: string) => void
 }) {
   if (!message) {
