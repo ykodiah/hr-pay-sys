@@ -16,6 +16,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
+    "smoke": "bash scripts/smoke-tests.sh",
     "start": "next start"
   },
   "dependencies": {
