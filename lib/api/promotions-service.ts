@@ -60,6 +60,12 @@ const EMPLOYEES: PromotionEmployeeProfile[] = [
 
 let promotionStore: PromotionCase[] = buildSeedPromotionCases()
 
+const PROMOTIONS_API_BASE = (process.env.NEXT_PUBLIC_PROMOTIONS_API_URL ?? "/promotions").replace(/\/$/, "")
+
+function promotionsEndpoint(path = "") {
+  return `${PROMOTIONS_API_BASE}${path}`
+}
+
 export function getPromotionEmployees() {
   return EMPLOYEES
 }
@@ -167,7 +173,7 @@ function getApproverName(role: string) {
 
 export async function listPromotionCases(): Promise<PromotionCase[]> {
   try {
-    const payload = await httpRequest<{ data: PromotionCase[] }>("/promotions", { method: "GET" })
+    const payload = await httpRequest<{ data: PromotionCase[] }>(promotionsEndpoint(), { method: "GET" })
     if (Array.isArray(payload?.data)) {
       promotionStore = payload.data
     }
@@ -182,7 +188,7 @@ export async function listPromotionCases(): Promise<PromotionCase[]> {
 
 export async function createPromotionCase(casePayload: PromotionCase): Promise<PromotionCase> {
   try {
-    const payload = await httpRequest<{ data: PromotionCase }>("/promotions", {
+    const payload = await httpRequest<{ data: PromotionCase }>(promotionsEndpoint(), {
       method: "POST",
       body: JSON.stringify(casePayload),
     })
@@ -202,7 +208,7 @@ export async function createPromotionCase(casePayload: PromotionCase): Promise<P
 
 export async function persistPromotionCase(caseRecord: PromotionCase): Promise<void> {
   try {
-    await httpRequest(`/promotions/${caseRecord.id}`, {
+    await httpRequest(promotionsEndpoint(`/${caseRecord.id}`), {
       method: "PUT",
       body: JSON.stringify(caseRecord),
     })
