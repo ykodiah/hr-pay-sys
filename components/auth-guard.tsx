@@ -19,9 +19,17 @@ export function AuthGuard({ children, requireAuth = true, redirectTo = "/auth/lo
   const router = useRouter()
 
   useEffect(() => {
+    const supabase = createClient()
+    const isMock = Boolean((supabase as any).__isMock)
+
+    if (isMock) {
+      setIsAuthenticated(true)
+      setIsLoading(false)
+      return
+    }
+
     const checkAuth = async () => {
       try {
-        const supabase = createClient()
         const {
           data: { user },
         } = await supabase.auth.getUser()
@@ -47,10 +55,8 @@ export function AuthGuard({ children, requireAuth = true, redirectTo = "/auth/lo
       }
     }
 
-    checkAuth()
+    void checkAuth()
 
-    // Listen for auth changes
-    const supabase = createClient()
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -64,7 +70,7 @@ export function AuthGuard({ children, requireAuth = true, redirectTo = "/auth/lo
     })
 
     return () => subscription.unsubscribe()
-  }, [requireAuth, redirectTo, router])
+  }, [redirectTo, requireAuth, router])
 
   if (isLoading) {
     return (

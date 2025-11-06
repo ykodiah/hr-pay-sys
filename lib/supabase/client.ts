@@ -3,8 +3,8 @@ import { createBrowserClient } from "@supabase/ssr"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-const createMockClient = () =>
-  ({
+const createMockClient = () => {
+  const mock: any = {
     from: (table: string) => ({
       select: (columns?: string) => ({
         single: () => Promise.resolve({ data: null, error: null }),
@@ -30,6 +30,14 @@ const createMockClient = () =>
       signInWithPassword: () => Promise.resolve({ data: null, error: null }),
       signUp: () => Promise.resolve({ data: null, error: null }),
       signOut: () => Promise.resolve({ error: null }),
+      onAuthStateChange: () => ({
+        data: {
+          subscription: {
+            unsubscribe: () => undefined,
+          },
+        },
+        error: null,
+      }),
     },
     storage: {
       from: (bucket: string) => ({
@@ -38,7 +46,11 @@ const createMockClient = () =>
         remove: () => Promise.resolve({ data: null, error: null }),
       }),
     },
-  }) as any
+  }
+
+  mock.__isMock = true
+  return mock
+}
 
 export function createClient() {
   console.log("[v0] Client - Environment check:", {
@@ -62,7 +74,8 @@ export function createClient() {
 
   try {
     console.log("[v0] Creating real Supabase client...")
-    const client = createBrowserClient(supabaseUrl, supabaseAnonKey)
+    const client: any = createBrowserClient(supabaseUrl, supabaseAnonKey)
+    client.__isMock = false
     console.log("[v0] Real Supabase client created successfully")
     return client
   } catch (error) {
