@@ -233,166 +233,166 @@ export default function EmployeePortalPage() {
     setAcknowledgedSignals((previous) => [...previous, title])
   }
 
-      return (
-        <div className="space-y-6">
-        <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-2">
-            <Badge variant="outline" className="w-fit border-emerald-200 text-emerald-700">
-              Employee Portal
-            </Badge>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Good afternoon, Ama 👋🏾</h1>
-            <p className="text-sm text-muted-foreground max-w-2xl">
-              Here’s a snapshot of your workday, benefits and growth signals. The assistant keeps learning from
-              your patterns to surface what matters most.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button variant="outline" className="gap-2" onClick={() => openAction("leave")}>
-              <CalendarCheck2 className="h-4 w-4" /> Quick leave request
-            </Button>
-            <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={() => openAction("payslip")}>
-              <FileDown className="h-4 w-4" /> Download payslip
-            </Button>
-          </div>
-        </section>
+  return (
+    <div className="space-y-6">
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="space-y-2">
+          <Badge variant="outline" className="w-fit border-emerald-200 text-emerald-700">
+            Employee Portal
+          </Badge>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Good afternoon, Ama 👋🏾</h1>
+          <p className="text-sm text-muted-foreground max-w-2xl">
+            Here’s a snapshot of your workday, benefits and growth signals. The assistant keeps learning from
+            your patterns to surface what matters most.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Button variant="outline" className="gap-2" onClick={() => openAction("leave")}>
+            <CalendarCheck2 className="h-4 w-4" /> Quick leave request
+          </Button>
+          <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={() => openAction("payslip")}>
+            <FileDown className="h-4 w-4" /> Download payslip
+          </Button>
+        </div>
+      </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {highlightCards.map((card) => (
-            <Card key={card.title} className="shadow-sm border-slate-100">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">{card.title}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className={`text-2xl font-semibold ${card.tone}`}>{card.value}</p>
-                  <p className="text-xs text-muted-foreground">{card.delta}</p>
-                </div>
-                <Button variant="outline" size="sm" className="w-full justify-between" onClick={card.action}>
-                  {card.actionLabel}
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <Card className="border-slate-100">
-            <CardHeader className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle className="text-base font-semibold">AI-powered nudges</CardTitle>
-                <CardDescription>Personalised signals based on attendance, productivity and learning graphs.</CardDescription>
-              </div>
-              <Badge variant="secondary" className="gap-1 text-xs">
-                <Sparkles className="h-3 w-3" /> Adaptive
-              </Badge>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {highlightCards.map((card) => (
+          <Card key={card.title} className="shadow-sm border-slate-100">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-slate-500">{card.title}</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {aiSignals.map((signal) => (
-                <div
-                  key={signal.title}
-                  className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
-                >
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-slate-900">{signal.title}</p>
-                    <p className="text-xs text-muted-foreground">{signal.detail}</p>
-                    <div className="flex items-center gap-2">
-                      <Progress value={signal.confidence * 100} className="h-1.5 w-32" />
-                      <span className="text-xs text-slate-500">Confidence {(signal.confidence * 100).toFixed(0)}%</span>
-                    </div>
+            <CardContent className="space-y-3">
+              <div>
+                <p className={`text-2xl font-semibold ${card.tone}`}>{card.value}</p>
+                <p className="text-xs text-muted-foreground">{card.delta}</p>
+              </div>
+              <Button variant="outline" size="sm" className="w-full justify-between" onClick={card.action}>
+                {card.actionLabel}
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <Card className="border-slate-100">
+          <CardHeader className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base font-semibold">AI-powered nudges</CardTitle>
+              <CardDescription>Personalised signals based on attendance, productivity and learning graphs.</CardDescription>
+            </div>
+            <Badge variant="secondary" className="gap-1 text-xs">
+              <Sparkles className="h-3 w-3" /> Adaptive
+            </Badge>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {aiSignals.map((signal) => (
+              <div
+                key={signal.title}
+                className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+              >
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-slate-900">{signal.title}</p>
+                  <p className="text-xs text-muted-foreground">{signal.detail}</p>
+                  <div className="flex items-center gap-2">
+                    <Progress value={signal.confidence * 100} className="h-1.5 w-32" />
+                    <span className="text-xs text-slate-500">Confidence {(signal.confidence * 100).toFixed(0)}%</span>
                   </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2 bg-white"
-                            onClick={() =>
-                              toast({
-                                title: "Applied recommendation",
-                                description: signal.recommendation,
-                              })
-                            }
-                          >
-                            <Lightbulb className="h-3.5 w-3.5 text-amber-500" /> Apply tip
-                          </Button>
-                          <span className="hidden text-[10px] text-muted-foreground sm:inline">
-                            Sends to your task list and assistant
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs"
-                            onClick={() => acknowledgeSignal(signal.title)}
-                            disabled={acknowledgedSignals.includes(signal.title)}
-                          >
-                            {acknowledgedSignals.includes(signal.title) ? "Saved" : "Acknowledge"}
-                          </Button>
-                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 bg-white"
+                    onClick={() =>
+                      toast({
+                        title: "Applied recommendation",
+                        description: signal.recommendation,
+                      })
+                    }
+                  >
+                    <Lightbulb className="h-3.5 w-3.5 text-amber-500" /> Apply tip
+                  </Button>
+                  <span className="hidden text-[10px] text-muted-foreground sm:inline">
+                    Sends to your task list and assistant
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => acknowledgeSignal(signal.title)}
+                    disabled={acknowledgedSignals.includes(signal.title)}
+                  >
+                    {acknowledgedSignals.includes(signal.title) ? "Saved" : "Acknowledge"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card className="border-slate-100">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <CalendarClock className="h-4 w-4 text-emerald-600" /> Upcoming schedule
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {upcomingEvents.map((event) => (
+                <div key={event.title} className="rounded-lg border border-slate-100 p-3 bg-white/80">
+                  <p className="text-sm font-medium text-slate-900">{event.title}</p>
+                  <p className="text-xs text-muted-foreground">{event.time}</p>
+                  <p className="text-xs text-muted-foreground">{event.location}</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 h-7 text-xs gap-1"
+                    onClick={() => toast({ title: `${event.status} action triggered`, description: event.title })}
+                  >
+                    {event.status}
+                    <ArrowRight className="h-3 w-3" />
+                  </Button>
                 </div>
               ))}
             </CardContent>
           </Card>
 
-          <div className="space-y-4">
-            <Card className="border-slate-100">
-              <CardHeader>
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <CalendarClock className="h-4 w-4 text-emerald-600" /> Upcoming schedule
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {upcomingEvents.map((event) => (
-                  <div key={event.title} className="rounded-lg border border-slate-100 p-3 bg-white/80">
-                    <p className="text-sm font-medium text-slate-900">{event.title}</p>
-                    <p className="text-xs text-muted-foreground">{event.time}</p>
-                    <p className="text-xs text-muted-foreground">{event.location}</p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-2 h-7 text-xs gap-1"
-                      onClick={() => toast({ title: `${event.status} action triggered`, description: event.title })}
-                    >
-                      {event.status}
-                      <ArrowRight className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-100">
-              <CardHeader>
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <BellRing className="h-4 w-4 text-sky-500" /> Well-being signals
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {wellbeingMoments.map((item) => (
-                  <div key={item.title} className="rounded-lg border border-slate-100 p-3 bg-slate-50">
-                    <div className="flex items-start gap-2">
-                      <item.icon className={`h-4 w-4 ${item.accent}`} />
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">{item.title}</p>
-                        <p className="text-xs text-muted-foreground">{item.description}</p>
-                      </div>
+          <Card className="border-slate-100">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <BellRing className="h-4 w-4 text-sky-500" /> Well-being signals
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {wellbeingMoments.map((item) => (
+                <div key={item.title} className="rounded-lg border border-slate-100 p-3 bg-slate-50">
+                  <div className="flex items-start gap-2">
+                    <item.icon className={`h-4 w-4 ${item.accent}`} />
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{item.title}</p>
+                      <p className="text-xs text-muted-foreground">{item.description}</p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2 h-7 gap-1"
-                      onClick={() => toast({ title: "Scheduled", description: `${item.title} added to your calendar.` })}
-                    >
-                      Schedule
-                      <ArrowRight className="h-3 w-3" />
-                    </Button>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        </section>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 h-7 gap-1"
+                    onClick={() => toast({ title: "Scheduled", description: `${item.title} added to your calendar.` })}
+                  >
+                    Schedule
+                    <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <Card className="border-slate-100">
             <CardHeader className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -491,7 +491,7 @@ export default function EmployeePortalPage() {
           </Card>
         </section>
 
-        <Dialog open={activeDialog === "leave"} onOpenChange={(open) => setActiveDialog(open ? "leave" : null)}>
+      <Dialog open={activeDialog === "leave"} onOpenChange={(open) => setActiveDialog(open ? "leave" : null)}>
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -557,7 +557,7 @@ export default function EmployeePortalPage() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={activeDialog === "payslip"} onOpenChange={(open) => setActiveDialog(open ? "payslip" : null)}>
+      <Dialog open={activeDialog === "payslip"} onOpenChange={(open) => setActiveDialog(open ? "payslip" : null)}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -594,7 +594,7 @@ export default function EmployeePortalPage() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={activeDialog === "feedback"} onOpenChange={(open) => setActiveDialog(open ? "feedback" : null)}>
+      <Dialog open={activeDialog === "feedback"} onOpenChange={(open) => setActiveDialog(open ? "feedback" : null)}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -625,6 +625,5 @@ export default function EmployeePortalPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </div>
-  )
+    )
 }
