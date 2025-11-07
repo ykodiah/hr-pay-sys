@@ -809,6 +809,35 @@ export default function AttendancePage() {
   const [policyDialogOpen, setPolicyDialogOpen] = useState(false)
   const [isSavingPolicy, setIsSavingPolicy] = useState(false)
   const [policyForm, setPolicyForm] = useState<AttendancePolicyForm>(() => createPolicyDefaults())
+  const [runningPolicyFor, setRunningPolicyFor] = useState<string | null>(null)
+  const handleRunPolicies = async (recordId: string) => {
+    try {
+      setRunningPolicyFor(recordId)
+      const response = await fetch("/functions/v1/apply-attendance-policies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recordId }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to run policies")
+      }
+
+      toast({
+        title: "Policy evaluation triggered",
+        description: "Attendance policies are being applied to this record.",
+      })
+    } catch (error) {
+      console.error("[attendance] handleRunPolicies error", error)
+      toast({
+        title: "Unable to run policies",
+        description: "Policy evaluation failed to start.",
+        variant: "destructive",
+      })
+    } finally {
+      setRunningPolicyFor(null)
+    }
+  }
 
   const [shiftForm, setShiftForm] = useState({
     id: "",
@@ -1884,6 +1913,25 @@ export default function AttendancePage() {
     return alerts
   }, [complianceDevices, geoCompliance])
 
+  const policyAppliedLookup = useMemo(() => {
+    const result = new Map<string, AttendancePolicy>()
+
+    filteredRecords.forEach((record) => {
+      const matching = policies.find((policy) => {
+        if (!policy.is_active) {
+          return false
+        }
+        return policy.policy_type === "grace" && policy.grace_minutes && record.status === "late"
+      })
+
+      if (matching) {
+        result.set(record.id, matching)
+      }
+    })
+
+    return result
+  }, [filteredRecords, policies])
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -2229,10 +2277,27 @@ export default function AttendancePage() {
                                     Send reminder
                                   </Button>
                                 </div>
+                                  <div className="flex items-center gap-2">
+                                    {policyAppliedLookup.has(record.id) && (
+                                      <span className="text-[11px] text-emerald-600">
+                                        Policy applied: {policyAppliedLookup.get(record.id)?.name ?? "Grace period"} (grace{" "}
+                                        {policyAppliedLookup.get(record.id)?.grace_minutes ?? 0} min)
+                                      </span>
+                                    )}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 px-3 text-xs"
+                                      onClick={() => handleRunPolicies(record.id)}
+                                      disabled={runningPolicyFor === record.id}
+                                    >
+                                      {runningPolicyFor === record.id ? "Running…" : "Run policies"}
+                                    </Button>
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
                         {!filteredRecords.length && (
                           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-slate-500">
                             No attendance records match the current filters.
