@@ -32,11 +32,15 @@ import {
   Fingerprint,
   Globe,
   Link as LinkIcon,
+  Activity,
+  AlertTriangle,
   MapPin,
   Plus,
+  Radar,
   RefreshCw,
   Search,
   Settings2,
+  ShieldCheck,
   Sparkles,
   Timer,
   UserCheck,
@@ -176,6 +180,27 @@ interface AiForecast {
   value: string
   delta: string
   trend: "up" | "down" | "steady"
+}
+
+type DeviceComplianceHealth = "healthy" | "warning" | "critical"
+
+interface ComplianceDevice {
+  id: string
+  name: string
+  provider: string
+  location: string
+  status: BiometricDevice["status"]
+  lastSync: string
+  minutesSinceSync: number
+  health: DeviceComplianceHealth
+}
+
+interface GeoAnomaly {
+  id: string
+  employeeId: string
+  employeeName: string
+  reason: string
+  detail: string
 }
 
 type SupabaseAttendanceRecord = {
@@ -367,6 +392,46 @@ const normalizeAttendanceRecord = (
     aiRiskScore,
     predictedTrend,
   }
+}
+
+const parseLastSyncMinutes = (input?: string): number => {
+  if (!input) {
+    return 999
+  }
+
+  const trimmed = input.trim()
+  if (!trimmed) {
+    return 999
+  }
+
+  const directTimestamp = Date.parse(trimmed)
+  if (!Number.isNaN(directTimestamp)) {
+    return Math.max(0, Math.round((Date.now() - directTimestamp) / 60000))
+  }
+
+  try {
+    const now = new Date()
+    const reference = new Date(now)
+    const lower = trimmed.toLowerCase()
+
+    if (lower.includes("yesterday")) {
+      reference.setDate(reference.getDate() - 1)
+    } else if (lower.includes("last sync")) {
+      // leave reference at now
+    }
+
+    const timeMatch = trimmed.match(/(\d{1,2}):(\d{2})/)
+    if (timeMatch) {
+      const hours = Number(timeMatch[1])
+      const minutes = Number(timeMatch[2])
+      reference.setHours(hours, minutes, 0, 0)
+      return Math.max(0, Math.round((now.getTime() - reference.getTime()) / 60000))
+    }
+  } catch {
+    // Ignore parsing errors
+  }
+
+  return 999
 }
 
 const initialAttendanceRecords: AttendanceRecord[] = [
@@ -1465,6 +1530,139 @@ export default function AttendancePage() {
       .slice(0, 6)
   }, [timesheetSummaries])
 
+  const complianceDevices = useMemo<ComplianceDevice[]>(() => {
+    if (!biometricDevices.length) {
+      return []
+    }
+
+    return biometricDevices.map((device) => {
+      const minutesSinceSync = parseLastSyncMinutes(device.lastSync)
+      let health: DeviceComplianceHealth = "healthy"
+
+      if (device.status === "offline" || minutesSinceSync > 60) {
+        health = "critical"
+      } else if (device.status === "syncing" || minutesSinceSync > 15) {
+        health = "warning"
+      }
+
+      return {
+        id: device.id,
+        name: device.name,
+        provider: device.provider,
+        location: device.location,
+        status: device.status,
+        lastSync: device.lastSync,
+        minutesSinceSync,
+        health,
+      }
+    })
+  }, [biometricDevices])
+
+  const deviceCompliance = useMemo(() => {
+    if (!complianceDevices.length) {
+      return {
+        uptimePercent: 100,
+        healthy: 0,
+        warning: 0,
+        critical: 0,
+        devices: [] as ComplianceDevice[],
+      }
+    }
+
+    const healthy = complianceDevices.filter((device) => device.health === "healthy").length
+    const warning = complianceDevices.filter((device) => device.health === "warning").length
+    const critical = complianceDevices.filter((device) => device.health === "critical").length
+    const total = complianceDevices.length
+    const uptimePercent = total ? Math.max(0, Math.round((healthy / total) * 100)) : 100
+
+    return {
+      uptimePercent,
+      healthy,
+      warning,
+      critical,
+      devices: complianceDevices,
+    }
+  }, [complianceDevices])
+
+  const geoCompliance = useMemo(() => {
+    const mobileRecords = attendanceRecords.filter(
+      (record) => record.method === "mobile" || record.workingArrangement !== "onsite",
+    )
+    const withLocation = mobileRecords.filter((record) => Boolean(record.location))
+    const withoutLocation = mobileRecords.filter((record) => !record.location)
+
+    const locationBuckets = new Map<string, AttendanceRecord[]>()
+    mobileRecords.forEach((record) => {
+      const key = `${record.date}-${record.location || "unknown"}`
+      const bucket = locationBuckets.get(key) ?? []
+      bucket.push(record)
+      locationBuckets.set(key, bucket)
+    })
+
+    const duplicateGroups = Array.from(locationBuckets.values()).filter(
+      (group) => group.length >= 4 && group[0].location && group[0].location !== "Unknown",
+    )
+
+    const anomalies: GeoAnomaly[] = []
+    withoutLocation.slice(0, 6).forEach((record) => {
+      anomalies.push({
+        id: `${record.id}-missing-location`,
+        employeeId: record.employeeId,
+        employeeName: record.employeeName,
+        reason: "Missing location",
+        detail: `${record.employeeName} • ${record.method.toUpperCase()} check-in on ${record.date} lacks geo tag.`,
+      })
+    })
+
+    duplicateGroups.slice(0, 6).forEach((group, index) => {
+      const sample = group[0]
+      anomalies.push({
+        id: `${sample.id}-dup-${index}`,
+        employeeId: sample.employeeId,
+        employeeName: sample.employeeName,
+        reason: "Repeated coordinates",
+        detail: `${group.length} mobile check-ins at ${sample.location} on ${sample.date}.`,
+      })
+    })
+
+    const rate = mobileRecords.length ? (withLocation.length / mobileRecords.length) * 100 : 100
+
+    return {
+      totalMobile: mobileRecords.length,
+      complianceRate: Math.max(0, Math.min(100, rate)),
+      missingCount: withoutLocation.length,
+      duplicateHotspots: duplicateGroups.length,
+      anomalies,
+    }
+  }, [attendanceRecords])
+
+  const tamperAlerts = useMemo(() => {
+    const alerts: { id: string; title: string; description: string; severity: "medium" | "high" }[] = []
+
+    complianceDevices
+      .filter((device) => device.health === "critical")
+      .slice(0, 4)
+      .forEach((device) => {
+        alerts.push({
+          id: `${device.id}-critical`,
+          title: `${device.name} offline`,
+          description: `${device.location || "Unknown location"} • Last sync ${device.lastSync || "n/a"}`,
+          severity: "high",
+        })
+      })
+
+    geoCompliance.anomalies.slice(0, 4).forEach((anomaly) => {
+      alerts.push({
+        id: `${anomaly.id}-geo`,
+        title: anomaly.reason,
+        description: anomaly.detail,
+        severity: anomaly.reason === "Missing location" ? "medium" : "high",
+      })
+    })
+
+    return alerts
+  }, [complianceDevices, geoCompliance])
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -1589,12 +1787,13 @@ export default function AttendancePage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="insights">AI Insights</TabsTrigger>
           <TabsTrigger value="shifts">Shift Management</TabsTrigger>
           <TabsTrigger value="overtime">Overtime</TabsTrigger>
           <TabsTrigger value="devices">Integrations</TabsTrigger>
+          <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="automation">Automation</TabsTrigger>
         </TabsList>
 
@@ -1907,7 +2106,7 @@ export default function AttendancePage() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+          </TabsContent>
 
         <TabsContent value="insights" className="space-y-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -2414,10 +2613,191 @@ export default function AttendancePage() {
                     </Button>
                   </div>
                 </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="compliance" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <Card className="border-emerald-100">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm font-medium text-emerald-700">
+                    <ShieldCheck className="h-4 w-4" /> Device uptime
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500">
+                    Healthy devices {deviceCompliance.healthy}/{deviceCompliance.devices.length}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-semibold text-emerald-700">{deviceCompliance.uptimePercent}%</span>
+                    <span className="text-xs uppercase text-slate-500">uptime</span>
+                  </div>
+                  <Progress value={deviceCompliance.uptimePercent} className="h-2" />
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>Warning {deviceCompliance.warning}</span>
+                    <span>Critical {deviceCompliance.critical}</span>
+                  </div>
+                </CardContent>
               </Card>
-            ))}
-          </div>
-        </TabsContent>
+              <Card className="border-amber-100">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm font-medium text-amber-700">
+                    <Activity className="h-4 w-4" /> Sync latency
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500">Minutes since last sync</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2 text-xs text-slate-600">
+                  {deviceCompliance.devices.slice(0, 3).map((device) => (
+                    <div key={device.id} className="flex items-center justify-between rounded border border-amber-100 bg-amber-50 px-3 py-2">
+                      <span className="font-medium text-amber-800">{device.name}</span>
+                      <span className="text-amber-700">
+                        {device.minutesSinceSync >= 999 ? ">999" : device.minutesSinceSync}m
+                      </span>
+                    </div>
+                  ))}
+                  {!deviceCompliance.devices.length && <p>No devices connected.</p>}
+                </CardContent>
+              </Card>
+              <Card className="border-sky-100">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm font-medium text-sky-700">
+                    <Globe className="h-4 w-4" /> Geo compliance
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500">
+                    Remote/mobile records {geoCompliance.totalMobile}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-semibold text-sky-700">{geoCompliance.complianceRate.toFixed(1)}%</span>
+                    <span className="text-xs uppercase text-slate-500">geo tagged</span>
+                  </div>
+                  <Progress value={geoCompliance.complianceRate} className="h-2" />
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>Missing {geoCompliance.missingCount}</span>
+                    <span>Hotspots {geoCompliance.duplicateHotspots}</span>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-rose-100">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm font-medium text-rose-700">
+                    <AlertTriangle className="h-4 w-4" /> Tamper alerts
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500">
+                    {tamperAlerts.length ? `${tamperAlerts.length} open` : "No alerts detected"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2 text-xs text-slate-600">
+                  {tamperAlerts.slice(0, 3).map((alert) => (
+                    <div key={alert.id} className="rounded border border-rose-100 bg-rose-50 px-3 py-2">
+                      <p className="font-medium text-rose-800">{alert.title}</p>
+                      <p className="text-[11px] text-rose-700">{alert.description}</p>
+                    </div>
+                  ))}
+                  {!tamperAlerts.length && <p>No tamper alerts at the moment.</p>}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                    <Radar className="h-5 w-5 text-emerald-500" /> Device health feed
+                  </CardTitle>
+                  <CardDescription>Real-time insight into biometric device connectivity.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm text-slate-600">
+                  {deviceCompliance.devices.slice(0, 6).map((device) => (
+                    <div key={device.id} className="flex flex-col rounded border bg-white p-3 shadow-sm">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-semibold text-slate-900">{device.name}</span>
+                        <Badge
+                          className={
+                            device.health === "healthy"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : device.health === "warning"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-rose-100 text-rose-700"
+                          }
+                        >
+                          {device.health.toUpperCase()}
+                        </Badge>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+                        <span>{device.location || "Unknown location"}</span>
+                        <span>{device.lastSync}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {!deviceCompliance.devices.length && <p>No devices to display.</p>}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                    <MapPin className="h-5 w-5 text-sky-500" /> Geo anomalies
+                  </CardTitle>
+                  <CardDescription>Flagged mobile check-ins requiring manual verification.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm text-slate-600">
+                  {geoCompliance.anomalies.length ? (
+                    geoCompliance.anomalies.slice(0, 6).map((anomaly) => (
+                      <div key={anomaly.id} className="flex flex-col rounded border border-slate-200 bg-white p-3 shadow-sm">
+                        <span className="font-semibold text-slate-900">{anomaly.employeeName}</span>
+                        <span className="text-xs uppercase text-slate-500">{anomaly.reason}</span>
+                        <p className="text-xs text-slate-600">{anomaly.detail}</p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2 h-8 px-3 text-xs"
+                          onClick={() =>
+                            toast({
+                              title: "Compliance review queued",
+                              description: `${anomaly.employeeName} anomaly forwarded to compliance desk.`,
+                            })
+                          }
+                        >
+                          Escalate
+                        </Button>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-500">No geo anomalies detected.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                  <Globe className="h-5 w-5 text-emerald-500" /> Geo-fence map view
+                </CardTitle>
+                <CardDescription>Visual heatmap of remote check-ins with risk overlays (preview).</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-center rounded-lg border border-dashed border-emerald-200 bg-emerald-50/40 p-10 text-sm text-emerald-700">
+                  Interactive map coming soon — integrate Mapbox or Leaflet to visualise geo-fence coverage.
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    toast({
+                      title: "Map export queued",
+                      description: "Geo-fence coverage report will be emailed to compliance admins.",
+                    })
+                  }
+                >
+                  <Download className="mr-2 h-4 w-4" /> Export geo coverage report
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
         <TabsContent value="automation" className="space-y-6">
             <div className="grid gap-4 lg:grid-cols-2">
