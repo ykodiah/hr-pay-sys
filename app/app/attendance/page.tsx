@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { createClient } from "@/lib/supabase/client"
 import {
   AlertCircle,
   BarChart3,
@@ -45,6 +46,30 @@ import {
 type AttendanceStatus = "present" | "late" | "absent" | "early-departure"
 type AttendanceMethod = "fingerprint" | "facial" | "mobile" | "manual" | "card"
 type PredictedTrend = "on-track" | "late-risk" | "absence-risk"
+
+const getInitialDemoMode = () => {
+  if (typeof window === "undefined") {
+    return false
+  }
+
+  try {
+    if (window.localStorage?.getItem("demo_mode") === "true") {
+      return true
+    }
+  } catch {
+    // Ignore localStorage access errors (e.g., privacy mode)
+  }
+
+  if (typeof document !== "undefined") {
+    const cookies = document.cookie?.split(";") ?? []
+    const demoSessionCookie = cookies.find((cookie) => cookie.trim().startsWith("demo-session="))
+    if (demoSessionCookie && demoSessionCookie.includes("active")) {
+      return true
+    }
+  }
+
+  return false
+}
 
 const formatDateByOffset = (offsetDays: number) => {
   const date = new Date()
@@ -151,6 +176,197 @@ interface AiForecast {
   value: string
   delta: string
   trend: "up" | "down" | "steady"
+}
+
+type SupabaseAttendanceRecord = {
+  id: string
+  employee_id: string
+  date: string
+  clock_in: string | null
+  clock_out: string | null
+  break_start: string | null
+  break_end: string | null
+  total_hours: number | null
+  overtime_hours: number | null
+  status: string | null
+  notes: string | null
+}
+
+type SupabaseEmployee = {
+  id: string
+  employee_id: string | null
+  full_name: string | null
+  department: string | null
+  division: string | null
+  location: string | null
+  subsidiary_id: string | null
+}
+
+type SupabaseSubsidiary = {
+  id: string
+  name: string | null
+}
+
+const formatTimeFragment = (value: string | null) => {
+  if (!value) {
+    return ""
+  }
+
+  // Supabase returns HH:MM:SS – keep HH:MM
+  return value.slice(0, 5)
+}
+
+const calculateHoursFromTimes = (clockIn: string | null, clockOut: string | null) => {
+  if (!clockIn || !clockOut) {
+    return 0
+  }
+
+  const [inHour, inMinute] = clockIn.split(":").map(Number)
+  const [outHour, outMinute] = clockOut.split(":").map(Number)
+
+  if (Number.isNaN(inHour) || Number.isNaN(inMinute) || Number.isNaN(outHour) || Number.isNaN(outMinute)) {
+    return 0
+  }
+
+  const inMinutesTotal = inHour * 60 + inMinute
+  let outMinutesTotal = outHour * 60 + outMinute
+
+  // Handle overnight shifts (clock-out past midnight)
+  if (outMinutesTotal < inMinutesTotal) {
+    outMinutesTotal += 24 * 60
+  }
+
+  const diffInMinutes = Math.max(outMinutesTotal - inMinutesTotal, 0)
+  return Number((diffInMinutes / 60).toFixed(2))
+}
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
+
+const mapStatusFromSupabase = (status: string | null): AttendanceStatus => {
+  switch (status) {
+    case "present":
+      return "present"
+    case "late":
+      return "late"
+    case "half_day":
+      return "early-departure"
+    case "leave":
+    case "absent":
+      return "absent"
+    default:
+      return "present"
+  }
+}
+
+const resolveShiftLabel = (clockIn: string | null, clockOut: string | null) => {
+  if (!clockIn) {
+    return "Flexible Shift"
+  }
+
+  const [hour] = clockIn.split(":").map(Number)
+  if (Number.isNaN(hour)) {
+    return "Flexible Shift"
+  }
+
+  if (hour >= 18 || (clockOut && clockOut < clockIn)) {
+    return "Night Shift"
+  }
+
+  if (hour < 10) {
+    return "Day Shift"
+  }
+
+  if (hour < 14) {
+    return "Midday Shift"
+  }
+
+  return "Afternoon Shift"
+}
+
+const detectAttendanceMethod = (notes: string | null): AttendanceMethod => {
+  const safeNotes = notes?.toLowerCase() ?? ""
+  if (safeNotes.includes("mobile") || safeNotes.includes("geo")) {
+    return "mobile"
+  }
+  if (safeNotes.includes("face") || safeNotes.includes("facial")) {
+    return "facial"
+  }
+  if (safeNotes.includes("card") || safeNotes.includes("rfid")) {
+    return "card"
+  }
+  if (safeNotes.includes("manual") || safeNotes.includes("override")) {
+    return "manual"
+  }
+  return "fingerprint"
+}
+
+const detectWorkingArrangement = (employee: SupabaseEmployee | undefined, notes: string | null): AttendanceRecord["workingArrangement"] => {
+  const lookupSource = `${employee?.location ?? ""} ${notes ?? ""}`.toLowerCase()
+  if (lookupSource.includes("remote") || lookupSource.includes("home")) {
+    return "remote"
+  }
+  if (lookupSource.includes("hybrid") || lookupSource.includes("flex")) {
+    return "hybrid"
+  }
+  return "onsite"
+}
+
+const normalizeAttendanceRecord = (
+  record: SupabaseAttendanceRecord,
+  employees: Map<string, SupabaseEmployee>,
+  subsidiaries: Map<string, SupabaseSubsidiary>,
+): AttendanceRecord => {
+  const employee = employees.get(record.employee_id)
+  const subsidiaryName =
+    employee?.subsidiary_id && subsidiaries.get(employee.subsidiary_id)
+      ? subsidiaries.get(employee.subsidiary_id)?.name ?? "Subsidiary"
+      : "Head Office"
+
+  const expectedHours = 8
+  const totalHours =
+    typeof record.total_hours === "number" && !Number.isNaN(record.total_hours)
+      ? Number(record.total_hours)
+      : calculateHoursFromTimes(record.clock_in, record.clock_out)
+
+  const overtimeHours =
+    typeof record.overtime_hours === "number" && !Number.isNaN(record.overtime_hours)
+      ? Number(record.overtime_hours)
+      : Math.max(totalHours - expectedHours, 0)
+
+  const status = mapStatusFromSupabase(record.status)
+  const productivityScore = totalHours ? clamp(Math.round((totalHours / expectedHours) * 100), 0, 100) : 0
+
+  const baseRisk =
+    status === "absent" ? 0.75 : status === "late" ? 0.45 : status === "early-departure" ? 0.35 : 0.12
+  const overtimeRiskBoost = overtimeHours > 2 ? 0.1 : overtimeHours > 0 ? 0.05 : 0
+  const aiRiskScore = clamp(baseRisk + overtimeRiskBoost, 0, 0.95)
+
+  const predictedTrend: PredictedTrend =
+    aiRiskScore >= 0.6 ? "absence-risk" : aiRiskScore >= 0.35 ? "late-risk" : "on-track"
+
+  return {
+    id: record.id,
+    employeeId: employee?.employee_id ?? record.employee_id,
+    employeeName: employee?.full_name ?? "Unknown employee",
+    date: record.date ? new Date(record.date).toISOString().split("T")[0] : formatDateByOffset(0),
+    clockIn: formatTimeFragment(record.clock_in),
+    clockOut: formatTimeFragment(record.clock_out),
+    totalHours,
+    overtimeHours,
+    expectedHours,
+    status,
+    location: employee?.location ?? "Not specified",
+    department: employee?.department ?? "General",
+    division: employee?.division ?? employee?.department ?? "Operations",
+    subsidiary: subsidiaryName,
+    team: employee?.division ?? employee?.department ?? "Core Team",
+    shift: resolveShiftLabel(formatTimeFragment(record.clock_in), formatTimeFragment(record.clock_out)),
+    method: detectAttendanceMethod(record.notes),
+    workingArrangement: detectWorkingArrangement(employee, record.notes),
+    productivityScore,
+    aiRiskScore,
+    predictedTrend,
+  }
 }
 
 const initialAttendanceRecords: AttendanceRecord[] = [
@@ -424,8 +640,16 @@ const initialHolidays: Holiday[] = [
 export default function AttendancePage() {
   const { toast } = useToast()
 
+  const demoModeRef = useRef<boolean>(getInitialDemoMode())
+
+  const [isDemoData, setIsDemoData] = useState(demoModeRef.current)
+  const [isLoadingData, setIsLoadingData] = useState(!demoModeRef.current)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
   const [activeTab, setActiveTab] = useState("overview")
-  const [attendanceRecords, setAttendanceRecords] = useState(initialAttendanceRecords)
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(
+    demoModeRef.current ? initialAttendanceRecords : [],
+  )
   const [shifts, setShifts] = useState(initialShifts)
   const [biometricDevices, setBiometricDevices] = useState(initialBiometricDevices)
   const [overtimeRequests, setOvertimeRequests] = useState(initialOvertimeRequests)
@@ -490,6 +714,105 @@ export default function AttendancePage() {
     escalateToManagers: true,
     includeContractors: false,
   })
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadAttendanceData = async () => {
+      if (demoModeRef.current) {
+        setIsLoadingData(false)
+        setIsDemoData(true)
+        setAttendanceRecords(initialAttendanceRecords)
+        setLoadError(null)
+        return
+      }
+
+      setIsLoadingData(true)
+      setLoadError(null)
+
+      try {
+        const supabase: any = createClient()
+
+        if (supabase?.__isMock) {
+          if (!isMounted) return
+          demoModeRef.current = true
+          setIsDemoData(true)
+          setAttendanceRecords(initialAttendanceRecords)
+          setIsLoadingData(false)
+          setLoadError("Supabase credentials missing. Showing sample attendance data.")
+          toast({
+            title: "Demo data in use",
+            description: "Supabase credentials missing. Showing sample attendance records.",
+          })
+          return
+        }
+
+        const [attendanceResponse, employeesResponse, subsidiariesResponse] = await Promise.all([
+          supabase
+            .from("attendance_records")
+            .select(
+              "id, employee_id, date, clock_in, clock_out, break_start, break_end, total_hours, overtime_hours, status, notes",
+            )
+            .order("date", { ascending: false })
+            .limit(200),
+          supabase.from("employees").select("id, employee_id, full_name, department, division, location, subsidiary_id"),
+          supabase.from("subsidiaries").select("id, name"),
+        ])
+
+        if (!isMounted) return
+
+        const errors = [attendanceResponse.error, employeesResponse.error, subsidiariesResponse.error].filter(Boolean)
+        if (errors.length) {
+          throw new Error(errors.map((err) => err?.message ?? "Unknown error").join(" • "))
+        }
+
+        const employeesMap = new Map<string, SupabaseEmployee>()
+        ;(employeesResponse.data ?? []).forEach((employee: SupabaseEmployee) => {
+          if (employee?.id) {
+            employeesMap.set(employee.id, employee)
+          }
+        })
+
+        const subsidiariesMap = new Map<string, SupabaseSubsidiary>()
+        ;(subsidiariesResponse.data ?? []).forEach((subsidiary: SupabaseSubsidiary) => {
+          if (subsidiary?.id) {
+            subsidiariesMap.set(subsidiary.id, subsidiary)
+          }
+        })
+
+        const normalizedRecords = (attendanceResponse.data ?? []).map((record: SupabaseAttendanceRecord) =>
+          normalizeAttendanceRecord(record, employeesMap, subsidiariesMap),
+        )
+
+        setAttendanceRecords(normalizedRecords)
+        setIsDemoData(false)
+        setIsLoadingData(false)
+
+        if (normalizedRecords.length === 0) {
+          setLoadError("No attendance records found. Add entries from capture devices or import attendance logs.")
+        }
+      } catch (error) {
+        if (!isMounted) return
+        console.error("[attendance] Failed to load attendance data", error)
+        setLoadError(error instanceof Error ? error.message : "Failed to load attendance data.")
+        demoModeRef.current = true
+        setIsDemoData(true)
+        setAttendanceRecords(initialAttendanceRecords)
+        setIsLoadingData(false)
+        toast({
+          title: "Using sample attendance data",
+          description: "We could not reach Supabase attendance records. Showing demo content instead.",
+          variant: "destructive",
+        })
+      }
+    }
+
+    loadAttendanceData()
+
+    return () => {
+      isMounted = false
+    }
+  }, [toast])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1013,6 +1336,12 @@ export default function AttendancePage() {
           <p className="text-sm text-slate-600">
             Unified attendance insights across locations, predictive risk detection, and automated compliance controls.
           </p>
+          {isDemoData && (
+            <p className="mt-1 flex items-center gap-2 text-xs text-amber-600">
+              <Sparkles className="h-3 w-3" />
+              Sample records shown while real attendance data is unavailable.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
@@ -1254,94 +1583,107 @@ export default function AttendancePage() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-4 xl:flex-row">
-                <div className="flex-1 space-y-4">
-                  {filteredRecords.map((record) => (
-                    <div key={record.id} className="rounded-lg border bg-white p-4 shadow-sm">
-                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-3">
-                            <h3 className="text-base font-semibold text-slate-900">{record.employeeName}</h3>
-                            <Badge variant="secondary" className="bg-slate-100 text-slate-700">
-                              {record.employeeId}
-                            </Badge>
-                          </div>
-                          <div className="flex flex-wrap gap-2 text-xs text-slate-500">
-                            <span>{record.department}</span>
-                            <span>•</span>
-                            <span>{record.subsidiary}</span>
-                            <span>•</span>
-                            <span>{record.shift}</span>
-                            {record.location && (
-                              <span className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" /> {record.location}
-                              </span>
-                            )}
-                          </div>
-                          <div className="grid gap-2 sm:grid-cols-4">
-                            <div>
-                              <p className="text-xs uppercase text-slate-500">Clock in</p>
-                              <p className="text-sm font-medium text-slate-800">{record.clockIn || "—"}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs uppercase text-slate-500">Clock out</p>
-                              <p className="text-sm font-medium text-slate-800">{record.clockOut || "—"}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs uppercase text-slate-500">Hours</p>
-                              <p className="text-sm font-medium text-slate-800">
-                                {record.totalHours.toFixed(1)}h / {record.expectedHours}h
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs uppercase text-slate-500">Overtime</p>
-                              <p className="text-sm font-medium text-emerald-600">{record.overtimeHours.toFixed(1)}h</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-start gap-2 text-sm md:items-end">
-                          <div className="flex flex-wrap gap-2">
-                            <Badge className={getStatusColor(record.status)}>{record.status.replace("-", " ")}</Badge>
-                            <Badge className={getPredictedTrendColor(record.predictedTrend)}>
-                              Predicted: {record.predictedTrend.replace("-", " ")}
-                            </Badge>
-                            <Badge variant="secondary" className="bg-slate-100 text-slate-700">
-                              {getMethodLabel(record.method)}
-                            </Badge>
-                          </div>
-                          <div className="flex w-full flex-col gap-1">
-                            <div className="flex items-center justify-between text-xs text-slate-500">
-                              <span>Productivity</span>
-                              <span>{record.productivityScore}%</span>
-                            </div>
-                            <Progress value={record.productivityScore} className="h-2" />
-                            <div className="flex items-center justify-between text-xs text-slate-500">
-                              <span>Risk</span>
-                              <span>{Math.round(record.aiRiskScore * 100)}%</span>
-                            </div>
-                            <Progress value={Math.round(record.aiRiskScore * 100)} className="h-2" />
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {record.status !== "present" && (
-                              <Button size="sm" onClick={() => handleUpdateAttendanceStatus(record.id, "present")}>
-                                Mark present
-                              </Button>
-                            )}
-                            <Button size="sm" variant="outline" onClick={() => handleSendReminder(record)}>
-                              Send reminder
-                            </Button>
-                          </div>
-                        </div>
+              <CardContent>
+                {loadError && (
+                  <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    {loadError}
+                  </div>
+                )}
+                <div className="flex flex-col gap-4 xl:flex-row">
+                  <div className="flex-1 space-y-4">
+                    {isLoadingData && !attendanceRecords.length ? (
+                      <div className="rounded-lg border border-dashed p-8 text-center text-sm text-slate-500">
+                        Loading attendance records...
                       </div>
-                    </div>
-                  ))}
-                  {!filteredRecords.length && (
-                    <div className="rounded-lg border border-dashed p-8 text-center text-sm text-slate-500">
-                      No attendance records match the current filters.
-                    </div>
-                  )}
-                </div>
+                    ) : (
+                      <>
+                        {filteredRecords.map((record) => (
+                          <div key={record.id} className="rounded-lg border bg-white p-4 shadow-sm">
+                            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-3">
+                                  <h3 className="text-base font-semibold text-slate-900">{record.employeeName}</h3>
+                                  <Badge variant="secondary" className="bg-slate-100 text-slate-700">
+                                    {record.employeeId}
+                                  </Badge>
+                                </div>
+                                <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                                  <span>{record.department}</span>
+                                  <span>•</span>
+                                  <span>{record.subsidiary}</span>
+                                  <span>•</span>
+                                  <span>{record.shift}</span>
+                                  {record.location && (
+                                    <span className="flex items-center gap-1">
+                                      <MapPin className="h-3 w-3" /> {record.location}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="grid gap-2 sm:grid-cols-4">
+                                  <div>
+                                    <p className="text-xs uppercase text-slate-500">Clock in</p>
+                                    <p className="text-sm font-medium text-slate-800">{record.clockIn || "—"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs uppercase text-slate-500">Clock out</p>
+                                    <p className="text-sm font-medium text-slate-800">{record.clockOut || "—"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs uppercase text-slate-500">Hours</p>
+                                    <p className="text-sm font-medium text-slate-800">
+                                      {record.totalHours.toFixed(1)}h / {record.expectedHours}h
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs uppercase text-slate-500">Overtime</p>
+                                    <p className="text-sm font-medium text-emerald-600">{record.overtimeHours.toFixed(1)}h</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-start gap-2 text-sm md:items-end">
+                                <div className="flex flex-wrap gap-2">
+                                  <Badge className={getStatusColor(record.status)}>{record.status.replace("-", " ")}</Badge>
+                                  <Badge className={getPredictedTrendColor(record.predictedTrend)}>
+                                    Predicted: {record.predictedTrend.replace("-", " ")}
+                                  </Badge>
+                                  <Badge variant="secondary" className="bg-slate-100 text-slate-700">
+                                    {getMethodLabel(record.method)}
+                                  </Badge>
+                                </div>
+                                <div className="flex w-full flex-col gap-1">
+                                  <div className="flex items-center justify-between text-xs text-slate-500">
+                                    <span>Productivity</span>
+                                    <span>{record.productivityScore}%</span>
+                                  </div>
+                                  <Progress value={record.productivityScore} className="h-2" />
+                                  <div className="flex items-center justify-between text-xs text-slate-500">
+                                    <span>Risk</span>
+                                    <span>{Math.round(record.aiRiskScore * 100)}%</span>
+                                  </div>
+                                  <Progress value={Math.round(record.aiRiskScore * 100)} className="h-2" />
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {record.status !== "present" && (
+                                    <Button size="sm" onClick={() => handleUpdateAttendanceStatus(record.id, "present")}>
+                                      Mark present
+                                    </Button>
+                                  )}
+                                  <Button size="sm" variant="outline" onClick={() => handleSendReminder(record)}>
+                                    Send reminder
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {!filteredRecords.length && (
+                          <div className="rounded-lg border border-dashed p-8 text-center text-sm text-slate-500">
+                            No attendance records match the current filters.
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 <div className="w-full space-y-4 xl:w-80">
                   <Card className="bg-slate-50">
                     <CardHeader>
