@@ -1328,6 +1328,143 @@ export default function AttendancePage() {
     }
   }
 
+  const timesheetSummaries = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        employeeId: string
+        employeeName: string
+        records: AttendanceRecord[]
+        totalHours: number
+        expectedHours: number
+        overtimeHours: number
+        latenessCount: number
+        missingClockIns: number
+        missingClockOuts: number
+        overnightShifts: number
+      }
+    >()
+
+    filteredRecords.forEach((record) => {
+      const key = record.employeeId
+      if (!groups.has(key)) {
+        groups.set(key, {
+          employeeId: record.employeeId,
+          employeeName: record.employeeName,
+          records: [],
+          totalHours: 0,
+          expectedHours: 0,
+          overtimeHours: 0,
+          latenessCount: 0,
+          missingClockIns: 0,
+          missingClockOuts: 0,
+          overnightShifts: 0,
+        })
+      }
+
+      const group = groups.get(key)!
+      group.records.push(record)
+      group.totalHours += record.totalHours
+      group.expectedHours += record.expectedHours
+      group.overtimeHours += record.overtimeHours
+
+      if (record.status === "late") {
+        group.latenessCount += 1
+      }
+
+      if (!record.clockIn) {
+        group.missingClockIns += 1
+      }
+
+      if (!record.clockOut) {
+        group.missingClockOuts += 1
+      }
+
+      if (record.shift.toLowerCase().includes("night") || (record.clockOut && record.clockIn && record.clockOut < record.clockIn)) {
+        group.overnightShifts += 1
+      }
+    })
+
+    const summaries = Array.from(groups.values()).map((group) => {
+      const variance = group.totalHours - group.expectedHours
+      const hasMissingPunches = group.missingClockIns > 0 || group.missingClockOuts > 0
+      const fatigueRisk = group.overtimeHours > 4 || group.overnightShifts > 2
+      const latenessStreak = group.latenessCount >= 3
+
+      const alerts: string[] = []
+      if (hasMissingPunches) alerts.push("Missing punches")
+      if (latenessStreak) alerts.push("Lateness streak")
+      if (fatigueRisk) alerts.push("Fatigue risk")
+      if (variance > 4) alerts.push("Significant overtime")
+      if (variance < -4) alerts.push("Under hours")
+
+      return {
+        ...group,
+        variance,
+        alerts,
+      }
+    })
+
+    summaries.sort((a, b) => b.alerts.length - a.alerts.length || b.totalHours - a.totalHours)
+    return summaries
+  }, [filteredRecords])
+
+  const timesheetExceptions = useMemo(() => {
+    return timesheetSummaries
+      .flatMap((summary) => {
+        const items: {
+          employeeId: string
+          employeeName: string
+          type: string
+          severity: "low" | "medium" | "high"
+          description: string
+        }[] = []
+
+        if (summary.missingClockIns > 0 || summary.missingClockOuts > 0) {
+          items.push({
+            employeeId: summary.employeeId,
+            employeeName: summary.employeeName,
+            type: "Missing punches",
+            severity: "high",
+            description: `${summary.missingClockIns} missing clock-in(s), ${summary.missingClockOuts} missing clock-out(s).`,
+          })
+        }
+
+        if (summary.latenessCount >= 3) {
+          items.push({
+            employeeId: summary.employeeId,
+            employeeName: summary.employeeName,
+            type: "Lateness streak",
+            severity: "medium",
+            description: `${summary.latenessCount} late arrivals in current range.`,
+          })
+        }
+
+        if (summary.overtimeHours > 4) {
+          items.push({
+            employeeId: summary.employeeId,
+            employeeName: summary.employeeName,
+            type: "Overtime review",
+            severity: "medium",
+            description: `${summary.overtimeHours.toFixed(1)} overtime hours logged.`,
+          })
+        }
+
+        if (summary.variance < -4) {
+          items.push({
+            employeeId: summary.employeeId,
+            employeeName: summary.employeeName,
+            type: "Under hours",
+            severity: "low",
+            description: `Variance of ${summary.variance.toFixed(1)} hours below expected.`,
+          })
+        }
+
+        return items
+      })
+      .slice(0, 6)
+  }, [timesheetSummaries])
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -1685,7 +1822,48 @@ export default function AttendancePage() {
                     )}
                   </div>
                 <div className="w-full space-y-4 xl:w-80">
-                  <Card className="bg-slate-50">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                          <Timer className="h-4 w-4 text-emerald-500" /> Timesheet snapshot
+                        </CardTitle>
+                        <CardDescription>Top variance and anomaly for the current filters.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3 text-xs text-slate-600">
+                        {timesheetSummaries.length ? (
+                          <>
+                            <div className="flex items-center justify-between text-slate-500">
+                              <span className="font-semibold text-slate-900">{timesheetSummaries[0].employeeName}</span>
+                              <Badge variant="secondary" className={timesheetSummaries[0].variance >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}>
+                                {timesheetSummaries[0].variance >= 0 ? "+" : ""}
+                                {timesheetSummaries[0].variance.toFixed(1)}h
+                              </Badge>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span>Total {timesheetSummaries[0].totalHours.toFixed(1)}h</span>
+                              <span>OT {timesheetSummaries[0].overtimeHours.toFixed(1)}h</span>
+                            </div>
+                            {timesheetSummaries[0].alerts.length ? (
+                              <div className="flex flex-wrap gap-1">
+                                {timesheetSummaries[0].alerts.map((alert) => (
+                                  <Badge key={alert} variant="secondary" className="bg-rose-50 text-rose-700">
+                                    {alert}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-slate-500">No anomalies detected.</p>
+                            )}
+                            <Button variant="outline" size="sm" className="w-full" onClick={() => setActiveTab("insights")}>
+                              View full timesheet insights
+                            </Button>
+                          </>
+                        ) : (
+                          <p className="text-xs text-slate-500">Collect attendance to unlock timesheet analytics.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-slate-50">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-sm font-medium text-slate-700">
                         <Sparkles className="h-4 w-4 text-purple-500" /> Predictive summary
@@ -1725,18 +1903,6 @@ export default function AttendancePage() {
                       )}
                     </CardContent>
                   </Card>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                        <BellRing className="h-4 w-4 text-amber-500" /> Missed check-in alert
-                      </CardTitle>
-                      <CardDescription>Upcoming alert at {alertSettings.time}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-2 text-xs text-slate-600">
-                      <p>{alertSettings.enabled ? "Alerts enabled" : "Alerts paused"} • Channel {alertSettings.channel.toUpperCase()}</p>
-                      <p>{alertTriggeredToday ? "Today's alert already processed." : "System will auto-escalate if absentees remain."}</p>
-                    </CardContent>
-                  </Card>
                 </div>
               </div>
             </CardContent>
@@ -1759,6 +1925,99 @@ export default function AttendancePage() {
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <Card className="border border-emerald-100">
+                <CardHeader className="space-y-1">
+                  <CardTitle className="flex items-center gap-2 text-base text-emerald-700">
+                    <Timer className="h-4 w-4" /> Timesheet intelligence
+                  </CardTitle>
+                  <CardDescription className="text-slate-600">
+                    Highlighted variances, fatigue risks, and missing punches for the selected range.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {timesheetSummaries.slice(0, 5).map((summary) => (
+                    <div key={summary.employeeId} className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-700">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-emerald-900">{summary.employeeName}</span>
+                        <Badge variant="secondary" className={summary.variance >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}>
+                          {summary.variance >= 0 ? "+" : ""}
+                          {summary.variance.toFixed(1)}h
+                        </Badge>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-emerald-600">
+                        <span>Total {summary.totalHours.toFixed(1)}h</span>
+                        <span>OT {summary.overtimeHours.toFixed(1)}h</span>
+                      </div>
+                      {summary.alerts.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {summary.alerts.map((alert) => (
+                            <Badge key={alert} variant="secondary" className="bg-emerald-100 text-emerald-700">
+                              {alert}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-[11px] text-emerald-600">No anomalies detected.</p>
+                      )}
+                    </div>
+                  ))}
+                  {!timesheetSummaries.length && (
+                    <p className="text-xs text-slate-500">Collect attendance to unlock timesheet analytics.</p>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="border border-amber-100">
+                <CardHeader className="space-y-1">
+                  <CardTitle className="flex items-center gap-2 text-base text-amber-700">
+                    <BellRing className="h-4 w-4" /> Exceptions watchlist
+                  </CardTitle>
+                  <CardDescription className="text-slate-600">
+                    The top anomalies flagged for supervisor review.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {timesheetExceptions.map((item) => (
+                    <div key={`${item.employeeId}-${item.type}`} className="rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-amber-900">{item.employeeName}</span>
+                        <Badge
+                          variant="secondary"
+                          className={
+                            item.severity === "high"
+                              ? "bg-rose-100 text-rose-700"
+                              : item.severity === "medium"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-slate-100 text-slate-700"
+                          }
+                        >
+                          {item.type}
+                        </Badge>
+                      </div>
+                      <p className="mt-2 text-[11px] text-amber-700">{item.description}</p>
+                      <div className="mt-3 flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-3 text-xs"
+                          onClick={() => toast({ title: "Follow-up queued", description: `Reminder sent to ${item.employeeName}.` })}
+                        >
+                          Nudge employee
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                          onClick={() => toast({ title: "Marked for payroll review", description: `${item.type} forwarded to payroll.` })}
+                        >
+                          Route to payroll
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {!timesheetExceptions.length && (
+                    <p className="text-xs text-slate-500">No exceptions detected for the current filters.</p>
+                  )}
+                </CardContent>
+              </Card>
             {aiInsights.map((insight) => (
               <Card key={insight.id} className="border border-purple-100">
                 <CardHeader className="space-y-1">
@@ -2161,7 +2420,7 @@ export default function AttendancePage() {
         </TabsContent>
 
         <TabsContent value="automation" className="space-y-6">
-          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
@@ -2271,6 +2530,39 @@ export default function AttendancePage() {
                 </div>
               </CardContent>
             </Card>
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                    <Download className="h-5 w-5 text-emerald-500" /> Timesheet automations
+                  </CardTitle>
+                  <CardDescription>Export payroll-ready timesheets or push variances into payroll review.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2 rounded border border-slate-200 p-4">
+                    <p className="text-sm font-medium text-slate-800">Weekly CSV export</p>
+                    <p className="text-xs text-slate-500">Compile timesheet CSV filtered by current date range and filters.</p>
+                    <Button onClick={() => handleExport("Timesheet CSV")} className="w-full">
+                      <Download className="mr-2 h-4 w-4" /> Export CSV
+                    </Button>
+                  </div>
+                  <div className="space-y-2 rounded border border-slate-200 p-4">
+                    <p className="text-sm font-medium text-slate-800">Sync to payroll</p>
+                    <p className="text-xs text-slate-500">Push approved hours and overtime variances into payroll staging.</p>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() =>
+                        toast({
+                          title: "Payroll sync queued",
+                          description: "Timesheet variances handed over to payroll review workspace.",
+                        })
+                      }
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" /> Queue sync
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
           </div>
 
           <Dialog open={holidayDialogOpen} onOpenChange={setHolidayDialogOpen}>
