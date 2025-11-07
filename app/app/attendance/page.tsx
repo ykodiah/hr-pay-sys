@@ -21,7 +21,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { createClient } from "@/lib/supabase/client"
-import { sendMessage as sendCommunicationMessage, type CommunicationMessage } from "@/lib/api/communication-service"
+import {
+  listChannels as listCommunicationChannels,
+  sendMessage as sendCommunicationMessage,
+  type CommunicationChannel,
+  type CommunicationMessage,
+} from "@/lib/api/communication-service"
 import {
   AlertCircle,
   BarChart3,
@@ -163,9 +168,10 @@ interface GeoCapture {
 interface AlertSettings {
   enabled: boolean
   time: string
-  channel: "email" | "sms" | "push"
+  deliveryChannel: "email" | "sms" | "push"
   escalateToManagers: boolean
   includeContractors: boolean
+  communicationChannelId: string | null
 }
 
 interface AiInsight {
@@ -873,10 +879,13 @@ export default function AttendancePage() {
   const [alertSettings, setAlertSettings] = useState<AlertSettings>({
     enabled: true,
     time: "10:30",
-    channel: "email",
+    deliveryChannel: "email",
     escalateToManagers: true,
     includeContractors: false,
+    communicationChannelId: "channel-ops",
   })
+
+  const [communicationChannels, setCommunicationChannels] = useState<CommunicationChannel[]>([])
 
   useEffect(() => {
     let isMounted = true
@@ -1012,6 +1021,31 @@ export default function AttendancePage() {
   const currentDayKey = `${currentTime.getFullYear()}-${currentTime.getMonth()}-${currentTime.getDate()}`
 
   useEffect(() => {
+    let mounted = true
+
+    const loadCommunicationChannels = async () => {
+      try {
+        const data = await listCommunicationChannels()
+        if (!mounted) return
+        setCommunicationChannels(data)
+        if (data.length > 0) {
+          setAlertSettings((previous) =>
+            previous.communicationChannelId ? previous : { ...previous, communicationChannelId: data[0].id },
+          )
+        }
+      } catch (error) {
+        console.error("[attendance] loadCommunicationChannels error", error)
+      }
+    }
+
+    loadCommunicationChannels()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  useEffect(() => {
     setAlertTriggeredToday(false)
   }, [currentDayKey, alertSettings.time])
 
@@ -1033,7 +1067,7 @@ export default function AttendancePage() {
       if (missed.length > 0) {
         toast({
           title: "Missed attendance alert ready",
-          description: `${missed.length} employee${missed.length > 1 ? "s" : ""} have not clocked in. Alert sent via ${alertSettings.channel}.`,
+          description: `${missed.length} employee${missed.length > 1 ? "s" : ""} have not clocked in. Alert sent via ${alertSettings.deliveryChannel}.`,
         })
         missed.forEach((record) => {
           void sendAttendanceAlert(record, { kind: "reminder" })
@@ -1244,7 +1278,7 @@ export default function AttendancePage() {
     })
   }
 
-  const communicationChannelId = "channel-ops"
+  const defaultCommunicationChannelId = "channel-ops"
 
   const sendAttendanceAlert = useCallback(
     async (record: AttendanceRecord, context: { kind: "reminder" | "status"; status?: AttendanceStatus }) => {
@@ -1254,20 +1288,26 @@ export default function AttendancePage() {
             ? crypto.randomUUID()
             : `attendance-msg-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
-        const channelName = alertSettings.channel
+        const targetChannelId = alertSettings.communicationChannelId ?? defaultCommunicationChannelId
+        const channelInfo = communicationChannels.find((channel) => channel.id === targetChannelId)
         const requiresAck = context.kind === "reminder" ? alertSettings.escalateToManagers : context.status === "absent"
         const priority = context.kind === "reminder" || context.status === "absent" ? "high" : "normal"
+        const deliveryLabel = alertSettings.deliveryChannel
+        const deliveryLabelText = deliveryLabel === "sms" ? "SMS" : deliveryLabel === "push" ? "Push" : "Email"
+        const destinationLabel = channelInfo?.name ?? targetChannelId
 
         const baseContent =
           context.kind === "reminder"
             ? `Attendance reminder: ${record.employeeName} has not clocked in for ${record.shift} (${record.date}).`
             : `Attendance status update: ${record.employeeName} is marked ${context.status ?? record.status} for ${record.date}.`
 
-        const content = `${baseContent} Notification broadcast via ${channelName}${alertSettings.escalateToManagers ? " with manager escalation" : ""}.`
+        const content = `${baseContent} Delivery via ${deliveryLabelText} and posted to ${destinationLabel}${
+          alertSettings.escalateToManagers ? " with manager escalation" : ""
+        }.`
 
         const message: CommunicationMessage = {
           id,
-          channelId: communicationChannelId,
+          channelId: targetChannelId,
           author: "Attendance Automation",
           authorRole: "Virtual Attendance Assistant",
           content,
@@ -1283,7 +1323,7 @@ export default function AttendancePage() {
         console.error("[attendance] sendAttendanceAlert error", error)
       }
     },
-    [alertSettings.channel, alertSettings.escalateToManagers],
+    [alertSettings.communicationChannelId, alertSettings.deliveryChannel, alertSettings.escalateToManagers, communicationChannels],
   )
 
   const handleUpdateAttendanceStatus = (id: string, status: AttendanceStatus) => {
@@ -1306,7 +1346,7 @@ export default function AttendancePage() {
   const handleSendReminder = (record: AttendanceRecord) => {
     toast({
       title: "Reminder queued",
-      description: `Notification sent to ${record.employeeName} via AI nudges and ${alertSettings.channel}.`,
+      description: `Notification sent to ${record.employeeName} via AI nudges and ${alertSettings.deliveryChannel}.`,
     })
 
     void sendAttendanceAlert(record, { kind: "reminder" })
@@ -3157,30 +3197,67 @@ export default function AttendancePage() {
                   </div>
                   <Switch checked={alertSettings.enabled} onCheckedChange={(checked) => setAlertSettings((previous) => ({ ...previous, enabled: checked }))} />
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label htmlFor="alert-time">Alert time</Label>
-                    <Input
-                      id="alert-time"
-                      type="time"
-                      value={alertSettings.time}
-                      onChange={(event) => setAlertSettings((previous) => ({ ...previous, time: event.target.value }))}
-                    />
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label htmlFor="alert-time">Alert time</Label>
+                      <Input
+                        id="alert-time"
+                        type="time"
+                        value={alertSettings.time}
+                        onChange={(event) => setAlertSettings((previous) => ({ ...previous, time: event.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Delivery channel</Label>
+                      <Select
+                        value={alertSettings.deliveryChannel}
+                        onValueChange={(value) =>
+                          setAlertSettings((previous) => ({
+                            ...previous,
+                            deliveryChannel: value as AlertSettings["deliveryChannel"],
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="email">Email digest</SelectItem>
+                          <SelectItem value="sms">SMS text</SelectItem>
+                          <SelectItem value="push">Mobile push</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div>
-                    <Label>Channel</Label>
-                    <Select value={alertSettings.channel} onValueChange={(value) => setAlertSettings((previous) => ({ ...previous, channel: value as AlertSettings["channel"] }))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="email">Email digest</SelectItem>
-                        <SelectItem value="sms">SMS text</SelectItem>
-                        <SelectItem value="push">Mobile push</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label>Communication stream</Label>
+                    {communicationChannels.length > 0 ? (
+                      <Select
+                        value={alertSettings.communicationChannelId ?? ""}
+                        onValueChange={(value) =>
+                          setAlertSettings((previous) => ({
+                            ...previous,
+                            communicationChannelId: value,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select channel" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {communicationChannels.map((channel) => (
+                            <SelectItem key={channel.id} value={channel.id}>
+                              {channel.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-xs text-slate-500">
+                        Communication service unavailable. Alerts will default to {defaultCommunicationChannelId}.
+                      </p>
+                    )}
                   </div>
-                </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="flex items-center justify-between rounded border p-3">
                     <div>
