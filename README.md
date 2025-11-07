@@ -1,3 +1,9 @@
+- Timesheet intelligence tables:
+  - `timesheet_snapshots`: aggregate weekly/hourly variances, fatigue risk indicators. Allows manager acknowledgement.
+  - `timesheet_anomalies`: individual exception rows (missing punches, lateness streaks) linked to snapshots.
+  - `timesheet_actions`: optional audit log for follow-ups (nudge, payroll escalation).
+  - Row-level-security grants employees access to their own records and HR/Admin to company-wide data. Insert/update expected via Supabase Functions/service role.
+
 # Supabase CLI
 
 [![Coverage Status](https://coveralls.io/repos/github/supabase/cli/badge.svg?branch=main)](https://coveralls.io/github/supabase/cli?branch=main) [![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/supabase-cli/setup-cli/master?style=flat-square&label=Bitbucket%20Canary)](https://bitbucket.org/supabase-cli/setup-cli/pipelines) [![Gitlab Pipeline Status](https://img.shields.io/gitlab/pipeline-status/sweatybridge%2Fsetup-cli?label=Gitlab%20Canary)
