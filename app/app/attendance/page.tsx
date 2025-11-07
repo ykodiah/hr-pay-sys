@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -201,6 +201,46 @@ interface GeoAnomaly {
   employeeName: string
   reason: string
   detail: string
+}
+
+interface AttendancePolicy {
+  id: string
+  name: string
+  policy_type: string
+  scope_type: string
+  scope_reference: string | null
+  grace_minutes: number | null
+  rounding_increment: number | null
+  rounding_mode: string | null
+  penalty_type: string | null
+  penalty_value: number | null
+  auto_escalate: boolean
+  escalation_minutes: number | null
+  escalation_channel: string | null
+  payroll_action: string | null
+  effective_from: string
+  effective_to: string | null
+  is_active: boolean
+}
+
+interface AttendancePolicyForm {
+  id?: string
+  name: string
+  policy_type: string
+  scope_type: string
+  scope_reference: string
+  grace_minutes: number
+  rounding_increment: number
+  rounding_mode: string
+  penalty_type: string
+  penalty_value: string
+  auto_escalate: boolean
+  escalation_minutes: string
+  escalation_channel: string
+  payroll_action: string
+  effective_from: string
+  effective_to: string
+  is_active: boolean
 }
 
 type SupabaseAttendanceRecord = {
@@ -742,6 +782,34 @@ export default function AttendancePage() {
   const [geoCapture, setGeoCapture] = useState<GeoCapture | null>(null)
   const [isCapturingLocation, setIsCapturingLocation] = useState(false)
 
+  const createPolicyDefaults = useCallback(
+    (): AttendancePolicyForm => ({
+      name: "",
+      policy_type: "grace",
+      scope_type: "company",
+      scope_reference: "",
+      grace_minutes: 10,
+      rounding_increment: 0,
+      rounding_mode: "nearest",
+      penalty_type: "",
+      penalty_value: "",
+      auto_escalate: false,
+      escalation_minutes: "",
+      escalation_channel: "email",
+      payroll_action: "",
+      effective_from: formatDateByOffset(0),
+      effective_to: "",
+      is_active: true,
+    }),
+    [],
+  )
+
+  const [policies, setPolicies] = useState<AttendancePolicy[]>([])
+  const [isLoadingPolicies, setIsLoadingPolicies] = useState(false)
+  const [policyDialogOpen, setPolicyDialogOpen] = useState(false)
+  const [isSavingPolicy, setIsSavingPolicy] = useState(false)
+  const [policyForm, setPolicyForm] = useState<AttendancePolicyForm>(() => createPolicyDefaults())
+
   const [shiftForm, setShiftForm] = useState({
     id: "",
     name: "",
@@ -885,6 +953,31 @@ export default function AttendancePage() {
     }, 1000)
     return () => clearInterval(timer)
   }, [])
+
+  const loadAttendancePolicies = useCallback(async () => {
+    try {
+      setIsLoadingPolicies(true)
+      const response = await fetch("/api/policies/attendance")
+      if (!response.ok) {
+        throw new Error("Failed to load attendance policies")
+      }
+      const payload = await response.json()
+      setPolicies(payload.data ?? [])
+    } catch (error) {
+      console.error("[attendance] loadAttendancePolicies error", error)
+      toast({
+        title: "Unable to load policies",
+        description: "Attendance policy automations could not be retrieved.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingPolicies(false)
+    }
+  }, [toast])
+
+  useEffect(() => {
+    loadAttendancePolicies()
+  }, [loadAttendancePolicies])
 
   const currentDayKey = `${currentTime.getFullYear()}-${currentTime.getMonth()}-${currentTime.getDate()}`
 
@@ -1346,6 +1439,134 @@ export default function AttendancePage() {
       },
       { enableHighAccuracy: true, timeout: 8000 },
     )
+  }
+
+  const handleOpenNewPolicyDialog = () => {
+    setPolicyForm(createPolicyDefaults())
+    setPolicyDialogOpen(true)
+  }
+
+  const handleEditPolicy = (policy: AttendancePolicy) => {
+    setPolicyForm({
+      id: policy.id,
+      name: policy.name,
+      policy_type: policy.policy_type ?? "grace",
+      scope_type: policy.scope_type ?? "company",
+      scope_reference: policy.scope_reference ?? "",
+      grace_minutes: policy.grace_minutes ?? 0,
+      rounding_increment: policy.rounding_increment ?? 0,
+      rounding_mode: policy.rounding_mode ?? "nearest",
+      penalty_type: policy.penalty_type ?? "",
+      penalty_value: policy.penalty_value !== null && policy.penalty_value !== undefined ? String(policy.penalty_value) : "",
+      auto_escalate: policy.auto_escalate ?? false,
+      escalation_minutes:
+        policy.escalation_minutes !== null && policy.escalation_minutes !== undefined ? String(policy.escalation_minutes) : "",
+      escalation_channel: policy.escalation_channel ?? "email",
+      payroll_action: policy.payroll_action ?? "",
+      effective_from: policy.effective_from ?? formatDateByOffset(0),
+      effective_to: policy.effective_to ?? "",
+      is_active: policy.is_active ?? true,
+    })
+    setPolicyDialogOpen(true)
+  }
+
+  const handlePolicyFormChange = (field: keyof AttendancePolicyForm, value: string | number | boolean) => {
+    setPolicyForm((previous) => ({
+      ...previous,
+      [field]: value,
+    }))
+  }
+
+  const handleSavePolicy = async () => {
+    if (!policyForm.name.trim()) {
+      toast({ title: "Policy name required", description: "Provide a name for the attendance policy." })
+      return
+    }
+
+    if (policyForm.policy_type === "grace" && policyForm.grace_minutes < 0) {
+      toast({ title: "Invalid grace minutes", description: "Grace minutes must be zero or positive." })
+      return
+    }
+
+    setIsSavingPolicy(true)
+
+    try {
+      const payload = {
+        id: policyForm.id,
+        name: policyForm.name.trim(),
+        policy_type: policyForm.policy_type,
+        scope_type: policyForm.scope_type,
+        scope_reference: policyForm.scope_reference || null,
+        grace_minutes: Number.isFinite(policyForm.grace_minutes) ? Number(policyForm.grace_minutes) : 0,
+        rounding_increment: Number(policyForm.rounding_increment) || 0,
+        rounding_mode: policyForm.rounding_mode,
+        penalty_type: policyForm.penalty_type || null,
+        penalty_value: policyForm.penalty_value ? Number(policyForm.penalty_value) : null,
+        auto_escalate: policyForm.auto_escalate,
+        escalation_minutes: policyForm.escalation_minutes ? Number(policyForm.escalation_minutes) : null,
+        escalation_channel: policyForm.escalation_channel,
+        payroll_action: policyForm.payroll_action || null,
+        effective_from: policyForm.effective_from || formatDateByOffset(0),
+        effective_to: policyForm.effective_to || null,
+        is_active: policyForm.is_active,
+      }
+
+      const response = await fetch("/api/policies/attendance", {
+        method: policyForm.id ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to save policy")
+      }
+
+      toast({
+        title: policyForm.id ? "Policy updated" : "Policy created",
+        description: policyForm.id
+          ? "Attendance policy updated successfully."
+          : "Attendance policy created and ready for automation.",
+      })
+      setPolicyDialogOpen(false)
+      setPolicyForm(createPolicyDefaults())
+      loadAttendancePolicies()
+    } catch (error) {
+      console.error("[attendance] handleSavePolicy error", error)
+      toast({
+        title: "Unable to save policy",
+        description: "There was a problem saving the attendance policy.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingPolicy(false)
+    }
+  }
+
+  const handleTogglePolicyActive = async (policy: AttendancePolicy) => {
+    try {
+      const response = await fetch("/api/policies/attendance", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: policy.id, is_active: !policy.is_active }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to update policy state")
+      }
+
+      toast({
+        title: "Policy updated",
+        description: `${policy.name} ${policy.is_active ? "disabled" : "activated"}.`,
+      })
+      loadAttendancePolicies()
+    } catch (error) {
+      console.error("[attendance] handleTogglePolicyActive error", error)
+      toast({
+        title: "Unable to update policy",
+        description: "We couldn't change the policy state. Try again later.",
+        variant: "destructive",
+      })
+    }
   }
 
   const getStatusColor = (status: AttendanceStatus) => {
@@ -2910,14 +3131,75 @@ export default function AttendancePage() {
                 </div>
               </CardContent>
             </Card>
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
-                    <Download className="h-5 w-5 text-emerald-500" /> Timesheet automations
-                  </CardTitle>
-                  <CardDescription>Export payroll-ready timesheets or push variances into payroll review.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2">
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                <ShieldCheck className="h-5 w-5 text-emerald-500" /> Attendance policy automation
+              </CardTitle>
+              <CardDescription>Grace periods, rounding, and penalties applied automatically.</CardDescription>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={handleOpenNewPolicyDialog}>
+                  <Plus className="mr-2 h-4 w-4" /> New policy
+                </Button>
+                <Button size="sm" variant="outline" onClick={loadAttendancePolicies}>
+                  <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-slate-600">
+              {isLoadingPolicies ? (
+                <p className="text-xs text-slate-500">Loading attendance policies…</p>
+              ) : policies.length ? (
+                policies.map((policy) => (
+                  <div
+                    key={policy.id}
+                    className="flex flex-col gap-2 rounded border border-slate-200 bg-white p-3 shadow-sm md:flex-row md:items-center md:justify-between"
+                  >
+                    <div>
+                      <p className="font-semibold text-slate-900">{policy.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {policy.policy_type === "grace"
+                          ? `Grace period ${policy.grace_minutes ?? 0} min`
+                          : policy.policy_type.replace(/^\w/, (char) => char.toUpperCase())}
+                        {" • "}
+                        Scope {policy.scope_type}
+                      </p>
+                      {policy.penalty_type && (
+                        <p className="text-xs text-rose-600">
+                          Penalty: {policy.penalty_type}
+                          {policy.penalty_value ? ` (${policy.penalty_value})` : ""}
+                        </p>
+                      )}
+                      <p className="text-[11px] text-slate-400">
+                        {policy.effective_from} — {policy.effective_to ?? "No end date"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={policy.is_active}
+                        onCheckedChange={() => handleTogglePolicyActive(policy)}
+                        aria-label="Toggle policy activation"
+                      />
+                      <Button size="sm" variant="outline" onClick={() => handleEditPolicy(policy)}>
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-slate-500">No automation policies defined yet.</p>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                <Download className="h-5 w-5 text-emerald-500" /> Timesheet automations
+              </CardTitle>
+              <CardDescription>Export payroll-ready timesheets or push variances into payroll review.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2 rounded border border-slate-200 p-4">
                     <p className="text-sm font-medium text-slate-800">Weekly CSV export</p>
                     <p className="text-xs text-slate-500">Compile timesheet CSV filtered by current date range and filters.</p>
@@ -2941,8 +3223,8 @@ export default function AttendancePage() {
                       <RefreshCw className="mr-2 h-4 w-4" /> Queue sync
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
+            </CardContent>
+          </Card>
           </div>
 
           <Dialog open={holidayDialogOpen} onOpenChange={setHolidayDialogOpen}>
@@ -3017,6 +3299,214 @@ export default function AttendancePage() {
                     Cancel
                   </Button>
                   <Button onClick={handleAddHoliday}>Save holiday</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={policyDialogOpen} onOpenChange={setPolicyDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{policyForm.id ? "Edit attendance policy" : "New attendance policy"}</DialogTitle>
+                <DialogDescription>Configure grace periods, rounding, and penalty automation for attendance.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="policy-name">Policy name</Label>
+                    <Input
+                      id="policy-name"
+                      value={policyForm.name}
+                      onChange={(event) => handlePolicyFormChange("name", event.target.value)}
+                      placeholder="e.g., Morning shift grace"
+                    />
+                  </div>
+                  <div>
+                    <Label>Policy type</Label>
+                    <Select value={policyForm.policy_type} onValueChange={(value) => handlePolicyFormChange("policy_type", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="grace">Grace period</SelectItem>
+                        <SelectItem value="rounding">Rounding</SelectItem>
+                        <SelectItem value="penalty">Penalty</SelectItem>
+                        <SelectItem value="payroll">Payroll sync</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label>Scope</Label>
+                    <Select value={policyForm.scope_type} onValueChange={(value) => handlePolicyFormChange("scope_type", value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="company">Company-wide</SelectItem>
+                        <SelectItem value="subsidiary">Subsidiary</SelectItem>
+                        <SelectItem value="department">Department</SelectItem>
+                        <SelectItem value="team">Team</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="policy-scope-reference">Scope reference (optional)</Label>
+                    <Input
+                      id="policy-scope-reference"
+                      value={policyForm.scope_reference}
+                      onChange={(event) => handlePolicyFormChange("scope_reference", event.target.value)}
+                      placeholder="Subsidiary or department id"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div>
+                    <Label htmlFor="policy-grace-minutes">Grace minutes</Label>
+                    <Input
+                      id="policy-grace-minutes"
+                      type="number"
+                      min={0}
+                      value={policyForm.grace_minutes}
+                      onChange={(event) => handlePolicyFormChange("grace_minutes", Number(event.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="policy-rounding-increment">Rounding increment (minutes)</Label>
+                    <Input
+                      id="policy-rounding-increment"
+                      type="number"
+                      min={0}
+                      value={policyForm.rounding_increment}
+                      onChange={(event) => handlePolicyFormChange("rounding_increment", Number(event.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Rounding mode</Label>
+                    <Select value={policyForm.rounding_mode} onValueChange={(value) => handlePolicyFormChange("rounding_mode", value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="nearest">Nearest</SelectItem>
+                        <SelectItem value="up">Round up</SelectItem>
+                        <SelectItem value="down">Round down</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="policy-penalty-type">Penalty type</Label>
+                    <Input
+                      id="policy-penalty-type"
+                      value={policyForm.penalty_type}
+                      onChange={(event) => handlePolicyFormChange("penalty_type", event.target.value)}
+                      placeholder="e.g., Points"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="policy-penalty-value">Penalty value</Label>
+                    <Input
+                      id="policy-penalty-value"
+                      value={policyForm.penalty_value}
+                      onChange={(event) => handlePolicyFormChange("penalty_value", event.target.value)}
+                      placeholder="Optional numeric value"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="flex items-center justify-between rounded border p-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">Auto escalate</p>
+                      <p className="text-xs text-slate-500">Notify managers when the policy triggers.</p>
+                    </div>
+                    <Switch
+                      checked={policyForm.auto_escalate}
+                      onCheckedChange={(checked) => handlePolicyFormChange("auto_escalate", checked)}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="policy-escalation-minutes">Escalation minutes</Label>
+                    <Input
+                      id="policy-escalation-minutes"
+                      type="number"
+                      min={0}
+                      value={policyForm.escalation_minutes}
+                      onChange={(event) => handlePolicyFormChange("escalation_minutes", event.target.value)}
+                      placeholder="e.g., 30"
+                    />
+                    <Label>Escalation channel</Label>
+                    <Select
+                      value={policyForm.escalation_channel}
+                      onValueChange={(value) => handlePolicyFormChange("escalation_channel", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="sms">SMS</SelectItem>
+                        <SelectItem value="push">Push</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="policy-payroll-action">Payroll action</Label>
+                    <Input
+                      id="policy-payroll-action"
+                      value={policyForm.payroll_action}
+                      onChange={(event) => handlePolicyFormChange("payroll_action", event.target.value)}
+                      placeholder="e.g., Deduct half-day"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 rounded border p-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-800">Policy active</p>
+                      <p className="text-xs text-slate-500">Disable to pause the automation.</p>
+                    </div>
+                    <Switch
+                      checked={policyForm.is_active}
+                      onCheckedChange={(checked) => handlePolicyFormChange("is_active", checked)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="policy-effective-from">Effective from</Label>
+                    <Input
+                      id="policy-effective-from"
+                      type="date"
+                      value={policyForm.effective_from}
+                      onChange={(event) => handlePolicyFormChange("effective_from", event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="policy-effective-to">Effective to (optional)</Label>
+                    <Input
+                      id="policy-effective-to"
+                      type="date"
+                      value={policyForm.effective_to}
+                      onChange={(event) => handlePolicyFormChange("effective_to", event.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setPolicyDialogOpen(false)} disabled={isSavingPolicy}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSavePolicy} disabled={isSavingPolicy}>
+                    {isSavingPolicy ? "Saving..." : "Save policy"}
+                  </Button>
                 </div>
               </div>
             </DialogContent>
