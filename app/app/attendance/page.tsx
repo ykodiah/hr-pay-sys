@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { createClient } from "@/lib/supabase/client"
+import { sendMessage as sendCommunicationMessage, type CommunicationMessage } from "@/lib/api/communication-service"
 import {
   AlertCircle,
   BarChart3,
@@ -1034,10 +1035,13 @@ export default function AttendancePage() {
           title: "Missed attendance alert ready",
           description: `${missed.length} employee${missed.length > 1 ? "s" : ""} have not clocked in. Alert sent via ${alertSettings.channel}.`,
         })
+        missed.forEach((record) => {
+          void sendAttendanceAlert(record, { kind: "reminder" })
+        })
         setAlertTriggeredToday(true)
       }
     }
-  }, [alertSettings, alertTriggeredToday, attendanceRecords, currentTime, toast])
+  }, [alertSettings, alertTriggeredToday, attendanceRecords, currentTime, sendAttendanceAlert, toast])
 
   const uniqueValues = useMemo(() => {
     const unique = {
@@ -1240,14 +1244,63 @@ export default function AttendancePage() {
     })
   }
 
+  const communicationChannelId = "channel-ops"
+
+  const sendAttendanceAlert = useCallback(
+    async (record: AttendanceRecord, context: { kind: "reminder" | "status"; status?: AttendanceStatus }) => {
+      try {
+        const id =
+          typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : `attendance-msg-${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+        const channelName = alertSettings.channel
+        const requiresAck = context.kind === "reminder" ? alertSettings.escalateToManagers : context.status === "absent"
+        const priority = context.kind === "reminder" || context.status === "absent" ? "high" : "normal"
+
+        const baseContent =
+          context.kind === "reminder"
+            ? `Attendance reminder: ${record.employeeName} has not clocked in for ${record.shift} (${record.date}).`
+            : `Attendance status update: ${record.employeeName} is marked ${context.status ?? record.status} for ${record.date}.`
+
+        const content = `${baseContent} Notification broadcast via ${channelName}${alertSettings.escalateToManagers ? " with manager escalation" : ""}.`
+
+        const message: CommunicationMessage = {
+          id,
+          channelId: communicationChannelId,
+          author: "Attendance Automation",
+          authorRole: "Virtual Attendance Assistant",
+          content,
+          sentAt: new Date().toISOString(),
+          priority,
+          requiresAck,
+          acknowledgedBy: [],
+          tags: ["attendance", context.kind === "reminder" ? "missed-clock-in" : "status-update"],
+        }
+
+        await sendCommunicationMessage(message)
+      } catch (error) {
+        console.error("[attendance] sendAttendanceAlert error", error)
+      }
+    },
+    [alertSettings.channel, alertSettings.escalateToManagers],
+  )
+
   const handleUpdateAttendanceStatus = (id: string, status: AttendanceStatus) => {
+    const targetRecord = attendanceRecords.find((record) => record.id === id)
+
     setAttendanceRecords((previous) =>
       previous.map((record) => (record.id === id ? { ...record, status, clockIn: record.clockIn || "08:30" } : record)),
     )
+
     toast({
       title: "Attendance updated",
       description: `Status flagged as ${status.replace("-", " ")}.`,
     })
+
+    if (targetRecord) {
+      void sendAttendanceAlert({ ...targetRecord, status }, { kind: "status", status })
+    }
   }
 
   const handleSendReminder = (record: AttendanceRecord) => {
@@ -1255,6 +1308,8 @@ export default function AttendancePage() {
       title: "Reminder queued",
       description: `Notification sent to ${record.employeeName} via AI nudges and ${alertSettings.channel}.`,
     })
+
+    void sendAttendanceAlert(record, { kind: "reminder" })
   }
 
   const handleToggleShiftActive = (id: string) => {

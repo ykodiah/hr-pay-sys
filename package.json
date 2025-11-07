@@ -17,7 +17,8 @@
     "dev": "next dev",
     "lint": "next lint",
     "smoke": "bash scripts/smoke-tests.sh",
-    "start": "next start"
+    "start": "next start",
+    "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
     "@ai-sdk/groq": "latest",
@@ -94,7 +95,8 @@
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "tsx": "^4.19.2"
   },
   "engines": {
     "node": ">=18.0.0"
