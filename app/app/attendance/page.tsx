@@ -481,6 +481,30 @@ const parseLastSyncMinutes = (input?: string): number => {
   return 999
 }
 
+const GHANA_BOUNDS = {
+  minLat: 4.5,
+  maxLat: 11.5,
+  minLon: -3.5,
+  maxLon: 1.5,
+}
+
+const resolveGeoCoordinate = (rawLocation: string | null | undefined) => {
+  if (!rawLocation) return null
+  const trimmed = rawLocation.trim()
+  if (!trimmed) return null
+
+  if (locationCoordinateLookup[trimmed]) {
+    return locationCoordinateLookup[trimmed]
+  }
+
+  const base = trimmed.split(" - ")[0]
+  if (locationCoordinateLookup[base]) {
+    return locationCoordinateLookup[base]
+  }
+
+  return null
+}
+
 const initialAttendanceRecords: AttendanceRecord[] = [
   {
     id: "ATT-001",
@@ -695,6 +719,23 @@ const initialBiometricDevices: BiometricDevice[] = [
   },
 ]
 
+const locationCoordinateLookup: Record<string, { lat: number; lon: number }> = {
+  "Accra HQ": { lat: 5.6037, lon: -0.187 },
+  "Accra HQ - Main Lobby": { lat: 5.6037, lon: -0.187 },
+  "Accra HQ - Executive Floor": { lat: 5.6043, lon: -0.186 },
+  "Accra HQ - Logistics Dock": { lat: 5.6021, lon: -0.189 },
+  "Tema Plant": { lat: 5.667, lon: -0.016 },
+  "Tema Plant - Security": { lat: 5.6668, lon: -0.0165 },
+  "Tema Plant - Shipping": { lat: 5.6681, lon: -0.0156 },
+  "Kumasi Hub": { lat: 6.6885, lon: -1.6244 },
+  "Kumasi Hub - Front Desk": { lat: 6.6892, lon: -1.6239 },
+  "Takoradi Depot": { lat: 4.9049, lon: -1.7569 },
+  "Tamale Warehouse": { lat: 9.4071, lon: -0.8393 },
+  "Sunyani Branch": { lat: 7.3393, lon: -2.3268 },
+  "Cape Coast Service": { lat: 5.1053, lon: -1.2466 },
+  Remote: { lat: 5.6145, lon: -0.2055 },
+}
+
 const initialOvertimeRequests: OvertimeRequest[] = [
   {
     id: "OT-001",
@@ -887,6 +928,7 @@ export default function AttendancePage() {
 
   const [communicationChannels, setCommunicationChannels] = useState<CommunicationChannel[]>([])
   const [subsidiaryOptions, setSubsidiaryOptions] = useState<SupabaseSubsidiary[]>([])
+  const offlineAlertedDevicesRef = useRef<Set<string>>(new Set())
 
   const formatDeliveryChannel = useCallback((channel: AlertSettings["deliveryChannel"]) => {
     if (channel === "sms") return "SMS"
@@ -1145,6 +1187,67 @@ export default function AttendancePage() {
     [departmentOptions, policyForm.scope_type, subsidiaryOptions, teamOptions],
   )
 
+  const geoHeatmap = useMemo(() => {
+    const pointsMap = new Map<
+      string,
+      {
+        location: string
+        count: number
+        lat: number
+        lon: number
+        latestDate: string
+      }
+    >()
+
+    attendanceRecords.forEach((record) => {
+      const coordinate = resolveGeoCoordinate(record.location)
+      if (!coordinate) {
+        return
+      }
+
+      const key = `${coordinate.lat.toFixed(4)}-${coordinate.lon.toFixed(4)}`
+      const existing = pointsMap.get(key)
+      if (existing) {
+        existing.count += 1
+        if (record.date > existing.latestDate) {
+          existing.latestDate = record.date
+        }
+      } else {
+        pointsMap.set(key, {
+          location: record.location || "Unknown location",
+          count: 1,
+          lat: coordinate.lat,
+          lon: coordinate.lon,
+          latestDate: record.date,
+        })
+      }
+    })
+
+    const total = Array.from(pointsMap.values()).reduce((acc, entry) => acc + entry.count, 0)
+    const points = Array.from(pointsMap.values()).map((entry, index) => {
+      const lonRange = GHANA_BOUNDS.maxLon - GHANA_BOUNDS.minLon
+      const latRange = GHANA_BOUNDS.maxLat - GHANA_BOUNDS.minLat
+      const xRatio = lonRange > 0 ? (entry.lon - GHANA_BOUNDS.minLon) / lonRange : 0.5
+      const yRatio = latRange > 0 ? (entry.lat - GHANA_BOUNDS.minLat) / latRange : 0.5
+      const size = Math.min(42, Math.max(12, 16 + entry.count * 4))
+
+      return {
+        id: `${entry.location}-${index}`,
+        location: entry.location,
+        count: entry.count,
+        latestDate: entry.latestDate,
+        leftPercent: Math.min(95, Math.max(5, xRatio * 100)),
+        topPercent: Math.min(95, Math.max(5, (1 - yRatio) * 100)),
+        size,
+      }
+    })
+
+    return {
+      total,
+      points,
+    }
+  }, [attendanceRecords])
+
   useEffect(() => {
     if (policyForm.scope_type === "company") {
       if (policyForm.scope_reference !== "") {
@@ -1162,6 +1265,22 @@ export default function AttendancePage() {
       setPolicyForm((previous) => ({ ...previous, scope_reference: scopeReferenceOptions[0].value }))
     }
   }, [policyForm.scope_reference, policyForm.scope_type, scopeReferenceOptions])
+
+  const slaBreaches = useMemo(() => {
+    return complianceDevices.filter((device) => device.minutesSinceSync > 30 || device.status === "offline")
+  }, [complianceDevices])
+
+  useEffect(() => {
+    complianceDevices
+      .filter((device) => device.health === "critical")
+      .forEach((device) => {
+        if (offlineAlertedDevicesRef.current.has(device.id)) {
+          return
+        }
+        offlineAlertedDevicesRef.current.add(device.id)
+        void sendDeviceAlert(device, { reason: "offline" })
+      })
+  }, [complianceDevices, sendDeviceAlert])
 
   const filteredRecords = useMemo(() => {
     const today = new Date()
@@ -1391,6 +1510,49 @@ export default function AttendancePage() {
     ],
   )
 
+  const sendDeviceAlert = useCallback(
+    async (device: ComplianceDevice, context: { reason: "offline" | "latency" }) => {
+      try {
+        const id =
+          typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : `device-alert-${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+        const targetChannelId = alertSettings.communicationChannelId ?? defaultCommunicationChannelId
+        const channelInfo = communicationChannels.find((channel) => channel.id === targetChannelId)
+        const deliveryLabelText = formatDeliveryChannel(alertSettings.deliveryChannel)
+        const destinationLabel = channelInfo?.name ?? targetChannelId
+
+        const baseContent =
+          context.reason === "offline"
+            ? `Device offline: ${device.name} at ${device.location || "Unknown site"} has been offline for ${
+                device.minutesSinceSync >= 999 ? "an extended period" : `${device.minutesSinceSync} minutes`
+              }.`
+            : `Device latency: ${device.name} sync delay of ${device.minutesSinceSync} minutes exceeds SLA threshold.`
+
+        const content = `${baseContent} Delivery via ${deliveryLabelText} and posted to ${destinationLabel}.`
+
+        const message: CommunicationMessage = {
+          id,
+          channelId: targetChannelId,
+          author: "Attendance Automation",
+          authorRole: "Device Monitoring",
+          content,
+          sentAt: new Date().toISOString(),
+          priority: context.reason === "offline" ? "critical" : "high",
+          requiresAck: true,
+          acknowledgedBy: [],
+          tags: ["attendance", "device-alert", context.reason === "offline" ? "offline" : "latency"],
+        }
+
+        await sendCommunicationMessage(message)
+      } catch (error) {
+        console.error("[attendance] sendDeviceAlert error", error)
+      }
+    },
+    [alertSettings.communicationChannelId, alertSettings.deliveryChannel, communicationChannels, formatDeliveryChannel],
+  )
+
   const handleUpdateAttendanceStatus = (id: string, status: AttendanceStatus) => {
     const targetRecord = attendanceRecords.find((record) => record.id === id)
 
@@ -1415,6 +1577,24 @@ export default function AttendancePage() {
     })
 
     void sendAttendanceAlert(record, { kind: "reminder" })
+  }
+
+  const handleEscalateDevice = (device: ComplianceDevice) => {
+    toast({
+      title: "Device escalation queued",
+      description: `${device.name} notification dispatched to compliance channel.`,
+    })
+
+    void sendDeviceAlert(device, { reason: device.health === "critical" ? "offline" : "latency" })
+  }
+
+  const handleExportGeoHeatmap = () => {
+    toast({
+      title: "Heatmap export queued",
+      description: geoHeatmap.total
+        ? `${geoHeatmap.total} geo-tagged events packaged for compliance review.`
+        : "No geo-tagged events available yet.",
+    })
   }
 
   const handleToggleShiftActive = (id: string) => {
@@ -3109,19 +3289,46 @@ export default function AttendancePage() {
               <Card className="border-amber-100">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-sm font-medium text-amber-700">
-                    <Activity className="h-4 w-4" /> Sync latency
+                    <Activity className="h-4 w-4" /> Sync latency & SLA
                   </CardTitle>
-                  <CardDescription className="text-xs text-slate-500">Minutes since last sync</CardDescription>
+                  <CardDescription className="text-xs text-slate-500">
+                    SLA breach if sync exceeds 30 minutes • {slaBreaches.length} device{slaBreaches.length === 1 ? "" : "s"} at risk
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-2 text-xs text-slate-600">
-                  {deviceCompliance.devices.slice(0, 3).map((device) => (
-                    <div key={device.id} className="flex items-center justify-between rounded border border-amber-100 bg-amber-50 px-3 py-2">
-                      <span className="font-medium text-amber-800">{device.name}</span>
-                      <span className="text-amber-700">
-                        {device.minutesSinceSync >= 999 ? ">999" : device.minutesSinceSync}m
-                      </span>
-                    </div>
-                  ))}
+                <CardContent className="space-y-3 text-xs text-slate-600">
+                  {deviceCompliance.devices.slice(0, 4).map((device) => {
+                    const breach = device.minutesSinceSync > 30 || device.status === "offline"
+                    return (
+                      <div
+                        key={device.id}
+                        className={cn(
+                          "flex flex-col gap-1 rounded border px-3 py-2",
+                          breach ? "border-rose-200 bg-rose-50" : "border-amber-100 bg-amber-50",
+                        )}
+                      >
+                        <div className="flex items-center justify-between text-[13px] font-medium text-slate-900">
+                          <span>{device.name}</span>
+                          <span className={breach ? "text-rose-700" : "text-amber-700"}>
+                            {device.minutesSinceSync >= 999 ? ">999" : device.minutesSinceSync}m
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-500">
+                          <span>{device.location || "Unknown site"}</span>
+                          <span>{device.status.toUpperCase()}</span>
+                        </div>
+                        {breach && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 self-start text-[11px]"
+                            onClick={() => handleEscalateDevice(device)}
+                          >
+                            Escalate via comms
+                          </Button>
+                        )}
+                      </div>
+                    )
+                  })}
                   {!deviceCompliance.devices.length && <p>No devices connected.</p>}
                 </CardContent>
               </Card>
@@ -3177,7 +3384,17 @@ export default function AttendancePage() {
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm text-slate-600">
                   {deviceCompliance.devices.slice(0, 6).map((device) => (
-                    <div key={device.id} className="flex flex-col rounded border bg-white p-3 shadow-sm">
+                    <div
+                      key={device.id}
+                      className={cn(
+                        "flex flex-col rounded border bg-white p-3 shadow-sm",
+                        device.health === "critical"
+                          ? "border-rose-200"
+                          : device.health === "warning"
+                            ? "border-amber-200"
+                            : "border-slate-200",
+                      )}
+                    >
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-semibold text-slate-900">{device.name}</span>
                         <Badge
@@ -3196,6 +3413,31 @@ export default function AttendancePage() {
                         <span>{device.location || "Unknown location"}</span>
                         <span>{device.lastSync}</span>
                       </div>
+                      {(device.health === "warning" || device.health === "critical") && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-[11px]"
+                            onClick={() => handleEscalateDevice(device)}
+                          >
+                            Escalate issue
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-[11px] text-slate-600 hover:bg-slate-100"
+                            onClick={() =>
+                              toast({
+                                title: "Maintenance task logged",
+                                description: `${device.name} added to the device maintenance queue.`,
+                              })
+                            }
+                          >
+                            Log maintenance
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ))}
                   {!deviceCompliance.devices.length && <p>No devices to display.</p>}
@@ -3241,32 +3483,105 @@ export default function AttendancePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
-                  <Globe className="h-5 w-5 text-emerald-500" /> Geo-fence map view
+                  <Globe className="h-5 w-5 text-emerald-500" /> Geo-fence heatmap
                 </CardTitle>
-                <CardDescription>Visual heatmap of remote check-ins with risk overlays (preview).</CardDescription>
+                <CardDescription>
+                  Live density of mobile check-ins across Ghana. Sized by activity, coloured by proximity to SLA breaches.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-center rounded-lg border border-dashed border-emerald-200 bg-emerald-50/40 p-10 text-sm text-emerald-700">
-                  Interactive map coming soon — integrate Mapbox or Leaflet to visualise geo-fence coverage.
+              <CardContent className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+                <div className="relative h-72 overflow-hidden rounded-xl border border-emerald-100 bg-[radial-gradient(circle_at_center,_#ecfdf5,_#e0f2fe)]">
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(16,185,129,0.05),_transparent_60%)]" />
+                  <div className="pointer-events-none absolute inset-4 rounded-lg border border-white/40" />
+                  {geoHeatmap.points.length ? (
+                    geoHeatmap.points.map((point) => (
+                      <div
+                        key={point.id}
+                        className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[10px] font-semibold text-white shadow-lg ring-2 ring-emerald-50"
+                        style={{
+                          left: `${point.leftPercent}%`,
+                          top: `${point.topPercent}%`,
+                          width: point.size,
+                          height: point.size,
+                          background:
+                            point.count > 6
+                              ? "rgba(239, 68, 68, 0.8)"
+                              : point.count > 3
+                                ? "rgba(250, 204, 21, 0.8)"
+                                : "rgba(16, 185, 129, 0.8)",
+                        }}
+                        title={`${point.location} • ${point.count} check-ins`}
+                      >
+                        {point.count}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-emerald-700">
+                      No geo-tagged check-ins yet. Mobile events will appear here.
+                    </div>
+                  )}
+                  <div className="pointer-events-none absolute bottom-3 left-3 flex gap-2 text-[11px] text-slate-600">
+                    <span className="flex items-center gap-1 rounded-full bg-emerald-500/80 px-2 py-0.5 text-white">
+                      <span className="h-2 w-2 rounded-full bg-white" /> Healthy density
+                    </span>
+                    <span className="flex items-center gap-1 rounded-full bg-amber-400/80 px-2 py-0.5 text-white">
+                      <span className="h-2 w-2 rounded-full bg-white" /> Watchlist
+                    </span>
+                    <span className="flex items-center gap-1 rounded-full bg-rose-500/80 px-2 py-0.5 text-white">
+                      <span className="h-2 w-2 rounded-full bg-white" /> Escalate now
+                    </span>
+                  </div>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    toast({
-                      title: "Map export queued",
-                      description: "Geo-fence coverage report will be emailed to compliance admins.",
-                    })
-                  }
-                >
-                  <Download className="mr-2 h-4 w-4" /> Export geo coverage report
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                <div className="space-y-4 text-sm text-slate-600">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {geoHeatmap.total} geo-tagged events monitored
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Top hotspots ordered by activity. Use this to validate geo-fence coverage and spot potential spoofing.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {geoHeatmap.points.slice(0, 5).map((point) => (
+                      <div key={point.id} className="flex items-center justify-between rounded border border-slate-200 bg-white px-3 py-2">
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{point.location}</p>
+                          <p className="text-[11px] text-slate-500">Last seen {point.latestDate}</p>
+                        </div>
+                        <Badge className="bg-emerald-100 text-emerald-700">{point.count} logs</Badge>
+                      </div>
+                    ))}
+                    {!geoHeatmap.points.length && (
+                      <p className="text-xs text-slate-500">
+                        Encourage remote teams to enable geo tagging to populate this heatmap.
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={handleExportGeoHeatmap}>
+                      <Download className="mr-2 h-4 w-4" /> Export heatmap snapshot
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-emerald-600 text-white hover:bg-emerald-700"
+                      onClick={() =>
+                        toast({
+                          title: "GIS sync pending",
+                          description: "Heatmap queued for the enterprise GIS workspace.",
+                        })
+                      }
+                    >
+                      Sync to GIS workspace
+                    </Button>
+                  </div>
+                </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-        <TabsContent value="automation" className="space-y-6">
-            <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
+            <TabsContent value="automation" className="space-y-6">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
                   <BellRing className="h-5 w-5 text-amber-500" /> Missed attendee alerts
