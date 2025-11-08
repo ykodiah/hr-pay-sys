@@ -886,6 +886,13 @@ export default function AttendancePage() {
   })
 
   const [communicationChannels, setCommunicationChannels] = useState<CommunicationChannel[]>([])
+  const [subsidiaryOptions, setSubsidiaryOptions] = useState<SupabaseSubsidiary[]>([])
+
+  const formatDeliveryChannel = useCallback((channel: AlertSettings["deliveryChannel"]) => {
+    if (channel === "sms") return "SMS"
+    if (channel === "push") return "Push"
+    return "Email"
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -957,6 +964,7 @@ export default function AttendancePage() {
         )
 
         setAttendanceRecords(normalizedRecords)
+        setSubsidiaryOptions(Array.from(subsidiariesMap.values()))
         setIsDemoData(false)
         setIsLoadingData(false)
 
@@ -1065,9 +1073,10 @@ export default function AttendancePage() {
     if (currentTime >= alertMoment) {
       const missed = attendanceRecords.filter((record) => record.status === "absent" || !record.clockIn)
       if (missed.length > 0) {
+        const deliveryLabelText = formatDeliveryChannel(alertSettings.deliveryChannel)
         toast({
           title: "Missed attendance alert ready",
-          description: `${missed.length} employee${missed.length > 1 ? "s" : ""} have not clocked in. Alert sent via ${alertSettings.deliveryChannel}.`,
+          description: `${missed.length} employee${missed.length > 1 ? "s" : ""} have not clocked in. Alert sent via ${deliveryLabelText}.`,
         })
         missed.forEach((record) => {
           void sendAttendanceAlert(record, { kind: "reminder" })
@@ -1075,7 +1084,7 @@ export default function AttendancePage() {
         setAlertTriggeredToday(true)
       }
     }
-  }, [alertSettings, alertTriggeredToday, attendanceRecords, currentTime, sendAttendanceAlert, toast])
+  }, [alertSettings, alertTriggeredToday, attendanceRecords, currentTime, formatDeliveryChannel, sendAttendanceAlert, toast])
 
   const uniqueValues = useMemo(() => {
     const unique = {
@@ -1084,6 +1093,7 @@ export default function AttendancePage() {
       division: new Set<string>(),
       subsidiary: new Set<string>(),
       method: new Set<string>(),
+      team: new Set<string>(),
     }
 
     attendanceRecords.forEach((record) => {
@@ -1092,6 +1102,7 @@ export default function AttendancePage() {
       unique.division.add(record.division)
       unique.subsidiary.add(record.subsidiary)
       unique.method.add(record.method)
+      if (record.team) unique.team.add(record.team)
     })
 
     return {
@@ -1100,8 +1111,57 @@ export default function AttendancePage() {
       division: Array.from(unique.division),
       subsidiary: Array.from(unique.subsidiary),
       method: Array.from(unique.method),
+      team: Array.from(unique.team),
     }
   }, [attendanceRecords])
+
+  const departmentOptions = uniqueValues.department
+  const teamOptions = uniqueValues.team
+
+  const scopeReferenceOptions = useMemo(
+    () => {
+      switch (policyForm.scope_type) {
+        case "subsidiary":
+          return subsidiaryOptions
+            .filter((subsidiary) => subsidiary.id)
+            .map((subsidiary) => ({
+              value: subsidiary.id as string,
+              label: subsidiary.name ?? "Unnamed subsidiary",
+            }))
+        case "department":
+          return departmentOptions.filter(Boolean).map((department) => ({
+            value: department,
+            label: department,
+          }))
+        case "team":
+          return teamOptions.filter(Boolean).map((team) => ({
+            value: team,
+            label: team,
+          }))
+        default:
+          return []
+      }
+    },
+    [departmentOptions, policyForm.scope_type, subsidiaryOptions, teamOptions],
+  )
+
+  useEffect(() => {
+    if (policyForm.scope_type === "company") {
+      if (policyForm.scope_reference !== "") {
+        setPolicyForm((previous) => ({ ...previous, scope_reference: "" }))
+      }
+      return
+    }
+
+    if (!scopeReferenceOptions.length) {
+      return
+    }
+
+    const hasMatch = scopeReferenceOptions.some((option) => option.value === policyForm.scope_reference)
+    if (!hasMatch) {
+      setPolicyForm((previous) => ({ ...previous, scope_reference: scopeReferenceOptions[0].value }))
+    }
+  }, [policyForm.scope_reference, policyForm.scope_type, scopeReferenceOptions])
 
   const filteredRecords = useMemo(() => {
     const today = new Date()
@@ -1292,8 +1352,7 @@ export default function AttendancePage() {
         const channelInfo = communicationChannels.find((channel) => channel.id === targetChannelId)
         const requiresAck = context.kind === "reminder" ? alertSettings.escalateToManagers : context.status === "absent"
         const priority = context.kind === "reminder" || context.status === "absent" ? "high" : "normal"
-        const deliveryLabel = alertSettings.deliveryChannel
-        const deliveryLabelText = deliveryLabel === "sms" ? "SMS" : deliveryLabel === "push" ? "Push" : "Email"
+        const deliveryLabelText = formatDeliveryChannel(alertSettings.deliveryChannel)
         const destinationLabel = channelInfo?.name ?? targetChannelId
 
         const baseContent =
@@ -1323,7 +1382,13 @@ export default function AttendancePage() {
         console.error("[attendance] sendAttendanceAlert error", error)
       }
     },
-    [alertSettings.communicationChannelId, alertSettings.deliveryChannel, alertSettings.escalateToManagers, communicationChannels],
+    [
+      alertSettings.communicationChannelId,
+      alertSettings.deliveryChannel,
+      alertSettings.escalateToManagers,
+      communicationChannels,
+      formatDeliveryChannel,
+    ],
   )
 
   const handleUpdateAttendanceStatus = (id: string, status: AttendanceStatus) => {
@@ -1346,7 +1411,7 @@ export default function AttendancePage() {
   const handleSendReminder = (record: AttendanceRecord) => {
     toast({
       title: "Reminder queued",
-      description: `Notification sent to ${record.employeeName} via AI nudges and ${alertSettings.deliveryChannel}.`,
+      description: `Notification sent to ${record.employeeName} via AI nudges and ${formatDeliveryChannel(alertSettings.deliveryChannel)}.`,
     })
 
     void sendAttendanceAlert(record, { kind: "reminder" })
@@ -1595,6 +1660,25 @@ export default function AttendancePage() {
   }
 
   const handlePolicyFormChange = (field: keyof AttendancePolicyForm, value: string | number | boolean) => {
+    if (field === "scope_type") {
+      const nextScopeType = value as AttendancePolicyForm["scope_type"]
+      let defaultReference = ""
+      if (nextScopeType === "subsidiary") {
+        defaultReference = subsidiaryOptions[0]?.id ?? ""
+      } else if (nextScopeType === "department") {
+        defaultReference = departmentOptions[0] ?? ""
+      } else if (nextScopeType === "team") {
+        defaultReference = teamOptions[0] ?? ""
+      }
+
+      setPolicyForm((previous) => ({
+        ...previous,
+        scope_type: nextScopeType,
+        scope_reference: defaultReference,
+      }))
+      return
+    }
+
     setPolicyForm((previous) => ({
       ...previous,
       [field]: value,
@@ -3549,13 +3633,44 @@ export default function AttendancePage() {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="policy-scope-reference">Scope reference (optional)</Label>
-                    <Input
-                      id="policy-scope-reference"
-                      value={policyForm.scope_reference}
-                      onChange={(event) => handlePolicyFormChange("scope_reference", event.target.value)}
-                      placeholder="Subsidiary or department id"
-                    />
+                    <Label htmlFor="policy-scope-reference">
+                      {policyForm.scope_type === "company" ? "Scope reference (not required)" : "Scope reference"}
+                    </Label>
+                    {policyForm.scope_type === "company" ? (
+                      <Input id="policy-scope-reference" value="Company-wide" disabled />
+                    ) : scopeReferenceOptions.length > 0 ? (
+                      <Select
+                        value={policyForm.scope_reference}
+                        onValueChange={(value) => handlePolicyFormChange("scope_reference", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select scope" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {scopeReferenceOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="policy-scope-reference"
+                        value={policyForm.scope_reference}
+                        onChange={(event) => handlePolicyFormChange("scope_reference", event.target.value)}
+                        placeholder={
+                          policyForm.scope_type === "department"
+                            ? "Type department identifier"
+                            : policyForm.scope_type === "team"
+                              ? "Type team identifier"
+                              : "Enter scope reference"
+                        }
+                      />
+                    )}
+                    {policyForm.scope_type === "subsidiary" && scopeReferenceOptions.length === 0 && (
+                      <p className="mt-1 text-xs text-slate-500">Add subsidiaries in company settings to target them here.</p>
+                    )}
                   </div>
                 </div>
 
