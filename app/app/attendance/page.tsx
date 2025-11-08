@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { createClient } from "@/lib/supabase/client"
+import { cn } from "@/lib/utils"
 import {
   listChannels as listCommunicationChannels,
   sendMessage as sendCommunicationMessage,
@@ -488,6 +489,23 @@ const GHANA_BOUNDS = {
   maxLon: 1.5,
 }
 
+const locationCoordinateLookup: Record<string, { lat: number; lon: number }> = {
+  "Accra HQ": { lat: 5.6037, lon: -0.187 },
+  "Accra HQ - Main Lobby": { lat: 5.6037, lon: -0.187 },
+  "Accra HQ - Executive Floor": { lat: 5.6043, lon: -0.186 },
+  "Accra HQ - Logistics Dock": { lat: 5.6021, lon: -0.189 },
+  "Tema Plant": { lat: 5.667, lon: -0.016 },
+  "Tema Plant - Security": { lat: 5.6668, lon: -0.0165 },
+  "Tema Plant - Shipping": { lat: 5.6681, lon: -0.0156 },
+  "Kumasi Hub": { lat: 6.6885, lon: -1.6244 },
+  "Kumasi Hub - Front Desk": { lat: 6.6892, lon: -1.6239 },
+  "Takoradi Depot": { lat: 4.9049, lon: -1.7569 },
+  "Tamale Warehouse": { lat: 9.4071, lon: -0.8393 },
+  "Sunyani Branch": { lat: 7.3393, lon: -2.3268 },
+  "Cape Coast Service": { lat: 5.1053, lon: -1.2466 },
+  Remote: { lat: 5.6145, lon: -0.2055 },
+}
+
 const resolveGeoCoordinate = (rawLocation: string | null | undefined) => {
   if (!rawLocation) return null
   const trimmed = rawLocation.trim()
@@ -718,23 +736,6 @@ const initialBiometricDevices: BiometricDevice[] = [
     provider: "Gallagher",
   },
 ]
-
-const locationCoordinateLookup: Record<string, { lat: number; lon: number }> = {
-  "Accra HQ": { lat: 5.6037, lon: -0.187 },
-  "Accra HQ - Main Lobby": { lat: 5.6037, lon: -0.187 },
-  "Accra HQ - Executive Floor": { lat: 5.6043, lon: -0.186 },
-  "Accra HQ - Logistics Dock": { lat: 5.6021, lon: -0.189 },
-  "Tema Plant": { lat: 5.667, lon: -0.016 },
-  "Tema Plant - Security": { lat: 5.6668, lon: -0.0165 },
-  "Tema Plant - Shipping": { lat: 5.6681, lon: -0.0156 },
-  "Kumasi Hub": { lat: 6.6885, lon: -1.6244 },
-  "Kumasi Hub - Front Desk": { lat: 6.6892, lon: -1.6239 },
-  "Takoradi Depot": { lat: 4.9049, lon: -1.7569 },
-  "Tamale Warehouse": { lat: 9.4071, lon: -0.8393 },
-  "Sunyani Branch": { lat: 7.3393, lon: -2.3268 },
-  "Cape Coast Service": { lat: 5.1053, lon: -1.2466 },
-  Remote: { lat: 5.6145, lon: -0.2055 },
-}
 
 const initialOvertimeRequests: OvertimeRequest[] = [
   {
@@ -1265,22 +1266,6 @@ export default function AttendancePage() {
       setPolicyForm((previous) => ({ ...previous, scope_reference: scopeReferenceOptions[0].value }))
     }
   }, [policyForm.scope_reference, policyForm.scope_type, scopeReferenceOptions])
-
-  const slaBreaches = useMemo(() => {
-    return complianceDevices.filter((device) => device.minutesSinceSync > 30 || device.status === "offline")
-  }, [complianceDevices])
-
-  useEffect(() => {
-    complianceDevices
-      .filter((device) => device.health === "critical")
-      .forEach((device) => {
-        if (offlineAlertedDevicesRef.current.has(device.id)) {
-          return
-        }
-        offlineAlertedDevicesRef.current.add(device.id)
-        void sendDeviceAlert(device, { reason: "offline" })
-      })
-  }, [complianceDevices, sendDeviceAlert])
 
   const filteredRecords = useMemo(() => {
     const today = new Date()
@@ -2192,6 +2177,22 @@ export default function AttendancePage() {
       devices: complianceDevices,
     }
   }, [complianceDevices])
+
+  const slaBreaches = useMemo(() => {
+    return complianceDevices.filter((device) => device.minutesSinceSync > 30 || device.status === "offline")
+  }, [complianceDevices])
+
+  useEffect(() => {
+    complianceDevices
+      .filter((device) => device.health === "critical")
+      .forEach((device) => {
+        if (offlineAlertedDevicesRef.current.has(device.id)) {
+          return
+        }
+        offlineAlertedDevicesRef.current.add(device.id)
+        void sendDeviceAlert(device, { reason: "offline" })
+      })
+  }, [complianceDevices, sendDeviceAlert])
 
   const geoCompliance = useMemo(() => {
     const mobileRecords = attendanceRecords.filter(

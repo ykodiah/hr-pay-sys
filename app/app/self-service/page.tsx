@@ -29,6 +29,7 @@ import {
   Flame,
   GraduationCap,
   HeartPulse,
+  AlertTriangle,
   Lightbulb,
   NotebookPen,
   Sparkles,
@@ -103,6 +104,96 @@ const aiSignals = [
   },
 ]
 
+type PersonalAttendanceStatus = "present" | "late" | "absent" | "early-departure"
+
+type PersonalAttendanceRecord = {
+  id: string
+  date: string
+  clockIn: string | null
+  clockOut: string | null
+  expectedHours: number
+  actualHours: number
+  variance: number
+  status: PersonalAttendanceStatus
+  notes?: string
+}
+
+type PersonalAttendanceAnomaly = {
+  id: string
+  label: string
+  description: string
+  severity: "info" | "warning" | "critical"
+  record: PersonalAttendanceRecord
+}
+
+const personalAttendance: PersonalAttendanceRecord[] = [
+  {
+    id: "PA-001",
+    date: "2025-02-03",
+    clockIn: "08:04",
+    clockOut: "17:15",
+    expectedHours: 8,
+    actualHours: 8.2,
+    variance: 0.2,
+    status: "present",
+  },
+  {
+    id: "PA-002",
+    date: "2025-02-04",
+    clockIn: "08:18",
+    clockOut: "17:02",
+    expectedHours: 8,
+    actualHours: 7.7,
+    variance: -0.3,
+    status: "late",
+    notes: "Traffic delay due to heavy rain",
+  },
+  {
+    id: "PA-003",
+    date: "2025-02-05",
+    clockIn: "08:02",
+    clockOut: "19:10",
+    expectedHours: 8,
+    actualHours: 9.1,
+    variance: 1.1,
+    status: "present",
+    notes: "Stayed late to close payroll batch",
+  },
+  {
+    id: "PA-004",
+    date: "2025-02-06",
+    clockIn: "08:15",
+    clockOut: null,
+    expectedHours: 8,
+    actualHours: 4.1,
+    variance: -3.9,
+    status: "early-departure",
+    notes: "Clock-out missing on biometric terminal",
+  },
+  {
+    id: "PA-005",
+    date: "2025-02-07",
+    clockIn: null,
+    clockOut: null,
+    expectedHours: 8,
+    actualHours: 0,
+    variance: -8,
+    status: "absent",
+    notes: "On-site client visit — manual log pending",
+  },
+  {
+    id: "PA-006",
+    date: "2025-02-08",
+    clockIn: "09:05",
+    clockOut: "17:30",
+    expectedHours: 6,
+    actualHours: 6.4,
+    variance: 0.4,
+    status: "late",
+    notes: "Weekend support rotation",
+  },
+]
+
 const upcomingEvents = [
   {
     title: "Leadership lab cohort call",
@@ -137,6 +228,9 @@ export default function EmployeePortalPage() {
   const [selectedPayslip, setSelectedPayslip] = useState(payslipPeriods[0])
   const [feedbackInput, setFeedbackInput] = useState("")
   const [acknowledgedSignals, setAcknowledgedSignals] = useState<string[]>([])
+  const [disputeDialogOpen, setDisputeDialogOpen] = useState(false)
+  const [selectedAnomaly, setSelectedAnomaly] = useState<PersonalAttendanceAnomaly | null>(null)
+  const [disputeNotes, setDisputeNotes] = useState("")
 
   const highlightCards = useMemo(
     () => [
@@ -177,6 +271,76 @@ export default function EmployeePortalPage() {
       },
     ],
     [toast],
+  )
+
+  const personalTimesheet = useMemo(() => {
+    const totalHours = personalAttendance.reduce((sum, record) => sum + record.actualHours, 0)
+    const expectedHours = personalAttendance.reduce((sum, record) => sum + record.expectedHours, 0)
+    const overtimeHours = personalAttendance.reduce((sum, record) => {
+      const overtime = record.actualHours - record.expectedHours
+      return overtime > 0 ? sum + overtime : sum
+    }, 0)
+    const variance = totalHours - expectedHours
+    const presentDays = personalAttendance.filter((record) => record.status === "present").length
+    const lateDays = personalAttendance.filter((record) => record.status === "late").length
+    const absentDays = personalAttendance.filter((record) => record.status === "absent").length
+    const adherencePercent = personalAttendance.length
+      ? Math.round((presentDays / personalAttendance.length) * 100)
+      : 100
+
+    return {
+      totalHours,
+      expectedHours,
+      overtimeHours,
+      variance,
+      presentDays,
+      lateDays,
+      absentDays,
+      adherencePercent,
+    }
+  }, [])
+
+  const personalAnomalies = useMemo<PersonalAttendanceAnomaly[]>(() => {
+    const anomalies: PersonalAttendanceAnomaly[] = []
+
+    personalAttendance.forEach((record) => {
+      if (!record.clockOut) {
+        anomalies.push({
+          id: `${record.id}-missing-clockout`,
+          label: "Missing check-out",
+          description: `${record.date}: Clock-out is missing. Provide supporting context to avoid absence mark.`,
+          severity: "critical",
+          record,
+        })
+      }
+
+      if (record.status === "absent") {
+        anomalies.push({
+          id: `${record.id}-absence`,
+          label: "Marked absent",
+          description: `${record.date}: Attendance shows as absent. Add justification or travel proof.`,
+          severity: "critical",
+          record,
+        })
+      }
+
+      if (record.status === "late") {
+        anomalies.push({
+          id: `${record.id}-late`,
+          label: "Late arrival",
+          description: `${record.date}: Arrival logged after 08:15. Explain delay if it was approved.`,
+          severity: record.variance < -0.5 ? "warning" : "info",
+          record,
+        })
+      }
+    })
+
+    return anomalies
+  }, [])
+
+  const personalAttendanceHistory = useMemo(
+    () => personalAttendance.slice().sort((a, b) => (a.date < b.date ? 1 : -1)),
+    [],
   )
 
   const openAction = (action: QuickAction) => setActiveDialog(action)
@@ -231,6 +395,33 @@ export default function EmployeePortalPage() {
       description: "We’ll refine future nudges based on your acknowledgement.",
     })
     setAcknowledgedSignals((previous) => [...previous, title])
+  }
+
+  const openDispute = (anomaly: PersonalAttendanceAnomaly) => {
+    setSelectedAnomaly(anomaly)
+    setDisputeNotes("")
+    setDisputeDialogOpen(true)
+  }
+
+  const submitDisputeAppeal = () => {
+    if (!disputeNotes.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Add a quick note",
+        description: "Provide context so your manager can review the anomaly.",
+      })
+      return
+    }
+
+    toast({
+      title: "Dispute submitted",
+      description: selectedAnomaly
+        ? `${selectedAnomaly.label} for ${selectedAnomaly.record.date} has been routed to your manager.`
+        : "Your attendance dispute has been routed to your manager.",
+    })
+    setDisputeDialogOpen(false)
+    setSelectedAnomaly(null)
+    setDisputeNotes("")
   }
 
   return (
@@ -391,6 +582,188 @@ export default function EmployeePortalPage() {
           </Card>
         </div>
       </section>
+
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <Card className="border-slate-100">
+            <CardHeader className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <CalendarClock className="h-4 w-4 text-emerald-600" /> Your attendance summary
+                </CardTitle>
+                <CardDescription>Latest six logs, variance, and adherence score—mirrors the manager console.</CardDescription>
+              </div>
+              <Badge variant="secondary" className="text-xs">
+                {personalTimesheet.adherencePercent}% adherence
+              </Badge>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3">
+                  <p className="text-xs uppercase text-emerald-600">Hours tracked</p>
+                  <p className="text-2xl font-semibold text-emerald-800">{personalTimesheet.totalHours.toFixed(1)}h</p>
+                  <p className="text-xs text-emerald-700">
+                    Expected {personalTimesheet.expectedHours.toFixed(1)}h • variance{" "}
+                    {personalTimesheet.variance >= 0 ? "+" : ""}
+                    {personalTimesheet.variance.toFixed(1)}h
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+                  <p className="text-xs uppercase text-slate-500">Attendance mix</p>
+                  <div className="flex items-center gap-2">
+                    <Progress value={personalTimesheet.adherencePercent} className="h-2 flex-1" />
+                    <span className="text-xs text-slate-500">{personalTimesheet.adherencePercent}%</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-600">
+                    <span>On-time {personalTimesheet.presentDays}</span>
+                    <span>Late {personalTimesheet.lateDays}</span>
+                    <span>Absent {personalTimesheet.absentDays}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-slate-900">Latest logs</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() =>
+                      toast({
+                        title: "Detailed timesheet opened",
+                        description: "Export-ready CSV queued in your downloads folder.",
+                      })
+                    }
+                  >
+                    Export CSV
+                    <ArrowRight className="ml-1 h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="mt-2 space-y-2">
+                  {personalAttendanceHistory.slice(0, 6).map((record) => (
+                    <div
+                      key={record.id}
+                      className="flex items-center justify-between rounded border border-slate-100 bg-white px-3 py-2 text-xs text-slate-600"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">{record.date}</p>
+                        <p>{record.clockIn ?? "--"} → {record.clockOut ?? "--"}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="secondary"
+                          className={
+                            record.status === "present"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : record.status === "late"
+                                ? "bg-amber-100 text-amber-700"
+                                : record.status === "early-departure"
+                                  ? "bg-sky-100 text-sky-700"
+                                  : "bg-rose-100 text-rose-700"
+                          }
+                        >
+                          {record.status.replace("-", " ")}
+                        </Badge>
+                        <span className="font-semibold">
+                          {record.variance >= 0 ? "+" : ""}
+                          {record.variance.toFixed(1)}h
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-4">
+            <Card className="border-rose-100">
+              <CardHeader>
+                <CardTitle className="text-base font-semibold flex items-center gap-2 text-rose-700">
+                  <AlertTriangle className="h-4 w-4" /> Exceptions needing review
+                </CardTitle>
+                <CardDescription>Flags mirrored from the manager cockpit. Raise disputes with one tap.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-slate-600">
+                {personalAnomalies.length ? (
+                  personalAnomalies.map((anomaly) => (
+                    <div key={anomaly.id} className="rounded border border-rose-100 bg-rose-50/80 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-rose-800">{anomaly.label}</p>
+                          <p className="text-xs text-rose-700">{anomaly.description}</p>
+                          {anomaly.record.notes && (
+                            <p className="mt-1 text-[11px] text-rose-600">Note: {anomaly.record.notes}</p>
+                          )}
+                        </div>
+                        <Badge
+                          variant="secondary"
+                          className={
+                            anomaly.severity === "critical"
+                              ? "bg-rose-200 text-rose-800"
+                              : anomaly.severity === "warning"
+                                ? "bg-amber-200 text-amber-800"
+                                : "bg-slate-200 text-slate-700"
+                          }
+                        >
+                          {anomaly.severity.toUpperCase()}
+                        </Badge>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 h-8 text-xs"
+                        onClick={() => openDispute(anomaly)}
+                      >
+                        Raise dispute
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-500">Great job—no anomalies detected this week.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-100">
+              <CardHeader>
+                <CardTitle className="text-base font-semibold">Assistant’s explanation</CardTitle>
+                <CardDescription>Why your reliability score sits in the green and what could change it.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-slate-600">
+                <p>
+                  Consistent on-time arrivals this month offset two late starts. The system still expects confirmation for
+                  the missing clock-out on 6 Feb; upload evidence to prevent an automatic absence.
+                </p>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span>Reliability index</span>
+                    <span className="font-semibold text-slate-700">92%</span>
+                  </div>
+                  <Progress value={92} className="h-1.5" />
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Pending dispute keeps your risk flagged medium until resolved.</li>
+                    <li>Sustained overtime prompts wellbeing nudges to avoid burnout.</li>
+                  </ul>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() =>
+                    toast({
+                      title: "Explainer downloaded",
+                      description: "A PDF breakdown of the AI reasoning has been emailed to you.",
+                    })
+                  }
+                >
+                  Download AI reasoning
+                  <ArrowRight className="ml-1 h-3 w-3" />
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <Card className="border-slate-100">
@@ -624,6 +997,57 @@ export default function EmployeePortalPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+    <Dialog open={disputeDialogOpen} onOpenChange={setDisputeDialogOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-rose-600" /> Raise attendance dispute
+          </DialogTitle>
+          <DialogDescription>
+            Provide context so your manager and payroll can review the flagged attendance entry.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2 text-sm text-slate-600">
+          <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs">
+            <p className="font-semibold text-slate-900">{selectedAnomaly?.label ?? "Select an anomaly"}</p>
+            {selectedAnomaly ? (
+              <>
+                <p className="text-slate-600">{selectedAnomaly.description}</p>
+                <p className="mt-2 text-[11px] uppercase text-slate-500">
+                  Entry: {selectedAnomaly.record.date} • Status {selectedAnomaly.record.status.toUpperCase()}
+                </p>
+                {selectedAnomaly.record.notes && (
+                  <p className="text-[11px] text-slate-500">Initial note: {selectedAnomaly.record.notes}</p>
+                )}
+              </>
+            ) : (
+              <p className="text-slate-500">
+                Select an attendance item from the exceptions panel before raising a dispute.
+              </p>
+            )}
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="dispute-notes">Explain what happened</Label>
+            <Textarea
+              id="dispute-notes"
+              placeholder="e.g., Was onsite with client at Kotoka – manual register to be uploaded."
+              value={disputeNotes}
+              onChange={(event) => setDisputeNotes(event.target.value)}
+              rows={4}
+            />
+          </div>
+        </div>
+        <DialogFooter className="flex items-center justify-between">
+          <Button variant="ghost" onClick={() => setDisputeDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button className="bg-rose-600 hover:bg-rose-700" onClick={submitDisputeAppeal}>
+            Submit dispute
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
       </div>
     )
 }
