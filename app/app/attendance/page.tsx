@@ -49,6 +49,7 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
+  FileDown,
   TrendingUp,
   Timer,
   UserCheck,
@@ -2793,6 +2794,40 @@ export default function AttendancePage() {
     ]
     }, [attendanceRecords, complianceDevices, isWithinSelectedRange, policyAppliedLookup, slaBreaches])
 
+  const approvalStats = useMemo(() => {
+    const total = approvalRequests.length
+    const approved = approvalRequests.filter((request) => request.status === "approved").length
+    const rejected = approvalRequests.filter((request) => request.status === "rejected").length
+    const pending = total - approved - rejected
+
+    const stageSnapshot = approvalRequests.reduce(
+      (accumulator, request) => {
+        request.stages.forEach((stage) => {
+          if (stage.status === "pending") {
+            accumulator.pendingStages[stage.stage] = (accumulator.pendingStages[stage.stage] ?? 0) + 1
+          }
+          if (stage.status === "awaiting") {
+            accumulator.awaitingStages[stage.stage] = (accumulator.awaitingStages[stage.stage] ?? 0) + 1
+          }
+        })
+        return accumulator
+      },
+      {
+        pendingStages: {} as Record<ApprovalStage, number>,
+        awaitingStages: {} as Record<ApprovalStage, number>,
+      },
+    )
+
+    return {
+      total,
+      approved,
+      rejected,
+      pending,
+      pendingStages: stageSnapshot.pendingStages,
+      awaitingStages: stageSnapshot.awaitingStages,
+    }
+  }, [approvalRequests])
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -2917,10 +2952,11 @@ export default function AttendancePage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="insights">AI Insights</TabsTrigger>
           <TabsTrigger value="shifts">Shift Management</TabsTrigger>
+          <TabsTrigger value="approvals">Approvals</TabsTrigger>
           <TabsTrigger value="overtime">Overtime</TabsTrigger>
           <TabsTrigger value="devices">Integrations</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
@@ -3653,6 +3689,199 @@ export default function AttendancePage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="approvals" className="space-y-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Routed approvals cockpit</h2>
+              <p className="text-sm text-slate-500">
+                Track manager → HR → payroll approvals, produce audit history, and download compliance certificates.
+              </p>
+            </div>
+            <div className="grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
+              <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                <p className="font-semibold text-slate-900">{approvalStats.pending}</p>
+                <p>In-flight requests</p>
+              </div>
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                <p className="font-semibold text-emerald-700">{approvalStats.approved}</p>
+                <p>Completed approvals</p>
+              </div>
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
+                <p className="font-semibold text-rose-700">{approvalStats.rejected}</p>
+                <p>Rejected escalations</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" /> Routed approvals
+                </CardTitle>
+                <CardDescription>
+                  Multi-level workflow with stage visibility and certificate generation once payroll signs off.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {approvalRequests.map((request) => {
+                  const currentStage = request.stages.find((stage) => stage.status === "pending")
+                  const awaitingStage = request.stages.find((stage) => stage.status === "awaiting")
+                  const completedStages = request.stages.filter((stage) => stage.status === "approved").length
+                  const totalStages = request.stages.length
+
+                  return (
+                    <div
+                      key={request.id}
+                      className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm space-y-4"
+                    >
+                      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm font-semibold text-slate-900">{request.employeeName}</h3>
+                            <Badge className={getStageBadgeClass(request.status === "approved" ? "approved" : request.status === "rejected" ? "rejected" : "pending")}>
+                              {request.status.toUpperCase()}
+                            </Badge>
+                            <Badge variant="secondary" className="bg-slate-100 text-slate-700">
+                              {request.department}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            Submitted {new Date(request.submittedAt).toLocaleString()}
+                          </p>
+                          <p className="text-sm text-slate-600">{request.reason}</p>
+                        </div>
+                        <div className="text-sm font-semibold text-slate-900">
+                          {request.amount.toLocaleString(undefined, { style: "currency", currency: "GHS" })}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-xs uppercase text-slate-500">Stage progress</p>
+                        <div className="flex flex-wrap gap-2">
+                          {approvalStageOrder.map((stageKey) => {
+                            const stageState =
+                              request.stages.find((stage) => stage.stage === stageKey) ??
+                              ({
+                                stage: stageKey,
+                                approver: "",
+                                status: "awaiting",
+                              } as ApprovalStageState)
+
+                            return (
+                              <div
+                                key={`${request.id}-${stageKey}`}
+                                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] ${getStageBadgeClass(stageState.status)}`}
+                              >
+                                <span>{approvalStageLabels[stageKey]}</span>
+                                <span className="text-xs font-medium">· {stageState.approver || "Assign approver"}</span>
+                                <span className="text-[10px] uppercase">
+                                  {formatStageStatus(stageState.status)}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        <Progress value={(completedStages / totalStages) * 100} className="h-2" />
+                        {currentStage && (
+                          <p className="text-xs text-slate-500">
+                            Current gate: {approvalStageLabels[currentStage.stage]} · {currentStage.approver}
+                          </p>
+                        )}
+                        {!currentStage && request.status === "pending" && awaitingStage && (
+                          <p className="text-xs text-slate-500">
+                            Awaiting re-submission to {approvalStageLabels[awaitingStage.stage]} after rejection.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleAdvanceApproval(request.id)}
+                          disabled={!currentStage}
+                        >
+                          Approve stage
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRejectApproval(request.id)}
+                          disabled={request.status !== "pending"}
+                        >
+                          Reject request
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-2"
+                          onClick={() => handleDownloadCertificate(request.id)}
+                          disabled={request.status !== "approved"}
+                        >
+                          <FileDown className="h-3.5 w-3.5" /> Certificate
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+                {!approvalRequests.length && (
+                  <p className="text-sm text-slate-500">No approval requests in queue. Great job!</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border border-slate-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <BarChart3 className="h-4 w-4 text-sky-500" /> Stage health & audit trail
+                </CardTitle>
+                <CardDescription>
+                  Monitor bottlenecks and view exact actions taken per approver.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
+                  {approvalStageOrder.map((stageKey) => (
+                    <div key={`stats-${stageKey}`} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p className="font-semibold text-slate-900">{approvalStats.pendingStages[stageKey] ?? 0}</p>
+                      <p>{approvalStageLabels[stageKey]}</p>
+                      <p className="text-[11px] text-slate-400">
+                        Awaiting next: {approvalStats.awaitingStages[stageKey] ?? 0}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs uppercase text-slate-500">Latest audit entries</p>
+                  <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                    {approvalAuditTrail.length ? (
+                      approvalAuditTrail.map((entry) => (
+                        <div key={entry.id} className="space-y-1 border-b border-slate-200 pb-2 last:border-none last:pb-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-slate-800">{approvalStageLabels[entry.stage]}</span>
+                            <Badge variant="secondary" className="bg-slate-100 text-slate-700">
+                              {entry.action === "certificate" ? "Certificate issued" : entry.action === "approved" ? "Approved" : "Rejected"}
+                            </Badge>
+                            <span className="text-[11px] text-slate-400">
+                              {new Date(entry.timestamp).toLocaleString()}
+                            </span>
+                          </div>
+                          <p>
+                            {entry.actor} · {entry.notes || "No additional notes"}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-500">Audit trail will populate as approvals progress.</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
