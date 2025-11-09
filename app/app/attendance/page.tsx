@@ -235,6 +235,38 @@ interface GeoAnomaly {
   detail: string
 }
 
+type ApprovalStage = "manager" | "hr" | "payroll"
+type ApprovalStageStatus = "awaiting" | "pending" | "approved" | "rejected"
+
+interface ApprovalStageState {
+  stage: ApprovalStage
+  approver: string
+  status: ApprovalStageStatus
+  timestamp?: string
+  notes?: string
+}
+
+interface ApprovalRequest {
+  id: string
+  employeeName: string
+  department: string
+  submittedAt: string
+  reason: string
+  amount: number
+  status: "pending" | "approved" | "rejected"
+  stages: ApprovalStageState[]
+}
+
+interface ApprovalAuditEntry {
+  id: string
+  requestId: string
+  stage: ApprovalStage
+  actor: string
+  action: "approved" | "rejected" | "certificate"
+  timestamp: string
+  notes?: string
+}
+
 interface AttendancePolicy {
   id: string
   name: string
@@ -794,6 +826,59 @@ const initialOvertimeRequests: OvertimeRequest[] = [
   },
 ]
 
+const initialApprovalRequests: ApprovalRequest[] = [
+  {
+    id: "APP-001",
+    employeeName: "Kwame Asante",
+    department: "Finance",
+    submittedAt: new Date().toISOString(),
+    reason: "Overtime payout for quarter-end reconciliation",
+    amount: 420,
+    status: "pending",
+    stages: [
+      { stage: "manager", approver: "Naa Mensah", status: "pending" },
+      { stage: "hr", approver: "Efua Boateng", status: "awaiting" },
+      { stage: "payroll", approver: "Kojo Owusu", status: "awaiting" },
+    ],
+  },
+  {
+    id: "APP-002",
+    employeeName: "Akosua Boateng",
+    department: "Operations",
+    submittedAt: new Date(Date.now() - 86400000).toISOString(),
+    reason: "Night shift differential and transport reimbursement",
+    amount: 310,
+    status: "pending",
+    stages: [
+      { stage: "manager", approver: "Yaw Baffour", status: "approved", timestamp: new Date(Date.now() - 43200000).toISOString() },
+      { stage: "hr", approver: "Priscilla Tetteh", status: "pending" },
+      { stage: "payroll", approver: "Kojo Owusu", status: "awaiting" },
+    ],
+  },
+  {
+    id: "APP-003",
+    employeeName: "Yaw Frimpong",
+    department: "Customer Success",
+    submittedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+    reason: "Weekend client migration coverage",
+    amount: 275,
+    status: "pending",
+    stages: [
+      { stage: "manager", approver: "Linda Nketiah", status: "pending" },
+      { stage: "hr", approver: "Samuel Adjei", status: "awaiting" },
+      { stage: "payroll", approver: "Kojo Owusu", status: "awaiting" },
+    ],
+  },
+]
+
+const approvalStageOrder: ApprovalStage[] = ["manager", "hr", "payroll"]
+
+const approvalStageLabels: Record<ApprovalStage, string> = {
+  manager: "Manager review",
+  hr: "HR validation",
+  payroll: "Payroll audit",
+}
+
 const initialHolidays: Holiday[] = [
   {
     id: "HOL-001",
@@ -831,6 +916,8 @@ export default function AttendancePage() {
   const [shifts, setShifts] = useState(initialShifts)
   const [biometricDevices, setBiometricDevices] = useState(initialBiometricDevices)
   const [overtimeRequests, setOvertimeRequests] = useState(initialOvertimeRequests)
+  const [approvalRequests, setApprovalRequests] = useState(initialApprovalRequests)
+  const [approvalAuditTrail, setApprovalAuditTrail] = useState<ApprovalAuditEntry[]>([])
   const [holidays, setHolidays] = useState(initialHolidays)
 
   const [searchTerm, setSearchTerm] = useState("")
@@ -1467,6 +1554,214 @@ export default function AttendancePage() {
     setCustomStartDate("")
     setCustomEndDate("")
     setSearchTerm("")
+  }
+
+  const getStageBadgeClass = (status: ApprovalStageStatus) => {
+    switch (status) {
+      case "approved":
+        return "bg-emerald-100 text-emerald-700"
+      case "pending":
+        return "bg-amber-100 text-amber-700"
+      case "rejected":
+        return "bg-rose-100 text-rose-700"
+      default:
+        return "bg-slate-100 text-slate-600"
+    }
+  }
+
+  const formatStageStatus = (status: ApprovalStageStatus) => {
+    switch (status) {
+      case "approved":
+        return "Approved"
+      case "pending":
+        return "Awaiting decision"
+      case "rejected":
+        return "Rejected"
+      default:
+        return "Queued"
+    }
+  }
+
+  const logApprovalEvent = (
+    requestId: string,
+    stage: ApprovalStage,
+    action: "approved" | "rejected" | "certificate",
+    actor: string,
+    notes?: string,
+  ) => {
+    setApprovalAuditTrail((previous) => [
+      {
+        id: `AUD-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        requestId,
+        stage,
+        actor,
+        action,
+        timestamp: new Date().toISOString(),
+        notes,
+      },
+      ...previous,
+    ])
+  }
+
+  const handleAdvanceApproval = (requestId: string) => {
+    let stageContext: { stage: ApprovalStage; approver: string; final: boolean } | null = null
+
+    setApprovalRequests((previous) =>
+      previous.map((request) => {
+        if (request.id !== requestId || request.status === "approved" || request.status === "rejected") {
+          return request
+        }
+
+        const stages = request.stages.map((stage) => ({ ...stage }))
+        const currentIndex = stages.findIndex((stage) => stage.status === "pending")
+        if (currentIndex === -1) {
+          return request
+        }
+
+        const currentStage = stages[currentIndex]
+        stageContext = {
+          stage: currentStage.stage,
+          approver: currentStage.approver,
+          final: currentIndex === stages.length - 1,
+        }
+
+        stages[currentIndex] = {
+          ...currentStage,
+          status: "approved",
+          timestamp: new Date().toISOString(),
+        }
+
+        let status: "pending" | "approved" | "rejected" = request.status
+
+        if (currentIndex < stages.length - 1) {
+          stages[currentIndex + 1] = { ...stages[currentIndex + 1], status: "pending" }
+          status = "pending"
+        } else {
+          status = "approved"
+        }
+
+        return {
+          ...request,
+          stages,
+          status,
+        }
+      }),
+    )
+
+    if (stageContext) {
+      logApprovalEvent(requestId, stageContext.stage, "approved", stageContext.approver)
+      toast({
+        title: stageContext.final ? "Approval completed" : "Stage approved",
+        description: stageContext.final
+          ? "Payroll has finalised the approval. Certificate ready for download."
+          : "Routed to the next approver.",
+      })
+    } else {
+      toast({
+        title: "No pending stage",
+        description: "This approval request has already been resolved.",
+      })
+    }
+  }
+
+  const handleRejectApproval = (requestId: string) => {
+    let stageContext: { stage: ApprovalStage; approver: string } | null = null
+
+    setApprovalRequests((previous) =>
+      previous.map((request) => {
+        if (request.id !== requestId || request.status === "approved" || request.status === "rejected") {
+          return request
+        }
+
+        const stages = request.stages.map((stage) => ({ ...stage }))
+        const currentIndex = stages.findIndex((stage) => stage.status === "pending")
+        if (currentIndex === -1) {
+          return request
+        }
+
+        const currentStage = stages[currentIndex]
+        stageContext = { stage: currentStage.stage, approver: currentStage.approver }
+        stages[currentIndex] = {
+          ...currentStage,
+          status: "rejected",
+          timestamp: new Date().toISOString(),
+        }
+
+        for (let index = currentIndex + 1; index < stages.length; index += 1) {
+          stages[index] = { ...stages[index], status: "awaiting", timestamp: undefined }
+        }
+
+        return {
+          ...request,
+          stages,
+          status: "rejected",
+        }
+      }),
+    )
+
+    if (stageContext) {
+      logApprovalEvent(requestId, stageContext.stage, "rejected", stageContext.approver)
+      toast({
+        title: "Approval rejected",
+        description: `${approvalStageLabels[stageContext.stage]} rejected the request.`,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDownloadCertificate = (requestId: string) => {
+    const request = approvalRequests.find((item) => item.id === requestId)
+    if (!request || request.status !== "approved") {
+      toast({
+        title: "Certificate unavailable",
+        description: "Complete all approval stages before downloading a certificate.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (typeof window === "undefined") {
+      toast({
+        title: "Download not supported",
+        description: "Certificate downloads are only available in the browser.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const lines = [
+      "Attendance Approval Certificate",
+      `Generated: ${new Date().toLocaleString()}`,
+      "",
+      `Employee: ${request.employeeName}`,
+      `Department: ${request.department}`,
+      `Reason: ${request.reason}`,
+      `Amount: ${request.amount.toLocaleString(undefined, { style: "currency", currency: "GHS" })}`,
+      "",
+      "Approval route:",
+      ...request.stages.map((stage) => {
+        const timePart = stage.timestamp ? ` on ${new Date(stage.timestamp).toLocaleString()}` : ""
+        const statusPart = formatStageStatus(stage.status)
+        return ` - ${approvalStageLabels[stage.stage]} (${stage.approver}): ${statusPart}${timePart}`
+      }),
+      "",
+      "This certificate confirms that attendance adjustments have passed all approval stages.",
+    ]
+
+    const blob = new Blob([lines.join("\n")], { type: "text/plain" })
+    const url = window.URL.createObjectURL(blob)
+    const anchor = document.createElement("a")
+    anchor.href = url
+    anchor.download = `${request.employeeName.replace(/\s+/g, "-").toLowerCase()}-attendance-approval.txt`
+    anchor.click()
+    window.URL.revokeObjectURL(url)
+
+    const finalStage = request.stages[request.stages.length - 1]
+    logApprovalEvent(request.id, finalStage.stage, "certificate", finalStage.approver)
+    toast({
+      title: "Certificate downloaded",
+      description: "Saved a compliance-ready approval certificate to your device.",
+    })
   }
 
   const handleBiometricClockIn = (method: AttendanceMethod) => {
