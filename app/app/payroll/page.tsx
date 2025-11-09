@@ -2228,7 +2228,7 @@ function IntercompanyTransferDialog({
         <div className="space-y-2">
           <Label>Destination subsidiary</Label>
           <Select value={targetSubsidiary} onValueChange={setTargetSubsidiary}>
-            <SelectTrigger className="[&>span]:truncate">
+            <SelectTrigger className="w-full overflow-hidden [&>span]:truncate">
               <SelectValue placeholder="Select subsidiary" />
             </SelectTrigger>
             <SelectContent>
@@ -2243,7 +2243,7 @@ function IntercompanyTransferDialog({
         <div className="space-y-2">
           <Label>Target division</Label>
           <Select value={targetDivision} onValueChange={setTargetDivision}>
-            <SelectTrigger className="[&>span]:truncate">
+            <SelectTrigger className="w-full overflow-hidden [&>span]:truncate">
               <SelectValue placeholder="Select division" />
             </SelectTrigger>
             <SelectContent>
@@ -2258,7 +2258,7 @@ function IntercompanyTransferDialog({
         <div className="space-y-2">
           <Label>Target department</Label>
           <Select value={targetDepartment} onValueChange={setTargetDepartment}>
-            <SelectTrigger className="[&>span]:truncate">
+            <SelectTrigger className="w-full overflow-hidden [&>span]:truncate">
               <SelectValue placeholder="Select department" />
             </SelectTrigger>
             <SelectContent>
