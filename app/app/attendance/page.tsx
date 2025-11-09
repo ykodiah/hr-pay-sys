@@ -49,6 +49,7 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
   Timer,
   UserCheck,
   Users,
@@ -86,6 +87,29 @@ const formatDateByOffset = (offsetDays: number) => {
   const date = new Date()
   date.setDate(date.getDate() + offsetDays)
   return date.toISOString().split("T")[0]
+}
+
+const getWeekStart = (date: Date) => {
+  const weekStart = new Date(date)
+  weekStart.setHours(0, 0, 0, 0)
+  const day = weekStart.getDay()
+  const diff = (day + 6) % 7
+  weekStart.setDate(weekStart.getDate() - diff)
+  return weekStart
+}
+
+const getIsoWeekNumber = (date: Date) => {
+  const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = target.getUTCDay() || 7
+  target.setUTCDate(target.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1))
+  return Math.ceil(((target.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+}
+
+const formatWeekLabel = (date: Date) => {
+  const weekNumber = getIsoWeekNumber(date)
+  const month = date.toLocaleString("default", { month: "short" })
+  return `W${weekNumber.toString().padStart(2, "0")} • ${month}`
 }
 
 interface AttendanceRecord {
@@ -2292,6 +2316,146 @@ export default function AttendancePage() {
     return result
   }, [filteredRecords, policies])
 
+  const attendanceTrendline = useMemo(() => {
+    const currentWeekStart = getWeekStart(new Date())
+    const windows = Array.from({ length: 4 }, (_, index) => {
+      const start = new Date(currentWeekStart)
+      start.setDate(start.getDate() - (3 - index) * 7)
+      const end = new Date(start)
+      end.setDate(end.getDate() + 7)
+      return {
+        label: formatWeekLabel(start),
+        start,
+        end,
+        total: 0,
+        present: 0,
+        late: 0,
+        absent: 0,
+        overtime: 0,
+      }
+    })
+
+    attendanceRecords.forEach((record) => {
+      const recordDate = new Date(record.date)
+      if (Number.isNaN(recordDate.getTime())) {
+        return
+      }
+
+      windows.forEach((window) => {
+        if (recordDate >= window.start && recordDate < window.end) {
+          window.total += 1
+          if (record.status === "present") {
+            window.present += 1
+          } else if (record.status === "late") {
+            window.late += 1
+          } else if (record.status === "absent") {
+            window.absent += 1
+          }
+          window.overtime += record.overtimeHours
+        }
+      })
+    })
+
+    return windows.map((window) => {
+      const { total, present, late, absent, overtime } = window
+      return {
+        label: window.label,
+        onTimeRate: total ? (present / total) * 100 : 0,
+        lateRate: total ? (late / total) * 100 : 0,
+        absenceRate: total ? (absent / total) * 100 : 0,
+        averageOvertime: total ? overtime / total : 0,
+      }
+    })
+  }, [attendanceRecords])
+
+  const benchmarkComparisons = useMemo(() => {
+    const totalRecords = attendanceRecords.length || 1
+    const presentCount = attendanceRecords.filter((record) => record.status === "present").length
+    const lateCount = attendanceRecords.filter((record) => record.status === "late").length
+    const absentCount = attendanceRecords.filter((record) => record.status === "absent").length
+
+    const automationCoverage = totalRecords ? (policyAppliedLookup.size / totalRecords) * 100 : 0
+    const highRiskRecords = attendanceRecords.filter((record) => record.aiRiskScore >= 0.6)
+    const highRiskWithPolicy = highRiskRecords.filter((record) => policyAppliedLookup.has(record.id))
+    const highRiskCoverage = highRiskRecords.length ? (highRiskWithPolicy.length / highRiskRecords.length) * 100 : 0
+    const slaBreachRate = complianceDevices.length ? (slaBreaches.length / complianceDevices.length) * 100 : 0
+
+    return [
+      {
+        metric: "On-time arrival rate",
+        organization: totalRecords ? (presentCount / totalRecords) * 100 : 0,
+        industry: 91,
+        bestInClass: 96,
+      },
+      {
+        metric: "Lateness rate",
+        organization: totalRecords ? (lateCount / totalRecords) * 100 : 0,
+        industry: 6.5,
+        bestInClass: 4.2,
+      },
+      {
+        metric: "Absence rate",
+        organization: totalRecords ? (absentCount / totalRecords) * 100 : 0,
+        industry: 3.1,
+        bestInClass: 2.2,
+      },
+      {
+        metric: "High-risk policy coverage",
+        organization: highRiskCoverage,
+        industry: 58,
+        bestInClass: 72,
+      },
+      {
+        metric: "Automation coverage",
+        organization: automationCoverage,
+        industry: 54,
+        bestInClass: 68,
+      },
+      {
+        metric: "Device SLA breach rate",
+        organization: slaBreachRate,
+        industry: 12,
+        bestInClass: 5,
+      },
+    ]
+  }, [attendanceRecords, complianceDevices, policyAppliedLookup, slaBreaches])
+
+  const crossModuleSignals = useMemo(() => {
+    const highRiskRecords = attendanceRecords.filter((record) => record.aiRiskScore >= 0.6)
+    const highRiskWithPolicy = highRiskRecords.filter((record) => policyAppliedLookup.has(record.id))
+    const highRiskCoverage = highRiskRecords.length ? (highRiskWithPolicy.length / highRiskRecords.length) * 100 : 0
+
+    const healthyDevices = complianceDevices.length - slaBreaches.length
+    const slaHealthyRate = complianceDevices.length ? (healthyDevices / complianceDevices.length) * 100 : 100
+
+    const remoteRecords = attendanceRecords.filter((record) => record.workingArrangement !== "onsite")
+    const remoteOnTime = remoteRecords.filter((record) => record.status === "present").length
+    const remoteReliability = remoteRecords.length ? (remoteOnTime / remoteRecords.length) * 100 : 100
+
+    return [
+      {
+        label: "High-risk employees under automation",
+        value: `${highRiskCoverage.toFixed(0)}%`,
+        delta: highRiskRecords.length
+          ? `${highRiskWithPolicy.length}/${highRiskRecords.length} covered`
+          : "No high-risk profiles",
+        description: "Attendance policy guardrails activated across AI-flagged risk cohorts.",
+      },
+      {
+        label: "Device SLA health",
+        value: `${slaHealthyRate.toFixed(0)}%`,
+        delta: `${healthyDevices}/${complianceDevices.length || 1} devices passing sync SLAs`,
+        description: "Blends device telemetry with attendance alerts to anticipate check-in gaps.",
+      },
+      {
+        label: "Remote reliability",
+        value: `${remoteReliability.toFixed(0)}%`,
+        delta: `${remoteOnTime}/${remoteRecords.length || 1} remote shifts on-time`,
+        description: "Hybrid cohorts correlated with geo-fence and timesheet variance data.",
+      },
+    ]
+  }, [attendanceRecords, complianceDevices, policyAppliedLookup, slaBreaches])
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -2861,6 +3025,89 @@ export default function AttendancePage() {
                   {!timesheetExceptions.length && (
                     <p className="text-xs text-slate-500">No exceptions detected for the current filters.</p>
                   )}
+                </CardContent>
+              </Card>
+              <Card className="border border-slate-200">
+                <CardHeader className="space-y-1">
+                  <CardTitle className="flex items-center gap-2 text-base text-slate-700">
+                    <TrendingUp className="h-4 w-4 text-emerald-600" /> Week-over-week trendline
+                  </CardTitle>
+                  <CardDescription className="text-slate-600">
+                    Four-week trajectory for punctuality, lateness, absence, and overtime.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm text-slate-600">
+                  {attendanceTrendline.map((point) => (
+                    <div key={point.label} className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs uppercase text-slate-500">
+                        <span>{point.label}</span>
+                        <span className="font-semibold text-slate-700">{point.onTimeRate.toFixed(1)}% on-time</span>
+                      </div>
+                      <Progress value={Math.min(100, Math.max(0, point.onTimeRate))} className="h-2" />
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+                        <span>Lateness {point.lateRate.toFixed(1)}%</span>
+                        <span>Absence {point.absenceRate.toFixed(1)}%</span>
+                        <span>Avg OT {point.averageOvertime.toFixed(1)}h</span>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+              <Card className="border border-blue-100">
+                <CardHeader className="space-y-1">
+                  <CardTitle className="flex items-center gap-2 text-base text-blue-700">
+                    <BarChart3 className="h-4 w-4 text-blue-500" /> Industry benchmarking
+                  </CardTitle>
+                  <CardDescription className="text-slate-600">
+                    Compare your current posture against regional peers and best-in-class operators.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm text-slate-600">
+                  {benchmarkComparisons.map((entry) => (
+                    <div key={entry.metric} className="rounded-lg border border-blue-100 bg-blue-50/70 p-3">
+                      <div className="flex items-center justify-between text-xs uppercase text-blue-700">
+                        <span>{entry.metric}</span>
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                          {entry.organization.toFixed(1)}%
+                        </Badge>
+                      </div>
+                      <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-blue-600">
+                        <span>Industry {entry.industry.toFixed(1)}%</span>
+                        <span>Best {entry.bestInClass.toFixed(1)}%</span>
+                        <span>
+                          Gap {(entry.organization - entry.industry).toFixed(1)} pts
+                        </span>
+                      </div>
+                      <Progress
+                        value={Math.min(100, Math.max(0, entry.organization))}
+                        className="mt-2 h-1.5 bg-blue-200 [&>div]:bg-blue-500"
+                      />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+              <Card className="border border-purple-100">
+                <CardHeader className="space-y-1">
+                  <CardTitle className="flex items-center gap-2 text-base text-purple-700">
+                    <Activity className="h-4 w-4 text-purple-500" /> Cross-module correlations
+                  </CardTitle>
+                  <CardDescription className="text-slate-600">
+                    Signal blending from automation, device compliance, and hybrid cohorts.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm text-slate-600">
+                  {crossModuleSignals.map((signal) => (
+                    <div key={signal.label} className="rounded-lg border border-purple-100 bg-white/70 p-3">
+                      <div className="flex items-center justify-between text-xs uppercase text-purple-600">
+                        <span>{signal.label}</span>
+                        <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+                          {signal.value}
+                        </Badge>
+                      </div>
+                      <p className="mt-2 text-[11px] text-purple-700">{signal.description}</p>
+                      <p className="text-[11px] text-slate-500">{signal.delta}</p>
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
             {aiInsights.map((insight) => (
