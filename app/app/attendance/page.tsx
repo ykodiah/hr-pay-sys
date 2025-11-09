@@ -384,8 +384,10 @@ const normalizeWellnessSnapshot = (row: SupabaseWellnessSnapshot): WellnessSnaps
     row.employees?.employee_id ??
     (row.employee_id ? row.employee_id : row.id)
 
+  const resolvedEmployeeId = employeeIdentifier ?? row.id
+
   return {
-    employeeId: employeeIdentifier,
+    employeeId: resolvedEmployeeId,
     periodStart: row.period_start ?? fallbackDate,
     periodEnd: row.period_end ?? fallbackDate,
     recoveryScore:
@@ -507,6 +509,13 @@ const calculateHoursFromTimes = (clockIn: string | null, clockOut: string | null
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
+}
+
+function normalizeEmployeeKey(value: string | null | undefined) {
+  if (!value) {
+    return null
+  }
+  return value.trim().toLowerCase()
 }
 
 const mapStatusFromSupabase = (status: string | null): AttendanceStatus => {
@@ -2095,15 +2104,24 @@ export default function AttendancePage() {
       }
 
       try {
-        const matchedSnapshot = wellnessSnapshots.find(
-          (snapshot) =>
-            snapshot.employeeId === action.employeeId || snapshot.sourceEmployeeKey === action.employeeId,
-        )
-        const possibleEmployeeKey = matchedSnapshot?.sourceEmployeeKey ?? null
+        const normalizedActionKey = normalizeEmployeeKey(action.employeeId)
+        const matchedSnapshot = wellnessSnapshots.find((snapshot) => {
+          const rawKeys = [snapshot.employeeId, snapshot.sourceEmployeeKey]
+          const normalizedKeys = rawKeys.map((key) => normalizeEmployeeKey(key)).filter(Boolean)
+          const matchRaw = rawKeys.some((key) => key && key === action.employeeId)
+          const matchNormalized =
+            normalizedActionKey && normalizedKeys.some((key) => key === normalizedActionKey)
+          return matchRaw || matchNormalized
+        })
+
+        const potentialUuid =
+          matchedSnapshot?.sourceEmployeeKey ??
+          matchedSnapshot?.employeeId ??
+          action.employeeId ??
+          null
+        const uuidRegex = /^[0-9a-fA-F-]{8}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{12}$/
         const employeeUuid =
-          possibleEmployeeKey && /^[0-9a-fA-F-]{8}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{12}$/.test(possibleEmployeeKey)
-            ? possibleEmployeeKey
-            : null
+          potentialUuid && uuidRegex.test(potentialUuid) ? potentialUuid : null
 
         const { error } = await supabase.from("wellness_nudge_actions").insert({
           nudge_id: action.nudgeId,
@@ -3471,12 +3489,20 @@ export default function AttendancePage() {
 
   const wellnessSnapshotMap = useMemo(() => {
     const map = new Map<string, WellnessSnapshot>()
+
     wellnessSnapshots.forEach((snapshot) => {
-      map.set(snapshot.employeeId, snapshot)
-      if (snapshot.sourceEmployeeKey) {
-        map.set(snapshot.sourceEmployeeKey, snapshot)
-      }
+      const rawKeys = [snapshot.employeeId, snapshot.sourceEmployeeKey]
+      const normalizedKeys = rawKeys
+        .map((key) => normalizeEmployeeKey(key))
+        .filter((key): key is string => Boolean(key))
+
+      rawKeys
+        .filter((key): key is string => Boolean(key))
+        .forEach((key) => map.set(key, snapshot))
+
+      normalizedKeys.forEach((key) => map.set(key, snapshot))
     })
+
     return map
   }, [wellnessSnapshots])
 
@@ -3573,9 +3599,10 @@ export default function AttendancePage() {
         100,
       )
 
+      const normalizedEmployeeKey = normalizeEmployeeKey(entry.employeeId)
       const snapshot =
-        wellnessSnapshotMap.get(entry.employeeId) ??
-        wellnessSnapshotMap.get(entry.employeeId?.toLowerCase().trim() ?? "")
+        (normalizedEmployeeKey ? wellnessSnapshotMap.get(normalizedEmployeeKey) : undefined) ??
+        wellnessSnapshotMap.get(entry.employeeId ?? "")
       const snapshotScore = snapshot ? calculateSnapshotWellbeingScore(snapshot) : null
       const wellbeingPenalty = snapshotScore !== null ? (100 - snapshotScore) * 0.6 : 0
       const combinedBurnout = clamp(attendanceBurnout + wellbeingPenalty, 0, 100)
