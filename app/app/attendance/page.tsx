@@ -298,6 +298,30 @@ interface ImportTemplate {
   size: string
 }
 
+interface WellnessDigest {
+  averageHours: number
+  overtimePerShift: number
+  remoteReliability: number
+  burnoutHotspots: number
+  wellbeingScore: number
+}
+
+interface WellnessNudge {
+  id: string
+  employeeId: string
+  employeeName: string
+  burnoutIndex: number
+  attendanceSummary: string
+  wellbeingSummary: string
+  recommendation: string
+  followUp: string
+  remoteReliability: number | null
+  overtimeAverage: number
+  latestDate: string
+}
+
+type EnrichedWellnessNudge = WellnessNudge & { acknowledged: boolean }
+
 interface AttendancePolicy {
   id: string
   name: string
@@ -1014,6 +1038,7 @@ export default function AttendancePage() {
       size: "8 KB",
     },
   ])
+  const [acknowledgedWellnessNudges, setAcknowledgedWellnessNudges] = useState<string[]>([])
 
   const [searchTerm, setSearchTerm] = useState("")
   const [dateFilter, setDateFilter] = useState<"today" | "yesterday" | "this-week" | "this-month" | "custom">("this-week")
@@ -1758,6 +1783,47 @@ export default function AttendancePage() {
     toast({
       title: "Template downloaded",
       description: `${template.name} sample saved to your device.`,
+    })
+  }
+
+  const getBurnoutBadgeClass = (score: number) => {
+    if (score >= 85) {
+      return "bg-rose-100 text-rose-700"
+    }
+    if (score >= 70) {
+      return "bg-amber-100 text-amber-700"
+    }
+    return "bg-emerald-100 text-emerald-700"
+  }
+
+  const getBurnoutLabel = (score: number) => {
+    if (score >= 85) {
+      return "High burnout risk"
+    }
+    if (score >= 70) {
+      return "Elevated burnout risk"
+    }
+    return "Healthy balance"
+  }
+
+  const handleScheduleWellnessCheckIn = (nudge: WellnessNudge) => {
+    toast({
+      title: "Wellness check-in queued",
+      description: `1:1 session for ${nudge.employeeName} added to the wellbeing pipeline.`,
+    })
+  }
+
+  const handleAcknowledgeWellnessNudge = (nudge: WellnessNudge) => {
+    setAcknowledgedWellnessNudges((previous) => {
+      if (previous.includes(nudge.id)) {
+        return previous
+      }
+      return [...previous, nudge.id]
+    })
+
+    toast({
+      title: "Nudge acknowledged",
+      description: `${nudge.employeeName}'s wellbeing plan recorded.`,
     })
   }
 
@@ -2997,6 +3063,159 @@ export default function AttendancePage() {
       },
     ]
     }, [attendanceRecords, complianceDevices, isWithinSelectedRange, policyAppliedLookup, slaBreaches])
+
+  const wellnessInsights = useMemo(() => {
+    const scopedRecords = attendanceRecords.filter((record) => isWithinSelectedRange(record.date))
+
+    if (!scopedRecords.length) {
+      const digest: WellnessDigest = {
+        averageHours: 0,
+        overtimePerShift: 0,
+        remoteReliability: 100,
+        burnoutHotspots: 0,
+        wellbeingScore: 100,
+      }
+      return { digest, nudges: [] as WellnessNudge[] }
+    }
+
+    const totalRecords = scopedRecords.length
+    const totalHours = scopedRecords.reduce((sum, record) => sum + record.totalHours, 0)
+    const totalOvertime = scopedRecords.reduce((sum, record) => sum + record.overtimeHours, 0)
+
+    const remoteRecords = scopedRecords.filter((record) => record.workingArrangement !== "onsite")
+    const remotePresent = remoteRecords.filter((record) => record.status === "present").length
+    const remoteReliability = remoteRecords.length ? (remotePresent / remoteRecords.length) * 100 : 100
+
+    const employeeAccumulator = new Map<
+      string,
+      {
+        employeeId: string
+        employeeName: string
+        totalRecords: number
+        lateDays: number
+        absenceDays: number
+        overtimeHours: number
+        totalHours: number
+        remoteDays: number
+        remotePresent: number
+        aiRiskSum: number
+        latestDate: string
+      }
+    >()
+
+    scopedRecords.forEach((record) => {
+      const key = record.employeeId || record.employeeName
+      const existing = employeeAccumulator.get(key)
+      if (existing) {
+        existing.totalRecords += 1
+        existing.totalHours += record.totalHours
+        existing.overtimeHours += record.overtimeHours
+        existing.aiRiskSum += record.aiRiskScore
+        if (record.status === "late") {
+          existing.lateDays += 1
+        }
+        if (record.status === "absent") {
+          existing.absenceDays += 1
+        }
+        if (record.workingArrangement !== "onsite") {
+          existing.remoteDays += 1
+          if (record.status === "present") {
+            existing.remotePresent += 1
+          }
+        }
+        if (record.date > existing.latestDate) {
+          existing.latestDate = record.date
+        }
+      } else {
+        employeeAccumulator.set(key, {
+          employeeId: key,
+          employeeName: record.employeeName,
+          totalRecords: 1,
+          totalHours: record.totalHours,
+          overtimeHours: record.overtimeHours,
+          aiRiskSum: record.aiRiskScore,
+          lateDays: record.status === "late" ? 1 : 0,
+          absenceDays: record.status === "absent" ? 1 : 0,
+          remoteDays: record.workingArrangement !== "onsite" ? 1 : 0,
+          remotePresent: record.workingArrangement !== "onsite" && record.status === "present" ? 1 : 0,
+          latestDate: record.date,
+        })
+      }
+    })
+
+    const employeeNudges = Array.from(employeeAccumulator.values()).map((entry) => {
+      const overtimeAverage = entry.overtimeHours / entry.totalRecords
+      const attendancePressure = ((entry.lateDays + entry.absenceDays) / entry.totalRecords) * 100
+      const remoteReliabilityEmployee = entry.remoteDays ? (entry.remotePresent / entry.remoteDays) * 100 : null
+      const aiRiskAverage = entry.aiRiskSum / entry.totalRecords
+      const burnoutIndex = clamp(
+        overtimeAverage * 18 +
+          attendancePressure * 0.4 +
+          aiRiskAverage * 60 +
+          (remoteReliabilityEmployee !== null ? (100 - remoteReliabilityEmployee) * 0.25 : 0),
+        0,
+        100,
+      )
+
+      const recommendation =
+        burnoutIndex >= 85
+          ? "Book wellness day and alert HR wellbeing partner."
+          : burnoutIndex >= 70
+            ? "Line manager to schedule focused coaching and encourage PTO."
+            : "Send positive reinforcement with micro-break reminders."
+
+      const followUp =
+        burnoutIndex >= 80
+          ? "Schedule 1:1 wellbeing check-in."
+          : remoteReliabilityEmployee !== null && remoteReliabilityEmployee < 75
+            ? "Reinforce hybrid routines & geo compliance."
+            : "Share mindfulness resources and hydration prompts."
+
+      return {
+        id: `wellness-${entry.employeeId}`,
+        employeeId: entry.employeeId,
+        employeeName: entry.employeeName,
+        burnoutIndex: Number(burnoutIndex.toFixed(1)),
+        attendanceSummary: `${entry.lateDays} late • ${entry.absenceDays} absent • OT ${overtimeAverage.toFixed(1)}h`,
+        wellbeingSummary: `Avg hours ${(entry.totalHours / entry.totalRecords).toFixed(1)}h • ${
+          remoteReliabilityEmployee !== null ? `Remote reliability ${remoteReliabilityEmployee.toFixed(0)}%` : "Onsite cohort"
+        }`,
+        recommendation,
+        followUp,
+        remoteReliability: remoteReliabilityEmployee,
+        overtimeAverage: Number(overtimeAverage.toFixed(1)),
+        latestDate: entry.latestDate,
+      } as WellnessNudge
+    })
+
+    const sortedNudges = employeeNudges
+      .filter((nudge) => nudge.burnoutIndex >= 45 || nudge.overtimeAverage >= 1)
+      .sort((first, second) => second.burnoutIndex - first.burnoutIndex)
+      .slice(0, 4)
+
+    const burnoutHotspots = sortedNudges.filter((nudge) => nudge.burnoutIndex >= 70).length
+    const wellbeingScoreRaw = employeeNudges.length
+      ? 100 - employeeNudges.reduce((sum, nudge) => sum + nudge.burnoutIndex, 0) / employeeNudges.length
+      : 100
+    const wellbeingScore = clamp(wellbeingScoreRaw, 0, 100)
+
+    const digest: WellnessDigest = {
+      averageHours: Number((totalHours / totalRecords).toFixed(1)),
+      overtimePerShift: Number((totalOvertime / totalRecords).toFixed(1)),
+      remoteReliability: Number(remoteReliability.toFixed(0)),
+      burnoutHotspots,
+      wellbeingScore: Number(wellbeingScore.toFixed(0)),
+    }
+
+    return { digest, nudges: sortedNudges }
+  }, [attendanceRecords, isWithinSelectedRange])
+
+  const wellnessNudges = useMemo<EnrichedWellnessNudge[]>(() => {
+    return wellnessInsights.nudges.map((nudge) => ({
+      ...nudge,
+      acknowledged: acknowledgedWellnessNudges.includes(nudge.id),
+    }))
+  }, [acknowledgedWellnessNudges, wellnessInsights])
 
   const approvalStats = useMemo(() => {
     const total = approvalRequests.length
@@ -4819,232 +5038,346 @@ export default function AttendancePage() {
             </TabsContent>
 
             <TabsContent value="automation" className="space-y-6">
-              <div className="grid gap-4 lg:grid-cols-2">
-                <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
-                  <BellRing className="h-5 w-5 text-amber-500" /> Missed attendee alerts
-                </CardTitle>
-                <CardDescription>Configure automated nudges when employees miss check-in targets.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">Enable alerts</p>
-                    <p className="text-xs text-slate-500">Send alert when AI detects missing check-ins.</p>
-                  </div>
-                  <Switch checked={alertSettings.enabled} onCheckedChange={(checked) => setAlertSettings((previous) => ({ ...previous, enabled: checked }))} />
-                </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <Label htmlFor="alert-time">Alert time</Label>
-                      <Input
-                        id="alert-time"
-                        type="time"
-                        value={alertSettings.time}
-                        onChange={(event) => setAlertSettings((previous) => ({ ...previous, time: event.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label>Delivery channel</Label>
-                      <Select
-                        value={alertSettings.deliveryChannel}
-                        onValueChange={(value) =>
-                          setAlertSettings((previous) => ({
-                            ...previous,
-                            deliveryChannel: value as AlertSettings["deliveryChannel"],
-                          }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="email">Email digest</SelectItem>
-                          <SelectItem value="sms">SMS text</SelectItem>
-                          <SelectItem value="push">Mobile push</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Communication stream</Label>
-                    {communicationChannels.length > 0 ? (
-                      <Select
-                        value={alertSettings.communicationChannelId ?? ""}
-                        onValueChange={(value) =>
-                          setAlertSettings((previous) => ({
-                            ...previous,
-                            communicationChannelId: value,
-                          }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select channel" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {communicationChannels.map((channel) => (
-                            <SelectItem key={channel.id} value={channel.id}>
-                              {channel.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <p className="text-xs text-slate-500">
-                        Communication service unavailable. Alerts will default to {defaultCommunicationChannelId}.
-                      </p>
-                    )}
-                  </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="flex items-center justify-between rounded border p-3">
-                    <div>
-                      <p className="text-sm font-medium text-slate-800">Escalate to managers</p>
-                      <p className="text-xs text-slate-500">Notify direct leads</p>
-                    </div>
-                    <Switch
-                      checked={alertSettings.escalateToManagers}
-                      onCheckedChange={(checked) => setAlertSettings((previous) => ({ ...previous, escalateToManagers: checked }))}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between rounded border p-3">
-                    <div>
-                      <p className="text-sm font-medium text-slate-800">Include contractors</p>
-                      <p className="text-xs text-slate-500">Send alerts to partner staff</p>
-                    </div>
-                    <Switch
-                      checked={alertSettings.includeContractors}
-                      onCheckedChange={(checked) => setAlertSettings((previous) => ({ ...previous, includeContractors: checked }))}
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleSaveAlertSettings}>Save preferences</Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
-                  <Settings2 className="h-5 w-5 text-indigo-500" /> Holiday & blackout calendar
-                </CardTitle>
-                <CardDescription>HR can define holidays or location-specific blackout days. Attendance auto-adjusts.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">Upcoming holidays</p>
-                    <p className="text-xs text-slate-500">Synced with payroll & leave management</p>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => setHolidayDialogOpen(true)}>
-                    <Plus className="mr-1 h-3 w-3" /> Add
-                  </Button>
-                </div>
-                <div className="space-y-3">
-                  {holidays.map((holiday) => (
-                    <div
-                      key={holiday.id}
-                      className="flex flex-col gap-2 rounded border border-slate-200 p-3 text-sm text-slate-700 md:flex-row md:items-center md:justify-between"
-                    >
+              <div className="grid gap-4">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                        <BellRing className="h-5 w-5 text-amber-500" /> Missed attendee alerts
+                      </CardTitle>
+                      <CardDescription>Configure automated nudges when employees miss check-in targets.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">Enable alerts</p>
+                          <p className="text-xs text-slate-500">Send alert when AI detects missing check-ins.</p>
+                        </div>
+                        <Switch
+                          checked={alertSettings.enabled}
+                          onCheckedChange={(checked) => setAlertSettings((previous) => ({ ...previous, enabled: checked }))}
+                        />
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <Label htmlFor="alert-time">Alert time</Label>
+                          <Input
+                            id="alert-time"
+                            type="time"
+                            value={alertSettings.time}
+                            onChange={(event) => setAlertSettings((previous) => ({ ...previous, time: event.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <Label>Delivery channel</Label>
+                          <Select
+                            value={alertSettings.deliveryChannel}
+                            onValueChange={(value) =>
+                              setAlertSettings((previous) => ({
+                                ...previous,
+                                deliveryChannel: value as AlertSettings["deliveryChannel"],
+                              }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="email">Email digest</SelectItem>
+                              <SelectItem value="sms">SMS text</SelectItem>
+                              <SelectItem value="push">Mobile push</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
                       <div>
-                        <p className="font-medium text-slate-900">{holiday.name}</p>
-                        <p className="text-xs text-slate-500">
-                          {new Date(holiday.date).toLocaleDateString()} • {holiday.scope === "company" ? "Company-wide" : holiday.scope === "subsidiary" ? holiday.scopeReference : `${holiday.scopeReference} team`}
-                        </p>
-                        {holiday.notes && <p className="text-xs text-slate-500">{holiday.notes}</p>}
+                        <Label>Communication stream</Label>
+                        {communicationChannels.length > 0 ? (
+                          <Select
+                            value={alertSettings.communicationChannelId ?? ""}
+                            onValueChange={(value) =>
+                              setAlertSettings((previous) => ({
+                                ...previous,
+                                communicationChannelId: value,
+                              }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select channel" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {communicationChannels.map((channel) => (
+                                <SelectItem key={channel.id} value={channel.id}>
+                                  {channel.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <p className="text-xs text-slate-500">
+                            Communication service unavailable. Alerts will default to {defaultCommunicationChannelId}.
+                          </p>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2 self-start md:self-end">
-                        <Badge className={holiday.isPaid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}>
-                          {holiday.isPaid ? "Paid" : "Unpaid"}
-                        </Badge>
-                        <Button size="sm" variant="ghost" onClick={() => handleRemoveHoliday(holiday.id)}>
-                          Remove
-                        </Button>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="flex items-center justify-between rounded border p-3">
+                          <div>
+                            <p className="text-sm font-medium text-slate-800">Escalate to managers</p>
+                            <p className="text-xs text-slate-500">Notify direct leads</p>
+                          </div>
+                          <Switch
+                            checked={alertSettings.escalateToManagers}
+                            onCheckedChange={(checked) =>
+                              setAlertSettings((previous) => ({ ...previous, escalateToManagers: checked }))
+                            }
+                          />
+                        </div>
+                        <div className="flex items-center justify-between rounded border p-3">
+                          <div>
+                            <p className="text-sm font-medium text-slate-800">Include contractors</p>
+                            <p className="text-xs text-slate-500">Send alerts to partner staff</p>
+                          </div>
+                          <Switch
+                            checked={alertSettings.includeContractors}
+                            onCheckedChange={(checked) =>
+                              setAlertSettings((previous) => ({ ...previous, includeContractors: checked }))
+                            }
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {!holidays.length && <p className="text-xs text-slate-500">No holidays defined yet.</p>}
-                </div>
-              </CardContent>
-            </Card>
+                      <Button onClick={handleSaveAlertSettings}>Save preferences</Button>
+                    </CardContent>
+                  </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
-                <ShieldCheck className="h-5 w-5 text-emerald-500" /> Attendance policy automation
-              </CardTitle>
-              <CardDescription>Grace periods, rounding, and penalties applied automatically.</CardDescription>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={handleOpenNewPolicyDialog}>
-                  <Plus className="mr-2 h-4 w-4" /> New policy
-                </Button>
-                <Button size="sm" variant="outline" onClick={loadAttendancePolicies}>
-                  <RefreshCw className="mr-2 h-4 w-4" /> Refresh
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-slate-600">
-              {isLoadingPolicies ? (
-                <p className="text-xs text-slate-500">Loading attendance policies…</p>
-              ) : policies.length ? (
-                policies.map((policy) => (
-                  <div
-                    key={policy.id}
-                    className="flex flex-col gap-2 rounded border border-slate-200 bg-white p-3 shadow-sm md:flex-row md:items-center md:justify-between"
-                  >
-                    <div>
-                      <p className="font-semibold text-slate-900">{policy.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {policy.policy_type === "grace"
-                          ? `Grace period ${policy.grace_minutes ?? 0} min`
-                          : policy.policy_type.replace(/^\w/, (char) => char.toUpperCase())}
-                        {" • "}
-                        Scope {policy.scope_type}
-                      </p>
-                      {policy.penalty_type && (
-                        <p className="text-xs text-rose-600">
-                          Penalty: {policy.penalty_type}
-                          {policy.penalty_value ? ` (${policy.penalty_value})` : ""}
-                        </p>
-                      )}
-                      <p className="text-[11px] text-slate-400">
-                        {policy.effective_from} — {policy.effective_to ?? "No end date"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Switch
-                        checked={policy.is_active}
-                        onCheckedChange={() => handleTogglePolicyActive(policy)}
-                        aria-label="Toggle policy activation"
-                      />
-                      <Button size="sm" variant="outline" onClick={() => handleEditPolicy(policy)}>
-                        Edit
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                        <Activity className="h-5 w-5 text-emerald-500" /> Wellness nudges & burnout radar
+                      </CardTitle>
+                      <CardDescription>
+                        Blends attendance signals with wellbeing KPIs to coach teams proactively.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded border border-slate-200 bg-white/60 p-3">
+                          <p className="text-[11px] uppercase text-slate-500">Average shift hours</p>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {wellnessInsights.digest.averageHours}h
+                          </p>
+                          <p className="text-[11px] text-slate-500">Target 8h</p>
+                        </div>
+                        <div className="rounded border border-slate-200 bg-white/60 p-3">
+                          <p className="text-[11px] uppercase text-slate-500">Overtime per shift</p>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {wellnessInsights.digest.overtimePerShift}h
+                          </p>
+                          <p className="text-[11px] text-slate-500">Over 1.5h triggers coaching</p>
+                        </div>
+                        <div className="rounded border border-slate-200 bg-white/60 p-3">
+                          <p className="text-[11px] uppercase text-slate-500">Remote reliability</p>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {wellnessInsights.digest.remoteReliability}%
+                          </p>
+                          <p className="text-[11px] text-slate-500">Current date filter</p>
+                        </div>
+                        <div className="rounded border border-slate-200 bg-white/60 p-3">
+                          <p className="text-[11px] uppercase text-slate-500">Burnout hotspots</p>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {wellnessInsights.digest.burnoutHotspots}
+                          </p>
+                          <p className="text-[11px] text-slate-500">Flagged cohorts</p>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        {wellnessNudges.length ? (
+                          wellnessNudges.map((nudge) => (
+                            <div
+                              key={nudge.id}
+                              className="space-y-2 rounded border border-slate-200 bg-white p-3 shadow-sm"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <p className="text-sm font-semibold text-slate-900">{nudge.employeeName}</p>
+                                  <p className="text-xs text-slate-500">{nudge.attendanceSummary}</p>
+                                  <p className="text-xs text-slate-500">{nudge.wellbeingSummary}</p>
+                                  <p className="text-[11px] text-slate-400">
+                                    Last variance {new Date(nudge.latestDate).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <Badge className={`${getBurnoutBadgeClass(nudge.burnoutIndex)} whitespace-nowrap`}>
+                                  {nudge.burnoutIndex}% risk
+                                </Badge>
+                              </div>
+                              <p className="text-xs font-medium text-slate-600">{getBurnoutLabel(nudge.burnoutIndex)}</p>
+                              <Progress value={nudge.burnoutIndex} className="h-1.5" />
+                              <p className="text-xs text-slate-600">{nudge.recommendation}</p>
+                              <p className="text-xs text-slate-500">Next step: {nudge.followUp}</p>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-[11px]"
+                                  onClick={() => handleScheduleWellnessCheckIn(nudge)}
+                                >
+                                  Schedule check-in
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="h-7 text-[11px]"
+                                  onClick={() => handleAcknowledgeWellnessNudge(nudge)}
+                                  disabled={nudge.acknowledged}
+                                >
+                                  {nudge.acknowledged ? "Acknowledged" : "Acknowledge"}
+                                </Button>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-xs text-slate-500">No wellbeing nudges for the selected range.</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                      <Settings2 className="h-5 w-5 text-indigo-500" /> Holiday & blackout calendar
+                    </CardTitle>
+                    <CardDescription>
+                      HR can define holidays or location-specific blackout days. Attendance auto-adjusts.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">Upcoming holidays</p>
+                        <p className="text-xs text-slate-500">Synced with payroll & leave management</p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => setHolidayDialogOpen(true)}>
+                        <Plus className="mr-1 h-3 w-3" /> Add
                       </Button>
                     </div>
+                    <div className="space-y-3">
+                      {holidays.map((holiday) => (
+                        <div
+                          key={holiday.id}
+                          className="flex flex-col gap-2 rounded border border-slate-200 p-3 text-sm text-slate-700 md:flex-row md:items-center md:justify-between"
+                        >
+                          <div>
+                            <p className="font-medium text-slate-900">{holiday.name}</p>
+                            <p className="text-xs text-slate-500">
+                              {new Date(holiday.date).toLocaleDateString()} •{" "}
+                              {holiday.scope === "company"
+                                ? "Company-wide"
+                                : holiday.scope === "subsidiary"
+                                  ? holiday.scopeReference
+                                  : `${holiday.scopeReference} team`}
+                            </p>
+                            {holiday.notes && <p className="text-xs text-slate-500">{holiday.notes}</p>}
+                          </div>
+                          <div className="flex items-center gap-2 self-start md:self-end">
+                            <Badge
+                              className={holiday.isPaid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}
+                            >
+                              {holiday.isPaid ? "Paid" : "Unpaid"}
+                            </Badge>
+                            <Button size="sm" variant="ghost" onClick={() => handleRemoveHoliday(holiday.id)}>
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      {!holidays.length && <p className="text-xs text-slate-500">No holidays defined yet.</p>}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                    <ShieldCheck className="h-5 w-5 text-emerald-500" /> Attendance policy automation
+                  </CardTitle>
+                  <CardDescription>Grace periods, rounding, and penalties applied automatically.</CardDescription>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={handleOpenNewPolicyDialog}>
+                      <Plus className="mr-2 h-4 w-4" /> New policy
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={loadAttendancePolicies}>
+                      <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+                    </Button>
                   </div>
-                ))
-              ) : (
-                <p className="text-xs text-slate-500">No automation policies defined yet.</p>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
-                <Download className="h-5 w-5 text-emerald-500" /> Timesheet automations
-              </CardTitle>
-              <CardDescription>Export payroll-ready timesheets or push variances into payroll review.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm text-slate-600">
+                  {isLoadingPolicies ? (
+                    <p className="text-xs text-slate-500">Loading attendance policies…</p>
+                  ) : policies.length ? (
+                    policies.map((policy) => (
+                      <div
+                        key={policy.id}
+                        className="flex flex-col gap-2 rounded border border-slate-200 bg-white p-3 shadow-sm md:flex-row md:items-center md:justify-between"
+                      >
+                        <div>
+                          <p className="font-semibold text-slate-900">{policy.name}</p>
+                          <p className="text-xs text-slate-500">
+                            {policy.policy_type === "grace"
+                              ? `Grace period ${policy.grace_minutes ?? 0} min`
+                              : policy.policy_type.replace(/^\w/, (char) => char.toUpperCase())}
+                            {" • "}
+                            Scope {policy.scope_type}
+                          </p>
+                          {policy.penalty_type && (
+                            <p className="text-xs text-rose-600">
+                              Penalty: {policy.penalty_type}
+                              {policy.penalty_value ? ` (${policy.penalty_value})` : ""}
+                            </p>
+                          )}
+                          <p className="text-[11px] text-slate-400">
+                            {policy.effective_from} — {policy.effective_to ?? "No end date"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            checked={policy.is_active}
+                            onCheckedChange={() => handleTogglePolicyActive(policy)}
+                            aria-label="Toggle policy activation"
+                          />
+                          <Button size="sm" variant="outline" onClick={() => handleEditPolicy(policy)}>
+                            Edit
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-500">No automation policies defined yet.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                    <Download className="h-5 w-5 text-emerald-500" /> Timesheet automations
+                  </CardTitle>
+                  <CardDescription>Export payroll-ready timesheets or push variances into payroll review.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2 rounded border border-slate-200 p-4">
                     <p className="text-sm font-medium text-slate-800">Weekly CSV export</p>
-                    <p className="text-xs text-slate-500">Compile timesheet CSV filtered by current date range and filters.</p>
+                    <p className="text-xs text-slate-500">
+                      Compile timesheet CSV filtered by current date range and filters.
+                    </p>
                     <Button onClick={() => handleExport("Timesheet CSV")} className="w-full">
                       <Download className="mr-2 h-4 w-4" /> Export CSV
                     </Button>
                   </div>
                   <div className="space-y-2 rounded border border-slate-200 p-4">
                     <p className="text-sm font-medium text-slate-800">Sync to payroll</p>
-                    <p className="text-xs text-slate-500">Push approved hours and overtime variances into payroll staging.</p>
+                    <p className="text-xs text-slate-500">
+                      Push approved hours and overtime variances into payroll staging.
+                    </p>
                     <Button
                       variant="outline"
                       className="w-full"
@@ -5058,11 +5391,10 @@ export default function AttendancePage() {
                       <RefreshCw className="mr-2 h-4 w-4" /> Queue sync
                     </Button>
                   </div>
-            </CardContent>
-          </Card>
-          </div>
-
-          <Dialog open={holidayDialogOpen} onOpenChange={setHolidayDialogOpen}>
+                </CardContent>
+              </Card>
+            
+            <Dialog open={holidayDialogOpen} onOpenChange={setHolidayDialogOpen}>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Schedule a holiday / blackout day</DialogTitle>
