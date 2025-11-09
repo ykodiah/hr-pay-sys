@@ -138,33 +138,44 @@ export async function submitOvertimeRequest(request: {
 }
 
 // Create attendance dispute
-export async function createAttendanceDispute(recordId: string, disputeReason: string, proposedCorrection: any) {
+export async function createAttendanceDispute(params: {
+  attendanceRecordId: string
+  employeeId: string
+  reason: string
+  proposedClockIn: string
+  proposedClockOut?: string
+  companyId: string
+}) {
   const supabase = await createClient()
-  const employeeId = await getCurrentEmployeeId()
 
   // Verify the record belongs to the employee
   const { data: record } = await supabase
     .from("attendance_records")
     .select("*")
-    .eq("id", recordId)
-    .eq("employee_id", employeeId)
+    .eq("id", params.attendanceRecordId)
+    .eq("employee_id", params.employeeId)
     .single()
 
   if (!record) throw new Error("Record not found or unauthorized")
 
-  // Update record to mark as requiring approval
+  // Create dispute record
   const { data, error } = await supabase
-    .from("attendance_records")
-    .update({
-      requires_approval: true,
-      notes: `DISPUTE: ${disputeReason}\nProposed: ${JSON.stringify(proposedCorrection)}\n\nOriginal Notes: ${record.notes || ""}`,
+    .from("attendance_disputes")
+    .insert({
+      attendance_record_id: params.attendanceRecordId,
+      employee_id: params.employeeId,
+      company_id: params.companyId,
+      dispute_reason: params.reason,
+      proposed_clock_in: params.proposedClockIn,
+      proposed_clock_out: params.proposedClockOut,
+      status: "pending",
     })
-    .eq("id", recordId)
     .select()
     .single()
 
   if (error) throw error
 
+  revalidatePath("/self-service/attendance")
   revalidatePath("/app/my-attendance")
   return data
 }
@@ -184,5 +195,37 @@ export async function getMyShiftSchedule() {
     .eq("is_active", true)
 
   if (error) throw error
+  return data
+}
+
+// Create overtime request
+export async function createOvertimeRequest(params: {
+  employeeId: string
+  date: string
+  hoursRequested: number
+  reason: string
+  companyId: string
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("overtime_requests")
+    .insert({
+      employee_id: params.employeeId,
+      company_id: params.companyId,
+      request_date: params.date,
+      hours_requested: params.hoursRequested,
+      overtime_type: "regular",
+      reason: params.reason,
+      status: "pending",
+      requested_by: params.employeeId,
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+
+  revalidatePath("/self-service/attendance")
+  revalidatePath("/app/my-attendance")
   return data
 }

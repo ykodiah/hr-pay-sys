@@ -32,6 +32,7 @@ import {
   X,
   AlertTriangle,
   DoorOpen,
+  Clock,
 } from "lucide-react"
 import { Logo } from "@/components/logo"
 
@@ -283,6 +284,13 @@ export default function SelfServiceLayout({
 
             <div className="pt-4">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Requests</p>
+              <a
+                href="/self-service/attendance"
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <Clock className="w-5 h-5" />
+                <span>My Attendance</span>
+              </a>
               <a
                 href="/self-service/leave"
                 className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
